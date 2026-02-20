@@ -1,0 +1,26 @@
+{
+  "name": "@om/mobile",
+  "private": true,
+  "version": "0.0.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@om/shared": "0.0.0",
+    "@supabase/supabase-js": "^2.49.0",
+    "expo": "~52.0.0",
+    "expo-constants": "~17.0.0",
+    "expo-linking": "~7.0.0",
+    "expo-router": "~4.0.0",
+    "expo-status-bar": "~2.0.0",
+    "react": "^19.0.0",
+    "react-native": "0.76.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.6.0"
+  }
+}
+

@@ -1,0 +1,14 @@
+{
+  "name": "om-library-app",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm -w @om/web run dev",
+    "dev:mobile": "npm -w @om/mobile run dev",
+    "typecheck": "npm -ws run typecheck"
+  }
+}
+
