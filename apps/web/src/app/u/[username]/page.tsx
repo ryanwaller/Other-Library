@@ -1,5 +1,5 @@
-export default function PublicProfilePage({ params }: { params: { username: string } }) {
-  const { username } = params;
+export default async function PublicProfilePage({ params }: { params: Promise<{ username: string }> }) {
+  const { username } = await params;
   return (
     <main className="container">
       <div className="card">
