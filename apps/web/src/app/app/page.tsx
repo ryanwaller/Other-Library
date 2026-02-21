@@ -145,6 +145,7 @@ function AppShell({
         <div>Other Library</div>
         <div className="row">
           <span className="muted">{profile ? `@${profile.username}` : userId}</span>
+          <Link href="/app/settings">Settings</Link>
           <button onClick={() => supabase?.auth.signOut()}>Sign out</button>
         </div>
       </div>

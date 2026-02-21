@@ -501,6 +501,7 @@ export default function BookDetailPage() {
           <Link href="/app">← Back</Link>
         </div>
         <div className="row">
+          <Link href="/app/settings">Settings</Link>
           {session ? <button onClick={() => supabase?.auth.signOut()}>Sign out</button> : null}
         </div>
       </div>
