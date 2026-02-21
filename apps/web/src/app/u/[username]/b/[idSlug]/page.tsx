@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
 
@@ -33,6 +33,7 @@ function parseBookId(idSlug: string): number | null {
 
 export default async function PublicBookPage({ params }: { params: Promise<{ username: string; idSlug: string }> }) {
   const { username, idSlug } = await params;
+  const usernameNorm = (username ?? "").trim().toLowerCase();
   const bookId = parseBookId(idSlug);
   const supabase = getServerSupabase();
 
@@ -56,10 +57,20 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     );
   }
 
+  if (usernameNorm && usernameNorm !== username) {
+    permanentRedirect(`/u/${usernameNorm}/b/${idSlug}`);
+  }
+
+  const aliasRes = await supabase.from("username_aliases").select("current_username").eq("old_username", usernameNorm).maybeSingle();
+  const alias = (aliasRes.data as any)?.current_username as string | undefined;
+  if (alias && alias !== usernameNorm) {
+    permanentRedirect(`/u/${alias}/b/${idSlug}`);
+  }
+
   const profileRes = await supabase
     .from("profiles")
     .select("id,username,display_name,bio,visibility")
-    .eq("username", username)
+    .eq("username", usernameNorm)
     .maybeSingle();
 
   const profile = profileRes.data as any;
@@ -104,7 +115,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const effectiveTitle = (book.title_override ?? "").trim() || book.edition?.title || "(untitled)";
   const canonical = bookIdSlug(book.id, effectiveTitle);
   if (idSlug !== canonical) {
-    redirect(`/u/${profile.username}/b/${canonical}`);
+    permanentRedirect(`/u/${profile.username}/b/${canonical}`);
   }
 
   const effectiveAuthors =

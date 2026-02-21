@@ -1,3 +1,4 @@
+import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../lib/supabaseServer";
 import Link from "next/link";
 import { bookIdSlug } from "../../../lib/slug";
@@ -13,6 +14,7 @@ type PublicBook = {
 
 export default async function PublicProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
+  const usernameNorm = (username ?? "").trim().toLowerCase();
   const supabase = getServerSupabase();
 
   if (!supabase) {
@@ -25,10 +27,20 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     );
   }
 
+  if (usernameNorm && usernameNorm !== username) {
+    permanentRedirect(`/u/${usernameNorm}`);
+  }
+
+  const aliasRes = await supabase.from("username_aliases").select("current_username").eq("old_username", usernameNorm).maybeSingle();
+  const alias = (aliasRes.data as any)?.current_username as string | undefined;
+  if (alias && alias !== usernameNorm) {
+    permanentRedirect(`/u/${alias}`);
+  }
+
   const profileRes = await supabase
     .from("profiles")
     .select("id,username,display_name,bio,visibility")
-    .eq("username", username)
+    .eq("username", usernameNorm)
     .maybeSingle();
 
   const profile = profileRes.data as any;
