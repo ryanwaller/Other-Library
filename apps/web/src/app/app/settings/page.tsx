@@ -78,13 +78,24 @@ export default function SettingsPage() {
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
 
-  const [profile, setProfile] = useState<{ username: string; display_name: string | null; visibility: string } | null>(null);
+  const [profile, setProfile] = useState<{ username: string; display_name: string | null; bio: string | null; visibility: string } | null>(null);
   const [aliases, setAliases] = useState<Array<{ old_username: string; created_at: string }>>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [newUsername, setNewUsername] = useState("");
   const [changeState, setChangeState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+
+  const [profileForm, setProfileForm] = useState<{ display_name: string; bio: string; visibility: "followers_only" | "public" }>({
+    display_name: "",
+    bio: "",
+    visibility: "followers_only"
+  });
+  const [profileSaveState, setProfileSaveState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
     message: null
@@ -103,10 +114,18 @@ export default function SettingsPage() {
       if (!supabase || !userId) return;
       setBusy(true);
       setError(null);
-      const res = await supabase.from("profiles").select("username,display_name,visibility").eq("id", userId).maybeSingle();
+      const res = await supabase.from("profiles").select("username,display_name,bio,visibility").eq("id", userId).maybeSingle();
       if (!alive) return;
       if (res.error) setError(res.error.message);
-      setProfile((res.data as any) ?? null);
+      const nextProfile = ((res.data as any) ?? null) as typeof profile;
+      setProfile(nextProfile);
+      if (nextProfile) {
+        setProfileForm({
+          display_name: (nextProfile.display_name ?? "") as string,
+          bio: (nextProfile.bio ?? "") as string,
+          visibility: (nextProfile.visibility === "public" ? "public" : "followers_only") as any
+        });
+      }
       setBusy(false);
     })();
     return () => {
@@ -155,6 +174,24 @@ export default function SettingsPage() {
     setProfile((p) => (p ? { ...p, username: actualNext } : p));
     setNewUsername("");
     setChangeState({ busy: false, error: null, message: actualPrev !== actualNext ? `Saved (@${actualPrev} → @${actualNext})` : "Saved" });
+  }
+
+  async function saveProfile() {
+    if (!supabase || !userId) return;
+    setProfileSaveState({ busy: true, error: null, message: "Saving…" });
+    const payload = {
+      display_name: profileForm.display_name.trim() ? profileForm.display_name.trim() : null,
+      bio: profileForm.bio.trim() ? profileForm.bio.trim() : null,
+      visibility: profileForm.visibility
+    };
+    const res = await supabase.from("profiles").update(payload).eq("id", userId).select("username,display_name,bio,visibility").maybeSingle();
+    if (res.error) {
+      setProfileSaveState({ busy: false, error: res.error.message, message: "Failed" });
+      return;
+    }
+    const nextProfile = ((res.data as any) ?? null) as typeof profile;
+    if (nextProfile) setProfile(nextProfile);
+    setProfileSaveState({ busy: false, error: null, message: "Saved" });
   }
 
   if (!supabase) {
@@ -242,9 +279,66 @@ export default function SettingsPage() {
           </div>
 
           <div style={{ marginTop: 16 }} className="card">
-            <div>Coming soon</div>
-            <div className="muted" style={{ marginTop: 8 }}>
-              Display name, profile bio, notification settings, and privacy controls will live here.
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <div>Profile</div>
+              <div className="muted">
+                {profileSaveState.message
+                  ? profileSaveState.error
+                    ? `${profileSaveState.message} (${profileSaveState.error})`
+                    : profileSaveState.message
+                  : ""}
+              </div>
+            </div>
+
+            <div className="row" style={{ marginTop: 10 }}>
+              <div style={{ width: 120 }} className="muted">
+                Display name
+              </div>
+              <input
+                value={profileForm.display_name}
+                onChange={(e) => setProfileForm((p) => ({ ...p, display_name: e.target.value }))}
+                placeholder="(optional)"
+                style={{ width: 360 }}
+              />
+            </div>
+
+            <div className="row" style={{ marginTop: 10, alignItems: "flex-start" }}>
+              <div style={{ width: 120 }} className="muted">
+                Bio
+              </div>
+              <textarea
+                value={profileForm.bio}
+                onChange={(e) => setProfileForm((p) => ({ ...p, bio: e.target.value }))}
+                placeholder="(optional)"
+                style={{ width: 360, height: 110 }}
+              />
+            </div>
+
+            <div className="row" style={{ marginTop: 10 }}>
+              <div style={{ width: 120 }} className="muted">
+                Library visibility
+              </div>
+              <select
+                value={profileForm.visibility}
+                onChange={(e) => setProfileForm((p) => ({ ...p, visibility: (e.target.value === "public" ? "public" : "followers_only") as any }))}
+              >
+                <option value="followers_only">followers_only</option>
+                <option value="public">public</option>
+              </select>
+              <div className="muted">
+                {profileForm.visibility === "public" ? "Anyone can view /u/username" : "Only approved followers (and public book overrides)."}
+              </div>
+            </div>
+
+            <div className="row" style={{ marginTop: 12 }}>
+              <button onClick={saveProfile} disabled={profileSaveState.busy}>
+                {profileSaveState.busy ? "Saving…" : "Save profile"}
+              </button>
+              {profile ? (
+                <a href={`/u/${profile.username}`} target="_blank" rel="noreferrer" className="muted">
+                  View public profile
+                </a>
+              ) : null}
             </div>
           </div>
         </div>
