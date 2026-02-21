@@ -105,6 +105,39 @@ function AppShell({
     }>
   >([]);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [gridCols, setGridCols] = useState<2 | 4 | 8>(4);
+  const [sortMode, setSortMode] = useState<"latest" | "earliest" | "title_asc" | "title_desc">("latest");
+  const [categoryMode, setCategoryMode] = useState<"all" | "art_books" | "fiction">("all");
+  const [deleteStateByBookId, setDeleteStateByBookId] = useState<Record<number, { busy: boolean; error: string | null; message: string | null } | undefined>>(
+    {}
+  );
+
+  useEffect(() => {
+    try {
+      const vm = window.localStorage.getItem("om_viewMode");
+      const gc = window.localStorage.getItem("om_gridCols");
+      const sm = window.localStorage.getItem("om_sortMode");
+      const cm = window.localStorage.getItem("om_categoryMode");
+      if (vm === "grid" || vm === "list") setViewMode(vm);
+      if (gc === "2" || gc === "4" || gc === "8") setGridCols(Number(gc) as any);
+      if (sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
+      if (cm === "all" || cm === "art_books" || cm === "fiction") setCategoryMode(cm);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("om_viewMode", viewMode);
+      window.localStorage.setItem("om_gridCols", String(gridCols));
+      window.localStorage.setItem("om_sortMode", sortMode);
+      window.localStorage.setItem("om_categoryMode", categoryMode);
+    } catch {
+      // ignore
+    }
+  }, [viewMode, gridCols, sortMode, categoryMode]);
 
   const header = useMemo(() => {
     return (
@@ -324,6 +357,53 @@ function AppShell({
     }));
   }
 
+  function categoryTagName(mode: "all" | "art_books" | "fiction"): string | null {
+    if (mode === "art_books") return "art books";
+    if (mode === "fiction") return "fiction";
+    return null;
+  }
+
+  async function deleteEntry(userBookId: number) {
+    if (!supabase) return;
+    if (!window.confirm("Delete this entry?")) return;
+
+    setDeleteStateByBookId((prev) => ({
+      ...prev,
+      [userBookId]: { busy: true, error: null, message: "Deleting…" }
+    }));
+
+    try {
+      const it = items.find((x) => x.id === userBookId) ?? null;
+      const paths = (it?.media ?? [])
+        .map((m) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
+        .filter(Boolean);
+
+      if (paths.length > 0) {
+        const rm = await supabase.storage.from("user-book-media").remove(paths);
+        if (rm.error) {
+          // continue; we'll still delete the DB record
+        }
+      }
+
+      const del = await supabase.from("user_books").delete().eq("id", userBookId);
+      if (del.error) throw new Error(del.error.message);
+
+      await refreshCatalog();
+      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true });
+      setUserBooksCount(count ?? 0);
+
+      setDeleteStateByBookId((prev) => ({
+        ...prev,
+        [userBookId]: { busy: false, error: null, message: "Deleted" }
+      }));
+    } catch (e: any) {
+      setDeleteStateByBookId((prev) => ({
+        ...prev,
+        [userBookId]: { busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" }
+      }));
+    }
+  }
+
   const filteredItems = useMemo(() => {
     const tag = (filterTag ?? "").trim();
     const author = (filterAuthor ?? "").trim();
@@ -340,6 +420,45 @@ function AppShell({
       return okTag && okAuthor && okSubject;
     });
   }, [items, filterTag, filterAuthor, filterSubject]);
+
+  const displayItems = useMemo(() => {
+    const categoryTag = categoryTagName(categoryMode);
+    let rows = [...filteredItems];
+    if (categoryTag) {
+      rows = rows.filter((it) => {
+        const tagNames = (it.book_tags ?? []).map((bt) => bt.tag?.name).filter(Boolean) as string[];
+        return tagNames.some((t) => t.toLowerCase() === categoryTag.toLowerCase());
+      });
+    }
+
+    const getTitle = (it: (typeof rows)[number]) => {
+      const e = it.edition;
+      const title = it.title_override?.trim() ? it.title_override : e?.title ?? "";
+      return title.trim().toLowerCase();
+    };
+
+    rows.sort((a, b) => {
+      if (sortMode === "latest" || sortMode === "earliest") {
+        const at = Date.parse(a.created_at);
+        const bt = Date.parse(b.created_at);
+        const diff = Number.isFinite(at) && Number.isFinite(bt) ? at - bt : 0;
+        return sortMode === "earliest" ? diff : -diff;
+      }
+      const ta = getTitle(a);
+      const tb = getTitle(b);
+      const cmp = ta.localeCompare(tb);
+      return sortMode === "title_asc" ? cmp : -cmp;
+    });
+
+    return rows;
+  }, [filteredItems, sortMode, categoryMode]);
+
+  const coverHeight = useMemo(() => {
+    if (viewMode === "list") return 56;
+    if (gridCols === 2) return 320;
+    if (gridCols === 8) return 140;
+    return 220;
+  }, [viewMode, gridCols]);
 
   return (
     <div className="card">
@@ -413,8 +532,51 @@ function AppShell({
             )}
           </div>
         </div>
-        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-          {filteredItems.map((it) => {
+        <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+          <span className="muted">View</span>
+          <select value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
+            <option value="grid">grid</option>
+            <option value="list">list</option>
+          </select>
+          {viewMode === "grid" ? (
+            <>
+              <span className="muted">Columns</span>
+              <select value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
+                <option value={2}>2</option>
+                <option value={4}>4</option>
+                <option value={8}>8</option>
+              </select>
+            </>
+          ) : null}
+          <span className="muted">Sort</span>
+          <select value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
+            <option value="latest">latest</option>
+            <option value="earliest">earliest</option>
+            <option value="title_asc">title A→Z</option>
+            <option value="title_desc">title Z→A</option>
+          </select>
+          <span className="muted">Category</span>
+          <select value={categoryMode} onChange={(e) => setCategoryMode(e.target.value as any)}>
+            <option value="all">all</option>
+            <option value="art_books">art books</option>
+            <option value="fiction">fiction</option>
+          </select>
+          <span className="muted">
+            Showing {displayItems.length}
+            {typeof userBooksCount === "number" ? ` / ${userBooksCount}` : ""}
+          </span>
+        </div>
+
+        <div
+          style={{
+            marginTop: 10,
+            display: viewMode === "grid" ? "grid" : "flex",
+            flexDirection: viewMode === "list" ? "column" : undefined,
+            gridTemplateColumns: viewMode === "grid" ? `repeat(${gridCols}, minmax(0, 1fr))` : undefined,
+            gap: 12
+          }}
+        >
+          {displayItems.map((it) => {
             const e = it.edition;
             const title = it.title_override?.trim() ? it.title_override : e?.title ?? "(untitled)";
             const effectiveAuthors =
@@ -423,18 +585,91 @@ function AppShell({
             const cover = (it.media ?? []).find((m) => m.kind === "cover");
             const coverSigned = cover ? mediaUrlsByPath[cover.storage_path] : null;
             const coverUrl = coverSigned ?? e?.cover_url ?? null;
-            const images = (it.media ?? []).filter((m) => m.kind === "image");
             const pendingCover = pendingCoverByBookId[it.id];
             const coverState = coverUploadStateByBookId[it.id];
+            const delState = deleteStateByBookId[it.id];
+            const coverEl = coverUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt={title} src={coverUrl} style={{ width: "100%", height: coverHeight, objectFit: "contain", border: "1px solid #eee" }} />
+            ) : (
+              <div style={{ width: "100%", height: coverHeight, border: "1px solid #eee" }} />
+            );
+
+            if (viewMode === "list") {
+              return (
+                <div key={it.id} className="card" style={{ display: "grid", gridTemplateColumns: "70px 1fr", gap: 12 }}>
+                  <Link href={`/app/books/${it.id}`} style={{ display: "block" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {coverUrl ? (
+                      <img alt={title} src={coverUrl} style={{ width: 70, height: 70, objectFit: "cover", border: "1px solid #eee" }} />
+                    ) : (
+                      <div style={{ width: 70, height: 70, border: "1px solid #eee" }} />
+                    )}
+                  </Link>
+                  <div>
+                    <div>
+                      <Link href={`/app/books/${it.id}`}>{title}</Link>
+                    </div>
+                    <div className="muted" style={{ marginTop: 4 }}>
+                      {effectiveAuthors.length > 0 ? (
+                        <>
+                          {effectiveAuthors.map((a, idx) => (
+                            <span key={a}>
+                              <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
+                              {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                            </span>
+                          ))}
+                        </>
+                      ) : (
+                        e?.isbn13 || ""
+                      )}
+                    </div>
+                    {tags.length > 0 ? (
+                      <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {tags.slice(0, 6).map((t) => (
+                          <span key={t} style={{ border: "1px solid #eee", padding: "2px 6px" }}>
+                            <Link href={`/app?tag=${encodeURIComponent(t)}`} style={{ textDecoration: "none" }}>
+                              {t}
+                            </Link>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10 }}>
+                      <span className="muted">Visibility</span>
+                      <select value={it.visibility} onChange={(ev) => updateUserBookVisibility(it.id, ev.target.value as any)}>
+                        <option value="inherit">inherit</option>
+                        <option value="followers_only">followers_only</option>
+                        <option value="public">public</option>
+                      </select>
+                      <span className="muted">Cover</span>
+                      <input key={coverInputKeyByBookId[it.id] ?? 0} type="file" accept="image/*" onChange={(ev) => selectPendingCover(it.id, ev.target.files)} />
+                      {pendingCover ? (
+                        <>
+                          <button onClick={() => uploadSelectedCover(it.id)} disabled={coverState?.busy ?? false}>
+                            {coverState?.busy ? "Uploading…" : "Submit"}
+                          </button>
+                          <button onClick={() => clearPendingCover(it.id)} disabled={coverState?.busy ?? false}>
+                            Clear
+                          </button>
+                        </>
+                      ) : null}
+                      <button onClick={() => deleteEntry(it.id)} disabled={delState?.busy ?? false}>
+                        Delete
+                      </button>
+                      <span className="muted">
+                        {delState?.message ? (delState?.error ? `${delState?.message} (${delState?.error})` : delState?.message) : ""}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <div key={it.id} className="card">
                 <Link href={`/app/books/${it.id}`} style={{ display: "block" }}>
-                  {coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid #eee" }} />
-                  ) : (
-                    <div style={{ width: "100%", height: 220, border: "1px solid #eee" }} />
-                  )}
+                  {coverEl}
                 </Link>
                 <div style={{ marginTop: 8 }}>
                   <Link href={`/app/books/${it.id}`}>{title}</Link>
@@ -454,8 +689,20 @@ function AppShell({
                   )}
                 </div>
 
-                <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
-                  <div className="muted">Book visibility</div>
+                {tags.length > 0 ? (
+                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {tags.slice(0, 6).map((t) => (
+                      <span key={t} style={{ border: "1px solid #eee", padding: "2px 6px" }}>
+                        <Link href={`/app?tag=${encodeURIComponent(t)}`} style={{ textDecoration: "none" }}>
+                          {t}
+                        </Link>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
+                  <div className="muted">Visibility</div>
                   <select value={it.visibility} onChange={(ev) => updateUserBookVisibility(it.id, ev.target.value as any)}>
                     <option value="inherit">inherit</option>
                     <option value="followers_only">followers_only</option>
@@ -464,7 +711,7 @@ function AppShell({
                 </div>
 
                 <div style={{ marginTop: 10 }}>
-                  <div className="muted">Cover override (optional)</div>
+                  <div className="muted">Cover override</div>
                   <input
                     key={coverInputKeyByBookId[it.id] ?? 0}
                     type="file"
@@ -476,7 +723,7 @@ function AppShell({
                     <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
                       <div className="row">
                         <button onClick={() => uploadSelectedCover(it.id)} disabled={coverState?.busy ?? false}>
-                          {coverState?.busy ? "Uploading…" : "Submit cover"}
+                          {coverState?.busy ? "Uploading…" : "Submit"}
                         </button>
                         <button onClick={() => clearPendingCover(it.id)} disabled={coverState?.busy ?? false} style={{ marginLeft: 8 }}>
                           Clear
@@ -490,43 +737,24 @@ function AppShell({
                     </div>
                   ) : (
                     <div className="muted" style={{ marginTop: 6 }}>
-                      Upload a photo/scan of your cover if the book has no online cover.
+                      Upload a cover if the book has no online cover.
                     </div>
                   )}
-
-                  {images.length > 0 ? (
-                    <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                      {images.slice(0, 6).map((m) => {
-                        const url = mediaUrlsByPath[m.storage_path];
-                        return url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img key={m.id} alt="" src={url} style={{ width: "100%", height: 70, objectFit: "cover", border: "1px solid #eee" }} />
-                        ) : (
-                          <div key={m.id} style={{ width: "100%", height: 70, border: "1px solid #eee" }} />
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="muted" style={{ marginTop: 6 }}>
-                      None yet. Add images on the Details page.
-                    </div>
-                  )}
-                  {tags.length > 0 ? (
-                    <div className="muted" style={{ marginTop: 8 }}>
-                      Tags:{" "}
-                      {tags.slice(0, 4).map((t, idx) => (
-                        <span key={t}>
-                          <Link href={`/app?tag=${encodeURIComponent(t)}`}>{t}</Link>
-                          {idx < Math.min(tags.length, 4) - 1 ? <span>, </span> : null}
-                        </span>
-                      ))}
-                      {tags.length > 4 ? <span>…</span> : null}
-                    </div>
-                  ) : null}
-                  <div className="muted" style={{ marginTop: 8 }}>
-                    <Link href={`/app/books/${it.id}`}>Details</Link> (metadata, tags, notes, all images)
-                  </div>
                 </div>
+
+                <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
+                  <Link href={`/app/books/${it.id}`} className="muted">
+                    Details
+                  </Link>
+                  <button onClick={() => deleteEntry(it.id)} disabled={delState?.busy ?? false}>
+                    Delete
+                  </button>
+                </div>
+                {delState?.message ? (
+                  <div className="muted" style={{ marginTop: 6 }}>
+                    {delState?.error ? `${delState?.message} (${delState?.error})` : delState?.message}
+                  </div>
+                ) : null}
               </div>
             );
           })}

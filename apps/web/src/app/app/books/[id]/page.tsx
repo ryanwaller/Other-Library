@@ -740,21 +740,29 @@ export default function BookDetailPage() {
                 </div>
                 <div style={{ marginTop: 8 }}>
                   {tagNames.length > 0 ? (
-                    tagNames.map((t) => {
-                      const tagObj = (book?.book_tags ?? []).map((bt) => bt.tag).find((x) => x?.name === t) ?? null;
-                      return (
-                        <div key={t} className="row" style={{ justifyContent: "space-between" }}>
-                          <div>
-                            <Link href={`/app?tag=${encodeURIComponent(t)}`}>{t}</Link>
-                          </div>
-                          {tagObj ? (
-                            <button onClick={() => removeTag(tagObj.id)} disabled={tagState.busy}>
-                              Remove
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {((book?.book_tags ?? []).map((bt) => bt.tag).filter(Boolean) as Array<{ id: number; name: string }>[])
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((t) => (
+                          <span
+                            key={t.id}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              border: "1px solid #eee",
+                              padding: "2px 6px"
+                            }}
+                          >
+                            <Link href={`/app?tag=${encodeURIComponent(t.name)}`} style={{ textDecoration: "none" }}>
+                              {t.name}
+                            </Link>
+                            <button onClick={() => removeTag(t.id)} disabled={tagState.busy} aria-label={`Remove tag ${t.name}`}>
+                              ×
                             </button>
-                          ) : null}
-                        </div>
-                      );
-                    })
+                          </span>
+                        ))}
+                    </div>
                   ) : (
                     <div className="muted">No tags yet.</div>
                   )}
