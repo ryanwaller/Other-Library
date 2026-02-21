@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
+import { bookIdSlug } from "../../../../lib/slug";
 
 type UserBookDetail = {
   id: number;
@@ -119,6 +120,8 @@ export default function BookDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [book, setBook] = useState<UserBookDetail | null>(null);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
+  const [ownerProfile, setOwnerProfile] = useState<{ username: string; visibility: "followers_only" | "public" } | null>(null);
+  const [shareState, setShareState] = useState<{ error: string | null; message: string | null }>({ error: null, message: null });
 
   const [formTitle, setFormTitle] = useState("");
   const [formAuthors, setFormAuthors] = useState("");
@@ -195,6 +198,14 @@ export default function BookDetailPage() {
       setFormVisibility(row.visibility);
       setFormStatus(row.status);
 
+      const ownerId = row.owner_id as string | undefined;
+      if (ownerId) {
+        const profileRes = await supabase.from("profiles").select("username,visibility").eq("id", ownerId).maybeSingle();
+        if (!profileRes.error && profileRes.data?.username) {
+          setOwnerProfile({ username: profileRes.data.username, visibility: profileRes.data.visibility as any });
+        }
+      }
+
       const paths = Array.from(
         new Set(
           (row.media ?? [])
@@ -239,6 +250,44 @@ export default function BookDetailPage() {
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
   const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : book?.edition?.cover_url ?? null;
   const imageMedia = useMemo(() => (book?.media ?? []).filter((m) => m.kind === "image") ?? [], [book]);
+
+  const publicBookPath = useMemo(() => {
+    if (!book || !ownerProfile?.username) return null;
+    return `/u/${ownerProfile.username}/b/${bookIdSlug(book.id, effectiveTitle)}`;
+  }, [book, ownerProfile, effectiveTitle]);
+
+  const publicBookUrl = useMemo(() => {
+    if (!publicBookPath) return null;
+    if (typeof window === "undefined") return publicBookPath;
+    try {
+      const url = new URL(window.location.origin);
+      if (url.hostname.startsWith("app.")) {
+        url.hostname = url.hostname.slice("app.".length);
+      }
+      return `${url.origin}${publicBookPath}`;
+    } catch {
+      return publicBookPath;
+    }
+  }, [publicBookPath]);
+
+  const isPubliclyVisible = useMemo(() => {
+    if (!book) return false;
+    if (book.visibility === "public") return true;
+    if (book.visibility === "inherit" && ownerProfile?.visibility === "public") return true;
+    return false;
+  }, [book, ownerProfile]);
+
+  async function copyPublicLink() {
+    if (!publicBookUrl) return;
+    setShareState({ error: null, message: null });
+    try {
+      await navigator.clipboard.writeText(publicBookUrl);
+      setShareState({ error: null, message: "Copied" });
+      window.setTimeout(() => setShareState({ error: null, message: null }), 1500);
+    } catch (e: any) {
+      setShareState({ error: e?.message ?? "Copy failed", message: "Copy failed" });
+    }
+  }
 
   async function saveEdits() {
     if (!supabase || !book || !userId) return;
@@ -467,6 +516,37 @@ export default function BookDetailPage() {
           <div className="row" style={{ justifyContent: "space-between" }}>
             <div>{effectiveTitle}</div>
             <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
+          </div>
+
+          <div style={{ marginTop: 10 }} className="card">
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <div>Share public link</div>
+              <div className="muted">{isPubliclyVisible ? "public" : "not public"}</div>
+            </div>
+            {publicBookUrl ? (
+              <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
+                <a href={publicBookUrl} target="_blank" rel="noreferrer">
+                  {publicBookUrl}
+                </a>
+                <button onClick={copyPublicLink}>
+                  Copy
+                </button>
+              </div>
+            ) : (
+              <div className="muted" style={{ marginTop: 8 }}>
+                Loading…
+              </div>
+            )}
+            {!isPubliclyVisible ? (
+              <div className="muted" style={{ marginTop: 8 }}>
+                To make this link work for anyone, set Visibility to <span>public</span> (in Your fields) and save.
+              </div>
+            ) : null}
+            {shareState.message ? (
+              <div className="muted" style={{ marginTop: 6 }}>
+                {shareState.error ? `${shareState.message} (${shareState.error})` : shareState.message}
+              </div>
+            ) : null}
           </div>
 
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "220px 1fr", gap: 14 }}>
