@@ -252,6 +252,20 @@ function AppShell({ session }: { session: Session }) {
     }));
   }
 
+  function clearPendingImages(userBookId: number) {
+    setPendingFilesByBookId((prev) => {
+      const next = { ...prev };
+      delete next[userBookId];
+      return next;
+    });
+    setUploadStateByBookId((prev) => {
+      const next = { ...prev };
+      delete next[userBookId];
+      return next;
+    });
+    setFileInputKeyByBookId((prev) => ({ ...prev, [userBookId]: (prev[userBookId] ?? 0) + 1 }));
+  }
+
   async function uploadSelectedImages(userBookId: number) {
     if (!supabase) return;
     const files = pendingFilesByBookId[userBookId] ?? [];
@@ -368,6 +382,8 @@ function AppShell({ session }: { session: Session }) {
             const title = e?.title ?? "(untitled)";
             const authors = (e?.authors ?? []).filter(Boolean).join(", ");
             const images = (it.media ?? []).filter((m) => m.kind === "image");
+            const pending = pendingFilesByBookId[it.id] ?? [];
+            const uploadState = uploadStateByBookId[it.id];
             return (
               <div key={it.id} className="card">
                 {e?.cover_url ? (
@@ -404,21 +420,47 @@ function AppShell({ session }: { session: Session }) {
                     onChange={(ev) => selectPendingImages(it.id, ev.target.files)}
                     style={{ marginTop: 6 }}
                   />
-                  <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
-                    <button
-                      onClick={() => uploadSelectedImages(it.id)}
-                      disabled={(uploadStateByBookId[it.id]?.busy ?? false) || (pendingFilesByBookId[it.id]?.length ?? 0) === 0}
-                    >
-                      {uploadStateByBookId[it.id]?.busy ? "Uploading…" : "Upload selected"}
-                    </button>
-                    <div className="muted">
-                      {uploadStateByBookId[it.id]?.message
-                        ? uploadStateByBookId[it.id]?.error
-                          ? `${uploadStateByBookId[it.id]?.message} (${uploadStateByBookId[it.id]?.error})`
-                          : uploadStateByBookId[it.id]?.message
-                        : ""}
+
+                  {pending.length > 0 ? (
+                    <div className="muted" style={{ marginTop: 8 }}>
+                      <div>Selected (not uploaded yet):</div>
+                      <div style={{ marginTop: 6 }}>
+                        {pending.map((f) => (
+                          <div key={`${f.name}:${f.size}:${f.lastModified}`}>{f.name}</div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="muted" style={{ marginTop: 8 }}>
+                      Select one or more images, then click Submit.
+                    </div>
+                  )}
+
+                  {pending.length === 0 && uploadState?.message ? (
+                    <div className="muted" style={{ marginTop: 6 }}>
+                      {uploadState?.error ? `${uploadState?.message} (${uploadState?.error})` : uploadState?.message}
+                    </div>
+                  ) : null}
+
+                  {pending.length > 0 ? (
+                    <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
+                      <div className="row">
+                        <button onClick={() => uploadSelectedImages(it.id)} disabled={uploadState?.busy ?? false}>
+                          {uploadState?.busy ? "Uploading…" : "Submit"}
+                        </button>
+                        <button onClick={() => clearPendingImages(it.id)} disabled={uploadState?.busy ?? false} style={{ marginLeft: 8 }}>
+                          Clear
+                        </button>
+                      </div>
+                      <div className="muted">
+                        {uploadState?.message
+                          ? uploadState?.error
+                            ? `${uploadState?.message} (${uploadState?.error})`
+                            : uploadState?.message
+                          : ""}
+                      </div>
+                    </div>
+                  ) : null}
                   {images.length > 0 ? (
                     <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
                       {images.slice(0, 6).map((m) => {
