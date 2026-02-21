@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
@@ -538,10 +538,6 @@ function AppShell({
 
 export default function AppPage() {
   const [session, setSession] = useState<Session | null>(null);
-  const searchParams = useSearchParams();
-  const filterTag = searchParams.get("tag");
-  const filterAuthor = searchParams.get("author");
-  const filterSubject = searchParams.get("subject");
 
   useEffect(() => {
     if (!supabase) return;
@@ -563,10 +559,20 @@ export default function AppPage() {
           </div>
         </div>
       ) : session ? (
-        <AppShell session={session} filterTag={filterTag} filterAuthor={filterAuthor} filterSubject={filterSubject} />
+        <Suspense fallback={<div className="card">Loading…</div>}>
+          <AppWithFilters session={session} />
+        </Suspense>
       ) : (
         <SignIn />
       )}
     </main>
   );
+}
+
+function AppWithFilters({ session }: { session: Session }) {
+  const searchParams = useSearchParams();
+  const filterTag = searchParams.get("tag");
+  const filterAuthor = searchParams.get("author");
+  const filterSubject = searchParams.get("subject");
+  return <AppShell session={session} filterTag={filterTag} filterAuthor={filterAuthor} filterSubject={filterSubject} />;
 }
