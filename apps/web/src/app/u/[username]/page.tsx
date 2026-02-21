@@ -1,4 +1,6 @@
 import { getServerSupabase } from "../../../lib/supabaseServer";
+import Link from "next/link";
+import { bookIdSlug } from "../../../lib/slug";
 
 export const dynamic = "force-dynamic";
 
@@ -97,20 +99,25 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           const authors = (e?.authors ?? []).filter(Boolean).join(", ");
           const cover = (b.media ?? []).find((m) => m.kind === "cover");
           const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
+          const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
           const extraImages = (b.media ?? []).filter((m) => m.kind === "image").slice(0, 3);
           return (
             <div key={b.id} className="card">
-              {coverUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  alt={title}
-                  src={coverUrl}
-                  style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid #eee" }}
-                />
-              ) : (
-                <div style={{ width: "100%", height: 220, border: "1px solid #eee" }} />
-              )}
-              <div style={{ marginTop: 8 }}>{title}</div>
+              <Link href={href} style={{ display: "block" }}>
+                {coverUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    alt={title}
+                    src={coverUrl}
+                    style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid #eee" }}
+                  />
+                ) : (
+                  <div style={{ width: "100%", height: 220, border: "1px solid #eee" }} />
+                )}
+              </Link>
+              <div style={{ marginTop: 8 }}>
+                <Link href={href}>{title}</Link>
+              </div>
               <div className="muted" style={{ marginTop: 4 }}>
                 {authors || e?.isbn13 || ""}
               </div>
