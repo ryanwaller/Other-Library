@@ -75,6 +75,21 @@ function AppShell({ session }: { session: Session }) {
   const [busyAdd, setBusyAdd] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [busyProfile, setBusyProfile] = useState(false);
+  const [pendingFilesByBookId, setPendingFilesByBookId] = useState<Record<number, File[]>>({});
+  const [uploadStateByBookId, setUploadStateByBookId] = useState<
+    Record<
+      number,
+      | {
+          busy: boolean;
+          done: number;
+          total: number;
+          error: string | null;
+          message: string | null;
+        }
+      | undefined
+    >
+  >({});
+  const [fileInputKeyByBookId, setFileInputKeyByBookId] = useState<Record<number, number>>({});
   const [items, setItems] = useState<
     Array<{
       id: number;
@@ -226,12 +241,31 @@ function AppShell({ session }: { session: Session }) {
     return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
   }
 
-  async function uploadImages(userBookId: number, files: FileList | null) {
-    if (!supabase || !files || files.length === 0) return;
-    const toUpload = Array.from(files).filter((f) => f.size > 0);
-    if (toUpload.length === 0) return;
+  function selectPendingImages(userBookId: number, files: FileList | null) {
+    const picked = Array.from(files ?? []).filter((f) => f.size > 0);
+    setPendingFilesByBookId((prev) => ({ ...prev, [userBookId]: picked }));
+    setUploadStateByBookId((prev) => ({
+      ...prev,
+      [userBookId]: picked.length
+        ? { busy: false, done: 0, total: picked.length, error: null, message: `${picked.length} selected` }
+        : undefined
+    }));
+  }
 
-    for (const file of toUpload) {
+  async function uploadSelectedImages(userBookId: number) {
+    if (!supabase) return;
+    const files = pendingFilesByBookId[userBookId] ?? [];
+    if (files.length === 0) return;
+
+    setUploadStateByBookId((prev) => ({
+      ...prev,
+      [userBookId]: { busy: true, done: 0, total: files.length, error: null, message: "Uploading…" }
+    }));
+
+    let done = 0;
+    let lastError: string | null = null;
+
+    for (const file of files) {
       const path = `${userId}/${userBookId}/${Date.now()}-${safeFileName(file.name)}`;
       const up = await supabase.storage.from("user-book-media").upload(path, file, {
         cacheControl: "3600",
@@ -239,19 +273,47 @@ function AppShell({ session }: { session: Session }) {
         contentType: file.type || "application/octet-stream"
       });
       if (up.error) {
-        setAddError(up.error.message);
-        continue;
+        lastError = up.error.message;
+      } else {
+        const ins = await supabase.from("user_book_media").insert({
+          user_book_id: userBookId,
+          kind: "image",
+          storage_path: path,
+          caption: null
+        });
+        if (ins.error) lastError = ins.error.message;
       }
-      const ins = await supabase.from("user_book_media").insert({
-        user_book_id: userBookId,
-        kind: "image",
-        storage_path: path,
-        caption: null
+
+      done += 1;
+      setUploadStateByBookId((prev) => {
+        const current = prev[userBookId];
+        if (!current) return prev;
+        return {
+          ...prev,
+          [userBookId]: {
+            ...current,
+            busy: true,
+            done,
+            total: files.length,
+            error: lastError,
+            message: `Uploading ${done}/${files.length}…`
+          }
+        };
       });
-      if (ins.error) setAddError(ins.error.message);
     }
 
     await refreshCatalog();
+
+    setPendingFilesByBookId((prev) => {
+      const next = { ...prev };
+      delete next[userBookId];
+      return next;
+    });
+    setFileInputKeyByBookId((prev) => ({ ...prev, [userBookId]: (prev[userBookId] ?? 0) + 1 }));
+    setUploadStateByBookId((prev) => ({
+      ...prev,
+      [userBookId]: { busy: false, done: files.length, total: files.length, error: lastError, message: lastError ? "Finished with errors" : "Uploaded" }
+    }));
   }
 
   return (
@@ -335,12 +397,28 @@ function AppShell({ session }: { session: Session }) {
                 <div style={{ marginTop: 10 }}>
                   <div className="muted">Additional images</div>
                   <input
+                    key={fileInputKeyByBookId[it.id] ?? 0}
                     type="file"
                     accept="image/*"
                     multiple
-                    onChange={(ev) => uploadImages(it.id, ev.target.files)}
+                    onChange={(ev) => selectPendingImages(it.id, ev.target.files)}
                     style={{ marginTop: 6 }}
                   />
+                  <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
+                    <button
+                      onClick={() => uploadSelectedImages(it.id)}
+                      disabled={(uploadStateByBookId[it.id]?.busy ?? false) || (pendingFilesByBookId[it.id]?.length ?? 0) === 0}
+                    >
+                      {uploadStateByBookId[it.id]?.busy ? "Uploading…" : "Upload selected"}
+                    </button>
+                    <div className="muted">
+                      {uploadStateByBookId[it.id]?.message
+                        ? uploadStateByBookId[it.id]?.error
+                          ? `${uploadStateByBookId[it.id]?.message} (${uploadStateByBookId[it.id]?.error})`
+                          : uploadStateByBookId[it.id]?.message
+                        : ""}
+                    </div>
+                  </div>
                   {images.length > 0 ? (
                     <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
                       {images.slice(0, 6).map((m) => {
