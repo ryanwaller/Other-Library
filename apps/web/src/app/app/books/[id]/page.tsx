@@ -741,7 +741,7 @@ export default function BookDetailPage() {
                 <div style={{ marginTop: 8 }}>
                   {tagNames.length > 0 ? (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {((book?.book_tags ?? []).map((bt) => bt.tag).filter(Boolean) as Array<{ id: number; name: string }>[])
+                      {((book?.book_tags ?? []).map((bt) => bt.tag).filter(Boolean) as Array<{ id: number; name: string }>)
                         .sort((a, b) => a.name.localeCompare(b.name))
                         .map((t) => (
                           <span
