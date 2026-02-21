@@ -9,8 +9,8 @@ type PublicBook = {
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
 
-export default async function PublicProfilePage({ params }: { params: { username: string } }) {
-  const { username } = params;
+export default async function PublicProfilePage({ params }: { params: Promise<{ username: string }> }) {
+  const { username } = await params;
   const supabase = getServerSupabase();
 
   if (!supabase) {
