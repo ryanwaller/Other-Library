@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -67,7 +69,17 @@ function SignIn() {
   );
 }
 
-function AppShell({ session }: { session: Session }) {
+function AppShell({
+  session,
+  filterTag,
+  filterAuthor,
+  filterSubject
+}: {
+  session: Session;
+  filterTag: string | null;
+  filterAuthor: string | null;
+  filterSubject: string | null;
+}) {
   const userId = session.user.id;
   const [profile, setProfile] = useState<{ username: string; visibility: string } | null>(null);
   const [userBooksCount, setUserBooksCount] = useState<number | null>(null);
@@ -75,28 +87,21 @@ function AppShell({ session }: { session: Session }) {
   const [busyAdd, setBusyAdd] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [busyProfile, setBusyProfile] = useState(false);
-  const [pendingFilesByBookId, setPendingFilesByBookId] = useState<Record<number, File[]>>({});
-  const [uploadStateByBookId, setUploadStateByBookId] = useState<
-    Record<
-      number,
-      | {
-          busy: boolean;
-          done: number;
-          total: number;
-          error: string | null;
-          message: string | null;
-        }
-      | undefined
-    >
+  const [pendingCoverByBookId, setPendingCoverByBookId] = useState<Record<number, File | undefined>>({});
+  const [coverUploadStateByBookId, setCoverUploadStateByBookId] = useState<
+    Record<number, { busy: boolean; error: string | null; message: string | null } | undefined>
   >({});
-  const [fileInputKeyByBookId, setFileInputKeyByBookId] = useState<Record<number, number>>({});
+  const [coverInputKeyByBookId, setCoverInputKeyByBookId] = useState<Record<number, number>>({});
   const [items, setItems] = useState<
     Array<{
       id: number;
       created_at: string;
       visibility: "inherit" | "followers_only" | "public";
-      edition: { id: number; isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null } | null;
+      title_override: string | null;
+      authors_override: string[] | null;
+      edition: { id: number; isbn13: string | null; title: string | null; authors: string[] | null; subjects: string[] | null; cover_url: string | null } | null;
       media: Array<{ id: number; kind: "cover" | "image"; storage_path: string; caption: string | null; created_at: string }>;
+      book_tags: Array<{ tag: { id: number; name: string } | null }>;
     }>
   >([]);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
@@ -117,7 +122,9 @@ function AppShell({ session }: { session: Session }) {
     if (!supabase) return;
     const { data, error } = await supabase
       .from("user_books")
-      .select("id,created_at,visibility,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)")
+      .select(
+        "id,created_at,visibility,title_override,authors_override,edition:editions(id,isbn13,title,authors,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name))"
+      )
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) return;
@@ -241,94 +248,98 @@ function AppShell({ session }: { session: Session }) {
     return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
   }
 
-  function selectPendingImages(userBookId: number, files: FileList | null) {
+  function selectPendingCover(userBookId: number, files: FileList | null) {
     const picked = Array.from(files ?? []).filter((f) => f.size > 0);
-    setPendingFilesByBookId((prev) => ({ ...prev, [userBookId]: picked }));
-    setUploadStateByBookId((prev) => ({
+    const first = picked[0];
+    setPendingCoverByBookId((prev) => ({ ...prev, [userBookId]: first }));
+    setCoverUploadStateByBookId((prev) => ({
       ...prev,
-      [userBookId]: picked.length
-        ? { busy: false, done: 0, total: picked.length, error: null, message: `${picked.length} selected` }
-        : undefined
+      [userBookId]: first ? { busy: false, error: null, message: `${first.name} selected` } : undefined
     }));
   }
 
-  function clearPendingImages(userBookId: number) {
-    setPendingFilesByBookId((prev) => {
+  function clearPendingCover(userBookId: number) {
+    setPendingCoverByBookId((prev) => {
       const next = { ...prev };
       delete next[userBookId];
       return next;
     });
-    setUploadStateByBookId((prev) => {
+    setCoverUploadStateByBookId((prev) => {
       const next = { ...prev };
       delete next[userBookId];
       return next;
     });
-    setFileInputKeyByBookId((prev) => ({ ...prev, [userBookId]: (prev[userBookId] ?? 0) + 1 }));
+    setCoverInputKeyByBookId((prev) => ({ ...prev, [userBookId]: (prev[userBookId] ?? 0) + 1 }));
   }
 
-  async function uploadSelectedImages(userBookId: number) {
+  async function uploadSelectedCover(userBookId: number) {
     if (!supabase) return;
-    const files = pendingFilesByBookId[userBookId] ?? [];
-    if (files.length === 0) return;
+    const file = pendingCoverByBookId[userBookId];
+    if (!file) return;
 
-    setUploadStateByBookId((prev) => ({
+    setCoverUploadStateByBookId((prev) => ({
       ...prev,
-      [userBookId]: { busy: true, done: 0, total: files.length, error: null, message: "Uploading…" }
+      [userBookId]: { busy: true, error: null, message: "Uploading cover…" }
     }));
 
-    let done = 0;
-    let lastError: string | null = null;
-
-    for (const file of files) {
-      const path = `${userId}/${userBookId}/${Date.now()}-${safeFileName(file.name)}`;
-      const up = await supabase.storage.from("user-book-media").upload(path, file, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: file.type || "application/octet-stream"
-      });
-      if (up.error) {
-        lastError = up.error.message;
-      } else {
-        const ins = await supabase.from("user_book_media").insert({
-          user_book_id: userBookId,
-          kind: "image",
-          storage_path: path,
-          caption: null
-        });
-        if (ins.error) lastError = ins.error.message;
-      }
-
-      done += 1;
-      setUploadStateByBookId((prev) => {
-        const current = prev[userBookId];
-        if (!current) return prev;
-        return {
-          ...prev,
-          [userBookId]: {
-            ...current,
-            busy: true,
-            done,
-            total: files.length,
-            error: lastError,
-            message: `Uploading ${done}/${files.length}…`
-          }
-        };
-      });
+    const path = `${userId}/${userBookId}/cover-${Date.now()}-${safeFileName(file.name)}`;
+    const up = await supabase.storage.from("user-book-media").upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type || "application/octet-stream"
+    });
+    if (up.error) {
+      setCoverUploadStateByBookId((prev) => ({
+        ...prev,
+        [userBookId]: { busy: false, error: up.error.message, message: "Upload failed" }
+      }));
+      return;
     }
 
-    await refreshCatalog();
+    const inserted = await supabase
+      .from("user_book_media")
+      .insert({ user_book_id: userBookId, kind: "cover", storage_path: path, caption: null })
+      .select("id")
+      .single();
+    if (inserted.error) {
+      setCoverUploadStateByBookId((prev) => ({
+        ...prev,
+        [userBookId]: { busy: false, error: inserted.error.message, message: "Upload failed" }
+      }));
+      return;
+    }
 
-    setPendingFilesByBookId((prev) => {
-      const next = { ...prev };
-      delete next[userBookId];
-      return next;
-    });
-    setFileInputKeyByBookId((prev) => ({ ...prev, [userBookId]: (prev[userBookId] ?? 0) + 1 }));
-    setUploadStateByBookId((prev) => ({
+    await supabase
+      .from("user_book_media")
+      .update({ kind: "image" })
+      .eq("user_book_id", userBookId)
+      .eq("kind", "cover")
+      .neq("id", inserted.data.id);
+
+    await refreshCatalog();
+    clearPendingCover(userBookId);
+    setCoverUploadStateByBookId((prev) => ({
       ...prev,
-      [userBookId]: { busy: false, done: files.length, total: files.length, error: lastError, message: lastError ? "Finished with errors" : "Uploaded" }
+      [userBookId]: { busy: false, error: null, message: "Cover uploaded" }
     }));
   }
+
+  const filteredItems = useMemo(() => {
+    const tag = (filterTag ?? "").trim();
+    const author = (filterAuthor ?? "").trim();
+    const subject = (filterSubject ?? "").trim();
+    if (!tag && !author && !subject) return items;
+    return items.filter((it) => {
+      const tagNames = (it.book_tags ?? []).map((bt) => bt.tag?.name).filter(Boolean) as string[];
+      const effectiveAuthors =
+        (it.authors_override ?? []).filter(Boolean).length > 0 ? (it.authors_override ?? []).filter(Boolean) : (it.edition?.authors ?? []).filter(Boolean);
+      const editionSubjects = (it.edition?.subjects ?? []).filter(Boolean) as string[];
+      const okTag = tag ? tagNames.some((t) => t.toLowerCase() === tag.toLowerCase()) : true;
+      const okAuthor = author ? effectiveAuthors.some((a) => a.toLowerCase() === author.toLowerCase()) : true;
+      const okSubject = subject ? (editionSubjects ?? []).some((s) => String(s).toLowerCase() === subject.toLowerCase()) : true;
+      return okTag && okAuthor && okSubject;
+    });
+  }, [items, filterTag, filterAuthor, filterSubject]);
 
   return (
     <div className="card">
@@ -374,31 +385,73 @@ function AppShell({ session }: { session: Session }) {
       <div style={{ marginTop: 16 }}>
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div>Your catalog</div>
-          <div className="muted">(most recent first)</div>
+          <div className="muted">
+            {filterTag || filterAuthor || filterSubject ? (
+              <>
+                filtered{" "}
+                {filterTag ? (
+                  <>
+                    tag: <span>{filterTag}</span>
+                  </>
+                ) : null}
+                {filterTag && (filterAuthor || filterSubject) ? <span>, </span> : null}
+                {filterAuthor ? (
+                  <>
+                    author: <span>{filterAuthor}</span>
+                  </>
+                ) : null}{" "}
+                {filterAuthor && filterSubject ? <span>, </span> : null}
+                {filterSubject ? (
+                  <>
+                    subject: <span>{filterSubject}</span>
+                  </>
+                ) : null}{" "}
+                (<Link href="/app">clear</Link>)
+              </>
+            ) : (
+              <>(most recent first)</>
+            )}
+          </div>
         </div>
         <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-          {items.map((it) => {
+          {filteredItems.map((it) => {
             const e = it.edition;
-            const title = e?.title ?? "(untitled)";
-            const authors = (e?.authors ?? []).filter(Boolean).join(", ");
+            const title = it.title_override?.trim() ? it.title_override : e?.title ?? "(untitled)";
+            const effectiveAuthors =
+              (it.authors_override ?? []).filter(Boolean).length > 0 ? (it.authors_override ?? []).filter(Boolean) : (e?.authors ?? []).filter(Boolean);
+            const tags = (it.book_tags ?? []).map((bt) => bt.tag?.name).filter(Boolean) as string[];
+            const cover = (it.media ?? []).find((m) => m.kind === "cover");
+            const coverSigned = cover ? mediaUrlsByPath[cover.storage_path] : null;
+            const coverUrl = coverSigned ?? e?.cover_url ?? null;
             const images = (it.media ?? []).filter((m) => m.kind === "image");
-            const pending = pendingFilesByBookId[it.id] ?? [];
-            const uploadState = uploadStateByBookId[it.id];
+            const pendingCover = pendingCoverByBookId[it.id];
+            const coverState = coverUploadStateByBookId[it.id];
             return (
               <div key={it.id} className="card">
-                {e?.cover_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    alt={title}
-                    src={e.cover_url}
-                    style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid #eee" }}
-                  />
-                ) : (
-                  <div style={{ width: "100%", height: 220, border: "1px solid #eee" }} />
-                )}
-                <div style={{ marginTop: 8 }}>{title}</div>
+                <Link href={`/app/books/${it.id}`} style={{ display: "block" }}>
+                  {coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid #eee" }} />
+                  ) : (
+                    <div style={{ width: "100%", height: 220, border: "1px solid #eee" }} />
+                  )}
+                </Link>
+                <div style={{ marginTop: 8 }}>
+                  <Link href={`/app/books/${it.id}`}>{title}</Link>
+                </div>
                 <div className="muted" style={{ marginTop: 4 }}>
-                  {authors || e?.isbn13 || ""}
+                  {effectiveAuthors.length > 0 ? (
+                    <>
+                      {effectiveAuthors.map((a, idx) => (
+                        <span key={a}>
+                          <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
+                          {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                        </span>
+                      ))}
+                    </>
+                  ) : (
+                    e?.isbn13 || ""
+                  )}
                 </div>
 
                 <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
@@ -411,56 +464,36 @@ function AppShell({ session }: { session: Session }) {
                 </div>
 
                 <div style={{ marginTop: 10 }}>
-                  <div className="muted">Additional images</div>
+                  <div className="muted">Cover override (optional)</div>
                   <input
-                    key={fileInputKeyByBookId[it.id] ?? 0}
+                    key={coverInputKeyByBookId[it.id] ?? 0}
                     type="file"
                     accept="image/*"
-                    multiple
-                    onChange={(ev) => selectPendingImages(it.id, ev.target.files)}
+                    onChange={(ev) => selectPendingCover(it.id, ev.target.files)}
                     style={{ marginTop: 6 }}
                   />
-
-                  {pending.length > 0 ? (
-                    <div className="muted" style={{ marginTop: 8 }}>
-                      <div>Selected (not uploaded yet):</div>
-                      <div style={{ marginTop: 6 }}>
-                        {pending.map((f) => (
-                          <div key={`${f.name}:${f.size}:${f.lastModified}`}>{f.name}</div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="muted" style={{ marginTop: 8 }}>
-                      Select one or more images, then click Submit.
-                    </div>
-                  )}
-
-                  {pending.length === 0 && uploadState?.message ? (
-                    <div className="muted" style={{ marginTop: 6 }}>
-                      {uploadState?.error ? `${uploadState?.message} (${uploadState?.error})` : uploadState?.message}
-                    </div>
-                  ) : null}
-
-                  {pending.length > 0 ? (
+                  {pendingCover ? (
                     <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
                       <div className="row">
-                        <button onClick={() => uploadSelectedImages(it.id)} disabled={uploadState?.busy ?? false}>
-                          {uploadState?.busy ? "Uploading…" : "Submit"}
+                        <button onClick={() => uploadSelectedCover(it.id)} disabled={coverState?.busy ?? false}>
+                          {coverState?.busy ? "Uploading…" : "Submit cover"}
                         </button>
-                        <button onClick={() => clearPendingImages(it.id)} disabled={uploadState?.busy ?? false} style={{ marginLeft: 8 }}>
+                        <button onClick={() => clearPendingCover(it.id)} disabled={coverState?.busy ?? false} style={{ marginLeft: 8 }}>
                           Clear
                         </button>
                       </div>
-                      <div className="muted">
-                        {uploadState?.message
-                          ? uploadState?.error
-                            ? `${uploadState?.message} (${uploadState?.error})`
-                            : uploadState?.message
-                          : ""}
-                      </div>
+                      <div className="muted">{coverState?.message ? (coverState?.error ? `${coverState?.message} (${coverState?.error})` : coverState?.message) : ""}</div>
                     </div>
-                  ) : null}
+                  ) : coverState?.message ? (
+                    <div className="muted" style={{ marginTop: 6 }}>
+                      {coverState?.error ? `${coverState?.message} (${coverState?.error})` : coverState?.message}
+                    </div>
+                  ) : (
+                    <div className="muted" style={{ marginTop: 6 }}>
+                      Upload a photo/scan of your cover if the book has no online cover.
+                    </div>
+                  )}
+
                   {images.length > 0 ? (
                     <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
                       {images.slice(0, 6).map((m) => {
@@ -475,9 +508,24 @@ function AppShell({ session }: { session: Session }) {
                     </div>
                   ) : (
                     <div className="muted" style={{ marginTop: 6 }}>
-                      None yet.
+                      None yet. Add images on the Details page.
                     </div>
                   )}
+                  {tags.length > 0 ? (
+                    <div className="muted" style={{ marginTop: 8 }}>
+                      Tags:{" "}
+                      {tags.slice(0, 4).map((t, idx) => (
+                        <span key={t}>
+                          <Link href={`/app?tag=${encodeURIComponent(t)}`}>{t}</Link>
+                          {idx < Math.min(tags.length, 4) - 1 ? <span>, </span> : null}
+                        </span>
+                      ))}
+                      {tags.length > 4 ? <span>…</span> : null}
+                    </div>
+                  ) : null}
+                  <div className="muted" style={{ marginTop: 8 }}>
+                    <Link href={`/app/books/${it.id}`}>Details</Link> (metadata, tags, notes, all images)
+                  </div>
                 </div>
               </div>
             );
@@ -490,6 +538,10 @@ function AppShell({ session }: { session: Session }) {
 
 export default function AppPage() {
   const [session, setSession] = useState<Session | null>(null);
+  const searchParams = useSearchParams();
+  const filterTag = searchParams.get("tag");
+  const filterAuthor = searchParams.get("author");
+  const filterSubject = searchParams.get("subject");
 
   useEffect(() => {
     if (!supabase) return;
@@ -511,7 +563,7 @@ export default function AppPage() {
           </div>
         </div>
       ) : session ? (
-        <AppShell session={session} />
+        <AppShell session={session} filterTag={filterTag} filterAuthor={filterAuthor} filterSubject={filterSubject} />
       ) : (
         <SignIn />
       )}

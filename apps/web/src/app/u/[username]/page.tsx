@@ -58,7 +58,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     new Set(
       books
         .flatMap((b) => (Array.isArray(b.media) ? b.media : []))
-        .filter((m) => m.kind === "image" && typeof m.storage_path === "string" && m.storage_path.length > 0)
+        .filter((m) => typeof m.storage_path === "string" && m.storage_path.length > 0)
         .map((m) => m.storage_path)
     )
   );
@@ -95,14 +95,16 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           const e = b.edition;
           const title = e?.title ?? "(untitled)";
           const authors = (e?.authors ?? []).filter(Boolean).join(", ");
+          const cover = (b.media ?? []).find((m) => m.kind === "cover");
+          const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
           const extraImages = (b.media ?? []).filter((m) => m.kind === "image").slice(0, 3);
           return (
             <div key={b.id} className="card">
-              {e?.cover_url ? (
+              {coverUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   alt={title}
-                  src={e.cover_url}
+                  src={coverUrl}
                   style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid #eee" }}
                 />
               ) : (

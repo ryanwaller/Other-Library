@@ -18,6 +18,14 @@ type EditionMetadata = {
 
 const USER_AGENT = "Other-Library/0.1 (https://other-library.com; contact: hello@other-library.com)";
 
+function normalizeHttpsUrl(url: string | null | undefined): string | null {
+  const raw = (url ?? "").trim();
+  if (!raw) return null;
+  if (raw.startsWith("//")) return `https:${raw}`;
+  if (raw.startsWith("http://")) return `https://${raw.slice("http://".length)}`;
+  return raw;
+}
+
 function normalizeIsbn(input: string): string {
   return input
     .trim()
@@ -154,8 +162,9 @@ async function openLibraryLookup(isbn13: string, isbn10: string | null): Promise
         ? data.description.value
         : null;
   const subjects = Array.isArray(data.subjects) ? data.subjects.map((s: any) => s?.name).filter(Boolean) : [];
-  const cover_url =
-    data.cover?.large ?? data.cover?.medium ?? data.cover?.small ?? `https://covers.openlibrary.org/b/isbn/${isbn13}-L.jpg`;
+  const cover_url = normalizeHttpsUrl(
+    data.cover?.large ?? data.cover?.medium ?? data.cover?.small ?? `https://covers.openlibrary.org/b/isbn/${isbn13}-L.jpg`
+  );
 
   return {
     title,
@@ -184,10 +193,11 @@ async function googleBooksLookup(isbn: string): Promise<EditionMetadata | null> 
   const publish_date = parseDateToIso(info.publishedDate);
   const description = typeof info.description === "string" ? info.description : null;
   const subjects = Array.isArray(info.categories) ? info.categories.filter((c: any) => typeof c === "string") : [];
-  const cover_url =
+  const cover_url = normalizeHttpsUrl(
     info.imageLinks?.thumbnail ??
-    info.imageLinks?.smallThumbnail ??
-    (typeof info.imageLinks?.small === "string" ? info.imageLinks.small : null);
+      info.imageLinks?.smallThumbnail ??
+      (typeof info.imageLinks?.small === "string" ? info.imageLinks.small : null)
+  );
 
   return {
     title,
