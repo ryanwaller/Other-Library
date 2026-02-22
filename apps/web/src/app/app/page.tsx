@@ -208,6 +208,7 @@ function AppShell({
       .select(
         "id,created_at,visibility,title_override,authors_override,subjects_override,edition:editions(id,isbn13,title,authors,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name))"
       )
+      .eq("owner_id", userId)
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) return;
@@ -253,7 +254,7 @@ function AppShell({
         setAvatarUrl(null);
       }
 
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true });
+      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
       if (!alive) return;
       setUserBooksCount(count ?? 0);
 
@@ -307,7 +308,7 @@ function AppShell({
 
       setIsbn("");
       await refreshCatalog();
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true });
+      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
       setUserBooksCount(count ?? 0);
     } catch (e: any) {
       setAddError(e?.message ?? "Failed to add book");
@@ -333,7 +334,7 @@ function AppShell({
       setManualTitle("");
       setManualAuthors("");
       await refreshCatalog();
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true });
+      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
       setUserBooksCount(count ?? 0);
       setManualState({ busy: false, error: null, message: "Added" });
       window.setTimeout(() => setManualState({ busy: false, error: null, message: null }), 1200);
@@ -473,7 +474,7 @@ function AppShell({
       if (del.error) throw new Error(del.error.message);
 
       await refreshCatalog();
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true });
+      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
       setUserBooksCount(count ?? 0);
 
       setDeleteStateByBookId((prev) => ({
