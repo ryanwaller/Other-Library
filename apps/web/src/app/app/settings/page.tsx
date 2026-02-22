@@ -392,6 +392,19 @@ export default function SettingsPage() {
 
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
+              <div>Follows</div>
+              <div className="muted">requests + approvals</div>
+            </div>
+            <div className="muted" style={{ marginTop: 8 }}>
+              Manage who can see followers-only content.
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <Link href="/app/follows">Open follow settings</Link>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }} className="card">
+            <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Username</div>
               <div className="muted">{profile ? `@${profile.username}` : ""}</div>
             </div>

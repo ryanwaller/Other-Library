@@ -286,7 +286,16 @@ as $$
     (auth.uid() = target)
     or public.is_public_profile(target)
     or (auth.uid() is not null and public.is_approved_follower(auth.uid(), target))
-    or public.has_public_books(target);
+    or public.has_public_books(target)
+    or (
+      auth.uid() is not null
+      and exists (
+        select 1
+        from public.follows f
+        where (f.follower_id = auth.uid() and f.followee_id = target)
+           or (f.followee_id = auth.uid() and f.follower_id = target)
+      )
+    );
 $$;
 
 -- -----------------------
@@ -480,7 +489,7 @@ drop policy if exists "follows_insert_self" on public.follows;
 create policy "follows_insert_self"
 on public.follows
 for insert
-with check (auth.uid() = follower_id);
+with check (auth.uid() = follower_id and status = 'pending');
 
 drop policy if exists "follows_update_followee" on public.follows;
 create policy "follows_update_followee"

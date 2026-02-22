@@ -2,6 +2,7 @@ import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../lib/supabaseServer";
 import Link from "next/link";
 import { bookIdSlug } from "../../../lib/slug";
+import FollowControls from "./FollowControls";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             {profile.bio}
           </div>
         ) : null}
+        <FollowControls profileId={profile.id} profileUsername={profile.username} />
       </div>
 
       <div style={{ marginTop: 14 }} className="muted">
