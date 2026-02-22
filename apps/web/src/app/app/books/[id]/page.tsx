@@ -554,9 +554,13 @@ export default function BookDetailPage() {
             <div>
               {coverUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img alt={effectiveTitle} src={coverUrl} style={{ width: "100%", height: 280, objectFit: "contain", border: "1px solid #eee" }} />
+                <img
+                  alt={effectiveTitle}
+                  src={coverUrl}
+                  style={{ width: "100%", height: 280, objectFit: "contain", border: "1px solid var(--border)" }}
+                />
               ) : (
-                <div style={{ width: "100%", height: 280, border: "1px solid #eee" }} />
+                <div style={{ width: "100%", height: 280, border: "1px solid var(--border)" }} />
               )}
 
               <div style={{ marginTop: 10 }}>
@@ -751,7 +755,7 @@ export default function BookDetailPage() {
                               display: "inline-flex",
                               alignItems: "center",
                               gap: 6,
-                              border: "1px solid #eee",
+                              border: "1px solid var(--border)",
                               padding: "2px 6px"
                             }}
                           >
@@ -815,9 +819,9 @@ export default function BookDetailPage() {
                         <div key={m.id} className="card">
                           {url ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img alt="" src={url} style={{ width: "100%", height: 120, objectFit: "cover", border: "1px solid #eee" }} />
+                            <img alt="" src={url} style={{ width: "100%", height: 120, objectFit: "cover", border: "1px solid var(--border)" }} />
                           ) : (
-                            <div style={{ width: "100%", height: 120, border: "1px solid #eee" }} />
+                            <div style={{ width: "100%", height: 120, border: "1px solid var(--border)" }} />
                           )}
                           <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
                             <button onClick={() => setAsCover(m.id)} disabled={coverState.busy}>

@@ -165,9 +165,13 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           <div>
             {coverUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img alt={effectiveTitle} src={coverUrl} style={{ width: "100%", height: 280, objectFit: "contain", border: "1px solid #eee" }} />
+              <img
+                alt={effectiveTitle}
+                src={coverUrl}
+                style={{ width: "100%", height: 280, objectFit: "contain", border: "1px solid var(--border)" }}
+              />
             ) : (
-              <div style={{ width: "100%", height: 280, border: "1px solid #eee" }} />
+              <div style={{ width: "100%", height: 280, border: "1px solid var(--border)" }} />
             )}
           </div>
 
@@ -216,9 +220,9 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 <a key={m.id} href={url || "#"} target="_blank" rel="noreferrer" className="card">
                   {url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img alt="" src={url} style={{ width: "100%", height: 120, objectFit: "cover", border: "1px solid #eee" }} />
+                    <img alt="" src={url} style={{ width: "100%", height: 120, objectFit: "cover", border: "1px solid var(--border)" }} />
                   ) : (
-                    <div style={{ width: "100%", height: 120, border: "1px solid #eee" }} />
+                    <div style={{ width: "100%", height: 120, border: "1px solid var(--border)" }} />
                   )}
                 </a>
               );

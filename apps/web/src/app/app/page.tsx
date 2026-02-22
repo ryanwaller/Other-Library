@@ -591,9 +591,13 @@ function AppShell({
             const delState = deleteStateByBookId[it.id];
             const coverEl = coverUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img alt={title} src={coverUrl} style={{ width: "100%", height: coverHeight, objectFit: "contain", border: "1px solid #eee" }} />
+              <img
+                alt={title}
+                src={coverUrl}
+                style={{ width: "100%", height: coverHeight, objectFit: "contain", border: "1px solid var(--border)" }}
+              />
             ) : (
-              <div style={{ width: "100%", height: coverHeight, border: "1px solid #eee" }} />
+              <div style={{ width: "100%", height: coverHeight, border: "1px solid var(--border)" }} />
             );
 
             if (viewMode === "list") {
@@ -602,9 +606,9 @@ function AppShell({
                   <Link href={`/app/books/${it.id}`} style={{ display: "block" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     {coverUrl ? (
-                      <img alt={title} src={coverUrl} style={{ width: 70, height: 70, objectFit: "cover", border: "1px solid #eee" }} />
+                      <img alt={title} src={coverUrl} style={{ width: 70, height: 70, objectFit: "cover", border: "1px solid var(--border)" }} />
                     ) : (
-                      <div style={{ width: 70, height: 70, border: "1px solid #eee" }} />
+                      <div style={{ width: 70, height: 70, border: "1px solid var(--border)" }} />
                     )}
                   </Link>
                   <div>
@@ -628,7 +632,7 @@ function AppShell({
                     {tags.length > 0 ? (
                       <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {tags.slice(0, 6).map((t) => (
-                          <span key={t} style={{ border: "1px solid #eee", padding: "2px 6px" }}>
+                          <span key={t} style={{ border: "1px solid var(--border)", padding: "2px 6px" }}>
                             <Link href={`/app?tag=${encodeURIComponent(t)}`} style={{ textDecoration: "none" }}>
                               {t}
                             </Link>
@@ -693,7 +697,7 @@ function AppShell({
                 {tags.length > 0 ? (
                   <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {tags.slice(0, 6).map((t) => (
-                      <span key={t} style={{ border: "1px solid #eee", padding: "2px 6px" }}>
+                      <span key={t} style={{ border: "1px solid var(--border)", padding: "2px 6px" }}>
                         <Link href={`/app?tag=${encodeURIComponent(t)}`} style={{ textDecoration: "none" }}>
                           {t}
                         </Link>

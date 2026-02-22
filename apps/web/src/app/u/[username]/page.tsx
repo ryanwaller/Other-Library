@@ -121,10 +121,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                   <img
                     alt={title}
                     src={coverUrl}
-                    style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid #eee" }}
+                    style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }}
                   />
                 ) : (
-                  <div style={{ width: "100%", height: 220, border: "1px solid #eee" }} />
+                  <div style={{ width: "100%", height: 220, border: "1px solid var(--border)" }} />
                 )}
               </Link>
               <div style={{ marginTop: 8 }}>
@@ -143,10 +143,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                         key={`${b.id}-${idx}`}
                         alt=""
                         src={url}
-                        style={{ width: "100%", height: 60, objectFit: "cover", border: "1px solid #eee" }}
+                        style={{ width: "100%", height: 60, objectFit: "cover", border: "1px solid var(--border)" }}
                       />
                     ) : (
-                      <div key={`${b.id}-${idx}`} style={{ width: "100%", height: 60, border: "1px solid #eee" }} />
+                      <div key={`${b.id}-${idx}`} style={{ width: "100%", height: 60, border: "1px solid var(--border)" }} />
                     );
                   })}
                 </div>
