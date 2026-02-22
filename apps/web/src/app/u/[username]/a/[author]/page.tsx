@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
-import { getServerSupabase } from "../../../../../../lib/supabaseServer";
-import { bookIdSlug } from "../../../../../../lib/slug";
+import { getServerSupabase } from "../../../../../lib/supabaseServer";
+import { bookIdSlug } from "../../../../../lib/slug";
 
 export const dynamic = "force-dynamic";
 
