@@ -8,6 +8,7 @@ export default function SignedInAppNav({ viewingUsername }: { viewingUsername?: 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [me, setMe] = useState<{ username: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<number>(0);
 
   useEffect(() => {
     if (!supabase) return;
@@ -15,6 +16,37 @@ export default function SignedInAppNav({ viewingUsername }: { viewingUsername?: 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSessionUserId(newSession?.user?.id ?? null));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    let timer: number | null = null;
+
+    async function refreshPending() {
+      if (!supabase || !sessionUserId) {
+        setPendingRequests(0);
+        return;
+      }
+      const res = await supabase
+        .from("follows")
+        .select("follower_id", { count: "exact", head: true })
+        .eq("followee_id", sessionUserId)
+        .eq("status", "pending");
+      if (!alive) return;
+      if (res.error) {
+        setPendingRequests(0);
+        return;
+      }
+      setPendingRequests(res.count ?? 0);
+    }
+
+    refreshPending();
+    timer = window.setInterval(refreshPending, 30_000);
+
+    return () => {
+      alive = false;
+      if (timer) window.clearInterval(timer);
+    };
+  }, [sessionUserId]);
 
   useEffect(() => {
     let alive = true;
@@ -75,9 +107,29 @@ export default function SignedInAppNav({ viewingUsername }: { viewingUsername?: 
         <div className="row" style={{ gap: 10 }}>
           <Link href="/app">App home</Link>
           {me?.username ? <Link href={`/u/${me.username}`}>My public page</Link> : null}
+          {pendingRequests > 0 ? (
+            <Link href="/app/follows" aria-label={`${pendingRequests} pending follow requests`} style={{ textDecoration: "none" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: 18,
+                  height: 18,
+                  padding: "0 6px",
+                  borderRadius: 999,
+                  background: "#b00020",
+                  color: "white",
+                  fontSize: 12,
+                  lineHeight: "18px"
+                }}
+              >
+                {pendingRequests}
+              </span>
+            </Link>
+          ) : null}
         </div>
       </div>
     </div>
   );
 }
-
