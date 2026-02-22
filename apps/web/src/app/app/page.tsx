@@ -19,6 +19,22 @@ type EditionMetadata = {
   raw?: Record<string, unknown>;
 };
 
+function parseAuthorsInput(input: string): string[] {
+  const parts = input
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of parts) {
+    const key = p.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
+  }
+  return out;
+}
+
 function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -94,6 +110,13 @@ function AppShell({
   const [isbn, setIsbn] = useState("");
   const [busyAdd, setBusyAdd] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualAuthors, setManualAuthors] = useState("");
+  const [manualState, setManualState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
   const [busyProfile, setBusyProfile] = useState(false);
   const [pendingCoverByBookId, setPendingCoverByBookId] = useState<Record<number, File | undefined>>({});
   const [coverUploadStateByBookId, setCoverUploadStateByBookId] = useState<
@@ -290,6 +313,32 @@ function AppShell({
       setAddError(e?.message ?? "Failed to add book");
     } finally {
       setBusyAdd(false);
+    }
+  }
+
+  async function addManual() {
+    if (!supabase) return;
+    const title = manualTitle.trim();
+    const authors = parseAuthorsInput(manualAuthors);
+    if (!title) return;
+    setManualState({ busy: true, error: null, message: "Adding…" });
+    try {
+      const created = await supabase
+        .from("user_books")
+        .insert({ owner_id: userId, edition_id: null, title_override: title, authors_override: authors.length > 0 ? authors : null })
+        .select("id")
+        .single();
+      if (created.error) throw new Error(created.error.message);
+
+      setManualTitle("");
+      setManualAuthors("");
+      await refreshCatalog();
+      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true });
+      setUserBooksCount(count ?? 0);
+      setManualState({ busy: false, error: null, message: "Added" });
+      window.setTimeout(() => setManualState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setManualState({ busy: false, error: e?.message ?? "Failed to add book", message: "Add failed" });
     }
   }
 
@@ -520,25 +569,69 @@ function AppShell({
 
       <div style={{ marginTop: 16 }} className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <div>Add by ISBN</div>
-          <div className="muted">Open Library → Google Books → Wikidata</div>
+          <div>Add books</div>
+          <div className="muted">ISBN or manual</div>
         </div>
-        <div className="row" style={{ marginTop: 10 }}>
-          <input
-            placeholder="ISBN-10 or ISBN-13"
-            value={isbn}
-            onChange={(e) => setIsbn(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              addByIsbn();
-            }}
-            style={{ minWidth: 260 }}
-          />
-          <button onClick={addByIsbn} disabled={busyAdd || !isbn.trim()}>
-            {busyAdd ? "Adding…" : "Add"}
-          </button>
-          {addError ? <span className="muted">{addError}</span> : null}
+
+        <div style={{ marginTop: 10 }} className="card">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <div>Add by ISBN</div>
+            <div className="muted">Open Library → Google Books → Wikidata</div>
+          </div>
+          <div className="row" style={{ marginTop: 10 }}>
+            <input
+              placeholder="ISBN-10 or ISBN-13"
+              value={isbn}
+              onChange={(e) => setIsbn(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                addByIsbn();
+              }}
+              style={{ minWidth: 260 }}
+            />
+            <button onClick={addByIsbn} disabled={busyAdd || !isbn.trim()}>
+              {busyAdd ? "Adding…" : "Add"}
+            </button>
+            {addError ? <span className="muted">{addError}</span> : null}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 10 }} className="card">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <div>Add manually</div>
+            <div className="muted">for books without ISBN</div>
+          </div>
+          <div className="row" style={{ marginTop: 10 }}>
+            <input
+              placeholder="Title"
+              value={manualTitle}
+              onChange={(e) => setManualTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                addManual();
+              }}
+              style={{ minWidth: 260 }}
+            />
+            <input
+              placeholder="Authors (comma-separated)"
+              value={manualAuthors}
+              onChange={(e) => setManualAuthors(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                addManual();
+              }}
+              style={{ minWidth: 260 }}
+            />
+            <button onClick={addManual} disabled={manualState.busy || !manualTitle.trim()}>
+              {manualState.busy ? "Adding…" : "Add"}
+            </button>
+            <span className="muted">
+              {manualState.message ? (manualState.error ? `${manualState.message} (${manualState.error})` : manualState.message) : ""}
+            </span>
+          </div>
         </div>
       </div>
 
