@@ -217,6 +217,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!supabase) return;
+    const client = supabase;
     if (!normalized) {
       setUsernameAvailability({ state: "idle", message: null });
       return;
@@ -232,7 +233,7 @@ export default function SettingsPage() {
 
     setUsernameAvailability({ state: "checking", message: "Checking…" });
     const t = window.setTimeout(async () => {
-      const res = await supabase.rpc("is_username_available", { input_username: normalized });
+      const res = await client.rpc("is_username_available", { input_username: normalized });
       if (res.error) {
         setUsernameAvailability({ state: "error", message: res.error.message });
         return;
