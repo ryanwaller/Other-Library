@@ -123,19 +123,32 @@ function AppShell({
     Record<number, { busy: boolean; error: string | null; message: string | null } | undefined>
   >({});
   const [coverInputKeyByBookId, setCoverInputKeyByBookId] = useState<Record<number, number>>({});
-  const [items, setItems] = useState<
-    Array<{
-      id: number;
-      created_at: string;
-      visibility: "inherit" | "followers_only" | "public";
-      title_override: string | null;
-      authors_override: string[] | null;
-      subjects_override: string[] | null;
-      edition: { id: number; isbn13: string | null; title: string | null; authors: string[] | null; subjects: string[] | null; cover_url: string | null } | null;
-      media: Array<{ id: number; kind: "cover" | "image"; storage_path: string; caption: string | null; created_at: string }>;
-      book_tags: Array<{ tag: { id: number; name: string } | null }>;
-    }>
-  >([]);
+  type CatalogItem = {
+    id: number;
+    created_at: string;
+    visibility: "inherit" | "followers_only" | "public";
+    title_override: string | null;
+    authors_override: string[] | null;
+    subjects_override: string[] | null;
+    edition: { id: number; isbn13: string | null; title: string | null; authors: string[] | null; subjects: string[] | null; cover_url: string | null } | null;
+    media: Array<{ id: number; kind: "cover" | "image"; storage_path: string; caption: string | null; created_at: string }>;
+    book_tags: Array<{ tag: { id: number; name: string } | null }>;
+  };
+  type CatalogGroup = {
+    key: string;
+    primary: CatalogItem;
+    copies: CatalogItem[];
+    copiesCount: number;
+    tagNames: string[];
+    filterAuthors: string[];
+    filterSubjects: string[];
+    title: string;
+    visibility: "inherit" | "followers_only" | "public" | "mixed";
+    latestCreatedAt: number;
+    earliestCreatedAt: number;
+  };
+
+  const [items, setItems] = useState<CatalogItem[]>([]);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [gridCols, setGridCols] = useState<2 | 4 | 8>(4);
@@ -220,7 +233,7 @@ function AppShell({
       )
       .eq("owner_id", userId)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(200);
     if (error) return;
     const rows = (data ?? []) as any[];
     setItems(rows as any);
@@ -372,6 +385,15 @@ function AppShell({
     setItems((prev) => prev.map((it) => (it.id === userBookId ? { ...it, visibility: nextVisibility } : it)));
   }
 
+  async function updateUserBookVisibilityGroup(userBookIds: number[], nextVisibility: "inherit" | "followers_only" | "public") {
+    if (!supabase) return;
+    const ids = Array.from(new Set(userBookIds)).filter((n) => Number.isFinite(n) && n > 0);
+    if (ids.length === 0) return;
+    const { error } = await supabase.from("user_books").update({ visibility: nextVisibility }).in("id", ids);
+    if (error) return;
+    setItems((prev) => prev.map((it) => (ids.includes(it.id) ? { ...it, visibility: nextVisibility } : it)));
+  }
+
   function safeFileName(name: string): string {
     return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
   }
@@ -500,54 +522,120 @@ function AppShell({
   }
 
   const filteredItems = useMemo(() => {
-    const tag = (filterTag ?? "").trim();
-    const author = (filterAuthor ?? "").trim();
-    const subject = (filterSubject ?? "").trim();
-    if (!tag && !author && !subject) return items;
-    return items.filter((it) => {
-      const tagNames = (it.book_tags ?? []).map((bt) => bt.tag?.name).filter(Boolean) as string[];
-      const effectiveAuthors =
-        (it.authors_override ?? []).filter(Boolean).length > 0 ? (it.authors_override ?? []).filter(Boolean) : (it.edition?.authors ?? []).filter(Boolean);
-      const editionSubjects = (it.edition?.subjects ?? []).filter(Boolean) as string[];
-      const effectiveSubjects = it.subjects_override !== null && it.subjects_override !== undefined ? (it.subjects_override ?? []).filter(Boolean) : editionSubjects;
-      const okTag = tag ? tagNames.some((t) => t.toLowerCase() === tag.toLowerCase()) : true;
-      const okAuthor = author ? effectiveAuthors.some((a) => a.toLowerCase() === author.toLowerCase()) : true;
-      const okSubject = subject ? (effectiveSubjects ?? []).some((s) => String(s).toLowerCase() === subject.toLowerCase()) : true;
-      return okTag && okAuthor && okSubject;
-    });
-  }, [items, filterTag, filterAuthor, filterSubject]);
+    return items;
+  }, [items]);
 
-  const displayItems = useMemo(() => {
-    const categoryTag = categoryTagName(categoryMode);
-    let rows = [...filteredItems];
-    if (categoryTag) {
-      rows = rows.filter((it) => {
-        const tagNames = (it.book_tags ?? []).map((bt) => bt.tag?.name).filter(Boolean) as string[];
-        return tagNames.some((t) => t.toLowerCase() === categoryTag.toLowerCase());
-      });
+  function normalizeKeyPart(input: string): string {
+    return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  }
+
+  function effectiveTitleFor(it: CatalogItem): string {
+    const e = it.edition;
+    return it.title_override?.trim() ? it.title_override : e?.title ?? "(untitled)";
+  }
+
+  function effectiveAuthorsFor(it: CatalogItem): string[] {
+    const override = (it.authors_override ?? []).filter(Boolean);
+    if (override.length > 0) return override;
+    return (it.edition?.authors ?? []).filter(Boolean);
+  }
+
+  function effectiveSubjectsFor(it: CatalogItem): string[] {
+    if (it.subjects_override !== null && it.subjects_override !== undefined) return (it.subjects_override ?? []).filter(Boolean);
+    return ((it.edition?.subjects ?? []) as string[]).filter(Boolean);
+  }
+
+  function tagNamesFor(it: CatalogItem): string[] {
+    return (it.book_tags ?? []).map((bt) => bt.tag?.name).filter(Boolean) as string[];
+  }
+
+  function groupKeyFor(it: CatalogItem): string {
+    const eId = it.edition?.id ?? null;
+    if (eId) return `e:${eId}`;
+    const title = normalizeKeyPart(effectiveTitleFor(it));
+    const authors = effectiveAuthorsFor(it).map((a) => normalizeKeyPart(a)).filter(Boolean).join("|");
+    return `m:${title}|${authors}`;
+  }
+
+  const displayGroups = useMemo(() => {
+    const tag = (filterTag ?? "").trim().toLowerCase();
+    const author = (filterAuthor ?? "").trim().toLowerCase();
+    const subject = (filterSubject ?? "").trim().toLowerCase();
+    const categoryTag = (categoryTagName(categoryMode) ?? "").trim().toLowerCase();
+
+    const byKey = new Map<string, CatalogItem[]>();
+    for (const it of filteredItems) {
+      const key = groupKeyFor(it);
+      const cur = byKey.get(key);
+      if (!cur) byKey.set(key, [it]);
+      else cur.push(it);
     }
 
-    const getTitle = (it: (typeof rows)[number]) => {
-      const e = it.edition;
-      const title = it.title_override?.trim() ? it.title_override : e?.title ?? "";
-      return title.trim().toLowerCase();
-    };
+    let groups: CatalogGroup[] = Array.from(byKey.entries()).map(([key, copies]) => {
+      const sorted = copies.slice().sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+      const primary = sorted[0]!;
+      const title = effectiveTitleFor(primary);
 
-    rows.sort((a, b) => {
-      if (sortMode === "latest" || sortMode === "earliest") {
-        const at = Date.parse(a.created_at);
-        const bt = Date.parse(b.created_at);
-        const diff = Number.isFinite(at) && Number.isFinite(bt) ? at - bt : 0;
-        return sortMode === "earliest" ? diff : -diff;
+      const tagSet = new Set<string>();
+      const authorsSet = new Set<string>();
+      const subjectsSet = new Set<string>();
+      const visSet = new Set<string>();
+      let latest = -Infinity;
+      let earliest = Infinity;
+      for (const c of sorted) {
+        for (const t of tagNamesFor(c)) tagSet.add(t);
+        for (const a of effectiveAuthorsFor(c)) authorsSet.add(a);
+        for (const s of effectiveSubjectsFor(c)) subjectsSet.add(s);
+        visSet.add(c.visibility);
+        const ts = Date.parse(c.created_at);
+        if (Number.isFinite(ts)) {
+          latest = Math.max(latest, ts);
+          earliest = Math.min(earliest, ts);
+        }
       }
-      const ta = getTitle(a);
-      const tb = getTitle(b);
-      const cmp = ta.localeCompare(tb);
+
+      const visibility = visSet.size === 1 ? (primary.visibility as any) : "mixed";
+
+      return {
+        key,
+        primary,
+        copies: sorted,
+        copiesCount: sorted.length,
+        tagNames: Array.from(tagSet.values()).sort((a, b) => a.localeCompare(b)),
+        filterAuthors: Array.from(authorsSet.values()),
+        filterSubjects: Array.from(subjectsSet.values()),
+        title,
+        visibility,
+        latestCreatedAt: Number.isFinite(latest) ? latest : Date.now(),
+        earliestCreatedAt: Number.isFinite(earliest) ? earliest : Date.now()
+      };
+    });
+
+    if (tag) {
+      groups = groups.filter((g) => g.tagNames.some((t) => t.toLowerCase() === tag));
+    }
+    if (author) {
+      groups = groups.filter((g) => g.filterAuthors.some((a) => a.toLowerCase() === author));
+    }
+    if (subject) {
+      groups = groups.filter((g) => g.filterSubjects.some((s) => String(s).toLowerCase() === subject));
+    }
+    if (categoryTag) {
+      groups = groups.filter((g) => g.tagNames.some((t) => t.toLowerCase() === categoryTag));
+    }
+
+    const titleKey = (g: CatalogGroup) => normalizeKeyPart(g.title);
+    groups.sort((a, b) => {
+      if (sortMode === "latest") return b.latestCreatedAt - a.latestCreatedAt;
+      if (sortMode === "earliest") return a.earliestCreatedAt - b.earliestCreatedAt;
+      const cmp = titleKey(a).localeCompare(titleKey(b));
       return sortMode === "title_asc" ? cmp : -cmp;
     });
 
-    return rows;
-  }, [filteredItems, sortMode, categoryMode]);
+    return groups;
+  }, [filteredItems, filterTag, filterAuthor, filterSubject, categoryMode, sortMode]);
+
+  const displayCopiesCount = useMemo(() => displayGroups.reduce((sum, g) => sum + g.copiesCount, 0), [displayGroups]);
 
   const coverHeight = useMemo(() => {
     if (viewMode === "list") return 56;
@@ -707,8 +795,8 @@ function AppShell({
             <option value="fiction">fiction</option>
           </select>
           <span className="muted">
-            Showing {displayItems.length}
-            {typeof userBooksCount === "number" ? ` / ${userBooksCount}` : ""}
+            Showing {displayGroups.length} books
+            {typeof userBooksCount === "number" ? ` / ${userBooksCount} copies` : ` (${displayCopiesCount} copies)`}
           </span>
         </div>
 
@@ -721,15 +809,20 @@ function AppShell({
             gap: 12
           }}
         >
-          {displayItems.map((it) => {
+          {displayGroups.map((g) => {
+            const it = g.primary;
             const e = it.edition;
-            const title = it.title_override?.trim() ? it.title_override : e?.title ?? "(untitled)";
-            const effectiveAuthors =
-              (it.authors_override ?? []).filter(Boolean).length > 0 ? (it.authors_override ?? []).filter(Boolean) : (e?.authors ?? []).filter(Boolean);
-            const tags = (it.book_tags ?? []).map((bt) => bt.tag?.name).filter(Boolean) as string[];
-            const cover = (it.media ?? []).find((m) => m.kind === "cover");
-            const coverSigned = cover ? mediaUrlsByPath[cover.storage_path] : null;
-            const coverUrl = coverSigned ?? e?.cover_url ?? null;
+            const title = g.title;
+            const effectiveAuthors = effectiveAuthorsFor(it);
+            const tags = g.tagNames;
+            const coverUrl =
+              g.copies
+                .map((c) => {
+                  const cover = (c.media ?? []).find((m) => m.kind === "cover");
+                  if (!cover) return null;
+                  return mediaUrlsByPath[cover.storage_path] ?? null;
+                })
+                .find(Boolean) ?? e?.cover_url ?? null;
             const pendingCover = pendingCoverByBookId[it.id];
             const coverState = coverUploadStateByBookId[it.id];
             const delState = deleteStateByBookId[it.id];
@@ -757,7 +850,8 @@ function AppShell({
                   </Link>
                   <div>
                     <div>
-                      <Link href={`/app/books/${it.id}`}>{title}</Link>
+                      <Link href={`/app/books/${it.id}`}>{title}</Link>{" "}
+                      <span className="muted">{g.copiesCount > 1 ? `(${g.copiesCount})` : ""}</span>
                     </div>
                     <div className="muted" style={{ marginTop: 4 }}>
                       {effectiveAuthors.length > 0 ? (
@@ -786,7 +880,15 @@ function AppShell({
                     ) : null}
                     <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10 }}>
                       <span className="muted">Visibility</span>
-                      <select value={it.visibility} onChange={(ev) => updateUserBookVisibility(it.id, ev.target.value as any)}>
+                      <select
+                        value={g.visibility}
+                        onChange={(ev) => updateUserBookVisibilityGroup(g.copies.map((c) => c.id), ev.target.value as any)}
+                      >
+                        {g.visibility === "mixed" ? (
+                          <option value="mixed" disabled>
+                            mixed
+                          </option>
+                        ) : null}
                         <option value="inherit">inherit</option>
                         <option value="followers_only">followers_only</option>
                         <option value="public">public</option>
@@ -803,8 +905,8 @@ function AppShell({
                           </button>
                         </>
                       ) : null}
-                      <button onClick={() => deleteEntry(it.id)} disabled={delState?.busy ?? false}>
-                        Delete
+                      <button onClick={() => deleteEntry(it.id)} disabled={delState?.busy ?? false} title="Deletes one copy">
+                        Delete copy
                       </button>
                       <span className="muted">
                         {delState?.message ? (delState?.error ? `${delState?.message} (${delState?.error})` : delState?.message) : ""}
@@ -821,7 +923,10 @@ function AppShell({
                   {coverEl}
                 </Link>
                 <div style={{ marginTop: 8 }}>
-                  <Link href={`/app/books/${it.id}`}>{title}</Link>
+                  <div className="row" style={{ justifyContent: "space-between", gap: 10 }}>
+                    <Link href={`/app/books/${it.id}`}>{title}</Link>
+                    <span className="muted">{g.copiesCount > 1 ? `(${g.copiesCount})` : ""}</span>
+                  </div>
                 </div>
                 <div className="muted" style={{ marginTop: 4 }}>
                   {effectiveAuthors.length > 0 ? (
@@ -852,7 +957,15 @@ function AppShell({
 
                 <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
                   <div className="muted">Visibility</div>
-                  <select value={it.visibility} onChange={(ev) => updateUserBookVisibility(it.id, ev.target.value as any)}>
+                  <select
+                    value={g.visibility}
+                    onChange={(ev) => updateUserBookVisibilityGroup(g.copies.map((c) => c.id), ev.target.value as any)}
+                  >
+                    {g.visibility === "mixed" ? (
+                      <option value="mixed" disabled>
+                        mixed
+                      </option>
+                    ) : null}
                     <option value="inherit">inherit</option>
                     <option value="followers_only">followers_only</option>
                     <option value="public">public</option>
@@ -895,8 +1008,8 @@ function AppShell({
                   <Link href={`/app/books/${it.id}`} className="muted">
                     Details
                   </Link>
-                  <button onClick={() => deleteEntry(it.id)} disabled={delState?.busy ?? false}>
-                    Delete
+                  <button onClick={() => deleteEntry(it.id)} disabled={delState?.busy ?? false} title="Deletes one copy">
+                    Delete copy
                   </button>
                 </div>
                 {delState?.message ? (

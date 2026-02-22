@@ -54,10 +54,12 @@ export default function GlobalNav() {
 
     refreshPending();
     timer = window.setInterval(refreshPending, 30_000);
+    window.addEventListener("om:follows-changed", refreshPending);
 
     return () => {
       alive = false;
       if (timer) window.clearInterval(timer);
+      window.removeEventListener("om:follows-changed", refreshPending);
     };
   }, [sessionUserId]);
 
@@ -149,4 +151,3 @@ export default function GlobalNav() {
     </div>
   );
 }
-

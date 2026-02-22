@@ -157,6 +157,8 @@ export default function BookDetailPage() {
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
   const [ownerProfile, setOwnerProfile] = useState<{ username: string; visibility: "followers_only" | "public" } | null>(null);
   const [shareState, setShareState] = useState<{ error: string | null; message: string | null }>({ error: null, message: null });
+  const [copiesCount, setCopiesCount] = useState<number | null>(null);
+  const [copiesCountState, setCopiesCountState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
 
   const [formTitle, setFormTitle] = useState("");
   const [formAuthors, setFormAuthors] = useState("");
@@ -234,6 +236,9 @@ export default function BookDetailPage() {
     if (!Number.isFinite(bookId) || bookId <= 0) return;
     setBusy(true);
     setError(null);
+    setOwnerProfile(null);
+    setCopiesCount(null);
+    setCopiesCountState({ busy: false, error: null });
     try {
       const res = await supabase
         .from("user_books")
@@ -273,6 +278,33 @@ export default function BookDetailPage() {
         const profileRes = await supabase.from("profiles").select("username,visibility").eq("id", ownerId).maybeSingle();
         if (!profileRes.error && profileRes.data?.username) {
           setOwnerProfile({ username: profileRes.data.username, visibility: profileRes.data.visibility as any });
+        }
+      }
+
+      if (ownerId) {
+        setCopiesCountState({ busy: true, error: null });
+        try {
+          if (row.edition?.id) {
+            const countRes = await supabase
+              .from("user_books")
+              .select("id", { count: "exact", head: true })
+              .eq("owner_id", ownerId)
+              .eq("edition_id", row.edition.id);
+            if (countRes.error) throw new Error(countRes.error.message);
+            setCopiesCount(countRes.count ?? 0);
+          } else {
+            let q = supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", ownerId).is("edition_id", null);
+            if (row.title_override) q = q.eq("title_override", row.title_override);
+            else q = q.is("title_override", null);
+            if (row.authors_override && row.authors_override.length > 0) q = q.eq("authors_override", row.authors_override);
+            else q = q.is("authors_override", null);
+            const countRes = await q;
+            if ((countRes as any).error) throw new Error((countRes as any).error.message);
+            setCopiesCount((countRes as any).count ?? 0);
+          }
+          setCopiesCountState({ busy: false, error: null });
+        } catch (e: any) {
+          setCopiesCountState({ busy: false, error: e?.message ?? "Failed to count copies" });
         }
       }
 
@@ -324,6 +356,12 @@ export default function BookDetailPage() {
     if (override.length > 0) return override;
     return (book?.edition?.authors ?? []).filter(Boolean);
   }, [formAuthors, book]);
+
+  const copiesLabel = useMemo(() => {
+    if (!book?.owner_id) return "Copies";
+    if (userId && book.owner_id === userId) return "Your copies";
+    return "Copies";
+  }, [book?.owner_id, userId]);
 
   const effectiveSubjects = useMemo(() => {
     const override = book?.subjects_override;
@@ -1004,6 +1042,15 @@ export default function BookDetailPage() {
                     <option value="selling">selling</option>
                     <option value="trading">trading</option>
                   </select>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    {copiesLabel}
+                  </div>
+                  <div className="muted">
+                    {copiesCountState.busy ? "…" : copiesCountState.error ? copiesCountState.error : copiesCount ?? "—"}
+                  </div>
                 </div>
 
                 <div className="row" style={{ marginTop: 6 }}>

@@ -17,6 +17,32 @@ type PublicBook = {
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
 
+function normalizeKeyPart(input: string): string {
+  return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function effectiveTitleFor(b: PublicBook): string {
+  const e = b.edition;
+  return (b.title_override ?? "").trim() || e?.title || "(untitled)";
+}
+
+function effectiveAuthorsFor(b: PublicBook): string[] {
+  const override = (b.authors_override ?? []).filter(Boolean);
+  if (override.length > 0) return override;
+  return (b.edition?.authors ?? []).filter(Boolean);
+}
+
+function groupKeyFor(b: PublicBook): string {
+  const eId = b.edition?.id ?? null;
+  if (eId) return `e:${eId}`;
+  const title = normalizeKeyPart(effectiveTitleFor(b));
+  const authors = effectiveAuthorsFor(b)
+    .map((a) => normalizeKeyPart(a))
+    .filter(Boolean)
+    .join("|");
+  return `m:${title}|${authors}`;
+}
+
 export default async function PublicProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
   const usernameNorm = (username ?? "").trim().toLowerCase();
@@ -75,7 +101,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     )
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
-    .limit(60);
+    .limit(200);
 
   const books = (booksRes.data ?? []) as unknown as PublicBook[];
 
@@ -97,7 +123,15 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     }
   }
 
-  const editionIds = books.map((b) => b.edition?.id).filter(Boolean) as number[];
+  const groupedMap = new Map<string, { primary: PublicBook; copies: PublicBook[] }>();
+  for (const b of books) {
+    const key = groupKeyFor(b);
+    const cur = groupedMap.get(key);
+    if (!cur) groupedMap.set(key, { primary: b, copies: [b] });
+    else cur.copies.push(b);
+  }
+  const groupedBooks = Array.from(groupedMap.values());
+  const editionIds = Array.from(new Set(groupedBooks.map((g) => g.primary.edition?.id).filter(Boolean))) as number[];
 
   return (
     <main className="container">
@@ -133,35 +167,30 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
       <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
         <AddToLibraryProvider editionIds={editionIds}>
-          {books.map((b) => {
+          {groupedBooks.map((g) => {
+            const b = g.primary;
             const e = b.edition;
-            const title = (b.title_override ?? "").trim() || e?.title || "(untitled)";
-            const authors = (e?.authors ?? []).filter(Boolean) as string[];
-            const effectiveAuthors =
-              (b.authors_override ?? []).filter(Boolean).length > 0 ? (b.authors_override ?? []).filter(Boolean) : authors;
-            const cover = (b.media ?? []).find((m) => m.kind === "cover");
-          const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
-          const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
-          return (
-            <div key={b.id} className="card">
-              <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                <span className="muted" />
-                <AddToLibraryButton
-                    editionId={e?.id ?? null}
-                    titleFallback={title}
-                    authorsFallback={effectiveAuthors}
-                    sourceOwnerId={profile.id}
-                    compact
-                  />
+            const title = effectiveTitleFor(b);
+            const effectiveAuthors = effectiveAuthorsFor(b);
+            const coverUrl =
+              g.copies
+                .map((c) => {
+                  const cover = (c.media ?? []).find((m) => m.kind === "cover");
+                  if (!cover) return null;
+                  return signedMap[cover.storage_path] ?? null;
+                })
+                .find(Boolean) ?? e?.cover_url ?? null;
+            const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
+            return (
+              <div key={b.id} className="card">
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="muted">{g.copies.length > 1 ? `(${g.copies.length})` : ""}</span>
+                  <AddToLibraryButton editionId={e?.id ?? null} titleFallback={title} authorsFallback={effectiveAuthors} sourceOwnerId={profile.id} compact />
                 </div>
                 <Link href={href} style={{ display: "block", marginTop: 6 }}>
                   {coverUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      alt={title}
-                      src={coverUrl}
-                      style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }}
-                    />
+                    <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }} />
                   ) : (
                     <div style={{ width: "100%", height: 220, border: "1px solid var(--border)" }} />
                   )}
@@ -169,21 +198,21 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                 <div style={{ marginTop: 8 }}>
                   <Link href={href}>{title}</Link>
                 </div>
-              <div className="muted" style={{ marginTop: 4 }}>
-                {effectiveAuthors.length > 0 ? (
-                  effectiveAuthors.map((a, idx) => (
-                    <span key={a}>
-                      <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                      {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                    </span>
-                  ))
-                ) : (
-                  e?.isbn13 || ""
-                )}
+                <div className="muted" style={{ marginTop: 4 }}>
+                  {effectiveAuthors.length > 0 ? (
+                    effectiveAuthors.map((a, idx) => (
+                      <span key={a}>
+                        <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                        {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                      </span>
+                    ))
+                  ) : (
+                    e?.isbn13 || ""
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
       </AddToLibraryProvider>
       </div>
     </main>

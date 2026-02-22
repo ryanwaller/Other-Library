@@ -21,6 +21,11 @@ type MiniProfile = {
   visibility: "followers_only" | "public";
 };
 
+function notifyFollowsChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("om:follows-changed"));
+}
+
 function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -200,6 +205,7 @@ export default function FollowsPage() {
         .eq("follower_id", followerId)
         .eq("followee_id", userId);
       if (res.error) throw new Error(res.error.message);
+      notifyFollowsChanged();
       await refresh();
     } catch (e: any) {
       setActionError(e?.message ?? "Approve failed");
@@ -220,6 +226,7 @@ export default function FollowsPage() {
         .eq("follower_id", followerId)
         .eq("followee_id", userId);
       if (res.error) throw new Error(res.error.message);
+      notifyFollowsChanged();
       await refresh();
     } catch (e: any) {
       setActionError(e?.message ?? "Reject failed");
@@ -236,6 +243,7 @@ export default function FollowsPage() {
     try {
       const res = await supabase.from("follows").delete().eq("follower_id", userId).eq("followee_id", followeeId);
       if (res.error) throw new Error(res.error.message);
+      notifyFollowsChanged();
       await refresh();
     } catch (e: any) {
       setActionError(e?.message ?? "Unfollow failed");
@@ -254,6 +262,7 @@ export default function FollowsPage() {
       if (del.error) throw new Error(del.error.message);
       const ins = await supabase.from("follows").insert({ follower_id: userId, followee_id: followeeId, status: "pending" });
       if (ins.error) throw new Error(ins.error.message);
+      notifyFollowsChanged();
       await refresh();
     } catch (e: any) {
       setActionError(e?.message ?? "Request failed");
