@@ -110,6 +110,11 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     avatarUrl = signed.data?.signedUrl ?? null;
   }
 
+  const countsRes = await supabase.rpc("get_follow_counts", { target_username: usernameNorm });
+  const countsRow = Array.isArray(countsRes.data) ? (countsRes.data[0] as any) : ((countsRes.data as any) ?? null);
+  const followersCount = typeof countsRow?.followers_count === "number" ? (countsRow.followers_count as number) : null;
+  const followingCount = typeof countsRow?.following_count === "number" ? (countsRow.following_count as number) : null;
+
   const booksRes = await supabase
     .from("user_books")
     .select(
@@ -200,6 +205,15 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             <div>{profile.username}</div>
           </div>
           <div className="muted">{profile.visibility}</div>
+        </div>
+        <div className="row muted" style={{ marginTop: 6, gap: 10 }}>
+          <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
+            Followers {followersCount ?? "—"}
+          </Link>
+          <span>·</span>
+          <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
+            Following {followingCount ?? "—"}
+          </Link>
         </div>
         {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
         {profile.bio ? (

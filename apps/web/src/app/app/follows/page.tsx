@@ -54,6 +54,11 @@ export default function FollowsPage() {
   const outgoingApproved = useMemo(() => outgoing.filter((r) => r.status === "approved"), [outgoing]);
   const outgoingRejected = useMemo(() => outgoing.filter((r) => r.status === "rejected"), [outgoing]);
 
+  function myOutgoingStatusFor(followeeId: string): FollowRow["status"] | null {
+    const row = outgoing.find((r) => r.followee_id === followeeId) ?? null;
+    return row?.status ?? null;
+  }
+
   function profileUsername(id: string): string | null {
     const u = (profilesById[id]?.username ?? "").trim();
     return u || null;
@@ -215,6 +220,23 @@ export default function FollowsPage() {
     }
   }
 
+  async function requestFollow(followeeId: string) {
+    if (!supabase || !userId) return;
+    const key = `follow:${followeeId}`;
+    setActionBusyKey(key);
+    setActionError(null);
+    try {
+      const ins = await supabase.from("follows").insert({ follower_id: userId, followee_id: followeeId, status: "pending" });
+      if (ins.error) throw new Error(ins.error.message);
+      notifyFollowsChanged();
+      await refresh();
+    } catch (e: any) {
+      setActionError(e?.message ?? "Request failed");
+    } finally {
+      setActionBusyKey(null);
+    }
+  }
+
   if (!supabase) {
     return (
       <main className="container">
@@ -313,6 +335,7 @@ export default function FollowsPage() {
                   const username = profileUsername(pid);
                   const name = profileLabel(pid);
                   const avatarUrl = avatarUrlFor(pid);
+                  const outgoingStatus = myOutgoingStatusFor(pid);
                   return (
                     <div key={`${r.follower_id}:${r.followee_id}`} className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
                       <div className="row">
@@ -323,6 +346,23 @@ export default function FollowsPage() {
                         {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
                       </div>
                       <div className="row">
+                        {outgoingStatus === null ? (
+                          <button onClick={() => requestFollow(pid)} disabled={actionBusyKey !== null} style={{ marginRight: 8 }}>
+                            {actionBusyKey === `follow:${pid}` ? "Requesting…" : "Follow back"}
+                          </button>
+                        ) : outgoingStatus === "approved" ? (
+                          <span className="muted" style={{ marginRight: 8 }}>
+                            Following
+                          </span>
+                        ) : outgoingStatus === "pending" ? (
+                          <span className="muted" style={{ marginRight: 8 }}>
+                            Requested
+                          </span>
+                        ) : (
+                          <button onClick={() => requestAgain(pid)} disabled={actionBusyKey !== null} style={{ marginRight: 8 }}>
+                            {actionBusyKey === `again:${pid}` ? "Requesting…" : "Request again"}
+                          </button>
+                        )}
                         <button onClick={() => reject(pid)} disabled={actionBusyKey !== null}>
                           {actionBusyKey === `reject:${pid}` ? "Removing…" : "Remove"}
                         </button>

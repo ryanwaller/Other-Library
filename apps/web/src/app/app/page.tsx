@@ -65,7 +65,6 @@ function AppShell({
     error: null,
     message: null
   });
-  const [busyProfile, setBusyProfile] = useState(false);
   const [pendingCoverByBookId, setPendingCoverByBookId] = useState<Record<number, File | undefined>>({});
   const [coverUploadStateByBookId, setCoverUploadStateByBookId] = useState<
     Record<number, { busy: boolean; error: string | null; message: string | null } | undefined>
@@ -474,18 +473,6 @@ function AppShell({
       window.setTimeout(() => setManualState({ busy: false, error: null, message: null }), 1200);
     } catch (e: any) {
       setManualState({ busy: false, error: e?.message ?? "Failed to add book", message: "Add failed" });
-    }
-  }
-
-  async function updateProfileVisibility(nextVisibility: "followers_only" | "public") {
-    if (!supabase) return;
-    setBusyProfile(true);
-    try {
-      const { error } = await supabase.from("profiles").update({ visibility: nextVisibility }).eq("id", userId);
-      if (error) throw new Error(error.message);
-      setProfile((p) => (p ? { ...p, visibility: nextVisibility } : p));
-    } finally {
-      setBusyProfile(false);
     }
   }
 
@@ -1235,21 +1222,6 @@ function AppShell({
   return (
     <div className="card">
       {header}
-      <div style={{ marginTop: 12 }} className="muted">
-        Status: signed in. Profile visibility: {profile?.visibility ?? "…"}.
-      </div>
-      <div style={{ marginTop: 10 }} className="row">
-        <div>Library visibility</div>
-        <select
-          value={(profile?.visibility ?? "followers_only") as any}
-          onChange={(e) => updateProfileVisibility(e.target.value as any)}
-          disabled={busyProfile || !profile}
-        >
-          <option value="followers_only">followers_only</option>
-          <option value="public">public</option>
-        </select>
-        <span className="muted">When private, you can still mark an individual book public.</span>
-      </div>
       <div style={{ marginTop: 8 }}>
         Catalog items: {userBooksCount ?? "…"}
       </div>

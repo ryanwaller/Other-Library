@@ -23,6 +23,8 @@ export default function GlobalNav() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<number>(0);
   const [pendingBorrowRequests, setPendingBorrowRequests] = useState<number>(0);
+  const [followersCount, setFollowersCount] = useState<number>(0);
+  const [followingCount, setFollowingCount] = useState<number>(0);
 
   useEffect(() => {
     if (!supabase) return;
@@ -61,6 +63,38 @@ export default function GlobalNav() {
       alive = false;
       if (timer) window.clearInterval(timer);
       window.removeEventListener("om:follows-changed", refreshPending);
+    };
+  }, [sessionUserId]);
+
+  useEffect(() => {
+    let alive = true;
+    let timer: number | null = null;
+
+    async function refreshCounts() {
+      if (!supabase || !sessionUserId) {
+        setFollowersCount(0);
+        setFollowingCount(0);
+        return;
+      }
+
+      const [followersRes, followingRes] = await Promise.all([
+        supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("followee_id", sessionUserId).eq("status", "approved"),
+        supabase.from("follows").select("followee_id", { count: "exact", head: true }).eq("follower_id", sessionUserId).eq("status", "approved")
+      ]);
+
+      if (!alive) return;
+      setFollowersCount(followersRes.error ? 0 : (followersRes.count ?? 0));
+      setFollowingCount(followingRes.error ? 0 : (followingRes.count ?? 0));
+    }
+
+    refreshCounts();
+    timer = window.setInterval(refreshCounts, 30_000);
+    window.addEventListener("om:follows-changed", refreshCounts);
+
+    return () => {
+      alive = false;
+      if (timer) window.clearInterval(timer);
+      window.removeEventListener("om:follows-changed", refreshCounts);
     };
   }, [sessionUserId]);
 
@@ -152,6 +186,15 @@ export default function GlobalNav() {
               </Link>
             ) : null}
             <span className="muted">{label ?? "Signed in."}</span>
+            <span className="muted">
+              <Link href="/app/follows" style={{ textDecoration: "none" }}>
+                Followers {followersCount}
+              </Link>
+              <span> · </span>
+              <Link href="/app/follows" style={{ textDecoration: "none" }}>
+                Following {followingCount}
+              </Link>
+            </span>
           </div>
 
           <div className="row" style={{ gap: 10 }}>
@@ -168,7 +211,7 @@ export default function GlobalNav() {
                     minWidth: 18,
                     height: 18,
                     padding: "0 6px",
-                    borderRadius: 999,
+                    borderRadius: 4,
                     background: "#b00020",
                     color: "white",
                     fontSize: 12,
@@ -189,7 +232,7 @@ export default function GlobalNav() {
                     minWidth: 18,
                     height: 18,
                     padding: "0 6px",
-                    borderRadius: 999,
+                    borderRadius: 4,
                     background: "#b00020",
                     color: "white",
                     fontSize: 12,

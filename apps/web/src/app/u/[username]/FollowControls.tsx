@@ -6,7 +6,15 @@ import { supabase } from "../../../lib/supabaseClient";
 
 type FollowStatus = "pending" | "approved" | "rejected";
 
-export default function FollowControls({ profileId, profileUsername }: { profileId: string; profileUsername: string }) {
+export default function FollowControls({
+  profileId,
+  profileUsername,
+  compact
+}: {
+  profileId: string;
+  profileUsername: string;
+  compact?: boolean;
+}) {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [row, setRow] = useState<{ status: FollowStatus } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -77,7 +85,7 @@ export default function FollowControls({ profileId, profileUsername }: { profile
 
   if (!sessionUserId) {
     return (
-      <div style={{ marginTop: 10 }} className="muted">
+      <div style={{ marginTop: compact ? 0 : 10 }} className="muted">
         <Link href="/app">Sign in</Link> to follow.
       </div>
     );
@@ -86,25 +94,25 @@ export default function FollowControls({ profileId, profileUsername }: { profile
   const status = row?.status ?? null;
 
   return (
-    <div style={{ marginTop: 10 }} className="row">
+    <div style={{ marginTop: compact ? 0 : 10 }} className="row">
       {status === "approved" ? (
         <>
-          <span className="muted">Following {profileUsername}</span>
-          <button onClick={cancelOrUnfollow} disabled={busy} style={{ marginLeft: 10 }}>
+          {!compact ? <span className="muted">Following {profileUsername}</span> : null}
+          <button onClick={cancelOrUnfollow} disabled={busy} style={{ marginLeft: compact ? 0 : 10 }}>
             {busy ? "Working…" : "Unfollow"}
           </button>
         </>
       ) : status === "pending" ? (
         <>
-          <span className="muted">Requested</span>
-          <button onClick={cancelOrUnfollow} disabled={busy} style={{ marginLeft: 10 }}>
+          {!compact ? <span className="muted">Requested</span> : null}
+          <button onClick={cancelOrUnfollow} disabled={busy} style={{ marginLeft: compact ? 0 : 10 }}>
             {busy ? "Working…" : "Cancel request"}
           </button>
         </>
       ) : status === "rejected" ? (
         <>
-          <span className="muted">Request was rejected</span>
-          <button onClick={requestFollow} disabled={busy} style={{ marginLeft: 10 }}>
+          {!compact ? <span className="muted">Request was rejected</span> : null}
+          <button onClick={requestFollow} disabled={busy} style={{ marginLeft: compact ? 0 : 10 }}>
             {busy ? "Working…" : "Request again"}
           </button>
         </>
@@ -113,8 +121,11 @@ export default function FollowControls({ profileId, profileUsername }: { profile
           {busy ? "Requesting…" : "Request follow"}
         </button>
       )}
-      {error ? <span className="muted" style={{ marginLeft: 10 }}>{error}</span> : null}
+      {error ? (
+        <span className="muted" style={{ marginLeft: 10 }}>
+          {error}
+        </span>
+      ) : null}
     </div>
   );
 }
-
