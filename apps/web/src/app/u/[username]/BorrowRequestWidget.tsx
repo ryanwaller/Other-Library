@@ -26,8 +26,11 @@ export default function BorrowRequestWidget({
   const [followApproved, setFollowApproved] = useState<boolean>(false);
   const [loadingFollow, setLoadingFollow] = useState<boolean>(false);
   const [note, setNote] = useState<string>("");
+  const [threadDraft, setThreadDraft] = useState<string>("");
   const [state, setState] = useState<{ busy: boolean; error: string | null; message: string | null }>({ busy: false, error: null, message: null });
-  const [existing, setExisting] = useState<{ id: number; kind: "borrow" | "note"; status: string; created_at: string } | null>(null);
+  const [existing, setExisting] = useState<{ id: number; kind: "borrow" | "note"; status: string; message: string | null; created_at: string } | null>(null);
+  const [thread, setThread] = useState<Array<{ id: number; sender_id: string; message: string; created_at: string }>>([]);
+  const [threadLoading, setThreadLoading] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -47,7 +50,7 @@ export default function BorrowRequestWidget({
       }
       const res = await supabase
         .from("borrow_requests")
-        .select("id,kind,status,created_at")
+        .select("id,kind,status,message,created_at")
         .eq("user_book_id", userBookId)
         .eq("requester_id", sessionUserId)
         .order("created_at", { ascending: false })
@@ -64,6 +67,33 @@ export default function BorrowRequestWidget({
       alive = false;
     };
   }, [sessionUserId, userBookId]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!supabase || !sessionUserId || !existing?.id) {
+        setThread([]);
+        return;
+      }
+      setThreadLoading(true);
+      const res = await supabase
+        .from("borrow_request_messages")
+        .select("id,sender_id,message,created_at")
+        .eq("borrow_request_id", existing.id)
+        .order("created_at", { ascending: true })
+        .limit(200);
+      if (!alive) return;
+      setThreadLoading(false);
+      if (res.error) {
+        setThread([]);
+        return;
+      }
+      setThread(((res.data as any) ?? []) as any);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [sessionUserId, existing?.id]);
 
   useEffect(() => {
     let alive = true;
@@ -100,8 +130,30 @@ export default function BorrowRequestWidget({
     return scope === "anyone" ? true : followApproved;
   }, [sessionUserId, isOwner, borrowable, scope, followApproved, loadingFollow]);
 
+  async function sendThreadMessage() {
+    if (!supabase || !sessionUserId || !existing?.id) return;
+    const msg = threadDraft.trim();
+    if (!msg) return;
+    if (existing.status !== "pending" && existing.status !== "approved") return;
+    setState({ busy: true, error: null, message: "Sending…" });
+    const res = await supabase
+      .from("borrow_request_messages")
+      .insert({ borrow_request_id: existing.id, sender_id: sessionUserId, message: msg })
+      .select("id,sender_id,message,created_at")
+      .single();
+    if (res.error) {
+      setState({ busy: false, error: res.error.message, message: "Failed" });
+      return;
+    }
+    setThreadDraft("");
+    setThread((prev) => [...prev, res.data as any]);
+    setState({ busy: false, error: null, message: "Sent" });
+    window.dispatchEvent(new Event("om:borrow-requests-changed"));
+  }
+
   async function requestBorrow() {
     if (!supabase || !sessionUserId) return;
+    const msg = note.trim() ? note.trim() : null;
     setState({ busy: true, error: null, message: "Sending…" });
     const res = await supabase
       .from("borrow_requests")
@@ -110,16 +162,25 @@ export default function BorrowRequestWidget({
         owner_id: ownerId,
         requester_id: sessionUserId,
         kind: "borrow",
-        message: note.trim() ? note.trim() : null
+        message: null
       })
-      .select("id,kind,status,created_at")
+      .select("id,kind,status,message,created_at")
       .single();
     if (res.error) {
       setState({ busy: false, error: res.error.message, message: "Failed" });
       return;
     }
-    setExisting(res.data as any);
+    const created = res.data as any;
+    setExisting(created);
     setNote("");
+    if (msg) {
+      const m = await supabase
+        .from("borrow_request_messages")
+        .insert({ borrow_request_id: created.id, sender_id: sessionUserId, message: msg })
+        .select("id,sender_id,message,created_at")
+        .single();
+      if (!m.error && m.data) setThread((prev) => [...prev, m.data as any]);
+    }
     setState({ busy: false, error: null, message: "Requested" });
     window.dispatchEvent(new Event("om:borrow-requests-changed"));
   }
@@ -136,16 +197,23 @@ export default function BorrowRequestWidget({
         owner_id: ownerId,
         requester_id: sessionUserId,
         kind: "note",
-        message: msg
+        message: null
       })
-      .select("id,kind,status,created_at")
+      .select("id,kind,status,message,created_at")
       .single();
     if (res.error) {
       setState({ busy: false, error: res.error.message, message: "Failed" });
       return;
     }
-    setExisting(res.data as any);
+    const created = res.data as any;
+    setExisting(created);
     setNote("");
+    const m = await supabase
+      .from("borrow_request_messages")
+      .insert({ borrow_request_id: created.id, sender_id: sessionUserId, message: msg })
+      .select("id,sender_id,message,created_at")
+      .single();
+    if (!m.error && m.data) setThread((prev) => [...prev, m.data as any]);
     setState({ busy: false, error: null, message: "Sent" });
     window.dispatchEvent(new Event("om:borrow-requests-changed"));
   }
@@ -186,7 +254,37 @@ export default function BorrowRequestWidget({
     return (
       <div>
         <div className="muted">{existing.kind === "note" ? "Note: sent." : "Borrow request: pending."}</div>
+        {existing.message ? (
+          <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
+            {existing.message}
+          </div>
+        ) : null}
+        {threadLoading ? (
+          <div className="muted" style={{ marginTop: 6 }}>
+            Loading thread…
+          </div>
+        ) : thread.length > 0 ? (
+          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+            {thread.map((m) => (
+              <div key={m.id} className="muted" style={{ whiteSpace: "pre-wrap" }}>
+                {(m.sender_id === sessionUserId ? "you" : "them")}: {m.message}
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div style={{ marginTop: 8 }}>
+          <textarea
+            value={threadDraft}
+            onChange={(e) => setThreadDraft(e.target.value)}
+            placeholder="Message"
+            rows={3}
+            style={{ width: "100%" }}
+          />
+        </div>
         <div className="row" style={{ marginTop: 8 }}>
+          <button onClick={sendThreadMessage} disabled={state.busy || !threadDraft.trim()}>
+            {state.busy ? "…" : "Send message"}
+          </button>
           <button onClick={cancelRequest} disabled={state.busy}>
             {state.busy ? "…" : existing.kind === "note" ? "Cancel note" : "Cancel request"}
           </button>
