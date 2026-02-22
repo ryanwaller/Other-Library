@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 type PublicBook = {
   id: number;
+  library_id: number;
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
   authors_override: string[] | null;
@@ -112,13 +113,29 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const booksRes = await supabase
     .from("user_books")
     .select(
-      "id,visibility,title_override,authors_override,borrowable_override,borrow_request_scope_override,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
+      "id,library_id,visibility,title_override,authors_override,borrowable_override,borrow_request_scope_override,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
     )
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
     .limit(200);
 
   const books = (booksRes.data ?? []) as unknown as PublicBook[];
+
+  // Try to load visible libraries so we can group public books by catalog.
+  // Note: this requires a libraries select policy that allows viewing libraries
+  // when the viewer can see at least one book in that library.
+  const librariesRes = await supabase
+    .from("libraries")
+    .select("id,name,created_at")
+    .eq("owner_id", profile.id)
+    .order("created_at", { ascending: true });
+
+  const librariesRaw = (librariesRes.data ?? []) as Array<{ id: number; name: string; created_at: string }>;
+  const fallbackLibraries = Array.from(new Set(books.map((b) => Number(b.library_id)).filter((n) => Number.isFinite(n) && n > 0)))
+    .sort((a, b) => a - b)
+    .map((id) => ({ id, name: `Catalog ${id}`, created_at: new Date(0).toISOString() }));
+
+  const libraries = librariesRaw.length > 0 ? librariesRaw : fallbackLibraries;
 
   const paths = Array.from(
     new Set(
@@ -140,7 +157,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   const groupedMap = new Map<string, { copies: PublicBook[] }>();
   for (const b of books) {
-    const key = groupKeyFor(b);
+    // Keep libraries separate: the same edition can exist in multiple libraries.
+    const key = `${b.library_id}:${groupKeyFor(b)}`;
     const cur = groupedMap.get(key);
     if (!cur) groupedMap.set(key, { copies: [b] });
     else cur.copies.push(b);
@@ -152,6 +170,17 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     return { primary, copies: g.copies, borrowableAny, scopeAny };
   });
   const editionIds = Array.from(new Set(groupedBooks.map((g) => g.primary.edition?.id).filter(Boolean))) as number[];
+
+  const groupsByLibraryId = new Map<number, typeof groupedBooks>();
+  for (const g of groupedBooks) {
+    const libId = Number(g.primary.library_id);
+    if (!Number.isFinite(libId) || libId <= 0) continue;
+    const cur = groupsByLibraryId.get(libId);
+    if (!cur) groupsByLibraryId.set(libId, [g]);
+    else cur.push(g);
+  }
+
+  const showLibraryBlocks = libraries.length > 1;
 
   return (
     <main className="container">
@@ -185,65 +214,136 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
         Publicly visible books
       </div>
 
-      <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-        <AddToLibraryProvider editionIds={editionIds}>
-          {groupedBooks.map((g) => {
-            const b = g.primary;
-            const e = b.edition;
-            const title = effectiveTitleFor(b);
-            const effectiveAuthors = effectiveAuthorsFor(b);
-            const coverUrl =
-              g.copies
-                .map((c) => {
-                  const cover = (c.media ?? []).find((m) => m.kind === "cover");
-                  if (!cover) return null;
-                  return signedMap[cover.storage_path] ?? null;
-                })
-                .find(Boolean) ?? e?.cover_url ?? null;
-            const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
-            return (
-              <div key={b.id} className="card">
-                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <span className="muted">{g.copies.length > 1 ? `(${g.copies.length})` : ""}</span>
-                  <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                    {g.borrowableAny ? <span className="muted">{g.scopeAny ? "borrowable (anyone)" : "borrowable"}</span> : null}
-                    <AddToLibraryButton
-                      editionId={e?.id ?? null}
-                      titleFallback={title}
-                      authorsFallback={effectiveAuthors}
-                      sourceOwnerId={profile.id}
-                      compact
-                    />
+      <AddToLibraryProvider editionIds={editionIds}>
+        {showLibraryBlocks ? (
+          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 14 }}>
+            {libraries.map((lib) => {
+              const groups = groupsByLibraryId.get(lib.id) ?? [];
+              if (groups.length === 0) return null;
+              const copiesCount = groups.reduce((sum, g) => sum + g.copies.length, 0);
+              return (
+                <div key={lib.id} className="card">
+                  <div className="row" style={{ justifyContent: "space-between" }}>
+                    <div>{lib.name}</div>
+                    <div className="muted">
+                      {groups.length} book{groups.length === 1 ? "" : "s"} / {copiesCount} cop{copiesCount === 1 ? "y" : "ies"}
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+                    {groups.map((g) => {
+                      const b = g.primary;
+                      const e = b.edition;
+                      const title = effectiveTitleFor(b);
+                      const effectiveAuthors = effectiveAuthorsFor(b);
+                      const coverUrl =
+                        g.copies
+                          .map((c) => {
+                            const cover = (c.media ?? []).find((m) => m.kind === "cover");
+                            if (!cover) return null;
+                            return signedMap[cover.storage_path] ?? null;
+                          })
+                          .find(Boolean) ?? e?.cover_url ?? null;
+                      const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
+                      return (
+                        <div key={b.id} className="card">
+                          <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                            <span className="muted">{g.copies.length > 1 ? `(${g.copies.length})` : ""}</span>
+                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                              {g.borrowableAny ? <span className="muted">{g.scopeAny ? "borrowable (anyone)" : "borrowable"}</span> : null}
+                              <AddToLibraryButton
+                                editionId={e?.id ?? null}
+                                titleFallback={title}
+                                authorsFallback={effectiveAuthors}
+                                sourceOwnerId={profile.id}
+                                compact
+                              />
+                            </div>
+                          </div>
+                          <Link href={href} style={{ display: "block", marginTop: 6 }}>
+                            {coverUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }} />
+                            ) : (
+                              <div style={{ width: "100%", height: 220, border: "1px solid var(--border)" }} />
+                            )}
+                          </Link>
+                          <div style={{ marginTop: 8 }}>
+                            <Link href={href}>{title}</Link>
+                          </div>
+                          <div className="muted" style={{ marginTop: 4 }}>
+                            {effectiveAuthors.length > 0 ? (
+                              effectiveAuthors.map((a, idx) => (
+                                <span key={a}>
+                                  <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                                  {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                                </span>
+                              ))
+                            ) : (
+                              e?.isbn13 || ""
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-                <Link href={href} style={{ display: "block", marginTop: 6 }}>
-                  {coverUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }} />
-                  ) : (
-                    <div style={{ width: "100%", height: 220, border: "1px solid var(--border)" }} />
-                  )}
-                </Link>
-                <div style={{ marginTop: 8 }}>
-                  <Link href={href}>{title}</Link>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+            {groupedBooks.map((g) => {
+              const b = g.primary;
+              const e = b.edition;
+              const title = effectiveTitleFor(b);
+              const effectiveAuthors = effectiveAuthorsFor(b);
+              const coverUrl =
+                g.copies
+                  .map((c) => {
+                    const cover = (c.media ?? []).find((m) => m.kind === "cover");
+                    if (!cover) return null;
+                    return signedMap[cover.storage_path] ?? null;
+                  })
+                  .find(Boolean) ?? e?.cover_url ?? null;
+              const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
+              return (
+                <div key={b.id} className="card">
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                    <span className="muted">{g.copies.length > 1 ? `(${g.copies.length})` : ""}</span>
+                    <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                      {g.borrowableAny ? <span className="muted">{g.scopeAny ? "borrowable (anyone)" : "borrowable"}</span> : null}
+                      <AddToLibraryButton editionId={e?.id ?? null} titleFallback={title} authorsFallback={effectiveAuthors} sourceOwnerId={profile.id} compact />
+                    </div>
+                  </div>
+                  <Link href={href} style={{ display: "block", marginTop: 6 }}>
+                    {coverUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }} />
+                    ) : (
+                      <div style={{ width: "100%", height: 220, border: "1px solid var(--border)" }} />
+                    )}
+                  </Link>
+                  <div style={{ marginTop: 8 }}>
+                    <Link href={href}>{title}</Link>
+                  </div>
+                  <div className="muted" style={{ marginTop: 4 }}>
+                    {effectiveAuthors.length > 0 ? (
+                      effectiveAuthors.map((a, idx) => (
+                        <span key={a}>
+                          <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                          {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                        </span>
+                      ))
+                    ) : (
+                      e?.isbn13 || ""
+                    )}
+                  </div>
                 </div>
-                <div className="muted" style={{ marginTop: 4 }}>
-                  {effectiveAuthors.length > 0 ? (
-                    effectiveAuthors.map((a, idx) => (
-                      <span key={a}>
-                        <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                        {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                      </span>
-                    ))
-                  ) : (
-                    e?.isbn13 || ""
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </AddToLibraryProvider>
-      </div>
+              );
+            })}
+          </div>
+        )}
+      </AddToLibraryProvider>
     </main>
   );
 }
