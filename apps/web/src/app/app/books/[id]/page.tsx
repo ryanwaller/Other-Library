@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState, type KeyboardEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
 import { bookIdSlug } from "../../../../lib/slug";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
+import SignInCard from "../../../components/SignInCard";
 
 type UserBookDetail = {
   id: number;
@@ -67,63 +68,6 @@ type MergeSource = {
   subjects_override: string[] | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
-
-function SignIn() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function signUp() {
-    if (!supabase) return;
-    setBusy(true);
-    setError(null);
-    const { error: err } = await supabase.auth.signUp({ email, password });
-    setBusy(false);
-    if (err) setError(err.message);
-  }
-
-  async function signIn() {
-    if (!supabase) return;
-    setBusy(true);
-    setError(null);
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
-    if (err) setError(err.message);
-  }
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    await signIn();
-  }
-
-  return (
-    <div className="card">
-      <form onSubmit={onSubmit}>
-        <div className="row">
-          <div>Email</div>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
-        <div className="row" style={{ marginTop: 8 }}>
-          <div>Password</div>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        </div>
-        <div className="row" style={{ marginTop: 12 }}>
-          <button type="submit" disabled={busy || !email || !password}>
-            Sign in
-          </button>
-          <button type="button" onClick={signUp} disabled={busy || !email || !password}>
-            Sign up
-          </button>
-          {error ? <span className="muted">{error}</span> : null}
-        </div>
-        <div className="muted" style={{ marginTop: 8 }}>
-          Sign in to view and edit this book.
-        </div>
-      </form>
-    </div>
-  );
-}
 
 function normalizeTagName(input: string): string {
   return input.trim().replace(/\s+/g, " ");
@@ -1127,7 +1071,7 @@ export default function BookDetailPage() {
       </div>
 
       {!session ? (
-        <SignIn />
+        <SignInCard note="Sign in to view and edit this book." />
       ) : !Number.isFinite(bookId) || bookId <= 0 ? (
         <div className="card">
           <div>Invalid book id.</div>

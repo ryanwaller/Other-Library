@@ -1,66 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
+import SignInCard from "../../components/SignInCard";
 
 function notifyBorrowRequestsChanged() {
   window.dispatchEvent(new Event("om:borrow-requests-changed"));
-}
-
-function SignIn() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function signUp() {
-    if (!supabase) return;
-    setBusy(true);
-    setError(null);
-    const { error: err } = await supabase.auth.signUp({ email, password });
-    setBusy(false);
-    if (err) setError(err.message);
-  }
-
-  async function signIn() {
-    if (!supabase) return;
-    setBusy(true);
-    setError(null);
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
-    if (err) setError(err.message);
-  }
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    await signIn();
-  }
-
-  return (
-    <div className="card">
-      <form onSubmit={onSubmit}>
-        <div className="row">
-          <div>Email</div>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
-        <div className="row" style={{ marginTop: 8 }}>
-          <div>Password</div>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        </div>
-        <div className="row" style={{ marginTop: 12 }}>
-          <button type="submit" disabled={busy || !email || !password}>
-            Sign in
-          </button>
-          <button type="button" onClick={signUp} disabled={busy || !email || !password}>
-            Sign up
-          </button>
-          {error ? <span className="muted">{error}</span> : null}
-        </div>
-      </form>
-    </div>
-  );
 }
 
 type BorrowRequest = {
@@ -68,6 +15,7 @@ type BorrowRequest = {
   user_book_id: number;
   requester_id: string;
   owner_id: string;
+  kind: "borrow" | "note";
   status: "pending" | "approved" | "rejected" | "cancelled";
   message: string | null;
   created_at: string;
@@ -111,7 +59,7 @@ export default function BorrowRequestsPage() {
     try {
       const res = await supabase
         .from("borrow_requests")
-        .select("id,user_book_id,requester_id,owner_id,status,message,created_at")
+        .select("id,user_book_id,requester_id,owner_id,kind,status,message,created_at")
         .eq("owner_id", userId)
         .order("created_at", { ascending: false })
         .limit(200);
@@ -211,7 +159,7 @@ export default function BorrowRequestsPage() {
       </div>
 
       {!session ? (
-        <SignIn />
+        <SignInCard note="Sign in to manage borrow requests." />
       ) : (
         <div className="card">
           <div className="row" style={{ justifyContent: "space-between" }}>
@@ -220,7 +168,7 @@ export default function BorrowRequestsPage() {
           </div>
 
           <div className="muted" style={{ marginTop: 8 }}>
-            Incoming requests to borrow books from your library.
+            Incoming borrow requests and notes about your books.
           </div>
 
           <div style={{ marginTop: 12 }}>
@@ -254,7 +202,9 @@ export default function BorrowRequestsPage() {
                           {requester?.username ? <Link href={`/u/${requester.username}`}>{requester.username}</Link> : <span className="muted">{r.requester_id}</span>}
                         </div>
                       </div>
-                      <div className="muted">{r.status}</div>
+                      <div className="muted">
+                        {r.kind === "note" ? "note" : "borrow request"} • {r.status}
+                      </div>
                     </div>
 
                     <div style={{ marginTop: 8 }}>
@@ -269,7 +219,7 @@ export default function BorrowRequestsPage() {
                     ) : null}
 
                     <div className="row" style={{ marginTop: 10 }}>
-                      {r.status === "pending" ? (
+                      {r.status === "pending" && r.kind === "borrow" ? (
                         <>
                           <button onClick={() => setStatus(r.id, "approved")} disabled={reqState.busy}>
                             Approve
@@ -278,6 +228,10 @@ export default function BorrowRequestsPage() {
                             Reject
                           </button>
                         </>
+                      ) : r.status === "pending" && r.kind === "note" ? (
+                        <button onClick={() => setStatus(r.id, "approved")} disabled={reqState.busy}>
+                          Mark done
+                        </button>
                       ) : null}
                       <span className="muted">
                         {reqState.message ? (reqState.error ? `${reqState.message} (${reqState.error})` : reqState.message) : ""}

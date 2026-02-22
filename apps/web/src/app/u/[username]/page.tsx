@@ -13,9 +13,13 @@ type PublicBook = {
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
   authors_override: string[] | null;
+  borrowable_override: boolean | null;
+  borrow_request_scope_override: "anyone" | "approved_followers" | null;
   edition: { id: number; isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
+
+type BorrowScope = "anyone" | "approved_followers";
 
 function normalizeKeyPart(input: string): string {
   return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -41,6 +45,17 @@ function groupKeyFor(b: PublicBook): string {
     .filter(Boolean)
     .join("|");
   return `m:${title}|${authors}`;
+}
+
+function effectiveBorrowableFor(b: PublicBook, profile: any): boolean {
+  if (b.borrowable_override === true) return true;
+  if (b.borrowable_override === false) return false;
+  return Boolean(profile?.borrowable_default);
+}
+
+function effectiveScopeFor(b: PublicBook, profile: any): BorrowScope {
+  const raw = (b.borrow_request_scope_override ?? profile?.borrow_request_scope ?? "approved_followers") as string;
+  return raw === "anyone" ? "anyone" : "approved_followers";
 }
 
 export default async function PublicProfilePage({ params }: { params: Promise<{ username: string }> }) {
@@ -70,7 +85,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   const profileRes = await supabase
     .from("profiles")
-    .select("id,username,display_name,bio,visibility,avatar_path")
+    .select("id,username,display_name,bio,visibility,avatar_path,borrowable_default,borrow_request_scope")
     .eq("username", usernameNorm)
     .maybeSingle();
 
@@ -97,7 +112,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const booksRes = await supabase
     .from("user_books")
     .select(
-      "id,visibility,title_override,authors_override,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
+      "id,visibility,title_override,authors_override,borrowable_override,borrow_request_scope_override,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
     )
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
@@ -123,14 +138,19 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     }
   }
 
-  const groupedMap = new Map<string, { primary: PublicBook; copies: PublicBook[] }>();
+  const groupedMap = new Map<string, { copies: PublicBook[] }>();
   for (const b of books) {
     const key = groupKeyFor(b);
     const cur = groupedMap.get(key);
-    if (!cur) groupedMap.set(key, { primary: b, copies: [b] });
+    if (!cur) groupedMap.set(key, { copies: [b] });
     else cur.copies.push(b);
   }
-  const groupedBooks = Array.from(groupedMap.values());
+  const groupedBooks = Array.from(groupedMap.values()).map((g) => {
+    const borrowableAny = g.copies.some((b) => effectiveBorrowableFor(b, profile));
+    const scopeAny = g.copies.some((b) => effectiveBorrowableFor(b, profile) && effectiveScopeFor(b, profile) === "anyone");
+    const primary = g.copies.find((b) => effectiveBorrowableFor(b, profile)) ?? g.copies[0];
+    return { primary, copies: g.copies, borrowableAny, scopeAny };
+  });
   const editionIds = Array.from(new Set(groupedBooks.map((g) => g.primary.edition?.id).filter(Boolean))) as number[];
 
   return (
@@ -185,7 +205,16 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               <div key={b.id} className="card">
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                   <span className="muted">{g.copies.length > 1 ? `(${g.copies.length})` : ""}</span>
-                  <AddToLibraryButton editionId={e?.id ?? null} titleFallback={title} authorsFallback={effectiveAuthors} sourceOwnerId={profile.id} compact />
+                  <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                    {g.borrowableAny ? <span className="muted">{g.scopeAny ? "borrowable (anyone)" : "borrowable"}</span> : null}
+                    <AddToLibraryButton
+                      editionId={e?.id ?? null}
+                      titleFallback={title}
+                      authorsFallback={effectiveAuthors}
+                      sourceOwnerId={profile.id}
+                      compact
+                    />
+                  </div>
                 </div>
                 <Link href={href} style={{ display: "block", marginTop: 6 }}>
                   {coverUrl ? (
@@ -213,7 +242,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               </div>
             );
           })}
-      </AddToLibraryProvider>
+        </AddToLibraryProvider>
       </div>
     </main>
   );

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
+import SignInCard from "../../components/SignInCard";
 
 type BorrowScope = "anyone" | "approved_followers";
 
@@ -26,7 +27,7 @@ export default function BorrowRequestWidget({
   const [loadingFollow, setLoadingFollow] = useState<boolean>(false);
   const [note, setNote] = useState<string>("");
   const [state, setState] = useState<{ busy: boolean; error: string | null; message: string | null }>({ busy: false, error: null, message: null });
-  const [existing, setExisting] = useState<{ id: number; status: string; created_at: string } | null>(null);
+  const [existing, setExisting] = useState<{ id: number; kind: "borrow" | "note"; status: string; created_at: string } | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -46,7 +47,7 @@ export default function BorrowRequestWidget({
       }
       const res = await supabase
         .from("borrow_requests")
-        .select("id,status,created_at")
+        .select("id,kind,status,created_at")
         .eq("user_book_id", userBookId)
         .eq("requester_id", sessionUserId)
         .order("created_at", { ascending: false })
@@ -108,9 +109,10 @@ export default function BorrowRequestWidget({
         user_book_id: userBookId,
         owner_id: ownerId,
         requester_id: sessionUserId,
+        kind: "borrow",
         message: note.trim() ? note.trim() : null
       })
-      .select("id,status,created_at")
+      .select("id,kind,status,created_at")
       .single();
     if (res.error) {
       setState({ busy: false, error: res.error.message, message: "Failed" });
@@ -119,6 +121,33 @@ export default function BorrowRequestWidget({
     setExisting(res.data as any);
     setNote("");
     setState({ busy: false, error: null, message: "Requested" });
+    window.dispatchEvent(new Event("om:borrow-requests-changed"));
+  }
+
+  async function sendNote() {
+    if (!supabase || !sessionUserId) return;
+    const msg = note.trim();
+    if (!msg) return;
+    setState({ busy: true, error: null, message: "Sending…" });
+    const res = await supabase
+      .from("borrow_requests")
+      .insert({
+        user_book_id: userBookId,
+        owner_id: ownerId,
+        requester_id: sessionUserId,
+        kind: "note",
+        message: msg
+      })
+      .select("id,kind,status,created_at")
+      .single();
+    if (res.error) {
+      setState({ busy: false, error: res.error.message, message: "Failed" });
+      return;
+    }
+    setExisting(res.data as any);
+    setNote("");
+    setState({ busy: false, error: null, message: "Sent" });
+    window.dispatchEvent(new Event("om:borrow-requests-changed"));
   }
 
   async function cancelRequest() {
@@ -131,28 +160,17 @@ export default function BorrowRequestWidget({
     }
     setExisting((e) => (e ? { ...e, status: "cancelled" } : e));
     setState({ busy: false, error: null, message: "Cancelled" });
+    window.dispatchEvent(new Event("om:borrow-requests-changed"));
   }
 
   if (!supabase) return null;
-
-  if (!borrowable) {
-    return <div className="muted">Not borrowable.</div>;
-  }
 
   if (isOwner) {
     return <div className="muted">This is your book.</div>;
   }
 
   if (!sessionUserId) {
-    return (
-      <div className="muted">
-        Sign in to request to borrow this book.{" "}
-        <Link href="/app" target="_blank" rel="noreferrer">
-          Open app
-        </Link>
-        .
-      </div>
-    );
+    return <SignInCard note="Sign in to request to borrow or send a note." />;
   }
 
   if (scope === "approved_followers" && !followApproved) {
@@ -167,10 +185,27 @@ export default function BorrowRequestWidget({
   if (existing?.status === "pending") {
     return (
       <div>
-        <div className="muted">Borrow request: pending.</div>
+        <div className="muted">{existing.kind === "note" ? "Note: sent." : "Borrow request: pending."}</div>
         <div className="row" style={{ marginTop: 8 }}>
           <button onClick={cancelRequest} disabled={state.busy}>
-            {state.busy ? "…" : "Cancel request"}
+            {state.busy ? "…" : existing.kind === "note" ? "Cancel note" : "Cancel request"}
+          </button>
+          <div className="muted">{state.message ? (state.error ? `${state.message} (${state.error})` : state.message) : ""}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!borrowable) {
+    return (
+      <div>
+        <div className="muted">Not borrowable, but you can send a note.</div>
+        <div style={{ marginTop: 8 }}>
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note" rows={3} style={{ width: "100%" }} />
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <button onClick={sendNote} disabled={state.busy || !note.trim()}>
+            {state.busy ? "Sending…" : "Send note"}
           </button>
           <div className="muted">{state.message ? (state.error ? `${state.message} (${state.error})` : state.message) : ""}</div>
         </div>
@@ -199,4 +234,3 @@ export default function BorrowRequestWidget({
     </div>
   );
 }
-

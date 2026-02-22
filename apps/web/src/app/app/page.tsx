@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
+import SignInCard from "../components/SignInCard";
 
 type EditionMetadata = {
   isbn10?: string | null;
@@ -33,63 +34,6 @@ function parseAuthorsInput(input: string): string[] {
     out.push(p);
   }
   return out;
-}
-
-function SignIn() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function signUp() {
-    if (!supabase) return;
-    setBusy(true);
-    setError(null);
-    const { error: err } = await supabase.auth.signUp({ email, password });
-    setBusy(false);
-    if (err) setError(err.message);
-  }
-
-  async function signIn() {
-    if (!supabase) return;
-    setBusy(true);
-    setError(null);
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
-    if (err) setError(err.message);
-  }
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    await signIn();
-  }
-
-  return (
-    <div className="card">
-      <form onSubmit={onSubmit}>
-        <div className="row">
-          <div>Email</div>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
-        <div className="row" style={{ marginTop: 8 }}>
-          <div>Password</div>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        </div>
-        <div className="row" style={{ marginTop: 12 }}>
-          <button type="submit" disabled={busy || !email || !password}>
-            Sign in
-          </button>
-          <button type="button" onClick={signUp} disabled={busy || !email || !password}>
-            Sign up
-          </button>
-          {error ? <span className="muted">{error}</span> : null}
-        </div>
-        <div className="muted" style={{ marginTop: 8 }}>
-          Followers-only by default; public is optional later.
-        </div>
-      </form>
-    </div>
-  );
 }
 
 function AppShell({
@@ -1518,7 +1462,7 @@ export default function AppPage() {
           <AppWithFilters session={session} />
         </Suspense>
       ) : (
-        <SignIn />
+        <SignInCard note="Followers-only by default; public is optional later." />
       )}
     </main>
   );
