@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
@@ -94,6 +94,7 @@ function AppShell({
   };
   type CatalogGroup = {
     key: string;
+    libraryId: number;
     primary: CatalogItem;
     copies: CatalogItem[];
     copiesCount: number;
@@ -118,10 +119,9 @@ function AppShell({
     {}
   );
 
-  const [libraries, setLibraries] = useState<Array<{ id: number; name: string; created_at: string }>>([]);
-  const [currentLibraryId, setCurrentLibraryId] = useState<number | null>(null);
-  const currentLibrary = useMemo(() => libraries.find((l) => l.id === currentLibraryId) ?? null, [libraries, currentLibraryId]);
-  const [editingLibraryName, setEditingLibraryName] = useState(false);
+  const [libraries, setLibraries] = useState<Array<{ id: number; name: string; created_at: string; sort_order?: number | null }>>([]);
+  const [addLibraryId, setAddLibraryId] = useState<number | null>(null);
+  const [editingLibraryId, setEditingLibraryId] = useState<number | null>(null);
   const [libraryNameDraft, setLibraryNameDraft] = useState("");
   const [newLibraryName, setNewLibraryName] = useState("");
   const [libraryState, setLibraryState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
@@ -212,7 +212,7 @@ function AppShell({
     );
   }, [profile, userId, avatarUrl]);
 
-  async function refreshCatalog(libraryId: number) {
+  async function refreshAllBooks() {
     if (!supabase) return;
     const { data, error } = await supabase
       .from("user_books")
@@ -220,9 +220,8 @@ function AppShell({
         "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
       )
       .eq("owner_id", userId)
-      .eq("library_id", libraryId)
       .order("created_at", { ascending: false })
-      .limit(200);
+      .limit(800);
     if (error) return;
     const rows = (data ?? []) as any[];
     setItems(rows as any);
@@ -250,47 +249,68 @@ function AppShell({
     if (!supabase) return;
     setLibraryState({ busy: true, error: null, message: null });
     try {
-      let res = await supabase
-        .from("libraries")
-        .select("id,name,created_at")
-        .eq("owner_id", userId)
-        .order("created_at", { ascending: true });
-      if (res.error) throw new Error(res.error.message);
+      let list: Array<{ id: number; name: string; created_at: string; sort_order?: number | null }> = [];
 
-      let list = (res.data ?? []) as any as Array<{ id: number; name: string; created_at: string }>;
+      // Prefer DB ordering if the column exists, but gracefully fall back (older schema).
+      const resWithOrder = await supabase.from("libraries").select("id,name,created_at,sort_order").eq("owner_id", userId).order("sort_order", { ascending: true });
+      if (!resWithOrder.error) {
+        list = (resWithOrder.data ?? []) as any;
+      } else {
+        const msg = (resWithOrder.error.message ?? "").toLowerCase();
+        if (msg.includes("sort_order") && msg.includes("does not exist")) {
+          const res = await supabase.from("libraries").select("id,name,created_at").eq("owner_id", userId).order("created_at", { ascending: true });
+          if (res.error) throw new Error(res.error.message);
+          list = (res.data ?? []) as any;
+        } else {
+          throw new Error(resWithOrder.error.message);
+        }
+      }
+
       if (list.length === 0) {
         const created = await supabase.from("libraries").insert({ owner_id: userId, name: "Your catalog" }).select("id").single();
         if (created.error) throw new Error(created.error.message);
-        res = await supabase.from("libraries").select("id,name,created_at").eq("owner_id", userId).order("created_at", { ascending: true });
-        if (res.error) throw new Error(res.error.message);
-        list = (res.data ?? []) as any;
+        const res2 = await supabase.from("libraries").select("id,name,created_at").eq("owner_id", userId).order("created_at", { ascending: true });
+        if (res2.error) throw new Error(res2.error.message);
+        list = (res2.data ?? []) as any;
       }
 
-      setLibraries(list);
-
-      let nextId: number | null = null;
+      // Apply local order preference (used even if DB order is present, until we migrate fully).
       try {
-        const raw = window.localStorage.getItem("om_currentLibraryId");
-        const parsed = raw ? Number(raw) : NaN;
-        if (Number.isFinite(parsed) && parsed > 0 && list.some((l) => l.id === parsed)) nextId = parsed;
+        const raw = window.localStorage.getItem("om_libraryOrder");
+        const order = (raw ?? "")
+          .split(",")
+          .map((s) => Number(s.trim()))
+          .filter((n) => Number.isFinite(n) && n > 0);
+        if (order.length > 0) {
+          const rank = new Map<number, number>();
+          order.forEach((id, idx) => rank.set(id, idx));
+          list = list
+            .slice()
+            .sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9) || Date.parse(a.created_at) - Date.parse(b.created_at));
+        }
       } catch {
         // ignore
       }
 
-      if (!nextId) nextId = list[0]?.id ?? null;
-      setCurrentLibraryId(nextId);
-      setBulkMoveLibraryId(nextId);
-      if (nextId) {
-        try {
-          window.localStorage.setItem("om_currentLibraryId", String(nextId));
-        } catch {
-          // ignore
+      setLibraries(list);
+
+      try {
+        const raw = window.localStorage.getItem("om_addLibraryId");
+        const parsed = raw ? Number(raw) : NaN;
+        if (Number.isFinite(parsed) && parsed > 0 && list.some((l) => l.id === parsed)) {
+          setAddLibraryId(parsed);
+        } else {
+          setAddLibraryId(list[0]?.id ?? null);
         }
+      } catch {
+        setAddLibraryId(list[0]?.id ?? null);
       }
+
+      setBulkMoveLibraryId((prev) => (prev && list.some((l) => l.id === prev) ? prev : list[0]?.id ?? null));
       setLibraryState({ busy: false, error: null, message: null });
     } catch (e: any) {
       setLibraries([]);
-      setCurrentLibraryId(null);
+      setAddLibraryId(null);
       setLibraryState({ busy: false, error: e?.message ?? "Failed to load catalogs", message: null });
     }
   }
@@ -306,8 +326,13 @@ function AppShell({
       await refreshLibraries();
       const id = (created.data as any)?.id as number | undefined;
       if (id) {
-        setCurrentLibraryId(id);
+        setAddLibraryId(id);
         setBulkMoveLibraryId(id);
+        try {
+          window.localStorage.setItem("om_addLibraryId", String(id));
+        } catch {
+          // ignore
+        }
       }
       setNewLibraryName("");
       setLibraryState({ busy: false, error: null, message: "Created" });
@@ -326,7 +351,7 @@ function AppShell({
       const upd = await supabase.from("libraries").update({ name: n }).eq("id", libraryId).eq("owner_id", userId);
       if (upd.error) throw new Error(upd.error.message);
       await refreshLibraries();
-      setEditingLibraryName(false);
+      setEditingLibraryId(null);
       setLibraryState({ busy: false, error: null, message: "Saved" });
       window.setTimeout(() => setLibraryState({ busy: false, error: null, message: null }), 1200);
     } catch (e: any) {
@@ -359,27 +384,16 @@ function AppShell({
       setUserBooksCount(count ?? 0);
 
       await refreshLibraries();
+      await refreshAllBooks();
     })();
     return () => {
       alive = false;
     };
   }, [userId]);
 
-  useEffect(() => {
-    if (!supabase) return;
-    if (!currentLibraryId) return;
-    try {
-      window.localStorage.setItem("om_currentLibraryId", String(currentLibraryId));
-    } catch {
-      // ignore
-    }
-    refreshCatalog(currentLibraryId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLibraryId]);
-
   async function addByIsbn() {
     if (!supabase) return;
-    if (!currentLibraryId) return;
+    if (!addLibraryId) return;
     setBusyAdd(true);
     setAddError(null);
     try {
@@ -416,11 +430,11 @@ function AppShell({
         editionId = inserted.data.id;
       }
 
-      const created = await supabase.from("user_books").insert({ owner_id: userId, library_id: currentLibraryId, edition_id: editionId }).select("id");
+      const created = await supabase.from("user_books").insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId }).select("id");
       if (created.error) throw new Error(created.error.message);
 
       setIsbn("");
-      await refreshCatalog(currentLibraryId);
+      await refreshAllBooks();
       const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
       setUserBooksCount(count ?? 0);
     } catch (e: any) {
@@ -432,7 +446,7 @@ function AppShell({
 
   async function addManual() {
     if (!supabase) return;
-    if (!currentLibraryId) return;
+    if (!addLibraryId) return;
     const title = manualTitle.trim();
     const authors = parseAuthorsInput(manualAuthors);
     if (!title) return;
@@ -442,7 +456,7 @@ function AppShell({
         .from("user_books")
         .insert({
           owner_id: userId,
-          library_id: currentLibraryId,
+          library_id: addLibraryId,
           edition_id: null,
           title_override: title,
           authors_override: authors.length > 0 ? authors : null
@@ -453,7 +467,7 @@ function AppShell({
 
       setManualTitle("");
       setManualAuthors("");
-      await refreshCatalog(currentLibraryId);
+      await refreshAllBooks();
       const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
       setUserBooksCount(count ?? 0);
       setManualState({ busy: false, error: null, message: "Added" });
@@ -563,7 +577,7 @@ function AppShell({
       .eq("kind", "cover")
       .neq("id", inserted.data.id);
 
-    if (currentLibraryId) await refreshCatalog(currentLibraryId);
+    await refreshAllBooks();
     clearPendingCover(userBookId);
     setCoverUploadStateByBookId((prev) => ({
       ...prev,
@@ -596,7 +610,7 @@ function AppShell({
       const del = await supabase.from("user_books").delete().eq("id", userBookId);
       if (del.error) throw new Error(del.error.message);
 
-      if (currentLibraryId) await refreshCatalog(currentLibraryId);
+      await refreshAllBooks();
       const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
       setUserBooksCount(count ?? 0);
 
@@ -668,7 +682,8 @@ function AppShell({
 
     const byKey = new Map<string, CatalogItem[]>();
     for (const it of filteredItems) {
-      const key = groupKeyFor(it);
+      // Keep each catalog ("library") independent: the same book can appear in multiple libraries.
+      const key = `${it.library_id}:${groupKeyFor(it)}`;
       const cur = byKey.get(key);
       if (!cur) byKey.set(key, [it]);
       else cur.push(it);
@@ -708,6 +723,7 @@ function AppShell({
 
       return {
         key,
+        libraryId: primary.library_id,
         primary,
         copies: sorted,
         copiesCount: sorted.length,
@@ -751,6 +767,17 @@ function AppShell({
   }, [filteredItems, filterTag, filterAuthor, filterSubject, filterPublisher, filterCategory, categoryMode, sortMode]);
 
   const displayCopiesCount = useMemo(() => displayGroups.reduce((sum, g) => sum + g.copiesCount, 0), [displayGroups]);
+
+  const displayGroupsByLibraryId = useMemo(() => {
+    const by: Record<number, CatalogGroup[]> = {};
+    for (const g of displayGroups) {
+      const id = Number(g.libraryId);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      if (!by[id]) by[id] = [];
+      by[id].push(g);
+    }
+    return by;
+  }, [displayGroups]);
 
   const coverHeight = useMemo(() => {
     if (viewMode === "list") return 56;
@@ -801,7 +828,7 @@ function AppShell({
   async function bulkDeleteSelected() {
     if (!supabase) return;
     if (bulkSelectedGroups.length === 0) return;
-    if (!window.confirm(`Delete ${bulkSelectedGroups.length} book(s) from this catalog? This deletes all selected copies in this catalog.`)) return;
+    if (!window.confirm(`Delete ${bulkSelectedGroups.length} book(s)? This deletes all selected copies across your catalogs.`)) return;
     setBulkState({ busy: true, error: null, message: "Deleting…" });
     try {
       const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
@@ -822,7 +849,7 @@ function AppShell({
       const del = await supabase.from("user_books").delete().in("id", ids);
       if (del.error) throw new Error(del.error.message);
       setBulkSelectedKeys({});
-      if (currentLibraryId) await refreshCatalog(currentLibraryId);
+      await refreshAllBooks();
       const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
       setUserBooksCount(count ?? 0);
       setBulkState({ busy: false, error: null, message: "Deleted" });
@@ -836,18 +863,141 @@ function AppShell({
     if (!supabase) return;
     if (bulkSelectedGroups.length === 0) return;
     if (!bulkMoveLibraryId) return;
+    if (
+      !window.confirm(
+        `Move ${bulkSelectedGroups.length} book(s) to "${libraries.find((l) => l.id === bulkMoveLibraryId)?.name ?? "selected catalog"}"?`
+      )
+    )
+      return;
     setBulkState({ busy: true, error: null, message: "Moving…" });
     try {
       const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
       const upd = await supabase.from("user_books").update({ library_id: bulkMoveLibraryId }).in("id", ids);
       if (upd.error) throw new Error(upd.error.message);
       setBulkSelectedKeys({});
-      setCurrentLibraryId(bulkMoveLibraryId);
+      await refreshAllBooks();
       setBulkState({ busy: false, error: null, message: "Moved" });
       window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
     } catch (e: any) {
       setBulkState({ busy: false, error: e?.message ?? "Move failed", message: "Move failed" });
     }
+  }
+
+  async function bulkCopySelected() {
+    if (!supabase) return;
+    if (bulkSelectedGroups.length === 0) return;
+    if (!bulkMoveLibraryId) return;
+    if (
+      !window.confirm(
+        `Copy ${bulkSelectedGroups.length} book(s) to "${libraries.find((l) => l.id === bulkMoveLibraryId)?.name ?? "selected catalog"}"?`
+      )
+    )
+      return;
+    setBulkState({ busy: true, error: null, message: "Copying…" });
+    try {
+      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
+
+      const srcRes = await supabase
+        .from("user_books")
+        .select(
+          "id,edition_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,subjects_override,publisher_override,publish_date_override,description_override,location,shelf,notes"
+        )
+        .in("id", ids);
+      if (srcRes.error) throw new Error(srcRes.error.message);
+      const srcRows = (srcRes.data ?? []) as any[];
+
+      const tagRes = await supabase.from("user_book_tags").select("user_book_id,tag_id").in("user_book_id", ids);
+      if (tagRes.error) throw new Error(tagRes.error.message);
+      const tagsByBookId: Record<number, number[]> = {};
+      for (const r of (tagRes.data ?? []) as any[]) {
+        const bid = Number(r.user_book_id);
+        const tid = Number(r.tag_id);
+        if (!Number.isFinite(bid) || !Number.isFinite(tid)) continue;
+        (tagsByBookId[bid] ??= []).push(tid);
+      }
+
+      let copied = 0;
+      for (const r of srcRows) {
+        const inserted = await supabase
+          .from("user_books")
+          .insert({
+            owner_id: userId,
+            library_id: bulkMoveLibraryId,
+            edition_id: (r as any).edition_id ?? null,
+            visibility: (r as any).visibility ?? "inherit",
+            status: (r as any).status ?? "owned",
+            borrowable_override: (r as any).borrowable_override ?? null,
+            borrow_request_scope_override: (r as any).borrow_request_scope_override ?? null,
+            title_override: (r as any).title_override ?? null,
+            authors_override: (r as any).authors_override ?? null,
+            subjects_override: (r as any).subjects_override ?? null,
+            publisher_override: (r as any).publisher_override ?? null,
+            publish_date_override: (r as any).publish_date_override ?? null,
+            description_override: (r as any).description_override ?? null,
+            location: (r as any).location ?? null,
+            shelf: (r as any).shelf ?? null,
+            notes: (r as any).notes ?? null
+          })
+          .select("id")
+          .single();
+        if (inserted.error) throw new Error(inserted.error.message);
+
+        copied += 1;
+        const newId = Number((inserted.data as any)?.id);
+        const oldId = Number((r as any).id);
+        const tagIds = (tagsByBookId[oldId] ?? []).filter((t) => Number.isFinite(t) && t > 0);
+        if (Number.isFinite(newId) && newId > 0 && tagIds.length > 0) {
+          const rows = tagIds.map((tagId) => ({ user_book_id: newId, tag_id: tagId }));
+          const insTags = await supabase.from("user_book_tags").insert(rows as any);
+          if (insTags.error) {
+            // continue; tags are optional
+          }
+        }
+      }
+
+      setBulkSelectedKeys({});
+      await refreshAllBooks();
+      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
+      setUserBooksCount(count ?? 0);
+      setBulkState({ busy: false, error: null, message: `Copied ${copied}` });
+      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setBulkState({ busy: false, error: e?.message ?? "Copy failed", message: "Copy failed" });
+    }
+  }
+
+  function moveLibrary(libraryId: number, delta: -1 | 1) {
+    setLibraries((prev) => {
+      const idx = prev.findIndex((l) => l.id === libraryId);
+      if (idx < 0) return prev;
+      const nextIdx = idx + delta;
+      if (nextIdx < 0 || nextIdx >= prev.length) return prev;
+      const next = prev.slice();
+      const [moved] = next.splice(idx, 1);
+      next.splice(nextIdx, 0, moved);
+      try {
+        window.localStorage.setItem(
+          "om_libraryOrder",
+          next
+            .map((l) => l.id)
+            .filter((n) => Number.isFinite(n) && n > 0)
+            .join(",")
+        );
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }
+
+  function beginEditLibrary(libraryId: number, currentName: string) {
+    setEditingLibraryId(libraryId);
+    setLibraryNameDraft(currentName ?? "");
+  }
+
+  function cancelEditLibrary() {
+    setEditingLibraryId(null);
+    setLibraryNameDraft("");
   }
 
   async function bulkAssignCategory() {
@@ -863,12 +1013,223 @@ function AppShell({
       const up = await supabase.from("user_book_tags").upsert(rows as any, { onConflict: "user_book_id,tag_id" });
       if (up.error) throw new Error(up.error.message);
       setBulkCategoryName("");
-      if (currentLibraryId) await refreshCatalog(currentLibraryId);
+      await refreshAllBooks();
       setBulkState({ busy: false, error: null, message: "Applied" });
       window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
     } catch (e: any) {
       setBulkState({ busy: false, error: e?.message ?? "Apply failed", message: "Apply failed" });
     }
+  }
+
+  const booksContainerStyle = useMemo<CSSProperties>(
+    () => ({
+      display: viewMode === "grid" ? "grid" : "flex",
+      flexDirection: viewMode === "list" ? ("column" as const) : undefined,
+      gridTemplateColumns: viewMode === "grid" ? `repeat(${gridCols}, minmax(0, 1fr))` : undefined,
+      gap: 12
+    }),
+    [viewMode, gridCols]
+  );
+
+  function renderGroup(g: CatalogGroup) {
+    const it = g.primary;
+    const e = it.edition;
+    const title = g.title;
+    const effectiveAuthors = effectiveAuthorsFor(it);
+    const tags = g.tagNames;
+    const selected = !!bulkSelectedKeys[g.key];
+    const coverUrl =
+      g.copies
+        .map((c) => {
+          const cover = (c.media ?? []).find((m) => m.kind === "cover");
+          if (!cover) return null;
+          return mediaUrlsByPath[cover.storage_path] ?? null;
+        })
+        .find(Boolean) ?? e?.cover_url ?? null;
+    const pendingCover = pendingCoverByBookId[it.id];
+    const coverState = coverUploadStateByBookId[it.id];
+    const delState = deleteStateByBookId[it.id];
+    const coverEl = coverUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img alt={title} src={coverUrl} style={{ width: "100%", height: coverHeight, objectFit: "contain", border: "1px solid var(--border)" }} />
+    ) : (
+      <div style={{ width: "100%", height: coverHeight, border: "1px solid var(--border)" }} />
+    );
+
+    if (viewMode === "list") {
+      return (
+        <div key={it.id} className="card" style={{ display: "grid", gridTemplateColumns: bulkMode ? "26px 70px 1fr" : "70px 1fr", gap: 12, alignItems: "start" }}>
+          {bulkMode ? <input type="checkbox" checked={selected} onChange={() => toggleBulkKey(g.key)} aria-label="Select book" /> : null}
+          <Link href={`/app/books/${it.id}`} style={{ display: "block" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {coverUrl ? (
+              <img alt={title} src={coverUrl} style={{ width: 70, height: 70, objectFit: "cover", border: "1px solid var(--border)" }} />
+            ) : (
+              <div style={{ width: 70, height: 70, border: "1px solid var(--border)" }} />
+            )}
+          </Link>
+          <div>
+            <div>
+              <Link href={`/app/books/${it.id}`}>{title}</Link> <span className="muted">{g.copiesCount > 1 ? `(${g.copiesCount})` : ""}</span>
+            </div>
+            <div className="muted" style={{ marginTop: 4 }}>
+              {effectiveAuthors.length > 0 ? (
+                <>
+                  {effectiveAuthors.map((a, idx) => (
+                    <span key={a}>
+                      <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
+                      {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                    </span>
+                  ))}
+                </>
+              ) : (
+                e?.isbn13 || ""
+              )}
+            </div>
+            {tags.length > 0 ? (
+              <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {tags.slice(0, 6).map((t) => (
+                  <span key={t} style={{ border: "1px solid var(--border)", padding: "2px 6px" }}>
+                    <Link href={`/app?tag=${encodeURIComponent(t)}`} style={{ textDecoration: "none" }}>
+                      {t}
+                    </Link>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10 }}>
+              <span className="muted">Visibility</span>
+              <select value={g.visibility} onChange={(ev) => updateUserBookVisibilityGroup(g.copies.map((c) => c.id), ev.target.value as any)}>
+                {g.visibility === "mixed" ? (
+                  <option value="mixed" disabled>
+                    mixed
+                  </option>
+                ) : null}
+                <option value="inherit">inherit</option>
+                <option value="followers_only">followers_only</option>
+                <option value="public">public</option>
+              </select>
+              <span className="muted">Cover</span>
+              <input key={coverInputKeyByBookId[it.id] ?? 0} type="file" accept="image/*" onChange={(ev) => selectPendingCover(it.id, ev.target.files)} />
+              {pendingCover ? (
+                <>
+                  <button onClick={() => uploadSelectedCover(it.id)} disabled={coverState?.busy ?? false}>
+                    {coverState?.busy ? "Uploading…" : "Submit"}
+                  </button>
+                  <button onClick={() => clearPendingCover(it.id)} disabled={coverState?.busy ?? false}>
+                    Clear
+                  </button>
+                </>
+              ) : null}
+              <button onClick={() => deleteEntry(it.id)} disabled={delState?.busy ?? false} title="Deletes one copy">
+                Delete copy
+              </button>
+              <span className="muted">{delState?.message ? (delState?.error ? `${delState?.message} (${delState?.error})` : delState?.message) : ""}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div key={it.id} className="card">
+        {bulkMode ? (
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+            <input type="checkbox" checked={selected} onChange={() => toggleBulkKey(g.key)} aria-label="Select book" />
+            <span className="muted">{g.copiesCount > 1 ? `(${g.copiesCount})` : ""}</span>
+          </div>
+        ) : null}
+        <Link href={`/app/books/${it.id}`} style={{ display: "block" }}>
+          {coverEl}
+        </Link>
+        <div style={{ marginTop: 8 }}>
+          <div className="row" style={{ justifyContent: "space-between", gap: 10 }}>
+            <Link href={`/app/books/${it.id}`}>{title}</Link>
+            {!bulkMode ? <span className="muted">{g.copiesCount > 1 ? `(${g.copiesCount})` : ""}</span> : null}
+          </div>
+        </div>
+        <div className="muted" style={{ marginTop: 4 }}>
+          {effectiveAuthors.length > 0 ? (
+            <>
+              {effectiveAuthors.map((a, idx) => (
+                <span key={a}>
+                  <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
+                  {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                </span>
+              ))}
+            </>
+          ) : (
+            e?.isbn13 || ""
+          )}
+        </div>
+
+        {tags.length > 0 ? (
+          <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {tags.slice(0, 6).map((t) => (
+              <span key={t} style={{ border: "1px solid var(--border)", padding: "2px 6px" }}>
+                <Link href={`/app?tag=${encodeURIComponent(t)}`} style={{ textDecoration: "none" }}>
+                  {t}
+                </Link>
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
+          <div className="muted">Visibility</div>
+          <select value={g.visibility} onChange={(ev) => updateUserBookVisibilityGroup(g.copies.map((c) => c.id), ev.target.value as any)}>
+            {g.visibility === "mixed" ? (
+              <option value="mixed" disabled>
+                mixed
+              </option>
+            ) : null}
+            <option value="inherit">inherit</option>
+            <option value="followers_only">followers_only</option>
+            <option value="public">public</option>
+          </select>
+        </div>
+
+        <div style={{ marginTop: 10 }}>
+          <div className="muted">Cover override</div>
+          <input key={coverInputKeyByBookId[it.id] ?? 0} type="file" accept="image/*" onChange={(ev) => selectPendingCover(it.id, ev.target.files)} style={{ marginTop: 6 }} />
+          {pendingCover ? (
+            <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
+              <div className="row">
+                <button onClick={() => uploadSelectedCover(it.id)} disabled={coverState?.busy ?? false}>
+                  {coverState?.busy ? "Uploading…" : "Submit"}
+                </button>
+                <button onClick={() => clearPendingCover(it.id)} disabled={coverState?.busy ?? false} style={{ marginLeft: 8 }}>
+                  Clear
+                </button>
+              </div>
+              <div className="muted">{coverState?.message ? (coverState?.error ? `${coverState?.message} (${coverState?.error})` : coverState?.message) : ""}</div>
+            </div>
+          ) : coverState?.message ? (
+            <div className="muted" style={{ marginTop: 6 }}>
+              {coverState?.error ? `${coverState?.message} (${coverState?.error})` : coverState?.message}
+            </div>
+          ) : (
+            <div className="muted" style={{ marginTop: 6 }}>
+              Upload a cover if the book has no online cover.
+            </div>
+          )}
+        </div>
+
+        <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
+          <Link href={`/app/books/${it.id}`} className="muted">
+            Details
+          </Link>
+          <button onClick={() => deleteEntry(it.id)} disabled={delState?.busy ?? false} title="Deletes one copy">
+            Delete copy
+          </button>
+        </div>
+        {delState?.message ? (
+          <div className="muted" style={{ marginTop: 6 }}>
+            {delState?.error ? `${delState?.message} (${delState?.error})` : delState?.message}
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -901,9 +1262,17 @@ function AppShell({
               <span className="row" style={{ gap: 8 }}>
                 <span>Catalog</span>
                 <select
-                  value={currentLibraryId ?? ""}
-                  onChange={(e) => setCurrentLibraryId(Number(e.target.value))}
-                  disabled={libraryState.busy || !currentLibraryId}
+                  value={addLibraryId ?? ""}
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    setAddLibraryId(id);
+                    try {
+                      window.localStorage.setItem("om_addLibraryId", String(id));
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                  disabled={libraryState.busy || !addLibraryId}
                 >
                   {libraries.map((l) => (
                     <option key={l.id} value={l.id}>
@@ -983,61 +1352,8 @@ function AppShell({
       <div style={{ marginTop: 16 }}>
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            {libraries.length > 1 ? (
-              <select
-                value={currentLibraryId ?? ""}
-                onChange={(e) => setCurrentLibraryId(Number(e.target.value))}
-                disabled={libraryState.busy || !currentLibraryId}
-              >
-                {libraries.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-
-            {editingLibraryName ? (
-              <span className="row" style={{ gap: 8 }}>
-                <input
-                  value={libraryNameDraft}
-                  onChange={(e) => setLibraryNameDraft(e.target.value)}
-                  placeholder="Catalog name"
-                  style={{ minWidth: 220 }}
-                />
-                <button
-                  onClick={() => {
-                    if (!currentLibraryId) return;
-                    saveLibraryName(currentLibraryId, libraryNameDraft);
-                  }}
-                  disabled={libraryState.busy || !currentLibraryId || !libraryNameDraft.trim()}
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => {
-                    setEditingLibraryName(false);
-                    setLibraryNameDraft(currentLibrary?.name ?? "Your catalog");
-                  }}
-                  disabled={libraryState.busy}
-                >
-                  Cancel
-                </button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingLibraryName(true);
-                  setLibraryNameDraft(currentLibrary?.name ?? "Your catalog");
-                }}
-                style={{ background: "transparent", border: "none", padding: 0, margin: 0, cursor: "pointer", fontFamily: "inherit", fontSize: "inherit" }}
-                title="Rename this catalog"
-              >
-                {currentLibrary?.name ?? "Your catalog"}
-              </button>
-            )}
-
+            <span className="muted">Catalogs</span>
+            <span>{libraries.length}</span>
             {libraryState.message ? <span className="muted">{libraryState.message}</span> : libraryState.error ? <span className="muted">{libraryState.error}</span> : null}
           </div>
           <div className="muted">
@@ -1165,245 +1481,82 @@ function AppShell({
             <button onClick={bulkMoveSelected} disabled={bulkState.busy || bulkSelectedGroups.length === 0 || !bulkMoveLibraryId}>
               Move
             </button>
+            <button onClick={bulkCopySelected} disabled={bulkState.busy || bulkSelectedGroups.length === 0 || !bulkMoveLibraryId}>
+              Copy
+            </button>
             {bulkState.message ? <span className="muted">{bulkState.error ? `${bulkState.message} (${bulkState.error})` : bulkState.message}</span> : null}
           </div>
         ) : null}
 
-        <div
-          style={{
-            marginTop: 10,
-            display: viewMode === "grid" ? "grid" : "flex",
-            flexDirection: viewMode === "list" ? "column" : undefined,
-            gridTemplateColumns: viewMode === "grid" ? `repeat(${gridCols}, minmax(0, 1fr))` : undefined,
-            gap: 12
-          }}
-        >
-          {displayGroups.map((g) => {
-            const it = g.primary;
-            const e = it.edition;
-            const title = g.title;
-            const effectiveAuthors = effectiveAuthorsFor(it);
-            const tags = g.tagNames;
-            const selected = !!bulkSelectedKeys[g.key];
-            const coverUrl =
-              g.copies
-                .map((c) => {
-                  const cover = (c.media ?? []).find((m) => m.kind === "cover");
-                  if (!cover) return null;
-                  return mediaUrlsByPath[cover.storage_path] ?? null;
-                })
-                .find(Boolean) ?? e?.cover_url ?? null;
-            const pendingCover = pendingCoverByBookId[it.id];
-            const coverState = coverUploadStateByBookId[it.id];
-            const delState = deleteStateByBookId[it.id];
-            const coverEl = coverUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                alt={title}
-                src={coverUrl}
-                style={{ width: "100%", height: coverHeight, objectFit: "contain", border: "1px solid var(--border)" }}
-              />
-            ) : (
-              <div style={{ width: "100%", height: coverHeight, border: "1px solid var(--border)" }} />
-            );
-
-            if (viewMode === "list") {
-              return (
-                <div
-                  key={it.id}
-                  className="card"
-                  style={{ display: "grid", gridTemplateColumns: bulkMode ? "26px 70px 1fr" : "70px 1fr", gap: 12, alignItems: "start" }}
-                >
-                  {bulkMode ? (
-                    <input type="checkbox" checked={selected} onChange={() => toggleBulkKey(g.key)} aria-label="Select book" />
-                  ) : null}
-                  <Link href={`/app/books/${it.id}`} style={{ display: "block" }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {coverUrl ? (
-                      <img alt={title} src={coverUrl} style={{ width: 70, height: 70, objectFit: "cover", border: "1px solid var(--border)" }} />
-                    ) : (
-                      <div style={{ width: 70, height: 70, border: "1px solid var(--border)" }} />
-                    )}
-                  </Link>
-                  <div>
-                    <div>
-                      <Link href={`/app/books/${it.id}`}>{title}</Link>{" "}
-                      <span className="muted">{g.copiesCount > 1 ? `(${g.copiesCount})` : ""}</span>
-                    </div>
-                    <div className="muted" style={{ marginTop: 4 }}>
-                      {effectiveAuthors.length > 0 ? (
-                        <>
-                          {effectiveAuthors.map((a, idx) => (
-                            <span key={a}>
-                              <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
-                              {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                            </span>
-                          ))}
-                        </>
-                      ) : (
-                        e?.isbn13 || ""
-                      )}
-                    </div>
-                    {tags.length > 0 ? (
-                      <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {tags.slice(0, 6).map((t) => (
-                          <span key={t} style={{ border: "1px solid var(--border)", padding: "2px 6px" }}>
-                            <Link href={`/app?tag=${encodeURIComponent(t)}`} style={{ textDecoration: "none" }}>
-                              {t}
-                            </Link>
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                    <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10 }}>
-                      <span className="muted">Visibility</span>
-                      <select
-                        value={g.visibility}
-                        onChange={(ev) => updateUserBookVisibilityGroup(g.copies.map((c) => c.id), ev.target.value as any)}
-                      >
-                        {g.visibility === "mixed" ? (
-                          <option value="mixed" disabled>
-                            mixed
-                          </option>
-                        ) : null}
-                        <option value="inherit">inherit</option>
-                        <option value="followers_only">followers_only</option>
-                        <option value="public">public</option>
-                      </select>
-                      <span className="muted">Cover</span>
-                      <input key={coverInputKeyByBookId[it.id] ?? 0} type="file" accept="image/*" onChange={(ev) => selectPendingCover(it.id, ev.target.files)} />
-                      {pendingCover ? (
-                        <>
-                          <button onClick={() => uploadSelectedCover(it.id)} disabled={coverState?.busy ?? false}>
-                            {coverState?.busy ? "Uploading…" : "Submit"}
-                          </button>
-                          <button onClick={() => clearPendingCover(it.id)} disabled={coverState?.busy ?? false}>
-                            Clear
-                          </button>
-                        </>
-                      ) : null}
-                      <button onClick={() => deleteEntry(it.id)} disabled={delState?.busy ?? false} title="Deletes one copy">
-                        Delete copy
+        {libraries.map((lib, idx) => {
+          const groups = displayGroupsByLibraryId[lib.id] ?? [];
+          const copiesInLibrary = groups.reduce((sum, g) => sum + g.copiesCount, 0);
+          return (
+            <div key={lib.id} className="card" style={{ marginTop: 14 }}>
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                <div className="row" style={{ gap: 10 }}>
+                  {editingLibraryId === lib.id ? (
+                    <span className="row" style={{ gap: 8 }}>
+                      <input
+                        value={libraryNameDraft}
+                        onChange={(e) => setLibraryNameDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            cancelEditLibrary();
+                            return;
+                          }
+                          if (e.key !== "Enter") return;
+                          e.preventDefault();
+                          saveLibraryName(lib.id, libraryNameDraft);
+                        }}
+                        autoFocus
+                        style={{ minWidth: 220 }}
+                      />
+                      <button onClick={() => saveLibraryName(lib.id, libraryNameDraft)} disabled={libraryState.busy || !libraryNameDraft.trim()}>
+                        Save
                       </button>
-                      <span className="muted">
-                        {delState?.message ? (delState?.error ? `${delState?.message} (${delState?.error})` : delState?.message) : ""}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <div key={it.id} className="card">
-                {bulkMode ? (
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                    <input type="checkbox" checked={selected} onChange={() => toggleBulkKey(g.key)} aria-label="Select book" />
-                    <span className="muted">{g.copiesCount > 1 ? `(${g.copiesCount})` : ""}</span>
-                  </div>
-                ) : null}
-                <Link href={`/app/books/${it.id}`} style={{ display: "block" }}>
-                  {coverEl}
-                </Link>
-                <div style={{ marginTop: 8 }}>
-                  <div className="row" style={{ justifyContent: "space-between", gap: 10 }}>
-                    <Link href={`/app/books/${it.id}`}>{title}</Link>
-                    {!bulkMode ? <span className="muted">{g.copiesCount > 1 ? `(${g.copiesCount})` : ""}</span> : null}
-                  </div>
-                </div>
-                <div className="muted" style={{ marginTop: 4 }}>
-                  {effectiveAuthors.length > 0 ? (
-                    <>
-                      {effectiveAuthors.map((a, idx) => (
-                        <span key={a}>
-                          <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
-                          {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                        </span>
-                      ))}
-                    </>
+                      <button onClick={cancelEditLibrary} disabled={libraryState.busy}>
+                        Cancel
+                      </button>
+                    </span>
                   ) : (
-                    e?.isbn13 || ""
+                    <button
+                      onClick={() => beginEditLibrary(lib.id, lib.name)}
+                      style={{ padding: 0, border: "none", background: "transparent", textDecoration: "underline" }}
+                      aria-label="Rename catalog"
+                    >
+                      {lib.name}
+                    </button>
                   )}
+                  <span className="muted">
+                    {groups.length} book{groups.length === 1 ? "" : "s"} / {copiesInLibrary} cop{copiesInLibrary === 1 ? "y" : "ies"}
+                  </span>
                 </div>
-
-                {tags.length > 0 ? (
-                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {tags.slice(0, 6).map((t) => (
-                      <span key={t} style={{ border: "1px solid var(--border)", padding: "2px 6px" }}>
-                        <Link href={`/app?tag=${encodeURIComponent(t)}`} style={{ textDecoration: "none" }}>
-                          {t}
-                        </Link>
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-
-                <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
-                  <div className="muted">Visibility</div>
-                  <select
-                    value={g.visibility}
-                    onChange={(ev) => updateUserBookVisibilityGroup(g.copies.map((c) => c.id), ev.target.value as any)}
-                  >
-                    {g.visibility === "mixed" ? (
-                      <option value="mixed" disabled>
-                        mixed
-                      </option>
-                    ) : null}
-                    <option value="inherit">inherit</option>
-                    <option value="followers_only">followers_only</option>
-                    <option value="public">public</option>
-                  </select>
+                <div className="row" style={{ gap: 8 }}>
+                  {idx > 0 ? (
+                    <button onClick={() => moveLibrary(lib.id, -1)} disabled={libraryState.busy} aria-label="Move catalog up">
+                      ↑
+                    </button>
+                  ) : null}
+                  {idx < libraries.length - 1 ? (
+                    <button onClick={() => moveLibrary(lib.id, 1)} disabled={libraryState.busy} aria-label="Move catalog down">
+                      ↓
+                    </button>
+                  ) : null}
                 </div>
-
-                <div style={{ marginTop: 10 }}>
-                  <div className="muted">Cover override</div>
-                  <input
-                    key={coverInputKeyByBookId[it.id] ?? 0}
-                    type="file"
-                    accept="image/*"
-                    onChange={(ev) => selectPendingCover(it.id, ev.target.files)}
-                    style={{ marginTop: 6 }}
-                  />
-                  {pendingCover ? (
-                    <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
-                      <div className="row">
-                        <button onClick={() => uploadSelectedCover(it.id)} disabled={coverState?.busy ?? false}>
-                          {coverState?.busy ? "Uploading…" : "Submit"}
-                        </button>
-                        <button onClick={() => clearPendingCover(it.id)} disabled={coverState?.busy ?? false} style={{ marginLeft: 8 }}>
-                          Clear
-                        </button>
-                      </div>
-                      <div className="muted">{coverState?.message ? (coverState?.error ? `${coverState?.message} (${coverState?.error})` : coverState?.message) : ""}</div>
-                    </div>
-                  ) : coverState?.message ? (
-                    <div className="muted" style={{ marginTop: 6 }}>
-                      {coverState?.error ? `${coverState?.message} (${coverState?.error})` : coverState?.message}
-                    </div>
-                  ) : (
-                    <div className="muted" style={{ marginTop: 6 }}>
-                      Upload a cover if the book has no online cover.
-                    </div>
-                  )}
-                </div>
-
-                <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
-                  <Link href={`/app/books/${it.id}`} className="muted">
-                    Details
-                  </Link>
-                  <button onClick={() => deleteEntry(it.id)} disabled={delState?.busy ?? false} title="Deletes one copy">
-                    Delete copy
-                  </button>
-                </div>
-                {delState?.message ? (
-                  <div className="muted" style={{ marginTop: 6 }}>
-                    {delState?.error ? `${delState?.message} (${delState?.error})` : delState?.message}
-                  </div>
-                ) : null}
               </div>
-            );
-          })}
-        </div>
+
+              {groups.length === 0 ? (
+                <div className="muted" style={{ marginTop: 10 }}>
+                  No books yet.
+                </div>
+              ) : (
+                <div style={{ marginTop: 10, ...booksContainerStyle }}>{groups.map(renderGroup)}</div>
+              )}
+            </div>
+          );
+        })}
 
         <div style={{ marginTop: 14 }} className="card">
           <div className="row" style={{ justifyContent: "space-between" }}>
