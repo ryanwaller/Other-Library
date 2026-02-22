@@ -2,11 +2,14 @@ import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
+import AddToLibraryButton from "../../AddToLibraryButton";
+import AlsoOwnedBy from "../../AlsoOwnedBy";
 
 export const dynamic = "force-dynamic";
 
 type PublicBookDetail = {
   id: number;
+  owner_id: string;
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
   authors_override: string[] | null;
@@ -15,6 +18,7 @@ type PublicBookDetail = {
   description_override: string | null;
   subjects_override: string[] | null;
   edition: {
+    id: number;
     isbn13: string | null;
     isbn10: string | null;
     title: string | null;
@@ -94,7 +98,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const bookRes = await supabase
     .from("user_books")
     .select(
-      "id,visibility,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,edition:editions(isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
+      "id,owner_id,visibility,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
     )
     .eq("id", bookId)
     .eq("owner_id", profile.id)
@@ -154,6 +158,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const coverMedia = (book.media ?? []).find((m) => m.kind === "cover") ?? null;
   const coverUrl = coverMedia ? signedMap[coverMedia.storage_path] : book.edition?.cover_url ?? null;
   const images = (book.media ?? []).filter((m) => m.kind === "image");
+  const editionId = book.edition?.id ?? null;
 
   return (
     <main className="container">
@@ -186,7 +191,16 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
       <div style={{ marginTop: 14 }} className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <div>{effectiveTitle}</div>
+          <div className="row" style={{ gap: 10 }}>
+            <div>{effectiveTitle}</div>
+            <AddToLibraryButton
+              editionId={editionId}
+              titleFallback={effectiveTitle}
+              authorsFallback={effectiveAuthors}
+              sourceOwnerId={book.owner_id}
+              compact
+            />
+          </div>
           <div className="muted">{book.edition?.isbn13 ?? book.edition?.isbn10 ?? ""}</div>
         </div>
 
@@ -277,6 +291,8 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           </div>
         )}
       </div>
+
+      {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={book.id} excludeOwnerId={book.owner_id} /> : null}
     </main>
   );
 }

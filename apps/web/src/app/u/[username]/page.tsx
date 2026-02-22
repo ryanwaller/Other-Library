@@ -3,6 +3,7 @@ import { getServerSupabase } from "../../../lib/supabaseServer";
 import Link from "next/link";
 import { bookIdSlug } from "../../../lib/slug";
 import FollowControls from "./FollowControls";
+import AddToLibraryButton from "./AddToLibraryButton";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ type PublicBook = {
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
   authors_override: string[] | null;
-  edition: { isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null } | null;
+  edition: { id: number; isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
 
@@ -69,7 +70,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const booksRes = await supabase
     .from("user_books")
     .select(
-      "id,visibility,title_override,authors_override,edition:editions(isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
+      "id,visibility,title_override,authors_override,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
     )
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
@@ -139,7 +140,11 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           const extraImages = (b.media ?? []).filter((m) => m.kind === "image").slice(0, 3);
           return (
             <div key={b.id} className="card">
-              <Link href={href} style={{ display: "block" }}>
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                <span className="muted" />
+                <AddToLibraryButton editionId={e?.id ?? null} titleFallback={title} authorsFallback={effectiveAuthors} sourceOwnerId={profile.id} compact />
+              </div>
+              <Link href={href} style={{ display: "block", marginTop: 6 }}>
                 {coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img

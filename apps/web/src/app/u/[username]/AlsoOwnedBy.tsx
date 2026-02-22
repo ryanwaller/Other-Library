@@ -1,0 +1,126 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../../../lib/supabaseClient";
+
+type AlsoOwnedRow = {
+  id: number;
+  owner_id: string;
+  visibility: "inherit" | "followers_only" | "public";
+  owner: { username: string; avatar_path: string | null } | null;
+};
+
+export default function AlsoOwnedBy({
+  editionId,
+  excludeUserBookId,
+  excludeOwnerId
+}: {
+  editionId: number;
+  excludeUserBookId: number;
+  excludeOwnerId?: string | null;
+}) {
+  const [rows, setRows] = useState<AlsoOwnedRow[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [avatarUrlsByPath, setAvatarUrlsByPath] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!supabase) return;
+      if (!editionId) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const res = await supabase
+          .from("user_books")
+          .select("id,owner_id,visibility,owner:profiles(username,avatar_path)")
+          .eq("edition_id", editionId)
+          .neq("id", excludeUserBookId)
+          .order("created_at", { ascending: false })
+          .limit(40);
+        if (!alive) return;
+        if (res.error) throw new Error(res.error.message);
+        const data = (res.data ?? []) as any as AlsoOwnedRow[];
+
+        // One row per owner (a user can have multiple entries).
+        const byOwner = new Map<string, AlsoOwnedRow>();
+        for (const r of data) {
+          if (!r?.owner_id) continue;
+          if (excludeOwnerId && r.owner_id === excludeOwnerId) continue;
+          if (!byOwner.has(r.owner_id)) byOwner.set(r.owner_id, r);
+        }
+        const unique = Array.from(byOwner.values());
+        setRows(unique);
+
+        const paths = Array.from(new Set(unique.map((r) => r.owner?.avatar_path).filter(Boolean))) as string[];
+        if (paths.length === 0) {
+          setAvatarUrlsByPath({});
+          return;
+        }
+        const signed = await supabase.storage.from("avatars").createSignedUrls(paths, 60 * 30);
+        if (!alive) return;
+        const amap: Record<string, string> = {};
+        for (const s of signed.data ?? []) {
+          if (s.path && s.signedUrl) amap[s.path] = s.signedUrl;
+        }
+        setAvatarUrlsByPath(amap);
+      } catch (e: any) {
+        setError(e?.message ?? "Failed to load");
+      } finally {
+        setBusy(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [editionId, excludeUserBookId]);
+
+  const owners = useMemo(() => {
+    return rows
+      .slice()
+      .filter((r) => r.owner?.username)
+      .sort((a, b) => (a.owner?.username ?? "").localeCompare(b.owner?.username ?? ""));
+  }, [rows]);
+
+  if (!supabase) return null;
+  if (!editionId) return null;
+
+  return (
+    <div style={{ marginTop: 14 }} className="card">
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <div>Also in</div>
+        <div className="muted">{busy ? "Loading…" : error ? error : `${owners.length}`}</div>
+      </div>
+      <div className="muted" style={{ marginTop: 8 }}>
+        Public libraries are shown to everyone; followers-only libraries are shown only to approved followers (when you’re signed in).
+      </div>
+      {owners.length === 0 ? (
+        <div className="muted" style={{ marginTop: 8 }}>
+          None found.
+        </div>
+      ) : (
+        <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 10 }}>
+          {owners.map((r) => {
+            const username = r.owner?.username ?? "";
+            const avatarPath = r.owner?.avatar_path ?? null;
+            const avatarUrl = avatarPath ? avatarUrlsByPath[avatarPath] ?? null : null;
+            return (
+              <Link key={r.owner_id} href={`/u/${username}`} className="card" style={{ textDecoration: "none", display: "inline-flex", gap: 8 }}>
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img alt="" src={avatarUrl} style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
+                ) : (
+                  <span style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)", display: "inline-block" }} />
+                )}
+                <span>{username}</span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
