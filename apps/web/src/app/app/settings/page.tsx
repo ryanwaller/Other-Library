@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 
@@ -80,25 +80,32 @@ function SignIn() {
     if (err) setError(err.message);
   }
 
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    await signIn();
+  }
+
   return (
     <div className="card">
-      <div className="row">
-        <div>Email</div>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} />
-      </div>
-      <div className="row" style={{ marginTop: 8 }}>
-        <div>Password</div>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      </div>
-      <div className="row" style={{ marginTop: 12 }}>
-        <button onClick={signIn} disabled={busy || !email || !password}>
-          Sign in
-        </button>
-        <button onClick={signUp} disabled={busy || !email || !password}>
-          Sign up
-        </button>
-        {error ? <span className="muted">{error}</span> : null}
-      </div>
+      <form onSubmit={onSubmit}>
+        <div className="row">
+          <div>Email</div>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <div>Password</div>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <button type="submit" disabled={busy || !email || !password}>
+            Sign in
+          </button>
+          <button type="button" onClick={signUp} disabled={busy || !email || !password}>
+            Sign up
+          </button>
+          {error ? <span className="muted">{error}</span> : null}
+        </div>
+      </form>
     </div>
   );
 }
@@ -398,6 +405,11 @@ export default function SettingsPage() {
                 placeholder="new_username"
                 value={newUsername}
                 onChange={(e) => setNewUsername(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  changeUsername();
+                }}
                 style={{ width: 220 }}
               />
               <button onClick={changeUsername} disabled={!canSubmit || changeState.busy}>
@@ -465,6 +477,11 @@ export default function SettingsPage() {
               <input
                 value={profileForm.display_name}
                 onChange={(e) => setProfileForm((p) => ({ ...p, display_name: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  saveProfile();
+                }}
                 placeholder="(optional)"
                 style={{ width: 360 }}
               />

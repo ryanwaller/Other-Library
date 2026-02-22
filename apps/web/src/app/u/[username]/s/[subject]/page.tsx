@@ -9,6 +9,7 @@ type PublicBook = {
   id: number;
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
+  subjects_override: string[] | null;
   edition: { isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null; subjects: string[] | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
@@ -75,7 +76,7 @@ export default async function PublicSubjectPage({ params }: { params: Promise<{ 
 
   const booksRes = await supabase
     .from("user_books")
-    .select("id,visibility,title_override,edition:editions(isbn13,title,authors,cover_url,subjects),media:user_book_media(kind,storage_path)")
+    .select("id,visibility,title_override,subjects_override,edition:editions(isbn13,title,authors,cover_url,subjects),media:user_book_media(kind,storage_path)")
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
     .limit(200);
@@ -83,7 +84,13 @@ export default async function PublicSubjectPage({ params }: { params: Promise<{ 
   const books = (booksRes.data ?? []) as unknown as PublicBook[];
 
   const needle = subjectName.toLowerCase();
-  const filtered = books.filter((b) => ((b.edition?.subjects ?? []).filter(Boolean) as string[]).some((s) => s.toLowerCase() === needle));
+  const filtered = books.filter((b) => {
+    const subjects =
+      b.subjects_override !== null && b.subjects_override !== undefined
+        ? ((b.subjects_override ?? []).filter(Boolean) as string[])
+        : ((b.edition?.subjects ?? []).filter(Boolean) as string[]);
+    return subjects.some((s) => s.toLowerCase() === needle);
+  });
 
   const paths = Array.from(
     new Set(

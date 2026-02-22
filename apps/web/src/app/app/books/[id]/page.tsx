@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent, type FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
 import { bookIdSlug } from "../../../../lib/slug";
@@ -14,6 +14,10 @@ type UserBookDetail = {
   status: "owned" | "loaned" | "selling" | "trading";
   title_override: string | null;
   authors_override: string[] | null;
+  publisher_override: string | null;
+  publish_date_override: string | null;
+  description_override: string | null;
+  subjects_override: string[] | null;
   location: string | null;
   shelf: string | null;
   notes: string | null;
@@ -58,28 +62,35 @@ function SignIn() {
     if (err) setError(err.message);
   }
 
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    await signIn();
+  }
+
   return (
     <div className="card">
-      <div className="row">
-        <div>Email</div>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} />
-      </div>
-      <div className="row" style={{ marginTop: 8 }}>
-        <div>Password</div>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      </div>
-      <div className="row" style={{ marginTop: 12 }}>
-        <button onClick={signIn} disabled={busy || !email || !password}>
-          Sign in
-        </button>
-        <button onClick={signUp} disabled={busy || !email || !password}>
-          Sign up
-        </button>
-        {error ? <span className="muted">{error}</span> : null}
-      </div>
-      <div className="muted" style={{ marginTop: 8 }}>
-        Sign in to view and edit this book.
-      </div>
+      <form onSubmit={onSubmit}>
+        <div className="row">
+          <div>Email</div>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <div>Password</div>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <button type="submit" disabled={busy || !email || !password}>
+            Sign in
+          </button>
+          <button type="button" onClick={signUp} disabled={busy || !email || !password}>
+            Sign up
+          </button>
+          {error ? <span className="muted">{error}</span> : null}
+        </div>
+        <div className="muted" style={{ marginTop: 8 }}>
+          Sign in to view and edit this book.
+        </div>
+      </form>
     </div>
   );
 }
@@ -88,8 +99,18 @@ function normalizeTagName(input: string): string {
   return input.trim().replace(/\s+/g, " ");
 }
 
+function normalizeSubjectName(input: string): string {
+  return input.trim().replace(/\s+/g, " ");
+}
+
 function safeFileName(name: string): string {
   return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
+}
+
+function onEnter(e: KeyboardEvent<HTMLInputElement>, fn: () => void) {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  fn();
 }
 
 function parseAuthorsInput(input: string): string[] {
@@ -125,6 +146,9 @@ export default function BookDetailPage() {
 
   const [formTitle, setFormTitle] = useState("");
   const [formAuthors, setFormAuthors] = useState("");
+  const [formPublisher, setFormPublisher] = useState("");
+  const [formPublishDate, setFormPublishDate] = useState("");
+  const [formDescription, setFormDescription] = useState("");
   const [formLocation, setFormLocation] = useState("");
   const [formShelf, setFormShelf] = useState("");
   const [formNotes, setFormNotes] = useState("");
@@ -138,6 +162,13 @@ export default function BookDetailPage() {
 
   const [newTag, setNewTag] = useState("");
   const [tagState, setTagState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+
+  const [newSubject, setNewSubject] = useState("");
+  const [subjectState, setSubjectState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
     message: null
@@ -177,7 +208,7 @@ export default function BookDetailPage() {
       const res = await supabase
         .from("user_books")
         .select(
-          "id,owner_id,visibility,status,title_override,authors_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name))"
+          "id,owner_id,visibility,status,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name))"
         )
         .eq("id", bookId)
         .maybeSingle();
@@ -192,6 +223,9 @@ export default function BookDetailPage() {
       setBook(row);
       setFormTitle(row.title_override ?? "");
       setFormAuthors((row.authors_override ?? []).filter(Boolean).join(", "));
+      setFormPublisher(row.publisher_override ?? row.edition?.publisher ?? "");
+      setFormPublishDate(row.publish_date_override ?? row.edition?.publish_date ?? "");
+      setFormDescription(row.description_override ?? row.edition?.description ?? "");
       setFormLocation(row.location ?? "");
       setFormShelf(row.shelf ?? "");
       setFormNotes(row.notes ?? "");
@@ -237,11 +271,29 @@ export default function BookDetailPage() {
     return formTitle.trim() ? formTitle.trim() : book?.edition?.title ?? "(untitled)";
   }, [formTitle, book]);
 
+  const effectivePublisher = useMemo(() => {
+    return formPublisher.trim() ? formPublisher.trim() : book?.edition?.publisher ?? "";
+  }, [formPublisher, book]);
+
+  const effectivePublishDate = useMemo(() => {
+    return formPublishDate.trim() ? formPublishDate.trim() : book?.edition?.publish_date ?? "";
+  }, [formPublishDate, book]);
+
+  const effectiveDescription = useMemo(() => {
+    return formDescription.trim() ? formDescription.trim() : book?.edition?.description ?? "";
+  }, [formDescription, book]);
+
   const effectiveAuthors = useMemo(() => {
     const override = parseAuthorsInput(formAuthors);
     if (override.length > 0) return override;
     return (book?.edition?.authors ?? []).filter(Boolean);
   }, [formAuthors, book]);
+
+  const effectiveSubjects = useMemo(() => {
+    const override = book?.subjects_override;
+    if (override !== null && override !== undefined) return (override ?? []).filter(Boolean);
+    return (book?.edition?.subjects ?? []).filter(Boolean);
+  }, [book]);
 
   const tagNames = useMemo(() => {
     return ((book?.book_tags ?? []).map((bt) => bt.tag?.name).filter(Boolean) as string[]).sort((a, b) => a.localeCompare(b));
@@ -298,6 +350,9 @@ export default function BookDetailPage() {
     const payload = {
       title_override,
       authors_override: authors_override.length > 0 ? authors_override : null,
+      publisher_override: formPublisher.trim() ? formPublisher.trim() : null,
+      publish_date_override: formPublishDate.trim() ? formPublishDate.trim() : null,
+      description_override: formDescription.trim() ? formDescription.trim() : null,
       location: formLocation.trim() ? formLocation.trim() : null,
       shelf: formShelf.trim() ? formShelf.trim() : null,
       notes: formNotes.trim() ? formNotes.trim() : null,
@@ -353,6 +408,41 @@ export default function BookDetailPage() {
     }
     await refresh();
     setTagState({ busy: false, error: null, message: "Removed" });
+  }
+
+  async function addSubject() {
+    if (!supabase || !book || !userId) return;
+    if (book.owner_id !== userId) return;
+    const name = normalizeSubjectName(newSubject);
+    if (!name) return;
+    setSubjectState({ busy: true, error: null, message: "Adding…" });
+    const current = (effectiveSubjects ?? []).slice();
+    const exists = current.some((s) => s.toLowerCase() === name.toLowerCase());
+    const next = exists ? current : [...current, name];
+    next.sort((a, b) => a.localeCompare(b));
+    const upd = await supabase.from("user_books").update({ subjects_override: next }).eq("id", book.id);
+    if (upd.error) {
+      setSubjectState({ busy: false, error: upd.error.message, message: "Add failed" });
+      return;
+    }
+    setNewSubject("");
+    await refresh();
+    setSubjectState({ busy: false, error: null, message: "Added" });
+  }
+
+  async function removeSubject(name: string) {
+    if (!supabase || !book || !userId) return;
+    if (book.owner_id !== userId) return;
+    setSubjectState({ busy: true, error: null, message: "Removing…" });
+    const current = (effectiveSubjects ?? []).slice();
+    const next = current.filter((s) => s.toLowerCase() !== name.toLowerCase());
+    const upd = await supabase.from("user_books").update({ subjects_override: next }).eq("id", book.id);
+    if (upd.error) {
+      setSubjectState({ busy: false, error: upd.error.message, message: "Remove failed" });
+      return;
+    }
+    await refresh();
+    setSubjectState({ busy: false, error: null, message: "Removed" });
   }
 
   async function uploadCover() {
@@ -621,19 +711,19 @@ export default function BookDetailPage() {
                   <div style={{ minWidth: 110 }} className="muted">
                     Publisher
                   </div>
-                  <div>{book?.edition?.publisher ?? "—"}</div>
+                  <div>{effectivePublisher || "—"}</div>
                 </div>
                 <div className="row" style={{ marginTop: 6 }}>
                   <div style={{ minWidth: 110 }} className="muted">
                     Publish date
                   </div>
-                  <div>{book?.edition?.publish_date ?? "—"}</div>
+                  <div>{effectivePublishDate || "—"}</div>
                 </div>
                 <div style={{ marginTop: 8 }}>
                   <div className="muted">Subjects</div>
                   <div style={{ marginTop: 6 }}>
-                    {(book?.edition?.subjects ?? []).filter(Boolean).length > 0 ? (
-                      (book?.edition?.subjects ?? []).filter(Boolean).map((s) => (
+                    {effectiveSubjects.length > 0 ? (
+                      effectiveSubjects.map((s) => (
                         <span key={s} style={{ marginRight: 10 }}>
                           <Link href={`/app?subject=${encodeURIComponent(s)}`}>{s}</Link>
                         </span>
@@ -646,7 +736,7 @@ export default function BookDetailPage() {
                 <div style={{ marginTop: 8 }}>
                   <div className="muted">Description</div>
                   <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-                    {book?.edition?.description ?? "—"}
+                    {effectiveDescription || "—"}
                   </div>
                 </div>
                 {book?.edition?.cover_url ? (
@@ -695,28 +785,59 @@ export default function BookDetailPage() {
                   <div style={{ minWidth: 110 }} className="muted">
                     Title override
                   </div>
-                  <input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} style={{ width: 360 }} />
+                  <input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} style={{ width: 360 }} />
                 </div>
 
                 <div className="row" style={{ marginTop: 6 }}>
                   <div style={{ minWidth: 110 }} className="muted">
                     Authors override
                   </div>
-                  <input value={formAuthors} onChange={(e) => setFormAuthors(e.target.value)} placeholder="Comma-separated" style={{ width: 360 }} />
+                  <input
+                    value={formAuthors}
+                    onChange={(e) => setFormAuthors(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, saveEdits)}
+                    placeholder="Comma-separated"
+                    style={{ width: 360 }}
+                  />
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Publisher
+                  </div>
+                  <input value={formPublisher} onChange={(e) => setFormPublisher(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} style={{ width: 360 }} />
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Publish date
+                  </div>
+                  <input type="date" value={formPublishDate || ""} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} />
+                </div>
+
+                <div style={{ marginTop: 8 }}>
+                  <div className="muted">Description</div>
+                  <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} rows={4} style={{ width: "100%", marginTop: 6 }} />
                 </div>
 
                 <div className="row" style={{ marginTop: 6 }}>
                   <div style={{ minWidth: 110 }} className="muted">
                     Location
                   </div>
-                  <input value={formLocation} onChange={(e) => setFormLocation(e.target.value)} placeholder="Home, Studio…" style={{ width: 360 }} />
+                  <input
+                    value={formLocation}
+                    onChange={(e) => setFormLocation(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, saveEdits)}
+                    placeholder="Home, Studio…"
+                    style={{ width: 360 }}
+                  />
                 </div>
 
                 <div className="row" style={{ marginTop: 6 }}>
                   <div style={{ minWidth: 110 }} className="muted">
                     Shelf
                   </div>
-                  <input value={formShelf} onChange={(e) => setFormShelf(e.target.value)} placeholder="Shelf #" style={{ width: 360 }} />
+                  <input value={formShelf} onChange={(e) => setFormShelf(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} placeholder="Shelf #" style={{ width: 360 }} />
                 </div>
 
                 <div style={{ marginTop: 8 }}>
@@ -733,11 +854,68 @@ export default function BookDetailPage() {
               </div>
 
               <div style={{ marginTop: 16 }} className="muted">
+                Subjects
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <div className="row">
+                  <input
+                    value={newSubject}
+                    onChange={(e) => setNewSubject(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, addSubject)}
+                    placeholder="Add a subject"
+                    style={{ width: 220 }}
+                  />
+                  <button onClick={addSubject} disabled={subjectState.busy || !newSubject.trim()}>
+                    Add
+                  </button>
+                  <div className="muted">
+                    {subjectState.message ? (subjectState.error ? `${subjectState.message} (${subjectState.error})` : subjectState.message) : ""}
+                  </div>
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  {effectiveSubjects.length > 0 ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {effectiveSubjects
+                        .slice()
+                        .sort((a, b) => a.localeCompare(b))
+                        .map((s) => (
+                          <span
+                            key={s}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              border: "1px solid var(--border)",
+                              padding: "2px 6px"
+                            }}
+                          >
+                            <Link href={`/app?subject=${encodeURIComponent(s)}`} style={{ textDecoration: "none" }}>
+                              {s}
+                            </Link>
+                            <button onClick={() => removeSubject(s)} disabled={subjectState.busy} aria-label={`Remove subject ${s}`}>
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="muted">No subjects yet.</div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16 }} className="muted">
                 Tags
               </div>
               <div style={{ marginTop: 8 }}>
                 <div className="row">
-                  <input value={newTag} onChange={(e) => setNewTag(e.target.value)} placeholder="Add a tag" style={{ width: 220 }} />
+                  <input
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, addTag)}
+                    placeholder="Add a tag"
+                    style={{ width: 220 }}
+                  />
                   <button onClick={addTag} disabled={tagState.busy || !newTag.trim()}>
                     Add
                   </button>

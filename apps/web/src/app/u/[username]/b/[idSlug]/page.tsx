@@ -10,6 +10,10 @@ type PublicBookDetail = {
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
   authors_override: string[] | null;
+  publisher_override: string | null;
+  publish_date_override: string | null;
+  description_override: string | null;
+  subjects_override: string[] | null;
   edition: {
     isbn13: string | null;
     isbn10: string | null;
@@ -90,7 +94,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const bookRes = await supabase
     .from("user_books")
     .select(
-      "id,visibility,title_override,authors_override,edition:editions(isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
+      "id,visibility,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,edition:editions(isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
     )
     .eq("id", bookId)
     .eq("owner_id", profile.id)
@@ -123,7 +127,14 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       ? (book.authors_override ?? []).filter(Boolean)
       : (book.edition?.authors ?? []).filter(Boolean);
 
-  const subjects = ((book.edition?.subjects ?? []).filter(Boolean) as string[]).sort((a, b) => a.localeCompare(b));
+  const effectivePublisher = (book.publisher_override ?? "").trim() || book.edition?.publisher || "";
+  const effectivePublishDate = (book.publish_date_override ?? "").trim() || book.edition?.publish_date || "";
+  const effectiveDescription = (book.description_override ?? "").trim() || book.edition?.description || "";
+  const effectiveSubjects =
+    book.subjects_override !== null && book.subjects_override !== undefined
+      ? ((book.subjects_override ?? []).filter(Boolean) as string[])
+      : ((book.edition?.subjects ?? []).filter(Boolean) as string[]);
+  const subjects = effectiveSubjects.slice().sort((a, b) => a.localeCompare(b));
 
   const paths = Array.from(new Set((book.media ?? []).map((m) => m.storage_path).filter(Boolean)));
   const signedMap: Record<string, string> = {};
@@ -212,8 +223,8 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
               Publisher / date
             </div>
             <div style={{ marginTop: 6 }}>
-              {book.edition?.publisher ?? "—"}
-              {book.edition?.publish_date ? ` (${book.edition.publish_date})` : ""}
+              {effectivePublisher || "—"}
+              {effectivePublishDate ? ` (${effectivePublishDate})` : ""}
             </div>
 
             <div style={{ marginTop: 12 }} className="muted">
@@ -236,7 +247,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
               Description
             </div>
             <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-              {book.edition?.description ?? "—"}
+              {effectiveDescription || "—"}
             </div>
           </div>
         </div>

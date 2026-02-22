@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
@@ -43,28 +43,35 @@ function SignIn() {
     if (err) setError(err.message);
   }
 
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    await signIn();
+  }
+
   return (
     <div className="card">
-      <div className="row">
-        <div>Email</div>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} />
-      </div>
-      <div className="row" style={{ marginTop: 8 }}>
-        <div>Password</div>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      </div>
-      <div className="row" style={{ marginTop: 12 }}>
-        <button onClick={signIn} disabled={busy || !email || !password}>
-          Sign in
-        </button>
-        <button onClick={signUp} disabled={busy || !email || !password}>
-          Sign up
-        </button>
-        {error ? <span className="muted">{error}</span> : null}
-      </div>
-      <div className="muted" style={{ marginTop: 8 }}>
-        Followers-only by default; public is optional later.
-      </div>
+      <form onSubmit={onSubmit}>
+        <div className="row">
+          <div>Email</div>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <div>Password</div>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <button type="submit" disabled={busy || !email || !password}>
+            Sign in
+          </button>
+          <button type="button" onClick={signUp} disabled={busy || !email || !password}>
+            Sign up
+          </button>
+          {error ? <span className="muted">{error}</span> : null}
+        </div>
+        <div className="muted" style={{ marginTop: 8 }}>
+          Followers-only by default; public is optional later.
+        </div>
+      </form>
     </div>
   );
 }
@@ -100,6 +107,7 @@ function AppShell({
       visibility: "inherit" | "followers_only" | "public";
       title_override: string | null;
       authors_override: string[] | null;
+      subjects_override: string[] | null;
       edition: { id: number; isbn13: string | null; title: string | null; authors: string[] | null; subjects: string[] | null; cover_url: string | null } | null;
       media: Array<{ id: number; kind: "cover" | "image"; storage_path: string; caption: string | null; created_at: string }>;
       book_tags: Array<{ tag: { id: number; name: string } | null }>;
@@ -175,7 +183,7 @@ function AppShell({
     const { data, error } = await supabase
       .from("user_books")
       .select(
-        "id,created_at,visibility,title_override,authors_override,edition:editions(id,isbn13,title,authors,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name))"
+        "id,created_at,visibility,title_override,authors_override,subjects_override,edition:editions(id,isbn13,title,authors,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name))"
       )
       .order("created_at", { ascending: false })
       .limit(50);
@@ -441,9 +449,10 @@ function AppShell({
       const effectiveAuthors =
         (it.authors_override ?? []).filter(Boolean).length > 0 ? (it.authors_override ?? []).filter(Boolean) : (it.edition?.authors ?? []).filter(Boolean);
       const editionSubjects = (it.edition?.subjects ?? []).filter(Boolean) as string[];
+      const effectiveSubjects = it.subjects_override !== null && it.subjects_override !== undefined ? (it.subjects_override ?? []).filter(Boolean) : editionSubjects;
       const okTag = tag ? tagNames.some((t) => t.toLowerCase() === tag.toLowerCase()) : true;
       const okAuthor = author ? effectiveAuthors.some((a) => a.toLowerCase() === author.toLowerCase()) : true;
-      const okSubject = subject ? (editionSubjects ?? []).some((s) => String(s).toLowerCase() === subject.toLowerCase()) : true;
+      const okSubject = subject ? (effectiveSubjects ?? []).some((s) => String(s).toLowerCase() === subject.toLowerCase()) : true;
       return okTag && okAuthor && okSubject;
     });
   }, [items, filterTag, filterAuthor, filterSubject]);
@@ -519,6 +528,11 @@ function AppShell({
             placeholder="ISBN-10 or ISBN-13"
             value={isbn}
             onChange={(e) => setIsbn(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              addByIsbn();
+            }}
             style={{ minWidth: 260 }}
           />
           <button onClick={addByIsbn} disabled={busyAdd || !isbn.trim()}>

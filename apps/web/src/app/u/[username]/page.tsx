@@ -8,6 +8,8 @@ export const dynamic = "force-dynamic";
 type PublicBook = {
   id: number;
   visibility: "inherit" | "followers_only" | "public";
+  title_override: string | null;
+  authors_override: string[] | null;
   edition: { isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
@@ -66,7 +68,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const booksRes = await supabase
     .from("user_books")
     .select(
-      "id,visibility,edition:editions(isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
+      "id,visibility,title_override,authors_override,edition:editions(isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
     )
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
@@ -125,8 +127,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
         {books.map((b) => {
           const e = b.edition;
-          const title = e?.title ?? "(untitled)";
+          const title = (b.title_override ?? "").trim() || e?.title || "(untitled)";
           const authors = (e?.authors ?? []).filter(Boolean) as string[];
+          const effectiveAuthors =
+            (b.authors_override ?? []).filter(Boolean).length > 0 ? (b.authors_override ?? []).filter(Boolean) : authors;
           const cover = (b.media ?? []).find((m) => m.kind === "cover");
           const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
           const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
@@ -149,11 +153,11 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                 <Link href={href}>{title}</Link>
               </div>
               <div className="muted" style={{ marginTop: 4 }}>
-                {authors.length > 0 ? (
-                  authors.map((a, idx) => (
+                {effectiveAuthors.length > 0 ? (
+                  effectiveAuthors.map((a, idx) => (
                     <span key={a}>
                       <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                      {idx < authors.length - 1 ? <span>, </span> : null}
+                      {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
                     </span>
                   ))
                 ) : (
