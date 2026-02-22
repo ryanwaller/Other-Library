@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, type KeyboardEvent, type FormEvent } from
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
 import { bookIdSlug } from "../../../../lib/slug";
+import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
 
 type UserBookDetail = {
   id: number;
@@ -363,6 +364,10 @@ export default function BookDetailPage() {
     if (book.visibility === "inherit" && ownerProfile?.visibility === "public") return true;
     return false;
   }, [book, ownerProfile]);
+
+  const editionId = useMemo(() => {
+    return book?.edition?.id ?? null;
+  }, [book]);
 
   async function copyPublicLink() {
     if (!publicBookUrl) return;
@@ -745,6 +750,8 @@ export default function BookDetailPage() {
               </div>
             ) : null}
           </div>
+
+          {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} /> : null}
 
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "220px 1fr", gap: 14 }}>
             <div>
