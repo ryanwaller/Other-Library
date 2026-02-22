@@ -7,8 +7,10 @@
   ],
   "scripts": {
     "dev:web": "npm -w @om/web run dev",
+    "dev:web:turbo": "npm -w @om/web run dev:turbo",
     "dev:mobile": "npm -w @om/mobile run dev",
+    "install:web": "npm install -w @om/shared -w @om/web",
+    "build:web": "npm -w @om/web run build",
     "typecheck": "npm -ws run typecheck"
   }
 }
-
