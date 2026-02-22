@@ -5,6 +5,26 @@ import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 
+const RESERVED_USERNAMES = [
+  "app",
+  "api",
+  "u",
+  "b",
+  "books",
+  "setup",
+  "settings",
+  "auth",
+  "login",
+  "logout",
+  "signup",
+  "signin",
+  "www",
+  "admin",
+  "root",
+  "support",
+  "help"
+] as const;
+
 function normalizeUsername(input: string): string {
   return input.trim().toLowerCase();
 }
@@ -17,6 +37,11 @@ function isValidUsername(input: string): boolean {
   return true;
 }
 
+function isReservedUsername(input: string): boolean {
+  const s = normalizeUsername(input);
+  return (RESERVED_USERNAMES as readonly string[]).includes(s);
+}
+
 function humanizeUsernameError(message: string): string {
   const m = (message || "").toLowerCase();
   if (m.includes("not_authenticated")) return "Please sign in again.";
@@ -25,6 +50,10 @@ function humanizeUsernameError(message: string): string {
   if (m.includes("reserved_username")) return "That username is reserved.";
   if (m.includes("username_taken")) return "That username is already taken (or previously used).";
   return message;
+}
+
+function safeFileName(name: string): string {
+  return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
 }
 
 function SignIn() {
@@ -78,7 +107,7 @@ export default function SettingsPage() {
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
 
-  const [profile, setProfile] = useState<{ username: string; display_name: string | null; bio: string | null; visibility: string } | null>(null);
+  const [profile, setProfile] = useState<{ username: string; display_name: string | null; bio: string | null; visibility: string; avatar_path: string | null } | null>(null);
   const [aliases, setAliases] = useState<Array<{ old_username: string; created_at: string }>>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +118,9 @@ export default function SettingsPage() {
     error: null,
     message: null
   });
+  const [usernameAvailability, setUsernameAvailability] = useState<{ state: "idle" | "checking" | "available" | "taken" | "error"; message: string | null }>(
+    { state: "idle", message: null }
+  );
 
   const [profileForm, setProfileForm] = useState<{ display_name: string; bio: string; visibility: "followers_only" | "public" }>({
     display_name: "",
@@ -96,6 +128,14 @@ export default function SettingsPage() {
     visibility: "followers_only"
   });
   const [profileSaveState, setProfileSaveState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
+  const [avatarState, setAvatarState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
     message: null
@@ -114,7 +154,7 @@ export default function SettingsPage() {
       if (!supabase || !userId) return;
       setBusy(true);
       setError(null);
-      const res = await supabase.from("profiles").select("username,display_name,bio,visibility").eq("id", userId).maybeSingle();
+      const res = await supabase.from("profiles").select("username,display_name,bio,visibility,avatar_path").eq("id", userId).maybeSingle();
       if (!alive) return;
       if (res.error) setError(res.error.message);
       const nextProfile = ((res.data as any) ?? null) as typeof profile;
@@ -136,6 +176,22 @@ export default function SettingsPage() {
   useEffect(() => {
     let alive = true;
     (async () => {
+      if (!supabase || !profile?.avatar_path) {
+        setAvatarUrl(null);
+        return;
+      }
+      const signed = await supabase.storage.from("avatars").createSignedUrl(profile.avatar_path, 60 * 60);
+      if (!alive) return;
+      setAvatarUrl(signed.data?.signedUrl ?? null);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [profile?.avatar_path]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
       if (!supabase || !userId) return;
       const res = await supabase
         .from("username_aliases")
@@ -152,12 +208,51 @@ export default function SettingsPage() {
   }, [userId, profile?.username]);
 
   const normalized = useMemo(() => normalizeUsername(newUsername), [newUsername]);
+  const localUsernameIssue = useMemo(() => {
+    if (!normalized) return null;
+    if (!isValidUsername(normalized)) return "invalid";
+    if (isReservedUsername(normalized)) return "reserved";
+    return null;
+  }, [normalized]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    if (!normalized) {
+      setUsernameAvailability({ state: "idle", message: null });
+      return;
+    }
+    if (localUsernameIssue === "invalid") {
+      setUsernameAvailability({ state: "idle", message: "Invalid format." });
+      return;
+    }
+    if (localUsernameIssue === "reserved") {
+      setUsernameAvailability({ state: "idle", message: "Reserved word." });
+      return;
+    }
+
+    setUsernameAvailability({ state: "checking", message: "Checking…" });
+    const t = window.setTimeout(async () => {
+      const res = await supabase.rpc("is_username_available", { input_username: normalized });
+      if (res.error) {
+        setUsernameAvailability({ state: "error", message: res.error.message });
+        return;
+      }
+      const available = Boolean(res.data);
+      setUsernameAvailability({ state: available ? "available" : "taken", message: available ? "Available." : "Taken." });
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [normalized, localUsernameIssue]);
+
   const canSubmit = useMemo(() => {
     if (!profile) return false;
     if (!normalized) return false;
     if (normalized === profile.username) return false;
-    return isValidUsername(normalized);
-  }, [profile, normalized]);
+    if (!isValidUsername(normalized)) return false;
+    if (isReservedUsername(normalized)) return false;
+    if (usernameAvailability.state === "checking") return false;
+    if (usernameAvailability.state === "taken") return false;
+    return true;
+  }, [profile, normalized, usernameAvailability.state]);
 
   async function changeUsername() {
     if (!supabase || !userId || !profile) return;
@@ -184,7 +279,12 @@ export default function SettingsPage() {
       bio: profileForm.bio.trim() ? profileForm.bio.trim() : null,
       visibility: profileForm.visibility
     };
-    const res = await supabase.from("profiles").update(payload).eq("id", userId).select("username,display_name,bio,visibility").maybeSingle();
+    const res = await supabase
+      .from("profiles")
+      .update(payload)
+      .eq("id", userId)
+      .select("username,display_name,bio,visibility,avatar_path")
+      .maybeSingle();
     if (res.error) {
       setProfileSaveState({ busy: false, error: res.error.message, message: "Failed" });
       return;
@@ -192,6 +292,38 @@ export default function SettingsPage() {
     const nextProfile = ((res.data as any) ?? null) as typeof profile;
     if (nextProfile) setProfile(nextProfile);
     setProfileSaveState({ busy: false, error: null, message: "Saved" });
+  }
+
+  async function uploadAvatar() {
+    if (!supabase || !userId || !pendingAvatar) return;
+    setAvatarState({ busy: true, error: null, message: "Uploading…" });
+    const safe = safeFileName(pendingAvatar.name);
+    const fileName = `avatar_${Date.now()}_${safe}`;
+    const path = `${userId}/${fileName}`;
+
+    const up = await supabase.storage.from("avatars").upload(path, pendingAvatar, {
+      upsert: true,
+      contentType: pendingAvatar.type || "application/octet-stream"
+    });
+    if (up.error) {
+      setAvatarState({ busy: false, error: up.error.message, message: "Failed" });
+      return;
+    }
+
+    const prevPath = profile?.avatar_path ?? null;
+    const res = await supabase.from("profiles").update({ avatar_path: path }).eq("id", userId).select("avatar_path").maybeSingle();
+    if (res.error) {
+      setAvatarState({ busy: false, error: res.error.message, message: "Failed" });
+      return;
+    }
+
+    if (prevPath && prevPath !== path) {
+      await supabase.storage.from("avatars").remove([prevPath]);
+    }
+
+    setProfile((p) => (p ? { ...p, avatar_path: path } : p));
+    setPendingAvatar(null);
+    setAvatarState({ busy: false, error: null, message: "Uploaded" });
   }
 
   if (!supabase) {
@@ -227,6 +359,25 @@ export default function SettingsPage() {
 
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
+              <div>Avatar</div>
+              <div className="muted">{avatarState.message ? (avatarState.error ? `${avatarState.message} (${avatarState.error})` : avatarState.message) : ""}</div>
+            </div>
+            <div className="row" style={{ marginTop: 10 }}>
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt="" src={avatarUrl} style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
+              ) : (
+                <div style={{ width: 28, height: 28, borderRadius: 999, border: "1px solid var(--border)" }} />
+              )}
+              <input type="file" accept="image/*" onChange={(e) => setPendingAvatar((e.target.files ?? [])[0] ?? null)} />
+              <button onClick={uploadAvatar} disabled={!pendingAvatar || avatarState.busy}>
+                {avatarState.busy ? "Uploading…" : "Submit avatar"}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }} className="card">
+            <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Username</div>
               <div className="muted">{profile ? `@${profile.username}` : ""}</div>
             </div>
@@ -247,12 +398,22 @@ export default function SettingsPage() {
               </button>
               <div className="muted">
                 {changeState.message ? (changeState.error ? `${changeState.message} (${changeState.error})` : changeState.message) : ""}
+                {!changeState.busy && !changeState.message && normalized
+                  ? ` ${usernameAvailability.message ?? ""}`
+                  : ""}
               </div>
             </div>
 
             <div className="muted" style={{ marginTop: 8 }}>
               Rules: 3–24 chars, lowercase letters/numbers/underscore. No leading/trailing underscore.
             </div>
+
+            <details style={{ marginTop: 8 }}>
+              <summary className="muted">Reserved words</summary>
+              <div className="muted" style={{ marginTop: 6 }}>
+                {RESERVED_USERNAMES.join(", ")}
+              </div>
+            </details>
 
             {profile ? (
               <div className="muted" style={{ marginTop: 10 }}>

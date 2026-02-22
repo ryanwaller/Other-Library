@@ -81,7 +81,8 @@ function AppShell({
   filterSubject: string | null;
 }) {
   const userId = session.user.id;
-  const [profile, setProfile] = useState<{ username: string; visibility: string } | null>(null);
+  const [profile, setProfile] = useState<{ username: string; visibility: string; avatar_path: string | null } | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userBooksCount, setUserBooksCount] = useState<number | null>(null);
   const [isbn, setIsbn] = useState("");
   const [busyAdd, setBusyAdd] = useState(false);
@@ -140,17 +141,22 @@ function AppShell({
   }, [viewMode, gridCols, sortMode, categoryMode]);
 
   const header = useMemo(() => {
+    const name = profile?.username ?? userId;
     return (
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>Other Library</div>
         <div className="row">
-          <span className="muted">{profile ? `@${profile.username}` : userId}</span>
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img alt="" src={avatarUrl} style={{ width: 22, height: 22, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
+          ) : null}
+          <span className="muted">{avatarUrl ? name : profile ? `@${profile.username}` : userId}</span>
           <Link href="/app/settings">Settings</Link>
           <button onClick={() => supabase?.auth.signOut()}>Sign out</button>
         </div>
       </div>
     );
-  }, [profile, userId]);
+  }, [profile, userId, avatarUrl]);
 
   async function refreshCatalog() {
     if (!supabase) return;
@@ -190,11 +196,19 @@ function AppShell({
       if (!supabase) return;
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("username,visibility")
+        .select("username,visibility,avatar_path")
         .eq("id", userId)
         .maybeSingle();
       if (!alive) return;
       if (profileData) setProfile(profileData);
+
+      if (profileData?.avatar_path) {
+        const signed = await supabase.storage.from("avatars").createSignedUrl(profileData.avatar_path, 60 * 60);
+        if (!alive) return;
+        setAvatarUrl(signed.data?.signedUrl ?? null);
+      } else {
+        setAvatarUrl(null);
+      }
 
       const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true });
       if (!alive) return;

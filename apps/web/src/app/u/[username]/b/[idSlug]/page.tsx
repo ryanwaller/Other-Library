@@ -69,7 +69,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
   const profileRes = await supabase
     .from("profiles")
-    .select("id,username,display_name,bio,visibility")
+    .select("id,username,display_name,bio,visibility,avatar_path")
     .eq("username", usernameNorm)
     .maybeSingle();
 
@@ -134,6 +134,12 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     }
   }
 
+  let avatarUrl: string | null = null;
+  if (profile.avatar_path) {
+    const signed = await supabase.storage.from("avatars").createSignedUrl(profile.avatar_path, 60 * 30);
+    avatarUrl = signed.data?.signedUrl ?? null;
+  }
+
   const coverMedia = (book.media ?? []).find((m) => m.kind === "cover") ?? null;
   const coverUrl = coverMedia ? signedMap[coverMedia.storage_path] : book.edition?.cover_url ?? null;
   const images = (book.media ?? []).filter((m) => m.kind === "image");
@@ -143,7 +149,13 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div>
-            <Link href={`/u/${profile.username}`}>@{profile.username}</Link>
+            <div className="row">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt="" src={avatarUrl} style={{ width: 24, height: 24, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
+              ) : null}
+              <Link href={`/u/${profile.username}`}>{profile.username}</Link>
+            </div>
           </div>
           <div className="muted">public</div>
         </div>

@@ -20,6 +20,10 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- Added later (safe to run on existing projects)
+alter table public.profiles
+add column if not exists avatar_path text;
+
 alter table public.profiles enable row level security;
 
 create or replace function public.set_updated_at()
@@ -178,6 +182,33 @@ begin
         user_id = excluded.user_id;
 
   return jsonb_build_object('ok', true, 'old', prev, 'new', next, 'changed', true);
+end;
+$$;
+
+-- Username availability RPC (works even if profiles are private)
+create or replace function public.is_username_available(input_username text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  u text;
+begin
+  u := public.normalize_username(input_username);
+  if not public.is_valid_username(u) then
+    return false;
+  end if;
+  if public.is_reserved_username(u) then
+    return false;
+  end if;
+  if exists (select 1 from public.profiles p where p.username = u) then
+    return false;
+  end if;
+  if exists (select 1 from public.username_aliases a where a.old_username = u) then
+    return false;
+  end if;
+  return true;
 end;
 $$;
 
