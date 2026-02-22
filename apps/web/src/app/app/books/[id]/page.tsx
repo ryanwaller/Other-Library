@@ -11,6 +11,7 @@ import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
 type UserBookDetail = {
   id: number;
   owner_id: string;
+  library_id: number;
   visibility: "inherit" | "followers_only" | "public";
   status: "owned" | "loaned" | "selling" | "trading";
   title_override: string | null;
@@ -36,7 +37,7 @@ type UserBookDetail = {
     raw: Record<string, unknown> | null;
   } | null;
   media: Array<{ id: number; kind: "cover" | "image"; storage_path: string; caption: string | null; created_at: string }>;
-  book_tags: Array<{ tag: { id: number; name: string } | null }>;
+  book_tags: Array<{ tag: { id: number; name: string; kind: "tag" | "category" } | null }>;
 };
 
 type MetadataSearchResult = {
@@ -50,6 +51,19 @@ type MetadataSearchResult = {
   isbn10: string | null;
   isbn13: string | null;
   cover_url: string | null;
+};
+
+type MergeSource = {
+  user_book_id: number;
+  owner_id: string;
+  owner_username: string | null;
+  title_override: string | null;
+  authors_override: string[] | null;
+  publisher_override: string | null;
+  publish_date_override: string | null;
+  description_override: string | null;
+  subjects_override: string[] | null;
+  media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
 
 function SignIn() {
@@ -159,6 +173,19 @@ export default function BookDetailPage() {
   const [shareState, setShareState] = useState<{ error: string | null; message: string | null }>({ error: null, message: null });
   const [copiesCount, setCopiesCount] = useState<number | null>(null);
   const [copiesCountState, setCopiesCountState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+  const [libraries, setLibraries] = useState<Array<{ id: number; name: string; created_at: string }>>([]);
+  const [formLibraryId, setFormLibraryId] = useState<number | null>(null);
+  const [libraryMoveState, setLibraryMoveState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+  const [copiesDraft, setCopiesDraft] = useState<string>("");
+  const [copiesUpdateState, setCopiesUpdateState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
 
   const [formTitle, setFormTitle] = useState("");
   const [formAuthors, setFormAuthors] = useState("");
@@ -178,6 +205,13 @@ export default function BookDetailPage() {
 
   const [newTag, setNewTag] = useState("");
   const [tagState, setTagState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+
+  const [newCategory, setNewCategory] = useState("");
+  const [categoryState, setCategoryState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
     message: null
@@ -224,6 +258,13 @@ export default function BookDetailPage() {
   });
   const [imagesInputKey, setImagesInputKey] = useState(0);
 
+  const [mergeSource, setMergeSource] = useState<MergeSource | null>(null);
+  const [mergeState, setMergeState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -231,19 +272,46 @@ export default function BookDetailPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!supabase) return;
+      if (!userId) {
+        setLibraries([]);
+        return;
+      }
+      if (!book || book.owner_id !== userId) {
+        setLibraries([]);
+        return;
+      }
+      const res = await supabase.from("libraries").select("id,name,created_at").eq("owner_id", userId).order("created_at", { ascending: true });
+      if (!alive) return;
+      if (res.error) {
+        setLibraries([]);
+        return;
+      }
+      setLibraries((res.data ?? []) as any);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [userId, book?.owner_id]);
+
   async function refresh() {
     if (!supabase) return;
     if (!Number.isFinite(bookId) || bookId <= 0) return;
     setBusy(true);
     setError(null);
     setOwnerProfile(null);
+    setMergeSource(null);
+    setMergeState({ busy: false, error: null, message: null });
     setCopiesCount(null);
     setCopiesCountState({ busy: false, error: null });
     try {
       const res = await supabase
         .from("user_books")
         .select(
-          "id,owner_id,visibility,status,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name))"
+          "id,owner_id,library_id,visibility,status,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
         )
         .eq("id", bookId)
         .maybeSingle();
@@ -266,6 +334,7 @@ export default function BookDetailPage() {
       setFormNotes(row.notes ?? "");
       setFormVisibility(row.visibility);
       setFormStatus(row.status);
+      setFormLibraryId((row as any).library_id ?? null);
 
       setSearchTitle((row.title_override ?? row.edition?.title ?? "").trim());
       setSearchAuthor(((row.authors_override ?? row.edition?.authors ?? []) as string[]).filter(Boolean).slice(0, 1).join(", "));
@@ -284,16 +353,21 @@ export default function BookDetailPage() {
       if (ownerId) {
         setCopiesCountState({ busy: true, error: null });
         try {
+          const countWithinLibrary = userId && ownerId === userId ? ((row as any).library_id as number | null) : null;
           if (row.edition?.id) {
-            const countRes = await supabase
+            let q = supabase
               .from("user_books")
               .select("id", { count: "exact", head: true })
               .eq("owner_id", ownerId)
               .eq("edition_id", row.edition.id);
+            if (countWithinLibrary) q = q.eq("library_id", countWithinLibrary);
+            const countRes = await q;
             if (countRes.error) throw new Error(countRes.error.message);
             setCopiesCount(countRes.count ?? 0);
+            if (countWithinLibrary) setCopiesDraft(String(countRes.count ?? 0));
           } else {
             let q = supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", ownerId).is("edition_id", null);
+            if (countWithinLibrary) q = q.eq("library_id", countWithinLibrary);
             if (row.title_override) q = q.eq("title_override", row.title_override);
             else q = q.is("title_override", null);
             if (row.authors_override && row.authors_override.length > 0) q = q.eq("authors_override", row.authors_override);
@@ -301,6 +375,7 @@ export default function BookDetailPage() {
             const countRes = await q;
             if ((countRes as any).error) throw new Error((countRes as any).error.message);
             setCopiesCount((countRes as any).count ?? 0);
+            if (countWithinLibrary) setCopiesDraft(String((countRes as any).count ?? 0));
           }
           setCopiesCountState({ busy: false, error: null });
         } catch (e: any) {
@@ -322,6 +397,87 @@ export default function BookDetailPage() {
           if (s.path && s.signedUrl) next[s.path] = s.signedUrl;
         }
         setMediaUrlsByPath(next);
+      }
+
+      // If you own this book and it's missing key metadata/media, look for a visible "source" to merge from.
+      try {
+        if (userId && row.owner_id === userId && row.edition?.id) {
+          const hasCoverMedia = (row.media ?? []).some((m) => m.kind === "cover");
+          const hasEditionCover = Boolean(row.edition.cover_url);
+          const hasAnyImages = (row.media ?? []).some((m) => m.kind === "image");
+
+          const missingTitle = !row.title_override && !row.edition.title;
+          const missingAuthors = (!row.authors_override || row.authors_override.length === 0) && (!row.edition.authors || row.edition.authors.length === 0);
+          const missingPublisher = !row.publisher_override && !row.edition.publisher;
+          const missingPublishDate = !row.publish_date_override && !row.edition.publish_date;
+          const missingDescription = !row.description_override && !row.edition.description;
+          const missingSubjects = (!row.subjects_override || row.subjects_override.length === 0) && (!row.edition.subjects || row.edition.subjects.length === 0);
+
+          const needsAny =
+            (!hasCoverMedia && !hasEditionCover) ||
+            !hasAnyImages ||
+            missingTitle ||
+            missingAuthors ||
+            missingPublisher ||
+            missingPublishDate ||
+            missingDescription ||
+            missingSubjects;
+
+          if (needsAny) {
+            const cand = await supabase
+              .from("user_books")
+              .select(
+                "id,owner_id,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,media:user_book_media(kind,storage_path)"
+              )
+              .eq("edition_id", row.edition.id)
+              .neq("owner_id", userId)
+              .limit(20);
+            if (!cand.error) {
+              const rows = (cand.data ?? []) as any[];
+              let best: any | null = null;
+              let bestScore = -1;
+              for (const r of rows) {
+                const media = (r.media ?? []) as any[];
+                const hasCover = media.some((m) => m.kind === "cover" && m.storage_path);
+                const hasImgs = media.some((m) => m.kind === "image" && m.storage_path);
+                let score = 0;
+                if (hasCover) score += 100;
+                if (hasImgs) score += 10;
+                if (r.publisher_override) score += 2;
+                if (r.publish_date_override) score += 1;
+                if (r.description_override) score += 1;
+                if (Array.isArray(r.subjects_override) && r.subjects_override.length > 0) score += 1;
+                if (Array.isArray(r.authors_override) && r.authors_override.length > 0) score += 1;
+                if (r.title_override) score += 1;
+                if (score > bestScore) {
+                  bestScore = score;
+                  best = r;
+                }
+              }
+
+              if (best && bestScore > 0) {
+                const profileRes = await supabase.from("profiles").select("username").eq("id", best.owner_id).maybeSingle();
+                const owner_username = (profileRes.data?.username as string | undefined) ?? null;
+                setMergeSource({
+                  user_book_id: best.id as number,
+                  owner_id: best.owner_id as string,
+                  owner_username,
+                  title_override: best.title_override ?? null,
+                  authors_override: (best.authors_override ?? null) as any,
+                  publisher_override: best.publisher_override ?? null,
+                  publish_date_override: best.publish_date_override ?? null,
+                  description_override: best.description_override ?? null,
+                  subjects_override: (best.subjects_override ?? null) as any,
+                  media: ((best.media ?? []) as any[])
+                    .filter((m) => (m.kind === "cover" || m.kind === "image") && typeof m.storage_path === "string" && m.storage_path)
+                    .map((m) => ({ kind: m.kind as "cover" | "image", storage_path: m.storage_path as string }))
+                });
+              }
+            }
+          }
+        }
+      } catch {
+        // best-effort only
       }
     } catch (e: any) {
       setError(e?.message ?? "Failed to load book");
@@ -369,8 +525,20 @@ export default function BookDetailPage() {
     return (book?.edition?.subjects ?? []).filter(Boolean);
   }, [book]);
 
-  const tagNames = useMemo(() => {
-    return ((book?.book_tags ?? []).map((bt) => bt.tag?.name).filter(Boolean) as string[]).sort((a, b) => a.localeCompare(b));
+  const tags = useMemo(() => {
+    const all = ((book?.book_tags ?? []).map((bt) => bt.tag).filter(Boolean) as any[]).filter((t) => t?.id && t?.name);
+    return all
+      .filter((t) => t.kind === "tag")
+      .map((t) => ({ id: t.id as number, name: String(t.name) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [book]);
+
+  const categories = useMemo(() => {
+    const all = ((book?.book_tags ?? []).map((bt) => bt.tag).filter(Boolean) as any[]).filter((t) => t?.id && t?.name);
+    return all
+      .filter((t) => t.kind === "category")
+      .map((t) => ({ id: t.id as number, name: String(t.name) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [book]);
 
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
@@ -446,13 +614,108 @@ export default function BookDetailPage() {
     setSaveState({ busy: false, error: null, message: "Saved" });
   }
 
-  async function getOrCreateTagId(name: string): Promise<number> {
+  async function moveToLibrary(nextLibraryId: number) {
+    if (!supabase || !book || !userId) return;
+    if (book.owner_id !== userId) return;
+    if (!nextLibraryId || !Number.isFinite(nextLibraryId)) return;
+    setLibraryMoveState({ busy: true, error: null, message: "Moving…" });
+    try {
+      const upd = await supabase.from("user_books").update({ library_id: nextLibraryId }).eq("id", book.id);
+      if (upd.error) throw new Error(upd.error.message);
+      setFormLibraryId(nextLibraryId);
+      try {
+        window.localStorage.setItem("om_currentLibraryId", String(nextLibraryId));
+      } catch {
+        // ignore
+      }
+      await refresh();
+      setLibraryMoveState({ busy: false, error: null, message: "Moved" });
+      window.setTimeout(() => setLibraryMoveState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setLibraryMoveState({ busy: false, error: e?.message ?? "Move failed", message: "Move failed" });
+    }
+  }
+
+  async function updateCopies() {
+    if (!supabase || !book || !userId) return;
+    if (book.owner_id !== userId) return;
+    const libId = formLibraryId ?? (book as any).library_id ?? null;
+    if (!libId) return;
+    const desired = Number(copiesDraft);
+    if (!Number.isFinite(desired) || desired < 1) {
+      setCopiesUpdateState({ busy: false, error: "Copies must be at least 1", message: "Invalid" });
+      return;
+    }
+
+    setCopiesUpdateState({ busy: true, error: null, message: "Updating…" });
+    try {
+      let q = supabase.from("user_books").select("id,created_at").eq("owner_id", userId).eq("library_id", libId);
+      if (book.edition?.id) {
+        q = q.eq("edition_id", book.edition.id);
+      } else {
+        q = q.is("edition_id", null);
+        if (book.title_override) q = q.eq("title_override", book.title_override);
+        else q = q.is("title_override", null);
+        if (book.authors_override && book.authors_override.length > 0) q = q.eq("authors_override", book.authors_override);
+        else q = q.is("authors_override", null);
+      }
+
+      const existing = await q.order("created_at", { ascending: false }).limit(200);
+      if (existing.error) throw new Error(existing.error.message);
+      const ids = ((existing.data ?? []) as any[]).map((r) => r.id as number).filter((n) => Number.isFinite(n));
+      const current = ids.length;
+
+      if (desired === current) {
+        setCopiesUpdateState({ busy: false, error: null, message: "No change" });
+        window.setTimeout(() => setCopiesUpdateState({ busy: false, error: null, message: null }), 1200);
+        return;
+      }
+
+      if (desired > current) {
+        const toAdd = desired - current;
+        const payloadBase: any = {
+          owner_id: userId,
+          library_id: libId,
+          edition_id: book.edition?.id ?? null,
+          visibility: formVisibility,
+          status: formStatus,
+          title_override: book.title_override ?? null,
+          authors_override: (book.authors_override ?? null) as any,
+          publisher_override: book.publisher_override ?? null,
+          publish_date_override: book.publish_date_override ?? null,
+          description_override: book.description_override ?? null,
+          subjects_override: book.subjects_override ?? null,
+          location: null,
+          shelf: null,
+          notes: null
+        };
+        const rows = Array.from({ length: toAdd }, () => ({ ...payloadBase }));
+        const ins = await supabase.from("user_books").insert(rows as any);
+        if (ins.error) throw new Error(ins.error.message);
+      } else {
+        const toRemove = current - desired;
+        const removable = ids.filter((id) => id !== book.id);
+        const idsToDelete = removable.slice(0, toRemove);
+        if (idsToDelete.length < toRemove) throw new Error("To reduce copies below 1, use Delete instead.");
+        const del = await supabase.from("user_books").delete().in("id", idsToDelete);
+        if (del.error) throw new Error(del.error.message);
+      }
+
+      await refresh();
+      setCopiesUpdateState({ busy: false, error: null, message: "Updated" });
+      window.setTimeout(() => setCopiesUpdateState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setCopiesUpdateState({ busy: false, error: e?.message ?? "Update failed", message: "Update failed" });
+    }
+  }
+
+  async function getOrCreateTagId(name: string, kind: "tag" | "category"): Promise<number> {
     if (!supabase || !userId) throw new Error("Not signed in");
     const normalized = normalizeTagName(name);
-    const existing = await supabase.from("tags").select("id").eq("owner_id", userId).eq("name", normalized).maybeSingle();
+    const existing = await supabase.from("tags").select("id").eq("owner_id", userId).eq("name", normalized).eq("kind", kind).maybeSingle();
     if (existing.error) throw new Error(existing.error.message);
     if (existing.data?.id) return existing.data.id as number;
-    const inserted = await supabase.from("tags").insert({ owner_id: userId, name: normalized }).select("id").single();
+    const inserted = await supabase.from("tags").insert({ owner_id: userId, name: normalized, kind }).select("id").single();
     if (inserted.error) throw new Error(inserted.error.message);
     return inserted.data.id as number;
   }
@@ -464,7 +727,7 @@ export default function BookDetailPage() {
     if (!name) return;
     setTagState({ busy: true, error: null, message: "Adding…" });
     try {
-      const tagId = await getOrCreateTagId(name);
+      const tagId = await getOrCreateTagId(name, "tag");
       const ins = await supabase.from("user_book_tags").insert({ user_book_id: book.id, tag_id: tagId });
       if (ins.error && !ins.error.message.toLowerCase().includes("duplicate")) throw new Error(ins.error.message);
       setNewTag("");
@@ -486,6 +749,37 @@ export default function BookDetailPage() {
     }
     await refresh();
     setTagState({ busy: false, error: null, message: "Removed" });
+  }
+
+  async function addCategory() {
+    if (!supabase || !book || !userId) return;
+    if (book.owner_id !== userId) return;
+    const name = normalizeTagName(newCategory);
+    if (!name) return;
+    setCategoryState({ busy: true, error: null, message: "Adding…" });
+    try {
+      const tagId = await getOrCreateTagId(name, "category");
+      const ins = await supabase.from("user_book_tags").insert({ user_book_id: book.id, tag_id: tagId });
+      if (ins.error && !ins.error.message.toLowerCase().includes("duplicate")) throw new Error(ins.error.message);
+      setNewCategory("");
+      await refresh();
+      setCategoryState({ busy: false, error: null, message: "Added" });
+    } catch (e: any) {
+      setCategoryState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
+    }
+  }
+
+  async function removeCategory(tagId: number) {
+    if (!supabase || !book || !userId) return;
+    if (book.owner_id !== userId) return;
+    setCategoryState({ busy: true, error: null, message: "Removing…" });
+    const del = await supabase.from("user_book_tags").delete().eq("user_book_id", book.id).eq("tag_id", tagId);
+    if (del.error) {
+      setCategoryState({ busy: false, error: del.error.message, message: "Remove failed" });
+      return;
+    }
+    await refresh();
+    setCategoryState({ busy: false, error: null, message: "Removed" });
   }
 
   async function addSubject() {
@@ -720,6 +1014,71 @@ export default function BookDetailPage() {
     }
   }
 
+  async function mergeFromSource() {
+    if (!supabase || !book || !mergeSource || !userId) return;
+    if (book.owner_id !== userId) return;
+    if (!window.confirm(`Merge missing metadata + images from ${mergeSource.owner_username ? `@${mergeSource.owner_username}` : "another user"}? This will only fill missing fields and add media to your copy.`)) {
+      return;
+    }
+
+    setMergeState({ busy: true, error: null, message: "Merging…" });
+    try {
+      const updates: any = {};
+
+      const needsTitle = !book.title_override && !book.edition?.title;
+      const needsAuthors = (!book.authors_override || book.authors_override.length === 0) && (!book.edition?.authors || book.edition.authors.length === 0);
+      const needsPublisher = !book.publisher_override && !book.edition?.publisher;
+      const needsPublishDate = !book.publish_date_override && !book.edition?.publish_date;
+      const needsDescription = !book.description_override && !book.edition?.description;
+      const needsSubjects = (!book.subjects_override || book.subjects_override.length === 0) && (!book.edition?.subjects || book.edition.subjects.length === 0);
+
+      if (needsTitle && mergeSource.title_override) updates.title_override = mergeSource.title_override;
+      if (needsAuthors && mergeSource.authors_override && mergeSource.authors_override.length > 0) updates.authors_override = mergeSource.authors_override;
+      if (needsPublisher && mergeSource.publisher_override) updates.publisher_override = mergeSource.publisher_override;
+      if (needsPublishDate && mergeSource.publish_date_override) updates.publish_date_override = mergeSource.publish_date_override;
+      if (needsDescription && mergeSource.description_override) updates.description_override = mergeSource.description_override;
+      if (needsSubjects && mergeSource.subjects_override && mergeSource.subjects_override.length > 0) updates.subjects_override = mergeSource.subjects_override;
+
+      if (Object.keys(updates).length > 0) {
+        const upd = await supabase.from("user_books").update(updates).eq("id", book.id);
+        if (upd.error) throw new Error(upd.error.message);
+      }
+
+      const existingCover = (book.media ?? []).some((m) => m.kind === "cover");
+      const existingImages = (book.media ?? []).some((m) => m.kind === "image");
+      const toCopy = mergeSource.media.filter((m) => {
+        if (m.kind === "cover") return !existingCover && !book.edition?.cover_url;
+        return !existingImages;
+      });
+
+      for (const m of toCopy) {
+        const signed = await supabase.storage.from("user-book-media").createSignedUrl(m.storage_path, 60 * 15);
+        if (signed.error || !signed.data?.signedUrl) continue;
+        const resp = await fetch(signed.data.signedUrl);
+        if (!resp.ok) continue;
+        const blob = await resp.blob();
+        const fileName = safeFileName(String(m.storage_path.split("/").pop() ?? "image"));
+        const destPath = `${userId}/${book.id}/merge-${Date.now()}-${fileName}`;
+        const up = await supabase.storage.from("user-book-media").upload(destPath, blob, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: resp.headers.get("content-type") || "application/octet-stream"
+        });
+        if (up.error) continue;
+        const ins = await supabase.from("user_book_media").insert({ user_book_id: book.id, kind: m.kind, storage_path: destPath, caption: null });
+        if (ins.error) {
+          // ignore; still uploaded
+        }
+      }
+
+      await refresh();
+      setMergeState({ busy: false, error: null, message: "Merged" });
+      window.setTimeout(() => setMergeState({ busy: false, error: null, message: null }), 1500);
+    } catch (e: any) {
+      setMergeState({ busy: false, error: e?.message ?? "Merge failed", message: "Merge failed" });
+    }
+  }
+
   if (!supabase) {
     return (
       <main className="container">
@@ -789,7 +1148,23 @@ export default function BookDetailPage() {
             ) : null}
           </div>
 
-          {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} /> : null}
+          {mergeSource && book?.owner_id === userId ? (
+            <div style={{ marginTop: 10 }} className="card">
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <div>Merge from community</div>
+                <div className="muted">{mergeSource.owner_username ? `@${mergeSource.owner_username}` : "available"}</div>
+              </div>
+              <div className="muted" style={{ marginTop: 8 }}>
+                If another user has added a cover, images, or filled-in metadata for this same edition, you can copy it into your copy (fills missing fields only).
+              </div>
+              <div className="row" style={{ marginTop: 10 }}>
+                <button onClick={mergeFromSource} disabled={mergeState.busy}>
+                  {mergeState.busy ? "Merging…" : "Merge missing fields + images"}
+                </button>
+                <div className="muted">{mergeState.message ? (mergeState.error ? `${mergeState.message} (${mergeState.error})` : mergeState.message) : ""}</div>
+              </div>
+            </div>
+          ) : null}
 
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "220px 1fr", gap: 14 }}>
             <div>
@@ -862,7 +1237,9 @@ export default function BookDetailPage() {
                   <div style={{ minWidth: 110 }} className="muted">
                     Publisher
                   </div>
-                  <div>{effectivePublisher || "—"}</div>
+                  <div>
+                    {effectivePublisher ? <Link href={`/app?publisher=${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link> : "—"}
+                  </div>
                 </div>
                 <div className="row" style={{ marginTop: 6 }}>
                   <div style={{ minWidth: 110 }} className="muted">
@@ -1046,11 +1423,60 @@ export default function BookDetailPage() {
 
                 <div className="row" style={{ marginTop: 6 }}>
                   <div style={{ minWidth: 110 }} className="muted">
+                    Catalog
+                  </div>
+                  {book?.owner_id === userId ? (
+                    libraries.length > 1 ? (
+                      <select
+                        value={formLibraryId ?? ""}
+                        onChange={(e) => moveToLibrary(Number(e.target.value))}
+                        disabled={libraryMoveState.busy || !formLibraryId}
+                      >
+                        {libraries.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div>{libraries[0]?.name ?? "Your catalog"}</div>
+                    )
+                  ) : (
+                    <div className="muted">—</div>
+                  )}
+                  <div className="muted">
+                    {libraryMoveState.message ? (libraryMoveState.error ? `${libraryMoveState.message} (${libraryMoveState.error})` : libraryMoveState.message) : ""}
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
                     {copiesLabel}
                   </div>
-                  <div className="muted">
-                    {copiesCountState.busy ? "…" : copiesCountState.error ? copiesCountState.error : copiesCount ?? "—"}
-                  </div>
+                  {book?.owner_id === userId ? (
+                    <div className="row" style={{ gap: 8 }}>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={copiesDraft}
+                        onChange={(e) => setCopiesDraft(e.target.value)}
+                        onKeyDown={(e) => onEnter(e, updateCopies)}
+                        style={{ width: 90 }}
+                      />
+                      <button onClick={updateCopies} disabled={copiesUpdateState.busy || !copiesDraft.trim()}>
+                        {copiesUpdateState.busy ? "Updating…" : "Update"}
+                      </button>
+                      <span className="muted">
+                        {copiesCountState.busy ? "…" : copiesCountState.error ? copiesCountState.error : `${copiesCount ?? "—"} current`}
+                      </span>
+                      <span className="muted">
+                        {copiesUpdateState.message ? (copiesUpdateState.error ? `${copiesUpdateState.message} (${copiesUpdateState.error})` : copiesUpdateState.message) : ""}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="muted">{copiesCountState.busy ? "…" : copiesCountState.error ? copiesCountState.error : copiesCount ?? "—"}</div>
+                  )}
                 </div>
 
                 <div className="row" style={{ marginTop: 6 }}>
@@ -1177,6 +1603,52 @@ export default function BookDetailPage() {
               </div>
 
               <div style={{ marginTop: 16 }} className="muted">
+                Categories
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <div className="row">
+                  <input
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, addCategory)}
+                    placeholder="Add a category"
+                    style={{ width: 220 }}
+                  />
+                  <button onClick={addCategory} disabled={categoryState.busy || !newCategory.trim()}>
+                    Add
+                  </button>
+                  <div className="muted">{categoryState.message ? (categoryState.error ? `${categoryState.message} (${categoryState.error})` : categoryState.message) : ""}</div>
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  {categories.length > 0 ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {categories.map((t) => (
+                        <span
+                          key={t.id}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            border: "1px solid var(--border)",
+                            padding: "2px 6px"
+                          }}
+                        >
+                          <Link href={`/app?category=${encodeURIComponent(t.name)}`} style={{ textDecoration: "none" }}>
+                            {t.name}
+                          </Link>
+                          <button onClick={() => removeCategory(t.id)} disabled={categoryState.busy} aria-label={`Remove category ${t.name}`}>
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="muted">No categories yet.</div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16 }} className="muted">
                 Tags
               </div>
               <div style={{ marginTop: 8 }}>
@@ -1194,29 +1666,27 @@ export default function BookDetailPage() {
                   <div className="muted">{tagState.message ? (tagState.error ? `${tagState.message} (${tagState.error})` : tagState.message) : ""}</div>
                 </div>
                 <div style={{ marginTop: 8 }}>
-                  {tagNames.length > 0 ? (
+                  {tags.length > 0 ? (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {((book?.book_tags ?? []).map((bt) => bt.tag).filter(Boolean) as Array<{ id: number; name: string }>)
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((t) => (
-                          <span
-                            key={t.id}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                              border: "1px solid var(--border)",
-                              padding: "2px 6px"
-                            }}
-                          >
-                            <Link href={`/app?tag=${encodeURIComponent(t.name)}`} style={{ textDecoration: "none" }}>
-                              {t.name}
-                            </Link>
-                            <button onClick={() => removeTag(t.id)} disabled={tagState.busy} aria-label={`Remove tag ${t.name}`}>
-                              ×
-                            </button>
-                          </span>
-                        ))}
+                      {tags.map((t) => (
+                        <span
+                          key={t.id}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            border: "1px solid var(--border)",
+                            padding: "2px 6px"
+                          }}
+                        >
+                          <Link href={`/app?tag=${encodeURIComponent(t.name)}`} style={{ textDecoration: "none" }}>
+                            {t.name}
+                          </Link>
+                          <button onClick={() => removeTag(t.id)} disabled={tagState.busy} aria-label={`Remove tag ${t.name}`}>
+                            ×
+                          </button>
+                        </span>
+                      ))}
                     </div>
                   ) : (
                     <div className="muted">No tags yet.</div>
@@ -1292,6 +1762,10 @@ export default function BookDetailPage() {
                 )}
               </div>
             </div>
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} /> : null}
           </div>
         </div>
       )}

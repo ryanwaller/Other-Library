@@ -21,6 +21,7 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
   const [createdId, setCreatedId] = useState<number | null>(null);
   const [count, setCount] = useState<number>(0);
   const [latestId, setLatestId] = useState<number | null>(null);
+  const [defaultLibraryId, setDefaultLibraryId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -28,6 +29,50 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSessionUserId(newSession?.user?.id ?? null));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  async function refreshDefaultLibrary() {
+    if (!supabase || !sessionUserId) {
+      setDefaultLibraryId(null);
+      return;
+    }
+    try {
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem("om_currentLibraryId") : null;
+      const parsed = raw ? Number(raw) : NaN;
+      if (Number.isFinite(parsed) && parsed > 0) {
+        setDefaultLibraryId(parsed);
+        return;
+      }
+    } catch {
+      // ignore
+    }
+
+    // Fallback: first library.
+    const libs = await supabase.from("libraries").select("id").eq("owner_id", sessionUserId).order("created_at", { ascending: true }).limit(1);
+    if (libs.error) return;
+    const id = (libs.data?.[0] as any)?.id as number | undefined;
+    if (id) {
+      setDefaultLibraryId(id);
+      try {
+        window.localStorage.setItem("om_currentLibraryId", String(id));
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    // If none exist yet, create a default library and retry once.
+    const created = await supabase.from("libraries").insert({ owner_id: sessionUserId, name: "Your catalog" }).select("id").single();
+    if (created.error) return;
+    const createdId = (created.data as any)?.id as number | undefined;
+    if (createdId) {
+      setDefaultLibraryId(createdId);
+      try {
+        window.localStorage.setItem("om_currentLibraryId", String(createdId));
+      } catch {
+        // ignore
+      }
+    }
+  }
 
   const isSelf = useMemo(() => {
     if (!sessionUserId) return false;
@@ -71,12 +116,21 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionUserId, editionId, ctx]);
 
+  useEffect(() => {
+    refreshDefaultLibrary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionUserId]);
+
   async function add() {
     if (!supabase || !sessionUserId) return;
+    if (!defaultLibraryId) {
+      setError("No catalog selected");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const payload: any = { owner_id: sessionUserId, edition_id: editionId };
+      const payload: any = { owner_id: sessionUserId, library_id: defaultLibraryId, edition_id: editionId };
       if (!editionId) {
         payload.edition_id = null;
         payload.title_override = titleFallback.trim() ? titleFallback.trim() : null;
