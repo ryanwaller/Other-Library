@@ -237,7 +237,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
               Publisher / date
             </div>
             <div style={{ marginTop: 6 }}>
-              {effectivePublisher || "—"}
+              {effectivePublisher ? <Link href={`/u/${profile.username}/p/${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link> : "—"}
               {effectivePublishDate ? ` (${effectivePublishDate})` : ""}
             </div>
 
