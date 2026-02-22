@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
+import { useAddToLibraryContext } from "./AddToLibraryProvider";
 
 type AddToLibraryButtonProps = {
   editionId: number | null;
@@ -13,11 +14,13 @@ type AddToLibraryButtonProps = {
 };
 
 export default function AddToLibraryButton({ editionId, titleFallback, authorsFallback, sourceOwnerId, compact }: AddToLibraryButtonProps) {
+  const ctx = useAddToLibraryContext();
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<number | null>(null);
-  const [existingId, setExistingId] = useState<number | null>(null);
+  const [count, setCount] = useState<number>(0);
+  const [latestId, setLatestId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -39,31 +42,40 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
   }, [sessionUserId, isSelf]);
 
   async function refreshExisting() {
-    if (!supabase || !sessionUserId) return;
     if (!editionId) {
-      setExistingId(null);
+      setCount(0);
+      setLatestId(null);
       return;
     }
-    const res = await supabase.from("user_books").select("id").eq("owner_id", sessionUserId).eq("edition_id", editionId).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (res.error) return;
-    setExistingId((res.data as any)?.id ?? null);
+
+    const fromCtx = ctx?.getInfo(editionId) ?? null;
+    if (fromCtx) {
+      setCount(fromCtx.count);
+      setLatestId(fromCtx.latestId);
+      return;
+    }
+
+    if (!supabase || !sessionUserId) return;
+    const [countRes, latestRes] = await Promise.all([
+      supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", sessionUserId).eq("edition_id", editionId),
+      supabase.from("user_books").select("id").eq("owner_id", sessionUserId).eq("edition_id", editionId).order("created_at", { ascending: false }).limit(1).maybeSingle()
+    ]);
+    if (countRes.error) return;
+    if (latestRes.error) return;
+    setCount(countRes.count ?? 0);
+    setLatestId((latestRes.data as any)?.id ?? null);
   }
 
   useEffect(() => {
     refreshExisting();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionUserId, editionId]);
+  }, [sessionUserId, editionId, ctx]);
 
   async function add() {
     if (!supabase || !sessionUserId) return;
     setBusy(true);
     setError(null);
     try {
-      if (existingId) {
-        setCreatedId(existingId);
-        return;
-      }
-
       const payload: any = { owner_id: sessionUserId, edition_id: editionId };
       if (!editionId) {
         payload.edition_id = null;
@@ -76,7 +88,11 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
       const id = (ins.data as any)?.id as number | undefined;
       if (!id) throw new Error("Add failed");
       setCreatedId(id);
-      setExistingId(id);
+      if (editionId) {
+        ctx?.bump(editionId, id);
+        setCount((c) => c + 1);
+        setLatestId(id);
+      }
     } catch (e: any) {
       setError(e?.message ?? "Add failed");
     } finally {
@@ -87,13 +103,22 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
   if (!supabase) return null;
   if (!canAdd) return null;
 
-  const idToOpen = createdId ?? existingId;
+  const idToOpen = latestId ?? createdId;
   const label = compact ? "＋" : "＋ Add";
 
   return (
     <span className="row" style={{ gap: 8 }}>
-      {idToOpen ? (
-        <Link href={`/app/books/${idToOpen}`}>{compact ? "open" : "Open in app"}</Link>
+      {editionId && count > 0 ? (
+        <>
+          <Link href={idToOpen ? `/app/books/${idToOpen}` : "/app"} style={{ textDecoration: "none" }}>
+            <span className="card" style={{ padding: "2px 8px", display: "inline-flex", alignItems: "center" }}>
+              {count}
+            </span>
+          </Link>
+          <button onClick={add} disabled={busy} title="Add another copy">
+            {busy ? (compact ? "…" : "Adding…") : compact ? "＋" : "Add copy"}
+          </button>
+        </>
       ) : (
         <button onClick={add} disabled={busy}>
           {busy ? (compact ? "…" : "Adding…") : label}

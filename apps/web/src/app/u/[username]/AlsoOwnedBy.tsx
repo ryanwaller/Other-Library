@@ -20,7 +20,7 @@ export default function AlsoOwnedBy({
   excludeUserBookId: number;
   excludeOwnerId?: string | null;
 }) {
-  const [rows, setRows] = useState<AlsoOwnedRow[]>([]);
+  const [rows, setRows] = useState<Array<AlsoOwnedRow & { copies: number }>>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatarUrlsByPath, setAvatarUrlsByPath] = useState<Record<string, string>>({});
@@ -44,17 +44,22 @@ export default function AlsoOwnedBy({
         if (res.error) throw new Error(res.error.message);
         const data = (res.data ?? []) as any as AlsoOwnedRow[];
 
-        // One row per owner (a user can have multiple entries).
-        const byOwner = new Map<string, AlsoOwnedRow>();
+        // Group by owner and count visible copies.
+        const byOwner = new Map<string, { row: AlsoOwnedRow; copies: number }>();
         for (const r of data) {
           if (!r?.owner_id) continue;
           if (excludeOwnerId && r.owner_id === excludeOwnerId) continue;
-          if (!byOwner.has(r.owner_id)) byOwner.set(r.owner_id, r);
+          const cur = byOwner.get(r.owner_id);
+          if (!cur) {
+            byOwner.set(r.owner_id, { row: r, copies: 1 });
+          } else {
+            cur.copies += 1;
+          }
         }
-        const unique = Array.from(byOwner.values());
-        setRows(unique);
+        const grouped = Array.from(byOwner.values()).map((x) => ({ ...x.row, copies: x.copies }));
+        setRows(grouped);
 
-        const paths = Array.from(new Set(unique.map((r) => r.owner?.avatar_path).filter(Boolean))) as string[];
+        const paths = Array.from(new Set(grouped.map((r) => r.owner?.avatar_path).filter(Boolean))) as string[];
         if (paths.length === 0) {
           setAvatarUrlsByPath({});
           return;
@@ -116,6 +121,7 @@ export default function AlsoOwnedBy({
                   <span style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)", display: "inline-block" }} />
                 )}
                 <span>{username}</span>
+                <span className="muted">{r.copies > 1 ? `(${r.copies})` : ""}</span>
               </Link>
             );
           })}

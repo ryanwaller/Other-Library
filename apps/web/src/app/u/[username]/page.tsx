@@ -4,6 +4,7 @@ import Link from "next/link";
 import { bookIdSlug } from "../../../lib/slug";
 import FollowControls from "./FollowControls";
 import AddToLibraryButton from "./AddToLibraryButton";
+import AddToLibraryProvider from "./AddToLibraryProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +96,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     }
   }
 
+  const editionIds = books.map((b) => b.edition?.id).filter(Boolean) as number[];
+
   return (
     <main className="container">
       <div className="card">
@@ -128,70 +131,78 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       </div>
 
       <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-        {books.map((b) => {
-          const e = b.edition;
-          const title = (b.title_override ?? "").trim() || e?.title || "(untitled)";
-          const authors = (e?.authors ?? []).filter(Boolean) as string[];
-          const effectiveAuthors =
-            (b.authors_override ?? []).filter(Boolean).length > 0 ? (b.authors_override ?? []).filter(Boolean) : authors;
-          const cover = (b.media ?? []).find((m) => m.kind === "cover");
-          const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
-          const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
-          const extraImages = (b.media ?? []).filter((m) => m.kind === "image").slice(0, 3);
-          return (
-            <div key={b.id} className="card">
-              <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                <span className="muted" />
-                <AddToLibraryButton editionId={e?.id ?? null} titleFallback={title} authorsFallback={effectiveAuthors} sourceOwnerId={profile.id} compact />
-              </div>
-              <Link href={href} style={{ display: "block", marginTop: 6 }}>
-                {coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    alt={title}
-                    src={coverUrl}
-                    style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }}
+        <AddToLibraryProvider editionIds={editionIds}>
+          {books.map((b) => {
+            const e = b.edition;
+            const title = (b.title_override ?? "").trim() || e?.title || "(untitled)";
+            const authors = (e?.authors ?? []).filter(Boolean) as string[];
+            const effectiveAuthors =
+              (b.authors_override ?? []).filter(Boolean).length > 0 ? (b.authors_override ?? []).filter(Boolean) : authors;
+            const cover = (b.media ?? []).find((m) => m.kind === "cover");
+            const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
+            const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
+            const extraImages = (b.media ?? []).filter((m) => m.kind === "image").slice(0, 3);
+            return (
+              <div key={b.id} className="card">
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="muted" />
+                  <AddToLibraryButton
+                    editionId={e?.id ?? null}
+                    titleFallback={title}
+                    authorsFallback={effectiveAuthors}
+                    sourceOwnerId={profile.id}
+                    compact
                   />
-                ) : (
-                  <div style={{ width: "100%", height: 220, border: "1px solid var(--border)" }} />
-                )}
-              </Link>
-              <div style={{ marginTop: 8 }}>
-                <Link href={href}>{title}</Link>
-              </div>
-              <div className="muted" style={{ marginTop: 4 }}>
-                {effectiveAuthors.length > 0 ? (
-                  effectiveAuthors.map((a, idx) => (
-                    <span key={a}>
-                      <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                      {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                    </span>
-                  ))
-                ) : (
-                  e?.isbn13 || ""
-                )}
-              </div>
-              {extraImages.length > 0 ? (
-                <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                  {extraImages.map((m, idx) => {
-                    const url = signedMap[m.storage_path];
-                    return url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={`${b.id}-${idx}`}
-                        alt=""
-                        src={url}
-                        style={{ width: "100%", height: 60, objectFit: "cover", border: "1px solid var(--border)" }}
-                      />
-                    ) : (
-                      <div key={`${b.id}-${idx}`} style={{ width: "100%", height: 60, border: "1px solid var(--border)" }} />
-                    );
-                  })}
                 </div>
-              ) : null}
-            </div>
-          );
-        })}
+                <Link href={href} style={{ display: "block", marginTop: 6 }}>
+                  {coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      alt={title}
+                      src={coverUrl}
+                      style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", height: 220, border: "1px solid var(--border)" }} />
+                  )}
+                </Link>
+                <div style={{ marginTop: 8 }}>
+                  <Link href={href}>{title}</Link>
+                </div>
+                <div className="muted" style={{ marginTop: 4 }}>
+                  {effectiveAuthors.length > 0 ? (
+                    effectiveAuthors.map((a, idx) => (
+                      <span key={a}>
+                        <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                        {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                      </span>
+                    ))
+                  ) : (
+                    e?.isbn13 || ""
+                  )}
+                </div>
+                {extraImages.length > 0 ? (
+                  <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                    {extraImages.map((m, idx) => {
+                      const url = signedMap[m.storage_path];
+                      return url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={`${b.id}-${idx}`}
+                          alt=""
+                          src={url}
+                          style={{ width: "100%", height: 60, objectFit: "cover", border: "1px solid var(--border)" }}
+                        />
+                      ) : (
+                        <div key={`${b.id}-${idx}`} style={{ width: "100%", height: 60, border: "1px solid var(--border)" }} />
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </AddToLibraryProvider>
       </div>
     </main>
   );
