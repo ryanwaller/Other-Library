@@ -176,7 +176,11 @@ function AppShell({
     const publicProfileHref = profile?.username ? `/u/${profile.username}` : null;
     return (
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <div>Other Library</div>
+        <div>
+          <Link href="/app" style={{ textDecoration: "none" }}>
+            Other Library
+          </Link>
+        </div>
         <div className="row">
           {avatarUrl ? (
             publicProfileHref ? (
@@ -193,7 +197,13 @@ function AppShell({
               <img alt="" src={avatarUrl} style={{ width: 22, height: 22, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
             )
           ) : null}
-          <span className="muted">{avatarUrl ? name : profile ? `@${profile.username}` : userId}</span>
+          {publicProfileHref ? (
+            <Link href={publicProfileHref} className="muted" style={{ textDecoration: "none" }}>
+              {avatarUrl ? name : profile ? `@${profile.username}` : userId}
+            </Link>
+          ) : (
+            <span className="muted">{avatarUrl ? name : profile ? `@${profile.username}` : userId}</span>
+          )}
           <Link href="/app/settings">Settings</Link>
           <button onClick={() => supabase?.auth.signOut()}>Sign out</button>
         </div>

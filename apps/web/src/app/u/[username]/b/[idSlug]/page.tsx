@@ -4,6 +4,7 @@ import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
 import AddToLibraryButton from "../../AddToLibraryButton";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
+import SignedInAppNav from "../../SignedInAppNav";
 
 export const dynamic = "force-dynamic";
 
@@ -162,6 +163,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
   return (
     <main className="container">
+      <SignedInAppNav viewingUsername={profile.username} />
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div>

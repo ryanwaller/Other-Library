@@ -279,7 +279,7 @@ export default function FollowsPage() {
     <main className="container">
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
         <div className="muted">
-          <Link href="/app">← Back</Link>
+          <Link href="/app">Home</Link>
         </div>
         <div className="row">
           <Link href="/app/settings">Settings</Link>

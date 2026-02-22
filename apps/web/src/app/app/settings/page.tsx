@@ -351,7 +351,7 @@ export default function SettingsPage() {
     <main className="container">
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
         <div className="muted">
-          <Link href="/app">← Back</Link>
+          <Link href="/app">Home</Link>
         </div>
         <div className="row">{session ? <button onClick={() => supabase?.auth.signOut()}>Sign out</button> : null}</div>
       </div>

@@ -5,6 +5,7 @@ import { bookIdSlug } from "../../../lib/slug";
 import FollowControls from "./FollowControls";
 import AddToLibraryButton from "./AddToLibraryButton";
 import AddToLibraryProvider from "./AddToLibraryProvider";
+import SignedInAppNav from "./SignedInAppNav";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     new Set(
       books
         .flatMap((b) => (Array.isArray(b.media) ? b.media : []))
+        .filter((m) => m?.kind === "cover")
         .filter((m) => typeof m.storage_path === "string" && m.storage_path.length > 0)
         .map((m) => m.storage_path)
     )
@@ -100,6 +102,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   return (
     <main className="container">
+      <SignedInAppNav viewingUsername={profile.username} />
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div className="row">
@@ -139,14 +142,13 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             const effectiveAuthors =
               (b.authors_override ?? []).filter(Boolean).length > 0 ? (b.authors_override ?? []).filter(Boolean) : authors;
             const cover = (b.media ?? []).find((m) => m.kind === "cover");
-            const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
-            const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
-            const extraImages = (b.media ?? []).filter((m) => m.kind === "image").slice(0, 3);
-            return (
-              <div key={b.id} className="card">
-                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <span className="muted" />
-                  <AddToLibraryButton
+          const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
+          const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
+          return (
+            <div key={b.id} className="card">
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                <span className="muted" />
+                <AddToLibraryButton
                     editionId={e?.id ?? null}
                     titleFallback={title}
                     authorsFallback={effectiveAuthors}
@@ -169,40 +171,22 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                 <div style={{ marginTop: 8 }}>
                   <Link href={href}>{title}</Link>
                 </div>
-                <div className="muted" style={{ marginTop: 4 }}>
-                  {effectiveAuthors.length > 0 ? (
-                    effectiveAuthors.map((a, idx) => (
-                      <span key={a}>
-                        <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                        {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                      </span>
-                    ))
-                  ) : (
-                    e?.isbn13 || ""
-                  )}
-                </div>
-                {extraImages.length > 0 ? (
-                  <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                    {extraImages.map((m, idx) => {
-                      const url = signedMap[m.storage_path];
-                      return url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          key={`${b.id}-${idx}`}
-                          alt=""
-                          src={url}
-                          style={{ width: "100%", height: 60, objectFit: "cover", border: "1px solid var(--border)" }}
-                        />
-                      ) : (
-                        <div key={`${b.id}-${idx}`} style={{ width: "100%", height: 60, border: "1px solid var(--border)" }} />
-                      );
-                    })}
-                  </div>
-                ) : null}
+              <div className="muted" style={{ marginTop: 4 }}>
+                {effectiveAuthors.length > 0 ? (
+                  effectiveAuthors.map((a, idx) => (
+                    <span key={a}>
+                      <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                      {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                    </span>
+                  ))
+                ) : (
+                  e?.isbn13 || ""
+                )}
               </div>
-            );
-          })}
-        </AddToLibraryProvider>
+            </div>
+          );
+        })}
+      </AddToLibraryProvider>
       </div>
     </main>
   );
