@@ -114,7 +114,15 @@ export default function SettingsPage() {
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
 
-  const [profile, setProfile] = useState<{ username: string; display_name: string | null; bio: string | null; visibility: string; avatar_path: string | null } | null>(null);
+  const [profile, setProfile] = useState<{
+    username: string;
+    display_name: string | null;
+    bio: string | null;
+    visibility: string;
+    avatar_path: string | null;
+    borrowable_default: boolean;
+    borrow_request_scope: "anyone" | "approved_followers";
+  } | null>(null);
   const [aliases, setAliases] = useState<Array<{ old_username: string; created_at: string }>>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,10 +137,18 @@ export default function SettingsPage() {
     { state: "idle", message: null }
   );
 
-  const [profileForm, setProfileForm] = useState<{ display_name: string; bio: string; visibility: "followers_only" | "public" }>({
+  const [profileForm, setProfileForm] = useState<{
+    display_name: string;
+    bio: string;
+    visibility: "followers_only" | "public";
+    borrowable_default: boolean;
+    borrow_request_scope: "anyone" | "approved_followers";
+  }>({
     display_name: "",
     bio: "",
-    visibility: "followers_only"
+    visibility: "followers_only",
+    borrowable_default: false,
+    borrow_request_scope: "approved_followers"
   });
   const [profileSaveState, setProfileSaveState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
@@ -161,7 +177,11 @@ export default function SettingsPage() {
       if (!supabase || !userId) return;
       setBusy(true);
       setError(null);
-      const res = await supabase.from("profiles").select("username,display_name,bio,visibility,avatar_path").eq("id", userId).maybeSingle();
+      const res = await supabase
+        .from("profiles")
+        .select("username,display_name,bio,visibility,avatar_path,borrowable_default,borrow_request_scope")
+        .eq("id", userId)
+        .maybeSingle();
       if (!alive) return;
       if (res.error) setError(res.error.message);
       const nextProfile = ((res.data as any) ?? null) as typeof profile;
@@ -170,7 +190,9 @@ export default function SettingsPage() {
         setProfileForm({
           display_name: (nextProfile.display_name ?? "") as string,
           bio: (nextProfile.bio ?? "") as string,
-          visibility: (nextProfile.visibility === "public" ? "public" : "followers_only") as any
+          visibility: (nextProfile.visibility === "public" ? "public" : "followers_only") as any,
+          borrowable_default: Boolean((nextProfile as any).borrowable_default),
+          borrow_request_scope: (((nextProfile as any).borrow_request_scope as string) === "anyone" ? "anyone" : "approved_followers") as any
         });
       }
       setBusy(false);
@@ -285,13 +307,15 @@ export default function SettingsPage() {
     const payload = {
       display_name: profileForm.display_name.trim() ? profileForm.display_name.trim() : null,
       bio: profileForm.bio.trim() ? profileForm.bio.trim() : null,
-      visibility: profileForm.visibility
+      visibility: profileForm.visibility,
+      borrowable_default: Boolean(profileForm.borrowable_default),
+      borrow_request_scope: profileForm.borrow_request_scope
     };
     const res = await supabase
       .from("profiles")
       .update(payload)
       .eq("id", userId)
-      .select("username,display_name,bio,visibility,avatar_path")
+      .select("username,display_name,bio,visibility,avatar_path,borrowable_default,borrow_request_scope")
       .maybeSingle();
     if (res.error) {
       setProfileSaveState({ busy: false, error: res.error.message, message: "Failed" });
@@ -400,6 +424,49 @@ export default function SettingsPage() {
             </div>
             <div style={{ marginTop: 10 }}>
               <Link href="/app/follows">Open follow settings</Link>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }} className="card">
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <div>Borrowing</div>
+              <div className="muted">defaults</div>
+            </div>
+            <div className="muted" style={{ marginTop: 8 }}>
+              Set defaults for whether books are borrowable. You can override per-book on the detail page.
+            </div>
+            <div className="row" style={{ marginTop: 10 }}>
+              <div style={{ width: 170 }} className="muted">
+                Borrowable by default
+              </div>
+              <select
+                value={profileForm.borrowable_default ? "yes" : "no"}
+                onChange={(e) => setProfileForm((p) => ({ ...p, borrowable_default: e.target.value === "yes" }))}
+              >
+                <option value="no">no</option>
+                <option value="yes">yes</option>
+              </select>
+            </div>
+            <div className="row" style={{ marginTop: 10 }}>
+              <div style={{ width: 170 }} className="muted">
+                Who can request
+              </div>
+              <select
+                value={profileForm.borrow_request_scope}
+                onChange={(e) =>
+                  setProfileForm((p) => ({
+                    ...p,
+                    borrow_request_scope: (e.target.value === "anyone" ? "anyone" : "approved_followers") as any
+                  }))
+                }
+              >
+                <option value="approved_followers">approved_followers</option>
+                <option value="anyone">anyone</option>
+              </select>
+              <div className="muted">{profileForm.borrow_request_scope === "anyone" ? "Any signed-in user." : "Only approved followers."}</div>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <Link href="/app/borrow-requests">View borrow requests</Link>
             </div>
           </div>
 

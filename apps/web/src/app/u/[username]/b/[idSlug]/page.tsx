@@ -4,6 +4,7 @@ import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
 import AddToLibraryButton from "../../AddToLibraryButton";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
+import BorrowRequestWidget from "../../BorrowRequestWidget";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ type PublicBookDetail = {
   publish_date_override: string | null;
   description_override: string | null;
   subjects_override: string[] | null;
+  borrowable_override: boolean | null;
+  borrow_request_scope_override: "anyone" | "approved_followers" | null;
   edition: {
     id: number;
     isbn13: string | null;
@@ -77,7 +80,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
   const profileRes = await supabase
     .from("profiles")
-    .select("id,username,display_name,bio,visibility,avatar_path")
+    .select("id,username,display_name,bio,visibility,avatar_path,borrowable_default,borrow_request_scope")
     .eq("username", usernameNorm)
     .maybeSingle();
 
@@ -98,7 +101,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const bookRes = await supabase
     .from("user_books")
     .select(
-      "id,owner_id,visibility,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
+      "id,owner_id,visibility,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,borrowable_override,borrow_request_scope_override,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
     )
     .eq("id", bookId)
     .eq("owner_id", profile.id)
@@ -159,6 +162,11 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const coverUrl = coverMedia ? signedMap[coverMedia.storage_path] : book.edition?.cover_url ?? null;
   const images = (book.media ?? []).filter((m) => m.kind === "image");
   const editionId = book.edition?.id ?? null;
+
+  const borrowableDefault = Boolean((profile as any).borrowable_default);
+  const borrowScopeDefault = (((profile as any).borrow_request_scope as string) || "approved_followers") as "anyone" | "approved_followers";
+  const effectiveBorrowable = book.borrowable_override === null || book.borrowable_override === undefined ? borrowableDefault : Boolean(book.borrowable_override);
+  const effectiveBorrowScope = (book.borrow_request_scope_override ?? borrowScopeDefault) as "anyone" | "approved_followers";
 
   return (
     <main className="container">
@@ -239,6 +247,23 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
             <div style={{ marginTop: 6 }}>
               {effectivePublisher ? <Link href={`/u/${profile.username}/p/${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link> : "—"}
               {effectivePublishDate ? ` (${effectivePublishDate})` : ""}
+            </div>
+
+            <div style={{ marginTop: 12 }} className="muted">
+              Borrowing
+            </div>
+            <div style={{ marginTop: 6 }} className="muted">
+              {effectiveBorrowable ? `borrowable (${effectiveBorrowScope})` : "not borrowable"}
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <BorrowRequestWidget
+                userBookId={book.id}
+                ownerId={book.owner_id}
+                ownerUsername={profile.username}
+                bookTitle={effectiveTitle}
+                borrowable={effectiveBorrowable}
+                scope={effectiveBorrowScope}
+              />
             </div>
 
             <div style={{ marginTop: 12 }} className="muted">

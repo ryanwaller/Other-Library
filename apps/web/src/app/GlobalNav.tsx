@@ -22,6 +22,7 @@ export default function GlobalNav() {
   const [me, setMe] = useState<{ username: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<number>(0);
+  const [pendingBorrowRequests, setPendingBorrowRequests] = useState<number>(0);
 
   useEffect(() => {
     if (!supabase) return;
@@ -60,6 +61,39 @@ export default function GlobalNav() {
       alive = false;
       if (timer) window.clearInterval(timer);
       window.removeEventListener("om:follows-changed", refreshPending);
+    };
+  }, [sessionUserId]);
+
+  useEffect(() => {
+    let alive = true;
+    let timer: number | null = null;
+
+    async function refreshPendingBorrow() {
+      if (!supabase || !sessionUserId) {
+        setPendingBorrowRequests(0);
+        return;
+      }
+      const res = await supabase
+        .from("borrow_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_id", sessionUserId)
+        .eq("status", "pending");
+      if (!alive) return;
+      if (res.error) {
+        setPendingBorrowRequests(0);
+        return;
+      }
+      setPendingBorrowRequests(res.count ?? 0);
+    }
+
+    refreshPendingBorrow();
+    timer = window.setInterval(refreshPendingBorrow, 30_000);
+    window.addEventListener("om:borrow-requests-changed", refreshPendingBorrow);
+
+    return () => {
+      alive = false;
+      if (timer) window.clearInterval(timer);
+      window.removeEventListener("om:borrow-requests-changed", refreshPendingBorrow);
     };
   }, [sessionUserId]);
 
@@ -124,6 +158,27 @@ export default function GlobalNav() {
             <Link href="/app">App home</Link>
             <Link href="/app/settings">Settings</Link>
             {me?.username ? <Link href={`/u/${me.username}`}>My public page</Link> : null}
+            {pendingBorrowRequests > 0 ? (
+              <Link href="/app/borrow-requests" aria-label={`${pendingBorrowRequests} pending borrow requests`} style={{ textDecoration: "none" }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 18,
+                    height: 18,
+                    padding: "0 6px",
+                    borderRadius: 999,
+                    background: "#b00020",
+                    color: "white",
+                    fontSize: 12,
+                    lineHeight: "18px"
+                  }}
+                >
+                  {pendingBorrowRequests}
+                </span>
+              </Link>
+            ) : null}
             {pendingRequests > 0 ? (
               <Link href="/app/follows" aria-label={`${pendingRequests} pending follow requests`} style={{ textDecoration: "none" }}>
                 <span

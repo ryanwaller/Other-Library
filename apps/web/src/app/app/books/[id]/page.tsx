@@ -14,6 +14,8 @@ type UserBookDetail = {
   library_id: number;
   visibility: "inherit" | "followers_only" | "public";
   status: "owned" | "loaned" | "selling" | "trading";
+  borrowable_override: boolean | null;
+  borrow_request_scope_override: "anyone" | "approved_followers" | null;
   title_override: string | null;
   authors_override: string[] | null;
   publisher_override: string | null;
@@ -170,6 +172,9 @@ export default function BookDetailPage() {
   const [book, setBook] = useState<UserBookDetail | null>(null);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
   const [ownerProfile, setOwnerProfile] = useState<{ username: string; visibility: "followers_only" | "public" } | null>(null);
+  const [ownerBorrowDefaults, setOwnerBorrowDefaults] = useState<{ borrowable_default: boolean; borrow_request_scope: "anyone" | "approved_followers" } | null>(
+    null
+  );
   const [shareState, setShareState] = useState<{ error: string | null; message: string | null }>({ error: null, message: null });
   const [copiesCount, setCopiesCount] = useState<number | null>(null);
   const [copiesCountState, setCopiesCountState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
@@ -197,6 +202,8 @@ export default function BookDetailPage() {
   const [formNotes, setFormNotes] = useState("");
   const [formVisibility, setFormVisibility] = useState<"inherit" | "followers_only" | "public">("inherit");
   const [formStatus, setFormStatus] = useState<"owned" | "loaned" | "selling" | "trading">("owned");
+  const [formBorrowable, setFormBorrowable] = useState<"inherit" | "yes" | "no">("inherit");
+  const [formBorrowScope, setFormBorrowScope] = useState<"inherit" | "anyone" | "approved_followers">("inherit");
   const [saveState, setSaveState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -303,6 +310,7 @@ export default function BookDetailPage() {
     setBusy(true);
     setError(null);
     setOwnerProfile(null);
+    setOwnerBorrowDefaults(null);
     setMergeSource(null);
     setMergeState({ busy: false, error: null, message: null });
     setCopiesCount(null);
@@ -311,7 +319,7 @@ export default function BookDetailPage() {
       const res = await supabase
         .from("user_books")
         .select(
-          "id,owner_id,library_id,visibility,status,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
+          "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
         )
         .eq("id", bookId)
         .maybeSingle();
@@ -335,6 +343,10 @@ export default function BookDetailPage() {
       setFormVisibility(row.visibility);
       setFormStatus(row.status);
       setFormLibraryId((row as any).library_id ?? null);
+      setFormBorrowable(row.borrowable_override === null || row.borrowable_override === undefined ? "inherit" : row.borrowable_override ? "yes" : "no");
+      setFormBorrowScope(
+        row.borrow_request_scope_override === null || row.borrow_request_scope_override === undefined ? "inherit" : (row.borrow_request_scope_override as any)
+      );
 
       setSearchTitle((row.title_override ?? row.edition?.title ?? "").trim());
       setSearchAuthor(((row.authors_override ?? row.edition?.authors ?? []) as string[]).filter(Boolean).slice(0, 1).join(", "));
@@ -344,9 +356,17 @@ export default function BookDetailPage() {
 
       const ownerId = row.owner_id as string | undefined;
       if (ownerId) {
-        const profileRes = await supabase.from("profiles").select("username,visibility").eq("id", ownerId).maybeSingle();
+        const profileRes = await supabase
+          .from("profiles")
+          .select("username,visibility,borrowable_default,borrow_request_scope")
+          .eq("id", ownerId)
+          .maybeSingle();
         if (!profileRes.error && profileRes.data?.username) {
           setOwnerProfile({ username: profileRes.data.username, visibility: profileRes.data.visibility as any });
+          setOwnerBorrowDefaults({
+            borrowable_default: Boolean((profileRes.data as any).borrowable_default),
+            borrow_request_scope: ((profileRes.data as any).borrow_request_scope === "anyone" ? "anyone" : "approved_followers") as any
+          });
         }
       }
 
@@ -603,7 +623,9 @@ export default function BookDetailPage() {
       shelf: formShelf.trim() ? formShelf.trim() : null,
       notes: formNotes.trim() ? formNotes.trim() : null,
       visibility: formVisibility,
-      status: formStatus
+      status: formStatus,
+      borrowable_override: formBorrowable === "inherit" ? null : formBorrowable === "yes",
+      borrow_request_scope_override: formBorrowScope === "inherit" ? null : formBorrowScope
     };
     const res = await supabase.from("user_books").update(payload).eq("id", book.id);
     if (res.error) {
@@ -1419,6 +1441,42 @@ export default function BookDetailPage() {
                     <option value="selling">selling</option>
                     <option value="trading">trading</option>
                   </select>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Borrowable
+                  </div>
+                  <select
+                    value={formBorrowable}
+                    onChange={(e) => setFormBorrowable(e.target.value as any)}
+                    disabled={!book || book.owner_id !== userId}
+                  >
+                    <option value="inherit">inherit</option>
+                    <option value="yes">yes</option>
+                    <option value="no">no</option>
+                  </select>
+                  <div className="muted">
+                    Default: {ownerBorrowDefaults ? (ownerBorrowDefaults.borrowable_default ? "yes" : "no") : "…"}
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Requests
+                  </div>
+                  <select
+                    value={formBorrowScope}
+                    onChange={(e) => setFormBorrowScope(e.target.value as any)}
+                    disabled={!book || book.owner_id !== userId}
+                  >
+                    <option value="inherit">inherit</option>
+                    <option value="approved_followers">approved_followers</option>
+                    <option value="anyone">anyone</option>
+                  </select>
+                  <div className="muted">
+                    Default: {ownerBorrowDefaults ? ownerBorrowDefaults.borrow_request_scope : "…"}
+                  </div>
                 </div>
 
                 <div className="row" style={{ marginTop: 6 }}>
