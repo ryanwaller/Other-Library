@@ -142,13 +142,25 @@ function AppShell({
 
   const header = useMemo(() => {
     const name = profile?.username ?? userId;
+    const publicProfileHref = profile?.username ? `/u/${profile.username}` : null;
     return (
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>Other Library</div>
         <div className="row">
           {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img alt="" src={avatarUrl} style={{ width: 22, height: 22, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
+            publicProfileHref ? (
+              <Link href={publicProfileHref} style={{ display: "inline-flex" }} aria-label="Open public profile">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  alt=""
+                  src={avatarUrl}
+                  style={{ width: 22, height: 22, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
+                />
+              </Link>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt="" src={avatarUrl} style={{ width: 22, height: 22, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
+            )
           ) : null}
           <span className="muted">{avatarUrl ? name : profile ? `@${profile.username}` : userId}</span>
           <Link href="/app/settings">Settings</Link>

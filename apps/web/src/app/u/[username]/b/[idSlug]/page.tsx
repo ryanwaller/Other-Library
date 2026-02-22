@@ -151,8 +151,14 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           <div>
             <div className="row">
               {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img alt="" src={avatarUrl} style={{ width: 24, height: 24, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
+                <Link href={`/u/${profile.username}`} style={{ display: "inline-flex" }} aria-label="Open profile">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt=""
+                    src={avatarUrl}
+                    style={{ width: 24, height: 24, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
+                  />
+                </Link>
               ) : null}
               <Link href={`/u/${profile.username}`}>{profile.username}</Link>
             </div>
@@ -191,7 +197,12 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
             <div className="muted">Authors</div>
             <div style={{ marginTop: 6 }}>
               {effectiveAuthors.length > 0 ? (
-                effectiveAuthors.join(", ")
+                effectiveAuthors.map((a, idx) => (
+                  <span key={a}>
+                    <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                    {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                  </span>
+                ))
               ) : (
                 <span className="muted">—</span>
               )}
@@ -209,7 +220,16 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
               Subjects
             </div>
             <div style={{ marginTop: 6 }}>
-              {subjects.length > 0 ? subjects.join(", ") : <span className="muted">—</span>}
+              {subjects.length > 0 ? (
+                subjects.map((s, idx) => (
+                  <span key={s}>
+                    <Link href={`/u/${profile.username}/s/${encodeURIComponent(s)}`}>{s}</Link>
+                    {idx < subjects.length - 1 ? <span>, </span> : null}
+                  </span>
+                ))
+              ) : (
+                <span className="muted">—</span>
+              )}
             </div>
 
             <div style={{ marginTop: 12 }} className="muted">

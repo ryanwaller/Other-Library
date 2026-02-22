@@ -1,20 +1,31 @@
-import { permanentRedirect } from "next/navigation";
-import { getServerSupabase } from "../../../lib/supabaseServer";
 import Link from "next/link";
-import { bookIdSlug } from "../../../lib/slug";
+import { permanentRedirect } from "next/navigation";
+import { getServerSupabase } from "../../../../../../lib/supabaseServer";
+import { bookIdSlug } from "../../../../../../lib/slug";
 
 export const dynamic = "force-dynamic";
 
 type PublicBook = {
   id: number;
   visibility: "inherit" | "followers_only" | "public";
-  edition: { isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null } | null;
+  title_override: string | null;
+  authors_override: string[] | null;
+  edition: { isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null; subjects: string[] | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
 
-export default async function PublicProfilePage({ params }: { params: Promise<{ username: string }> }) {
-  const { username } = await params;
+function safeDecode(input: string): string {
+  try {
+    return decodeURIComponent(input);
+  } catch {
+    return input;
+  }
+}
+
+export default async function PublicAuthorPage({ params }: { params: Promise<{ username: string; author: string }> }) {
+  const { username, author } = await params;
   const usernameNorm = (username ?? "").trim().toLowerCase();
+  const authorName = safeDecode(author ?? "").trim();
   const supabase = getServerSupabase();
 
   if (!supabase) {
@@ -28,13 +39,13 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   }
 
   if (usernameNorm && usernameNorm !== username) {
-    permanentRedirect(`/u/${usernameNorm}`);
+    permanentRedirect(`/u/${usernameNorm}/a/${encodeURIComponent(authorName)}`);
   }
 
   const aliasRes = await supabase.from("username_aliases").select("current_username").eq("old_username", usernameNorm).maybeSingle();
   const alias = (aliasRes.data as any)?.current_username as string | undefined;
   if (alias && alias !== usernameNorm) {
-    permanentRedirect(`/u/${alias}`);
+    permanentRedirect(`/u/${alias}/a/${encodeURIComponent(authorName)}`);
   }
 
   const profileRes = await supabase
@@ -48,7 +59,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     return (
       <main className="container">
         <div className="card">
-          <div>@{username}</div>
+          <div>@{usernameNorm}</div>
           <div className="muted" style={{ marginTop: 8 }}>
             Not found (or private).
           </div>
@@ -66,17 +77,26 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const booksRes = await supabase
     .from("user_books")
     .select(
-      "id,visibility,edition:editions(isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
+      "id,visibility,title_override,authors_override,edition:editions(isbn13,title,authors,cover_url,subjects),media:user_book_media(kind,storage_path)"
     )
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
-    .limit(60);
+    .limit(200);
 
   const books = (booksRes.data ?? []) as unknown as PublicBook[];
 
+  const needle = authorName.toLowerCase();
+  const filtered = books.filter((b) => {
+    const candidates =
+      (b.authors_override ?? []).filter(Boolean).length > 0
+        ? (b.authors_override ?? []).filter(Boolean)
+        : (b.edition?.authors ?? []).filter(Boolean);
+    return candidates.some((a) => a.toLowerCase() === needle);
+  });
+
   const paths = Array.from(
     new Set(
-      books
+      filtered
         .flatMap((b) => (Array.isArray(b.media) ? b.media : []))
         .filter((m) => typeof m.storage_path === "string" && m.storage_path.length > 0)
         .map((m) => m.storage_path)
@@ -95,52 +115,43 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     <main className="container">
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <div className="row">
-            {avatarUrl ? (
-              <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  alt=""
-                  src={avatarUrl}
-                  style={{ width: 24, height: 24, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
-                />
-              </a>
-            ) : null}
-            <div>{profile.username}</div>
+          <div>
+            <div className="row">
+              {avatarUrl ? (
+                <Link href={`/u/${profile.username}`} style={{ display: "inline-flex" }} aria-label="Open profile">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt=""
+                    src={avatarUrl}
+                    style={{ width: 24, height: 24, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
+                  />
+                </Link>
+              ) : null}
+              <Link href={`/u/${profile.username}`}>{profile.username}</Link>
+            </div>
           </div>
-          <div className="muted">{profile.visibility}</div>
+          <div className="muted">author</div>
         </div>
-        {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
-        {profile.bio ? (
-          <div className="muted" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
-            {profile.bio}
-          </div>
-        ) : null}
+        <div style={{ marginTop: 8 }}>{authorName || "—"}</div>
       </div>
 
       <div style={{ marginTop: 14 }} className="muted">
-        Publicly visible books
+        Books ({filtered.length})
       </div>
 
       <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-        {books.map((b) => {
+        {filtered.map((b) => {
           const e = b.edition;
-          const title = e?.title ?? "(untitled)";
-          const authors = (e?.authors ?? []).filter(Boolean) as string[];
+          const title = ((b.title_override ?? "").trim() || e?.title || "(untitled)") as string;
           const cover = (b.media ?? []).find((m) => m.kind === "cover");
           const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
           const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
-          const extraImages = (b.media ?? []).filter((m) => m.kind === "image").slice(0, 3);
           return (
             <div key={b.id} className="card">
               <Link href={href} style={{ display: "block" }}>
                 {coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    alt={title}
-                    src={coverUrl}
-                    style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }}
-                  />
+                  <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }} />
                 ) : (
                   <div style={{ width: "100%", height: 220, border: "1px solid var(--border)" }} />
                 )}
@@ -149,35 +160,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                 <Link href={href}>{title}</Link>
               </div>
               <div className="muted" style={{ marginTop: 4 }}>
-                {authors.length > 0 ? (
-                  authors.map((a, idx) => (
-                    <span key={a}>
-                      <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                      {idx < authors.length - 1 ? <span>, </span> : null}
-                    </span>
-                  ))
-                ) : (
-                  e?.isbn13 || ""
-                )}
+                {e?.isbn13 || ""}
               </div>
-              {extraImages.length > 0 ? (
-                <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                  {extraImages.map((m, idx) => {
-                    const url = signedMap[m.storage_path];
-                    return url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={`${b.id}-${idx}`}
-                        alt=""
-                        src={url}
-                        style={{ width: "100%", height: 60, objectFit: "cover", border: "1px solid var(--border)" }}
-                      />
-                    ) : (
-                      <div key={`${b.id}-${idx}`} style={{ width: "100%", height: 60, border: "1px solid var(--border)" }} />
-                    );
-                  })}
-                </div>
-              ) : null}
             </div>
           );
         })}

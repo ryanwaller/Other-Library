@@ -365,8 +365,14 @@ export default function SettingsPage() {
             </div>
             <div className="row" style={{ marginTop: 10 }}>
               {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img alt="" src={avatarUrl} style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
+                <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt=""
+                    src={avatarUrl}
+                    style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
+                  />
+                </a>
               ) : (
                 <div style={{ width: 28, height: 28, borderRadius: 999, border: "1px solid var(--border)" }} />
               )}
