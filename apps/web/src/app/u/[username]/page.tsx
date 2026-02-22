@@ -5,7 +5,6 @@ import { bookIdSlug } from "../../../lib/slug";
 import FollowControls from "./FollowControls";
 import AddToLibraryButton from "./AddToLibraryButton";
 import AddToLibraryProvider from "./AddToLibraryProvider";
-import SignedInAppNav from "./SignedInAppNav";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +101,6 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   return (
     <main className="container">
-      <SignedInAppNav viewingUsername={profile.username} />
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div className="row">

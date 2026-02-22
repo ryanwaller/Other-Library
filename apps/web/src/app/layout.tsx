@@ -1,4 +1,5 @@
 import "./globals.css";
+import GlobalNav from "./GlobalNav";
 
 export const metadata = {
   title: "OM Library",
@@ -8,8 +9,10 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <GlobalNav />
+        {children}
+      </body>
     </html>
   );
 }
-

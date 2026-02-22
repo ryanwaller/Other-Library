@@ -2,7 +2,6 @@ import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
-import SignedInAppNav from "../../SignedInAppNav";
 
 export const dynamic = "force-dynamic";
 
@@ -112,7 +111,6 @@ export default async function PublicSubjectPage({ params }: { params: Promise<{ 
 
   return (
     <main className="container">
-      <SignedInAppNav viewingUsername={profile.username} />
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div>
