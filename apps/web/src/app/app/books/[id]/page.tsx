@@ -38,6 +38,19 @@ type UserBookDetail = {
   book_tags: Array<{ tag: { id: number; name: string } | null }>;
 };
 
+type MetadataSearchResult = {
+  source: "openlibrary" | "googleBooks";
+  title: string | null;
+  authors: string[];
+  publisher: string | null;
+  publish_date: string | null;
+  publish_year: number | null;
+  subjects: string[];
+  isbn10: string | null;
+  isbn13: string | null;
+  cover_url: string | null;
+};
+
 function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -174,6 +187,22 @@ export default function BookDetailPage() {
     message: null
   });
 
+  const [linkIsbn, setLinkIsbn] = useState("");
+  const [linkState, setLinkState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+
+  const [searchTitle, setSearchTitle] = useState("");
+  const [searchAuthor, setSearchAuthor] = useState("");
+  const [searchState, setSearchState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+  const [searchResults, setSearchResults] = useState<MetadataSearchResult[]>([]);
+
   const [pendingCover, setPendingCover] = useState<File | null>(null);
   const [coverState, setCoverState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
@@ -231,6 +260,12 @@ export default function BookDetailPage() {
       setFormNotes(row.notes ?? "");
       setFormVisibility(row.visibility);
       setFormStatus(row.status);
+
+      setSearchTitle((row.title_override ?? row.edition?.title ?? "").trim());
+      setSearchAuthor(((row.authors_override ?? row.edition?.authors ?? []) as string[]).filter(Boolean).slice(0, 1).join(", "));
+      setSearchResults([]);
+      setSearchState({ busy: false, error: null, message: null });
+      setLinkState({ busy: false, error: null, message: null });
 
       const ownerId = row.owner_id as string | undefined;
       if (ownerId) {
@@ -571,6 +606,77 @@ export default function BookDetailPage() {
     });
   }
 
+  async function searchMetadata() {
+    const title = searchTitle.trim();
+    const author = searchAuthor.trim();
+    if (!title) return;
+    setSearchState({ busy: true, error: null, message: "Searching…" });
+    setSearchResults([]);
+    try {
+      const res = await fetch(`/api/search?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}`);
+      const json = await res.json();
+      if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Search failed");
+      setSearchResults((json.results ?? []) as MetadataSearchResult[]);
+      setSearchState({ busy: false, error: null, message: (json.results ?? []).length ? "Done" : "No results" });
+    } catch (e: any) {
+      setSearchState({ busy: false, error: e?.message ?? "Search failed", message: "Search failed" });
+    }
+  }
+
+  async function linkEditionByIsbn(isbn: string) {
+    if (!supabase || !book || !userId) return;
+    if (book.owner_id !== userId) return;
+
+    const value = isbn.trim();
+    if (!value) return;
+
+    setLinkState({ busy: true, error: null, message: "Looking up ISBN…" });
+
+    try {
+      const res = await fetch(`/api/isbn?isbn=${encodeURIComponent(value)}`);
+      const json = await res.json();
+      if (!res.ok || !json?.ok) throw new Error(json?.error ?? "ISBN lookup failed");
+      const edition = (json.edition ?? {}) as any;
+      const isbn13 = String(edition.isbn13 ?? "").trim();
+      if (!isbn13) throw new Error("No ISBN-13 returned by resolver");
+
+      const existing = await supabase.from("editions").select("id").eq("isbn13", isbn13).maybeSingle();
+      if (existing.error) throw new Error(existing.error.message);
+
+      let editionId = existing.data?.id as number | undefined;
+      if (!editionId) {
+        const inserted = await supabase
+          .from("editions")
+          .insert({
+            isbn10: edition.isbn10 ?? null,
+            isbn13,
+            title: edition.title ?? null,
+            authors: edition.authors ?? [],
+            publisher: edition.publisher ?? null,
+            publish_date: edition.publish_date ?? null,
+            description: edition.description ?? null,
+            subjects: edition.subjects ?? [],
+            cover_url: edition.cover_url ?? null,
+            raw: edition.raw ?? null
+          })
+          .select("id")
+          .single();
+        if (inserted.error) throw new Error(inserted.error.message);
+        editionId = inserted.data.id as number;
+      }
+
+      const upd = await supabase.from("user_books").update({ edition_id: editionId }).eq("id", book.id);
+      if (upd.error) throw new Error(upd.error.message);
+
+      setLinkIsbn("");
+      await refresh();
+      setLinkState({ busy: false, error: null, message: "Linked" });
+      window.setTimeout(() => setLinkState({ busy: false, error: null, message: null }), 1500);
+    } catch (e: any) {
+      setLinkState({ busy: false, error: e?.message ?? "Link failed", message: "Link failed" });
+    }
+  }
+
   if (!supabase) {
     return (
       <main className="container">
@@ -751,6 +857,118 @@ export default function BookDetailPage() {
                   <summary className="muted">Raw metadata</summary>
                   <pre style={{ marginTop: 8, fontSize: 12, whiteSpace: "pre-wrap" }}>{JSON.stringify(book?.edition?.raw ?? {}, null, 2)}</pre>
                 </details>
+              </div>
+
+              <div style={{ marginTop: 14 }} className="card">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div>Link edition (ISBN)</div>
+                  <div className="muted">{book?.edition ? "linked" : "not linked"}</div>
+                </div>
+                <div className="row" style={{ marginTop: 8 }}>
+                  <input
+                    placeholder="ISBN-10 or ISBN-13"
+                    value={linkIsbn}
+                    onChange={(e) => setLinkIsbn(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, () => linkEditionByIsbn(linkIsbn))}
+                    style={{ width: 260 }}
+                  />
+                  <button onClick={() => linkEditionByIsbn(linkIsbn)} disabled={linkState.busy || !linkIsbn.trim()}>
+                    {linkState.busy ? "Linking…" : "Link"}
+                  </button>
+                  <span className="muted" style={{ marginLeft: 10 }}>
+                    {linkState.message ? (linkState.error ? `${linkState.message} (${linkState.error})` : linkState.message) : ""}
+                  </span>
+                </div>
+                <div className="muted" style={{ marginTop: 8 }}>
+                  This upgrades a manual entry by attaching global metadata (covers/subjects/etc). Your overrides stay as-is.
+                </div>
+              </div>
+
+              <div style={{ marginTop: 10 }} className="card">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div>Find metadata by title/author</div>
+                  <div className="muted">free sources</div>
+                </div>
+                <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 8 }}>
+                  <input
+                    placeholder="Title"
+                    value={searchTitle}
+                    onChange={(e) => setSearchTitle(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, searchMetadata)}
+                    style={{ width: 260 }}
+                  />
+                  <input
+                    placeholder="Author (optional)"
+                    value={searchAuthor}
+                    onChange={(e) => setSearchAuthor(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, searchMetadata)}
+                    style={{ width: 220 }}
+                  />
+                  <button onClick={searchMetadata} disabled={searchState.busy || !searchTitle.trim()}>
+                    {searchState.busy ? "Searching…" : "Search"}
+                  </button>
+                  <span className="muted" style={{ marginLeft: 10 }}>
+                    {searchState.message ? (searchState.error ? `${searchState.message} (${searchState.error})` : searchState.message) : ""}
+                  </span>
+                </div>
+                {searchResults.length > 0 ? (
+                  <div style={{ marginTop: 10 }}>
+                    {searchResults.map((r, idx) => {
+                      const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
+                      const title = (r.title ?? "").trim() || "—";
+                      const authors = (r.authors ?? []).filter(Boolean).join(", ");
+                      const pub = [r.publisher ?? "", r.publish_date ?? (r.publish_year ? String(r.publish_year) : "")]
+                        .filter(Boolean)
+                        .join(" · ");
+                      return (
+                        <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="card" style={{ marginTop: 8 }}>
+                          <div className="row" style={{ justifyContent: "space-between" }}>
+                            <div>
+                              <div>{title}</div>
+                              <div className="muted" style={{ marginTop: 4 }}>
+                                {authors || "—"}
+                                {pub ? ` · ${pub}` : ""}
+                              </div>
+                              <div className="muted" style={{ marginTop: 4 }}>
+                                {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"}
+                                {r.cover_url ? (
+                                  <>
+                                    {" "}
+                                    ·{" "}
+                                    <a href={r.cover_url} target="_blank" rel="noreferrer">
+                                      cover
+                                    </a>
+                                  </>
+                                ) : null}
+                                {" "}
+                                · {r.source}
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                                <button onClick={() => linkEditionByIsbn(bestIsbn)} disabled={linkState.busy || !bestIsbn}>
+                                  Link ISBN
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (r.title) setFormTitle(r.title);
+                                    setFormAuthors((r.authors ?? []).filter(Boolean).join(", "));
+                                    if (r.publisher) setFormPublisher(r.publisher);
+                                    if (r.publish_date) setFormPublishDate(r.publish_date);
+                                    setSearchState((s) => ({ ...s, message: "Filled fields (not saved)" }));
+                                  }}
+                                  disabled={!r.title && (!r.authors || r.authors.length === 0) && !r.publisher && !r.publish_date}
+                                >
+                                  Fill fields
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
 
               <div style={{ marginTop: 16 }} className="muted">
