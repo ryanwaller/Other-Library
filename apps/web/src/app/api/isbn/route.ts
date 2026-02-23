@@ -134,6 +134,27 @@ function mergeMetadata(base: EditionMetadata, next: EditionMetadata, sourceName:
   return merged;
 }
 
+function chooseBestCoverUrl(urls: Array<string | null | undefined>): string | null {
+  const candidates = uniqStrings(urls.map((u) => normalizeHttpsUrl(u)).filter(Boolean) as string[]);
+  if (candidates.length === 0) return null;
+
+  const score = (u: string): number => {
+    let s = 0;
+    const lc = u.toLowerCase();
+    if (lc.includes("covers.openlibrary.org")) s += 4;
+    if (lc.includes("-l.")) s += 3;
+    if (lc.includes("special:filepath")) s += 3;
+    if (lc.includes("width=")) s += 1;
+    if (lc.includes("zoom=2") || lc.includes("zoom=3")) s += 2;
+    if (lc.includes("smallthumbnail")) s -= 2;
+    if (lc.includes("thumbnail")) s -= 1;
+    if (lc.endsWith(".jpg") || lc.endsWith(".jpeg") || lc.endsWith(".png") || lc.endsWith(".webp")) s += 1;
+    return s;
+  };
+
+  return candidates.slice().sort((a, b) => score(b) - score(a))[0] ?? candidates[0] ?? null;
+}
+
 async function fetchJson(url: string): Promise<unknown | null> {
   const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
   if (!res.ok) return null;
@@ -310,6 +331,9 @@ export async function GET(req: NextRequest) {
     if (!res) continue;
     merged = mergeMetadata(merged, res, name);
   }
+
+  // Prefer the best available cover among all sources (covers often differ by source).
+  merged.cover_url = chooseBestCoverUrl([merged.cover_url, ...results.map(([, r]) => r?.cover_url)]);
 
   // Ensure arrays are present.
   merged.authors = merged.authors ?? [];

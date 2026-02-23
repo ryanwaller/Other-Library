@@ -56,6 +56,20 @@ type MetadataSearchResult = {
   cover_url: string | null;
 };
 
+type ImportPreview = {
+  title: string | null;
+  authors: string[];
+  publisher: string | null;
+  publish_date: string | null;
+  description: string | null;
+  subjects: string[];
+  isbn10: string | null;
+  isbn13: string | null;
+  cover_url: string | null;
+  cover_candidates: string[];
+  sources: string[];
+};
+
 type MergeSource = {
   user_book_id: number;
   owner_id: string;
@@ -190,6 +204,20 @@ export default function BookDetailPage() {
     message: null
   });
   const [searchResults, setSearchResults] = useState<MetadataSearchResult[]>([]);
+
+  const [importUrl, setImportUrl] = useState("");
+  const [importState, setImportState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [importMeta, setImportMeta] = useState<{ final_url: string | null; domain: string | null; domain_kind: string | null; scraped_sources: string[] }>({
+    final_url: null,
+    domain: null,
+    domain_kind: null,
+    scraped_sources: []
+  });
 
   const [pendingCover, setPendingCover] = useState<File | null>(null);
   const [coverState, setCoverState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
@@ -926,6 +954,34 @@ export default function BookDetailPage() {
     }
   }
 
+  async function previewImportFromUrl() {
+    const url = importUrl.trim();
+    if (!url) return;
+    setImportState({ busy: true, error: null, message: "Importing…" });
+    setImportPreview(null);
+    setImportMeta({ final_url: null, domain: null, domain_kind: null, scraped_sources: [] });
+    try {
+      const res = await fetch("/api/import-url", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url })
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Import failed");
+      const preview = (json.preview ?? null) as ImportPreview | null;
+      setImportPreview(preview);
+      setImportMeta({
+        final_url: typeof json.final_url === "string" ? json.final_url : null,
+        domain: typeof json.domain === "string" ? json.domain : null,
+        domain_kind: typeof json.domain_kind === "string" ? json.domain_kind : null,
+        scraped_sources: Array.isArray(json.scraped?.sources) ? (json.scraped.sources as string[]) : []
+      });
+      setImportState({ busy: false, error: null, message: preview ? "Preview ready" : "No preview" });
+    } catch (e: any) {
+      setImportState({ busy: false, error: e?.message ?? "Import failed", message: "Import failed" });
+    }
+  }
+
   async function linkEditionByIsbn(isbn: string) {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
@@ -1310,7 +1366,20 @@ export default function BookDetailPage() {
                         .join(" · ");
                       return (
                         <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="card" style={{ marginTop: 8 }}>
-                          <div className="row" style={{ justifyContent: "space-between" }}>
+                          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                            <div style={{ width: 62, flex: "0 0 auto" }}>
+                              {r.cover_url ? (
+                                <img
+                                  src={r.cover_url}
+                                  alt=""
+                                  width={60}
+                                  height={90}
+                                  style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
+                                />
+                              ) : (
+                                <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
+                              )}
+                            </div>
                             <div>
                               <div>{title}</div>
                               <div className="muted" style={{ marginTop: 4 }}>
@@ -1355,6 +1424,119 @@ export default function BookDetailPage() {
                         </div>
                       );
                     })}
+                  </div>
+                ) : null}
+              </div>
+
+              <div style={{ marginTop: 10 }} className="card">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div>Import metadata from URL</div>
+                  <div className="muted">HTML (JSON-LD/OpenGraph)</div>
+                </div>
+                <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 8 }}>
+                  <input
+                    placeholder="Paste a product/publisher/shop link"
+                    value={importUrl}
+                    onChange={(e) => setImportUrl(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, previewImportFromUrl)}
+                    style={{ width: 520, maxWidth: "100%" }}
+                  />
+                  <button onClick={previewImportFromUrl} disabled={importState.busy || !importUrl.trim()}>
+                    {importState.busy ? "Importing…" : "Preview"}
+                  </button>
+                  <span className="muted" style={{ marginLeft: 10 }}>
+                    {importState.message ? (importState.error ? `${importState.message} (${importState.error})` : importState.message) : ""}
+                  </span>
+                </div>
+                {importPreview ? (
+                  <div style={{ marginTop: 10 }} className="card">
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                      <div style={{ width: 62, flex: "0 0 auto" }}>
+                        {importPreview.cover_url ? (
+                          <img
+                            src={importPreview.cover_url}
+                            alt=""
+                            width={60}
+                            height={90}
+                            style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
+                          />
+                        ) : (
+                          <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
+                        )}
+                      </div>
+                      <div style={{ flex: "1 1 auto" }}>
+                        <div>{(importPreview.title ?? "").trim() || "—"}</div>
+                        <div className="muted" style={{ marginTop: 4 }}>
+                          {(importPreview.authors ?? []).filter(Boolean).join(", ") || "—"}
+                        </div>
+                        <div className="muted" style={{ marginTop: 4 }}>
+                          {[importPreview.publisher ?? "", importPreview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
+                        </div>
+                        <div className="muted" style={{ marginTop: 4 }}>
+                          {importPreview.isbn13 || importPreview.isbn10 ? `ISBN: ${importPreview.isbn13 ?? importPreview.isbn10}` : "No ISBN found"}
+                          {" "}
+                          · sources: {(importPreview.sources ?? []).join(", ") || "—"}
+                        </div>
+                        <div className="muted" style={{ marginTop: 4 }}>
+                          {importMeta.domain ? `${importMeta.domain_kind ?? "generic"} · ${importMeta.domain}` : ""}
+                          {importMeta.final_url ? (
+                            <>
+                              {" "}
+                              ·{" "}
+                              <a href={importMeta.final_url} target="_blank" rel="noreferrer">
+                                open page
+                              </a>
+                            </>
+                          ) : null}
+                          {importPreview.cover_url ? (
+                            <>
+                              {" "}
+                              ·{" "}
+                              <a href={importPreview.cover_url} target="_blank" rel="noreferrer">
+                                open cover
+                              </a>
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div style={{ flex: "0 0 auto" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                          <button
+                            onClick={() => linkEditionByIsbn(importPreview.isbn13 ?? importPreview.isbn10 ?? "")}
+                            disabled={linkState.busy || !(importPreview.isbn13 ?? importPreview.isbn10)}
+                          >
+                            Link ISBN
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (importPreview.title) setFormTitle(importPreview.title);
+                              setFormAuthors((importPreview.authors ?? []).filter(Boolean).join(", "));
+                              if (importPreview.publisher) setFormPublisher(importPreview.publisher);
+                              if (importPreview.publish_date) setFormPublishDate(importPreview.publish_date);
+                              if (importPreview.description) setFormDescription(importPreview.description);
+                              setImportState((s) => ({ ...s, message: "Filled fields (not saved)" }));
+                            }}
+                            disabled={
+                              !importPreview.title &&
+                              (!importPreview.authors || importPreview.authors.length === 0) &&
+                              !importPreview.publisher &&
+                              !importPreview.publish_date &&
+                              !importPreview.description
+                            }
+                          >
+                            Fill fields
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    {importPreview.subjects && importPreview.subjects.length > 0 ? (
+                      <div className="muted" style={{ marginTop: 10 }}>
+                        Subjects found: {importPreview.subjects.slice(0, 12).join(", ")}
+                        {importPreview.subjects.length > 12 ? "…" : ""}
+                        {" "}
+                        (you can add them below)
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
