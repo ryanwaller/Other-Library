@@ -232,7 +232,7 @@ export default function GlobalNav() {
                     minWidth: 18,
                     height: 18,
                     padding: "0 6px",
-                    borderRadius: 4,
+                    borderRadius: 999,
                     background: "#b00020",
                     color: "white",
                     fontSize: 12,
