@@ -58,12 +58,44 @@ function AppShell({
   const [profile, setProfile] = useState<{ username: string; visibility: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userBooksCount, setUserBooksCount] = useState<number | null>(null);
-  const [isbn, setIsbn] = useState("");
-  const [busyAdd, setBusyAdd] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
-  const [manualTitle, setManualTitle] = useState("");
-  const [manualAuthors, setManualAuthors] = useState("");
-  const [manualState, setManualState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+  const [addInput, setAddInput] = useState("");
+  const [addState, setAddState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+  const [addUrlPreview, setAddUrlPreview] = useState<{
+    title: string | null;
+    authors: string[];
+    publisher: string | null;
+    publish_date: string | null;
+    description: string | null;
+    subjects: string[];
+    isbn10: string | null;
+    isbn13: string | null;
+    cover_url: string | null;
+    sources: string[];
+  } | null>(null);
+  const [addUrlMeta, setAddUrlMeta] = useState<{ final_url: string | null; domain: string | null; domain_kind: string | null }>({
+    final_url: null,
+    domain: null,
+    domain_kind: null
+  });
+  const [addSearchResults, setAddSearchResults] = useState<
+    Array<{
+      source: "openlibrary" | "googleBooks";
+      title: string | null;
+      authors: string[];
+      publisher: string | null;
+      publish_date: string | null;
+      publish_year: number | null;
+      subjects: string[];
+      isbn10: string | null;
+      isbn13: string | null;
+      cover_url: string | null;
+    }>
+  >([]);
+  const [addSearchState, setAddSearchState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
     message: null
@@ -175,46 +207,6 @@ function AppShell({
     setCategoryMode(normalized);
   }, [filterCategory]);
 
-  const header = useMemo(() => {
-    const name = profile?.username ?? userId;
-    const publicProfileHref = profile?.username ? `/u/${profile.username}` : null;
-    return (
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <div>
-          <Link href="/app" style={{ textDecoration: "none" }}>
-            Other Library
-          </Link>
-        </div>
-        <div className="row">
-          {avatarUrl ? (
-            publicProfileHref ? (
-              <Link href={publicProfileHref} style={{ display: "inline-flex" }} aria-label="Open public profile">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  alt=""
-                  src={avatarUrl}
-                  style={{ width: 22, height: 22, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
-                />
-              </Link>
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img alt="" src={avatarUrl} style={{ width: 22, height: 22, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
-            )
-          ) : null}
-          {publicProfileHref ? (
-            <Link href={publicProfileHref} className="muted" style={{ textDecoration: "none" }}>
-              {avatarUrl ? name : profile ? `@${profile.username}` : userId}
-            </Link>
-          ) : (
-            <span className="muted">{avatarUrl ? name : profile ? `@${profile.username}` : userId}</span>
-          )}
-          <Link href="/app/settings">Settings</Link>
-          <button onClick={() => supabase?.auth.signOut()}>Sign out</button>
-        </div>
-      </div>
-    );
-  }, [profile, userId, avatarUrl]);
-
   async function refreshAllBooks() {
     if (!supabase) return;
     const { data, error } = await supabase
@@ -237,9 +229,10 @@ function AppShell({
           .filter(Boolean)
       )
     );
-    if (paths.length === 0) return;
+    const missing = paths.filter((p) => !mediaUrlsByPath[p]);
+    if (missing.length === 0) return;
 
-    const { data: signed, error: signErr } = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 60);
+    const { data: signed, error: signErr } = await supabase.storage.from("user-book-media").createSignedUrls(missing, 60 * 60);
     if (signErr || !signed) return;
     const nextMap: Record<string, string> = {};
     for (const s of signed) {
@@ -394,11 +387,53 @@ function AppShell({
     };
   }, [userId]);
 
-  async function addByIsbn() {
-    if (!supabase) return;
-    if (!addLibraryId) return;
-    setBusyAdd(true);
-    setAddError(null);
+  function normalizeIsbn(input: string): string {
+    return input
+      .trim()
+      .toUpperCase()
+      .replace(/[^0-9X]/g, "");
+  }
+
+  function looksLikeIsbn(input: string): boolean {
+    const n = normalizeIsbn(input);
+    return n.length === 10 || n.length === 13;
+  }
+
+  function tryParseUrl(input: string): URL | null {
+    const raw = input.trim();
+    if (!raw) return null;
+    try {
+      return new URL(raw);
+    } catch {
+      // allow "www.example.com/..."
+      if (raw.startsWith("www.")) {
+        try {
+          return new URL(`https://${raw}`);
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    }
+  }
+
+  function parseTitleAndAuthor(input: string): { title: string; author: string | null } {
+    const s = input.trim().replace(/\s+/g, " ");
+    if (!s) return { title: "", author: null };
+    const by = s.split(/\s+by\s+/i);
+    if (by.length === 2 && by[0] && by[1]) return { title: by[0].trim(), author: by[1].trim() || null };
+    const dash = s.split(" - ");
+    if (dash.length === 2 && dash[0] && dash[1]) return { title: dash[0].trim(), author: dash[1].trim() || null };
+    const slash = s.split(" / ");
+    if (slash.length === 2 && slash[0] && slash[1]) return { title: slash[0].trim(), author: slash[1].trim() || null };
+    return { title: s, author: null };
+  }
+
+  async function addByIsbnValue(isbnValue: string): Promise<number> {
+    if (!supabase) throw new Error("Supabase is not configured");
+    if (!addLibraryId) throw new Error("Choose a catalog first");
+    const isbn = isbnValue.trim();
+    if (!isbn) throw new Error("Provide an ISBN");
     try {
       const res = await fetch(`/api/isbn?isbn=${encodeURIComponent(isbn)}`);
       const json = await res.json();
@@ -433,27 +468,38 @@ function AppShell({
         editionId = inserted.data.id;
       }
 
-      const created = await supabase.from("user_books").insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId }).select("id");
+      const created = await supabase
+        .from("user_books")
+        .insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId })
+        .select("id")
+        .single();
       if (created.error) throw new Error(created.error.message);
 
-      setIsbn("");
       await refreshAllBooks();
       const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
       setUserBooksCount(count ?? 0);
+      return created.data.id as number;
     } catch (e: any) {
-      setAddError(e?.message ?? "Failed to add book");
-    } finally {
-      setBusyAdd(false);
+      throw new Error(e?.message ?? "Failed to add book");
     }
   }
 
-  async function addManual() {
-    if (!supabase) return;
-    if (!addLibraryId) return;
-    const title = manualTitle.trim();
-    const authors = parseAuthorsInput(manualAuthors);
-    if (!title) return;
-    setManualState({ busy: true, error: null, message: "Adding…" });
+  async function addManualValue({
+    title,
+    authors,
+    publisher,
+    publish_date,
+    description
+  }: {
+    title: string;
+    authors: string[];
+    publisher?: string | null;
+    publish_date?: string | null;
+    description?: string | null;
+  }): Promise<number> {
+    if (!supabase) throw new Error("Supabase is not configured");
+    if (!addLibraryId) throw new Error("Choose a catalog first");
+    if (!title.trim()) throw new Error("Provide a title");
     try {
       const created = await supabase
         .from("user_books")
@@ -462,22 +508,121 @@ function AppShell({
           library_id: addLibraryId,
           edition_id: null,
           title_override: title,
-          authors_override: authors.length > 0 ? authors : null
+          authors_override: authors.length > 0 ? authors : null,
+          publisher_override: publisher ?? null,
+          publish_date_override: publish_date ?? null,
+          description_override: description ?? null
         })
         .select("id")
         .single();
       if (created.error) throw new Error(created.error.message);
 
-      setManualTitle("");
-      setManualAuthors("");
       await refreshAllBooks();
       const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
       setUserBooksCount(count ?? 0);
-      setManualState({ busy: false, error: null, message: "Added" });
-      window.setTimeout(() => setManualState({ busy: false, error: null, message: null }), 1200);
+      return created.data.id as number;
     } catch (e: any) {
-      setManualState({ busy: false, error: e?.message ?? "Failed to add book", message: "Add failed" });
+      throw new Error(e?.message ?? "Failed to add book");
     }
+  }
+
+  function extFromContentType(contentType: string | null): string {
+    const ct = (contentType ?? "").toLowerCase();
+    if (ct.includes("image/png")) return "png";
+    if (ct.includes("image/webp")) return "webp";
+    if (ct.includes("image/avif")) return "avif";
+    if (ct.includes("image/gif")) return "gif";
+    if (ct.includes("image/jpeg") || ct.includes("image/jpg")) return "jpg";
+    return "jpg";
+  }
+
+  async function importCoverForBook(userBookId: number, coverUrl: string) {
+    if (!supabase) return;
+    const value = coverUrl.trim();
+    if (!value) return;
+    const res = await fetch(`/api/image-proxy?url=${encodeURIComponent(value)}`);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const ext = extFromContentType(res.headers.get("content-type"));
+    const path = `${userId}/${userBookId}/cover-import-${Date.now()}.${ext}`;
+    const up = await supabase.storage.from("user-book-media").upload(path, blob, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: blob.type || "application/octet-stream"
+    });
+    if (up.error) return;
+    await supabase.from("user_book_media").insert({ user_book_id: userBookId, kind: "cover", storage_path: path, caption: null });
+  }
+
+  async function previewUrl(url: string) {
+    setAddState({ busy: true, error: null, message: "Importing…" });
+    setAddUrlPreview(null);
+    setAddUrlMeta({ final_url: null, domain: null, domain_kind: null });
+    try {
+      const res = await fetch("/api/import-url", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url })
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Import failed");
+      setAddUrlPreview(json.preview ?? null);
+      setAddUrlMeta({
+        final_url: typeof json.final_url === "string" ? json.final_url : null,
+        domain: typeof json.domain === "string" ? json.domain : null,
+        domain_kind: typeof json.domain_kind === "string" ? json.domain_kind : null
+      });
+      setAddState({ busy: false, error: null, message: "Preview ready" });
+    } catch (e: any) {
+      setAddState({ busy: false, error: e?.message ?? "Import failed", message: "Import failed" });
+    }
+  }
+
+  async function searchAddResults(title: string, author: string | null) {
+    setAddSearchState({ busy: true, error: null, message: "Searching…" });
+    setAddSearchResults([]);
+    try {
+      const res = await fetch(`/api/search?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author ?? "")}`);
+      const json = await res.json();
+      if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Search failed");
+      setAddSearchResults((json.results ?? []) as any[]);
+      setAddSearchState({ busy: false, error: null, message: (json.results ?? []).length ? "Done" : "No results" });
+    } catch (e: any) {
+      setAddSearchState({ busy: false, error: e?.message ?? "Search failed", message: "Search failed" });
+    }
+  }
+
+  async function smartAddOrSearch() {
+    const value = addInput.trim();
+    if (!value) return;
+    setAddState({ busy: false, error: null, message: null });
+    setAddUrlPreview(null);
+    setAddUrlMeta({ final_url: null, domain: null, domain_kind: null });
+    setAddSearchResults([]);
+    setAddSearchState({ busy: false, error: null, message: null });
+
+    if (looksLikeIsbn(value)) {
+      setAddState({ busy: true, error: null, message: "Adding…" });
+      try {
+        await addByIsbnValue(value);
+        setAddInput("");
+        setAddState({ busy: false, error: null, message: "Added" });
+        window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
+      } catch (e: any) {
+        setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
+      }
+      return;
+    }
+
+    const parsedUrl = tryParseUrl(value);
+    if (parsedUrl) {
+      await previewUrl(parsedUrl.toString());
+      return;
+    }
+
+    const { title, author } = parseTitleAndAuthor(value);
+    if (!title) return;
+    await searchAddResults(title, author);
   }
 
   async function updateUserBookVisibility(userBookId: number, nextVisibility: "inherit" | "followers_only" | "public") {
@@ -1090,104 +1235,209 @@ function AppShell({
 
   return (
     <div className="card">
-      {header}
-      <div style={{ marginTop: 8 }}>
-        Catalog items: {userBooksCount ?? "…"}
-      </div>
+      <div className="muted">Catalog items: {userBooksCount ?? "…"}</div>
 
       <div style={{ marginTop: 16 }} className="card">
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <div>Add books</div>
-          <div className="muted">
-            {libraries.length > 1 ? (
-              <span className="row" style={{ gap: 8 }}>
-                <span>Catalog</span>
-                <select
-                  value={addLibraryId ?? ""}
-                  onChange={(e) => {
-                    const id = Number(e.target.value);
-                    setAddLibraryId(id);
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+          <div>Add</div>
+          {libraries.length > 1 ? (
+            <span className="row" style={{ gap: 8 }}>
+              <span className="muted">Catalog</span>
+              <select
+                value={addLibraryId ?? ""}
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  setAddLibraryId(id);
+                  try {
+                    window.localStorage.setItem("om_addLibraryId", String(id));
+                  } catch {
+                    // ignore
+                  }
+                }}
+                disabled={libraryState.busy || !addLibraryId}
+              >
+                {libraries.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </span>
+          ) : null}
+        </div>
+        <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 8 }}>
+          <input
+            placeholder="ISBN, URL, or title (optional: “by Author”)"
+            value={addInput}
+            onChange={(e) => setAddInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              smartAddOrSearch();
+            }}
+            style={{ minWidth: 380, width: 520, maxWidth: "100%" }}
+          />
+          <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
+            {addState.busy ? "Working…" : "Go"}
+          </button>
+          <span className="muted">{addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}</span>
+        </div>
+
+        {addUrlPreview ? (
+          <div style={{ marginTop: 10 }} className="card">
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+              <div style={{ width: 62, flex: "0 0 auto" }}>
+                {addUrlPreview.cover_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={addUrlPreview.cover_url}
+                    alt=""
+                    width={60}
+                    height={90}
+                    style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
+                  />
+                ) : (
+                  <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
+                )}
+              </div>
+              <div style={{ flex: "1 1 auto" }}>
+                <div>{(addUrlPreview.title ?? "").trim() || "—"}</div>
+                <div className="muted" style={{ marginTop: 4 }}>
+                  {(addUrlPreview.authors ?? []).filter(Boolean).join(", ") || "—"}
+                </div>
+                <div className="muted" style={{ marginTop: 4 }}>
+                  {[addUrlPreview.publisher ?? "", addUrlPreview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
+                </div>
+                <div className="muted" style={{ marginTop: 4 }}>
+                  {addUrlPreview.isbn13 || addUrlPreview.isbn10 ? `ISBN: ${addUrlPreview.isbn13 ?? addUrlPreview.isbn10}` : "No ISBN found"}
+                  {" "}
+                  · sources: {(addUrlPreview.sources ?? []).join(", ") || "—"}
+                </div>
+                <div className="muted" style={{ marginTop: 4 }}>
+                  {addUrlMeta.domain ? `${addUrlMeta.domain_kind ?? "generic"} · ${addUrlMeta.domain}` : ""}
+                  {addUrlMeta.final_url ? (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <a href={addUrlMeta.final_url} target="_blank" rel="noreferrer">
+                        open
+                      </a>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+              <div style={{ flex: "0 0 auto" }}>
+                <button
+                  onClick={async () => {
+                    if (!addUrlPreview) return;
+                    setAddState({ busy: true, error: null, message: "Adding…" });
                     try {
-                      window.localStorage.setItem("om_addLibraryId", String(id));
-                    } catch {
-                      // ignore
+                      const isbn = String(addUrlPreview.isbn13 ?? addUrlPreview.isbn10 ?? "").trim();
+                      let id: number;
+                      if (isbn) id = await addByIsbnValue(isbn);
+                      else
+                        id = await addManualValue({
+                          title: (addUrlPreview.title ?? "").trim() || addInput.trim(),
+                          authors: (addUrlPreview.authors ?? []).filter(Boolean),
+                          publisher: addUrlPreview.publisher ?? null,
+                          publish_date: addUrlPreview.publish_date ?? null,
+                          description: addUrlPreview.description ?? null
+                        });
+
+                      if (addUrlPreview.cover_url) {
+                        await importCoverForBook(id, addUrlPreview.cover_url);
+                        await refreshAllBooks();
+                      }
+
+                      setAddInput("");
+                      setAddUrlPreview(null);
+                      setAddUrlMeta({ final_url: null, domain: null, domain_kind: null });
+                      setAddState({ busy: false, error: null, message: "Added" });
+                      window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
+                    } catch (e: any) {
+                      setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
                     }
                   }}
-                  disabled={libraryState.busy || !addLibraryId}
+                  disabled={addState.busy}
                 >
-                  {libraries.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </select>
-              </span>
-            ) : (
-              <>ISBN or manual</>
-            )}
+                  Add
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        <div style={{ marginTop: 10 }} className="card">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <div>Add by ISBN</div>
-            <div className="muted">Open Library → Google Books → Wikidata</div>
+        {addSearchResults.length > 0 ? (
+          <div style={{ marginTop: 10 }}>
+            {addSearchResults.map((r, idx) => {
+              const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
+              const title = (r.title ?? "").trim() || "—";
+              const authors = (r.authors ?? []).filter(Boolean).join(", ");
+              const pub = [r.publisher ?? "", r.publish_date ?? (r.publish_year ? String(r.publish_year) : "")].filter(Boolean).join(" · ");
+              return (
+                <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="card" style={{ marginTop: 8 }}>
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                    <div style={{ width: 62, flex: "0 0 auto" }}>
+                      {r.cover_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={r.cover_url} alt="" width={60} height={90} style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }} />
+                      ) : (
+                        <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
+                      )}
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      <div>{title}</div>
+                      <div className="muted" style={{ marginTop: 4 }}>
+                        {authors || "—"}
+                        {pub ? ` · ${pub}` : ""}
+                      </div>
+                      <div className="muted" style={{ marginTop: 4 }}>
+                        {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"} · {r.source}
+                      </div>
+                    </div>
+                    <div style={{ flex: "0 0 auto" }}>
+                      <button
+                        onClick={async () => {
+                          setAddState({ busy: true, error: null, message: "Adding…" });
+                          try {
+                            let id: number;
+                            if (bestIsbn) id = await addByIsbnValue(bestIsbn);
+                            else
+                              id = await addManualValue({
+                                title: (r.title ?? addInput).trim() || addInput.trim(),
+                                authors: (r.authors ?? []).filter(Boolean),
+                                publisher: r.publisher ?? null,
+                                publish_date: r.publish_date ?? null,
+                                description: null
+                              });
+                            if (r.cover_url) {
+                              await importCoverForBook(id, r.cover_url);
+                              await refreshAllBooks();
+                            }
+                            setAddState({ busy: false, error: null, message: "Added" });
+                            window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
+                          } catch (e: any) {
+                            setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
+                          }
+                        }}
+                        disabled={addState.busy}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="muted" style={{ marginTop: 6 }}>
+              {addSearchState.message ? (addSearchState.error ? `${addSearchState.message} (${addSearchState.error})` : addSearchState.message) : ""}
+            </div>
           </div>
-          <div className="row" style={{ marginTop: 10 }}>
-            <input
-              placeholder="ISBN-10 or ISBN-13"
-              value={isbn}
-              onChange={(e) => setIsbn(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                addByIsbn();
-              }}
-              style={{ minWidth: 260 }}
-            />
-            <button onClick={addByIsbn} disabled={busyAdd || !isbn.trim()}>
-              {busyAdd ? "Adding…" : "Add"}
-            </button>
-            {addError ? <span className="muted">{addError}</span> : null}
+        ) : addSearchState.message ? (
+          <div className="muted" style={{ marginTop: 8 }}>
+            {addSearchState.error ? `${addSearchState.message} (${addSearchState.error})` : addSearchState.message}
           </div>
-        </div>
-
-        <div style={{ marginTop: 10 }} className="card">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <div>Add manually</div>
-            <div className="muted">for books without ISBN</div>
-          </div>
-          <div className="row" style={{ marginTop: 10 }}>
-            <input
-              placeholder="Title"
-              value={manualTitle}
-              onChange={(e) => setManualTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                addManual();
-              }}
-              style={{ minWidth: 260 }}
-            />
-            <input
-              placeholder="Authors (comma-separated)"
-              value={manualAuthors}
-              onChange={(e) => setManualAuthors(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                addManual();
-              }}
-              style={{ minWidth: 260 }}
-            />
-            <button onClick={addManual} disabled={manualState.busy || !manualTitle.trim()}>
-              {manualState.busy ? "Adding…" : "Add"}
-            </button>
-            <span className="muted">
-              {manualState.message ? (manualState.error ? `${manualState.message} (${manualState.error})` : manualState.message) : ""}
-            </span>
-          </div>
-        </div>
+        ) : null}
       </div>
 
       <div style={{ marginTop: 16 }}>
@@ -1360,7 +1610,6 @@ function AppShell({
         <div style={{ marginTop: 14 }} className="card">
           <div className="row" style={{ justifyContent: "space-between" }}>
             <div>Add another catalog</div>
-            <div className="muted">optional</div>
           </div>
           <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10 }}>
             <input
@@ -1399,9 +1648,6 @@ export default function AppPage() {
 
   return (
     <main className="container">
-      <div style={{ marginBottom: 12 }} className="muted">
-        App (followers-only by default). Marketing and crawlable public pages live on the main domain.
-      </div>
       {!supabase ? (
         <div className="card">
           <div>Supabase is not configured.</div>

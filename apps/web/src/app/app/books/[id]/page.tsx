@@ -511,6 +511,8 @@ export default function BookDetailPage() {
     return (book?.edition?.authors ?? []).filter(Boolean);
   }, [formAuthors, book]);
 
+  const isOwner = Boolean(book && userId && book.owner_id === userId);
+
   const copiesLabel = useMemo(() => {
     if (!book?.owner_id) return "Copies";
     if (userId && book.owner_id === userId) return "Your copies";
@@ -1186,16 +1188,6 @@ export default function BookDetailPage() {
 
   return (
     <main className="container">
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-        <div className="muted">
-          <Link href="/app">Home</Link>
-        </div>
-        <div className="row">
-          <Link href="/app/settings">Settings</Link>
-          {session ? <button onClick={() => supabase?.auth.signOut()}>Sign out</button> : null}
-        </div>
-      </div>
-
       {!session ? (
         <SignInCard note="Sign in to view and edit this book." />
       ) : !Number.isFinite(bookId) || bookId <= 0 ? (
@@ -1204,7 +1196,7 @@ export default function BookDetailPage() {
         </div>
       ) : (
         <div className="card">
-          <div className="row" style={{ justifyContent: "space-between" }}>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             <div>{effectiveTitle}</div>
             <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
           </div>
@@ -1271,146 +1263,161 @@ export default function BookDetailPage() {
                 <div style={{ width: "100%", height: 280, border: "1px solid var(--border)" }} />
               )}
 
-              <div style={{ marginTop: 10 }}>
-                <div className="muted">Cover override</div>
-                <input key={coverInputKey} type="file" accept="image/*" onChange={(ev) => setPendingCover((ev.target.files ?? [])[0] ?? null)} style={{ marginTop: 6 }} />
-                {pendingCover ? (
-                  <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
-                    <button onClick={uploadCover} disabled={coverState.busy}>
-                      {coverState.busy ? "Uploading…" : "Submit cover"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPendingCover(null);
-                        setCoverInputKey((k) => k + 1);
-                      }}
-                      disabled={coverState.busy}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                ) : null}
-                {coverState.message ? (
-                  <div className="muted" style={{ marginTop: 6 }}>
-                    {coverState.error ? `${coverState.message} (${coverState.error})` : coverState.message}
-                  </div>
-                ) : null}
-                {book?.owner_id === userId && suggestedCoverUrl ? (
-                  <div style={{ marginTop: 10 }}>
-                    <div className="muted">Cover from preview</div>
-                    <div className="row" style={{ marginTop: 6, justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={suggestedCoverUrl}
-                          alt=""
-                          width={44}
-                          height={66}
-                          style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
-                        />
-                        <div className="muted" style={{ maxWidth: 140, wordBreak: "break-word" }}>
-                          <a href={suggestedCoverUrl} target="_blank" rel="noreferrer">
-                            open
-                          </a>
+              {isOwner ? (
+                <div style={{ marginTop: 10 }}>
+                  <div className="muted">Cover override</div>
+                  <input
+                    key={coverInputKey}
+                    type="file"
+                    accept="image/*"
+                    onChange={(ev) => setPendingCover((ev.target.files ?? [])[0] ?? null)}
+                    style={{ marginTop: 6 }}
+                  />
+                  {pendingCover ? (
+                    <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
+                      <button onClick={uploadCover} disabled={coverState.busy}>
+                        {coverState.busy ? "Uploading…" : "Submit cover"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPendingCover(null);
+                          setCoverInputKey((k) => k + 1);
+                        }}
+                        disabled={coverState.busy}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  ) : null}
+                  {coverState.message ? (
+                    <div className="muted" style={{ marginTop: 6 }}>
+                      {coverState.error ? `${coverState.message} (${coverState.error})` : coverState.message}
+                    </div>
+                  ) : null}
+                  {suggestedCoverUrl ? (
+                    <div style={{ marginTop: 10 }}>
+                      <div className="muted">Cover from preview</div>
+                      <div className="row" style={{ marginTop: 6, justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={suggestedCoverUrl}
+                            alt=""
+                            width={44}
+                            height={66}
+                            style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
+                          />
+                          <div className="muted" style={{ maxWidth: 140, wordBreak: "break-word" }}>
+                            <a href={suggestedCoverUrl} target="_blank" rel="noreferrer">
+                              open
+                            </a>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                          <button onClick={() => importCoverFromUrl(suggestedCoverUrl)} disabled={suggestedCoverState.busy}>
+                            {suggestedCoverState.busy ? "Importing…" : "Use as cover"}
+                          </button>
+                          <button onClick={() => setSuggestedCoverUrl(null)} disabled={suggestedCoverState.busy}>
+                            Clear
+                          </button>
                         </div>
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                        <button onClick={() => importCoverFromUrl(suggestedCoverUrl)} disabled={suggestedCoverState.busy}>
-                          {suggestedCoverState.busy ? "Importing…" : "Use as cover"}
-                        </button>
-                        <button onClick={() => setSuggestedCoverUrl(null)} disabled={suggestedCoverState.busy}>
-                          Clear
-                        </button>
-                      </div>
+                      {suggestedCoverState.message ? (
+                        <div className="muted" style={{ marginTop: 6 }}>
+                          {suggestedCoverState.error
+                            ? `${suggestedCoverState.message} (${suggestedCoverState.error})`
+                            : suggestedCoverState.message}
+                        </div>
+                      ) : null}
                     </div>
-                    {suggestedCoverState.message ? (
-                      <div className="muted" style={{ marginTop: 6 }}>
-                        {suggestedCoverState.error
-                          ? `${suggestedCoverState.message} (${suggestedCoverState.error})`
-                          : suggestedCoverState.message}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div>
-              <div className="muted">Authors</div>
-              <div style={{ marginTop: 4 }}>
-                {effectiveAuthors.length > 0 ? (
-                  <>
-                    {effectiveAuthors.map((a, idx) => (
-                      <span key={a}>
-                        <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
-                        {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                      </span>
-                    ))}
-                  </>
-                ) : (
-                  <span className="muted">—</span>
-                )}
-              </div>
-
-              <div style={{ marginTop: 14 }} className="muted">
-                Metadata
-              </div>
-              <div style={{ marginTop: 6 }}>
-                <div className="row">
-                  <div style={{ minWidth: 110 }} className="muted">
-                    ISBN
-                  </div>
-                  <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10 ?? "—"}</div>
-                </div>
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Publisher
-                  </div>
-                  <div>
-                    {effectivePublisher ? <Link href={`/app?publisher=${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link> : "—"}
-                  </div>
-                </div>
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Publish date
-                  </div>
-                  <div>{effectivePublishDate || "—"}</div>
-                </div>
-                <div style={{ marginTop: 8 }}>
-                  <div className="muted">Subjects</div>
-                  <div style={{ marginTop: 6 }}>
-                    {effectiveSubjects.length > 0 ? (
-                      effectiveSubjects.map((s) => (
-                        <span key={s} style={{ marginRight: 10 }}>
-                          <Link href={`/app?subject=${encodeURIComponent(s)}`}>{s}</Link>
-                        </span>
-                      ))
+              {!isOwner ? (
+                <>
+                  <div className="muted">Authors</div>
+                  <div style={{ marginTop: 4 }}>
+                    {effectiveAuthors.length > 0 ? (
+                      <>
+                        {effectiveAuthors.map((a, idx) => (
+                          <span key={a}>
+                            <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
+                            {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                          </span>
+                        ))}
+                      </>
                     ) : (
                       <span className="muted">—</span>
                     )}
                   </div>
-                </div>
-                <div style={{ marginTop: 8 }}>
-                  <div className="muted">Description</div>
-                  <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-                    {effectiveDescription || "—"}
-                  </div>
-                </div>
-                {book?.edition?.cover_url ? (
-                  <div style={{ marginTop: 8 }} className="muted">
-                    Online cover:{" "}
-                    <a href={book.edition.cover_url} target="_blank" rel="noreferrer">
-                      open
-                    </a>
-                  </div>
-                ) : null}
-                <details style={{ marginTop: 10 }}>
-                  <summary className="muted">Raw metadata</summary>
-                  <pre style={{ marginTop: 8, fontSize: 12, whiteSpace: "pre-wrap" }}>{JSON.stringify(book?.edition?.raw ?? {}, null, 2)}</pre>
-                </details>
-              </div>
 
-              <div style={{ marginTop: 14 }} className="card">
+                  <div style={{ marginTop: 14 }} className="muted">
+                    Metadata
+                  </div>
+                  <div style={{ marginTop: 6 }}>
+                    <div className="row">
+                      <div style={{ minWidth: 110 }} className="muted">
+                        ISBN
+                      </div>
+                      <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10 ?? "—"}</div>
+                    </div>
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Publisher
+                      </div>
+                      <div>
+                        {effectivePublisher ? <Link href={`/app?publisher=${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link> : "—"}
+                      </div>
+                    </div>
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Publish date
+                      </div>
+                      <div>{effectivePublishDate || "—"}</div>
+                    </div>
+                    <div style={{ marginTop: 8 }}>
+                      <div className="muted">Subjects</div>
+                      <div style={{ marginTop: 6 }}>
+                        {effectiveSubjects.length > 0 ? (
+                          effectiveSubjects.map((s) => (
+                            <span key={s} style={{ marginRight: 10 }}>
+                              <Link href={`/app?subject=${encodeURIComponent(s)}`}>{s}</Link>
+                            </span>
+                          ))
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 8 }}>
+                      <div className="muted">Description</div>
+                      <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
+                        {effectiveDescription || "—"}
+                      </div>
+                    </div>
+                    {book?.edition?.cover_url ? (
+                      <div style={{ marginTop: 8 }} className="muted">
+                        Online cover:{" "}
+                        <a href={book.edition.cover_url} target="_blank" rel="noreferrer">
+                          open
+                        </a>
+                      </div>
+                    ) : null}
+                    <details style={{ marginTop: 10 }}>
+                      <summary className="muted">Raw metadata</summary>
+                      <pre style={{ marginTop: 8, fontSize: 12, whiteSpace: "pre-wrap" }}>{JSON.stringify(book?.edition?.raw ?? {}, null, 2)}</pre>
+                    </details>
+                  </div>
+                </>
+              ) : null}
+
+              {isOwner ? (
+                <details style={{ marginTop: 14 }}>
+                  <summary className="muted">Lookup &amp; import</summary>
+                  <div style={{ marginTop: 10 }} className="card">
                 <div className="row" style={{ justifyContent: "space-between" }}>
                   <div>Link edition (ISBN)</div>
                   <div className="muted">{book?.edition ? "linked" : "not linked"}</div>
@@ -1653,11 +1660,15 @@ export default function BookDetailPage() {
                   </div>
                 ) : null}
               </div>
+                </details>
+              ) : null}
 
-              <div style={{ marginTop: 16 }} className="muted">
-                Your fields
-              </div>
-              <div style={{ marginTop: 8 }}>
+              {isOwner ? (
+                <>
+                  <div style={{ marginTop: 16 }} className="muted">
+                    Details
+                  </div>
+                  <div style={{ marginTop: 8 }}>
                 <div className="row">
                   <div style={{ minWidth: 110 }} className="muted">
                     Visibility
@@ -1778,14 +1789,21 @@ export default function BookDetailPage() {
 
                 <div className="row" style={{ marginTop: 6 }}>
                   <div style={{ minWidth: 110 }} className="muted">
-                    Title override
+                    ISBN
+                  </div>
+                  <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10 ?? "—"}</div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Title
                   </div>
                   <input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} style={{ width: 360 }} />
                 </div>
 
                 <div className="row" style={{ marginTop: 6 }}>
                   <div style={{ minWidth: 110 }} className="muted">
-                    Authors override
+                    Authors
                   </div>
                   <input
                     value={formAuthors}
@@ -1801,6 +1819,9 @@ export default function BookDetailPage() {
                     Publisher
                   </div>
                   <input value={formPublisher} onChange={(e) => setFormPublisher(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} style={{ width: 360 }} />
+                  <div className="muted">
+                    {effectivePublisher ? <Link href={`/app?publisher=${encodeURIComponent(effectivePublisher)}`}>browse</Link> : ""}
+                  </div>
                 </div>
 
                 <div className="row" style={{ marginTop: 6 }}>
@@ -2058,6 +2079,8 @@ export default function BookDetailPage() {
                   </div>
                 )}
               </div>
+                </>
+              ) : null}
             </div>
           </div>
 

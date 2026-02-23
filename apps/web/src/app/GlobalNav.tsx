@@ -180,15 +180,6 @@ export default function GlobalNav() {
     };
   }, [sessionUserId]);
 
-  const label = useMemo(() => {
-    if (!me?.username) return null;
-    const viewing = (viewingUsername ?? "").trim().toLowerCase();
-    const meUser = me.username.trim().toLowerCase();
-    if (!viewing) return `Signed in as ${me.username}.`;
-    if (viewing === meUser) return `Signed in as ${me.username}. Viewing your public page.`;
-    return `Signed in as ${me.username}. Viewing ${viewingUsername}.`;
-  }, [me?.username, viewingUsername]);
-
   const editInAppHref = useMemo(() => {
     if (!me?.username) return null;
     const viewing = (viewingUsername ?? "").trim().toLowerCase();
@@ -206,34 +197,19 @@ export default function GlobalNav() {
     <div className="container">
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-          <div className="row" style={{ gap: 8 }}>
-            {avatarUrl ? (
-              <Link href={me?.username ? `/u/${me.username}` : "/app"} aria-label="Open your public profile">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img alt="" src={avatarUrl} style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
-              </Link>
-            ) : null}
-            <span className="muted">{label ?? "Signed in."}</span>
-            <span className="muted">
-              <Link href="/app/follows" style={{ textDecoration: "none" }}>
-                Followers {followersCount}
-              </Link>
-              <span> · </span>
-              <Link href="/app/follows" style={{ textDecoration: "none" }}>
-                Following {followingCount}
-              </Link>
-            </span>
+          <div>
+            <Link href="/app" style={{ textDecoration: "none" }}>
+              Other Library
+            </Link>
           </div>
 
-          <div className="row" style={{ gap: 10 }}>
-            <Link href="/app">App home</Link>
-            <Link href="/app/settings">Settings</Link>
-            {me?.username ? <Link href={`/u/${me.username}`}>My public page</Link> : null}
+          <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             {editInAppHref ? (
               <Link href={editInAppHref} style={{ fontWeight: 600 }} aria-label="Edit this page in the app">
                 Edit in app
               </Link>
             ) : null}
+
             {pendingBorrowRequests > 0 ? (
               <Link href="/app/messages" aria-label={`${pendingBorrowRequests} pending borrow requests`} style={{ textDecoration: "none" }}>
                 <span
@@ -255,6 +231,7 @@ export default function GlobalNav() {
                 </span>
               </Link>
             ) : null}
+
             {pendingRequests > 0 ? (
               <Link href="/app/follows" aria-label={`${pendingRequests} pending follow requests`} style={{ textDecoration: "none" }}>
                 <span
@@ -276,6 +253,26 @@ export default function GlobalNav() {
                 </span>
               </Link>
             ) : null}
+
+            {avatarUrl ? (
+              <Link href={me?.username ? `/u/${me.username}` : "/app"} aria-label="Open your public profile" style={{ display: "inline-flex" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  alt=""
+                  src={avatarUrl}
+                  style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)", objectFit: "cover" }}
+                />
+              </Link>
+            ) : null}
+
+            {me?.username ? (
+              <Link href="/app" className="muted" style={{ textDecoration: "none" }}>
+                {me.username}
+              </Link>
+            ) : null}
+
+            <Link href="/app/settings">Settings</Link>
+            <button onClick={() => supabase?.auth.signOut()}>Sign out</button>
           </div>
         </div>
       </div>

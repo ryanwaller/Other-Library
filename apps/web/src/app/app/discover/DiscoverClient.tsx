@@ -91,13 +91,6 @@ export default function DiscoverClient() {
 
   return (
     <main className="container">
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-        <div className="muted">
-          <Link href="/app">Home</Link>
-        </div>
-        <div className="row">{session ? <button onClick={() => supabase?.auth.signOut()}>Sign out</button> : null}</div>
-      </div>
-
       {!session ? (
         <SignInCard note="Sign in to search your network." />
       ) : (
@@ -195,4 +188,3 @@ export default function DiscoverClient() {
     </main>
   );
 }
-

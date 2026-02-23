@@ -181,25 +181,18 @@ export default function MessagesPage() {
 
   return (
     <main className="container">
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-        <div className="muted">
-          <Link href="/app">Home</Link>
-        </div>
-        <div className="row" style={{ gap: 10 }}>
-          <button onClick={refresh} disabled={busy}>
-            Refresh
-          </button>
-          {session ? <button onClick={() => supabase?.auth.signOut()}>Sign out</button> : null}
-        </div>
-      </div>
-
       {!session ? (
         <SignInCard note="Sign in to view borrow request chats." />
       ) : (
         <div className="card">
           <div className="row" style={{ justifyContent: "space-between" }}>
             <div>Messages</div>
-            <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
+            <div className="row" style={{ gap: 10, alignItems: "center" }}>
+              <button onClick={refresh} disabled={busy}>
+                Refresh
+              </button>
+              <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
+            </div>
           </div>
           <div className="muted" style={{ marginTop: 8 }}>
             Borrow request conversations. Pending incoming: {pendingIncomingCount}.
