@@ -25,7 +25,8 @@ export default function BorrowRequestWidget({
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [followApproved, setFollowApproved] = useState<boolean>(false);
   const [loadingFollow, setLoadingFollow] = useState<boolean>(false);
-  const [note, setNote] = useState<string>("");
+  const [composerOpen, setComposerOpen] = useState<boolean>(false);
+  const [message, setMessage] = useState<string>("");
   const [threadDraft, setThreadDraft] = useState<string>("");
   const [state, setState] = useState<{ busy: boolean; error: string | null; message: string | null }>({ busy: false, error: null, message: null });
   const [existing, setExisting] = useState<{ id: number; kind: "borrow" | "note"; status: string; message: string | null; created_at: string } | null>(null);
@@ -153,41 +154,7 @@ export default function BorrowRequestWidget({
 
   async function requestBorrow() {
     if (!supabase || !sessionUserId) return;
-    const msg = note.trim() ? note.trim() : null;
-    setState({ busy: true, error: null, message: "Sending…" });
-    const res = await supabase
-      .from("borrow_requests")
-      .insert({
-        user_book_id: userBookId,
-        owner_id: ownerId,
-        requester_id: sessionUserId,
-        kind: "borrow",
-        message: null
-      })
-      .select("id,kind,status,message,created_at")
-      .single();
-    if (res.error) {
-      setState({ busy: false, error: res.error.message, message: "Failed" });
-      return;
-    }
-    const created = res.data as any;
-    setExisting(created);
-    setNote("");
-    if (msg) {
-      const m = await supabase
-        .from("borrow_request_messages")
-        .insert({ borrow_request_id: created.id, sender_id: sessionUserId, message: msg })
-        .select("id,sender_id,message,created_at")
-        .single();
-      if (!m.error && m.data) setThread((prev) => [...prev, m.data as any]);
-    }
-    setState({ busy: false, error: null, message: "Requested" });
-    window.dispatchEvent(new Event("om:borrow-requests-changed"));
-  }
-
-  async function sendNote() {
-    if (!supabase || !sessionUserId) return;
-    const msg = note.trim();
+    const msg = message.trim();
     if (!msg) return;
     setState({ busy: true, error: null, message: "Sending…" });
     const res = await supabase
@@ -196,8 +163,8 @@ export default function BorrowRequestWidget({
         user_book_id: userBookId,
         owner_id: ownerId,
         requester_id: sessionUserId,
-        kind: "note",
-        message: null
+        kind: "borrow",
+        message: msg
       })
       .select("id,kind,status,message,created_at")
       .single();
@@ -207,14 +174,9 @@ export default function BorrowRequestWidget({
     }
     const created = res.data as any;
     setExisting(created);
-    setNote("");
-    const m = await supabase
-      .from("borrow_request_messages")
-      .insert({ borrow_request_id: created.id, sender_id: sessionUserId, message: msg })
-      .select("id,sender_id,message,created_at")
-      .single();
-    if (!m.error && m.data) setThread((prev) => [...prev, m.data as any]);
-    setState({ busy: false, error: null, message: "Sent" });
+    setComposerOpen(false);
+    setMessage("");
+    setState({ busy: false, error: null, message: "Requested" });
     window.dispatchEvent(new Event("om:borrow-requests-changed"));
   }
 
@@ -238,7 +200,7 @@ export default function BorrowRequestWidget({
   }
 
   if (!sessionUserId) {
-    return <SignInCard note="Sign in to request to borrow or send a note." />;
+    return <SignInCard note="Sign in to request to borrow." />;
   }
 
   if (scope === "approved_followers" && !followApproved) {
@@ -253,7 +215,7 @@ export default function BorrowRequestWidget({
   if (existing?.status === "pending") {
     return (
       <div>
-        <div className="muted">{existing.kind === "note" ? "Note: sent." : "Borrow request: pending."}</div>
+        <div className="muted">Borrow request: pending.</div>
         {existing.message ? (
           <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
             {existing.message}
@@ -286,8 +248,11 @@ export default function BorrowRequestWidget({
             {state.busy ? "…" : "Send message"}
           </button>
           <button onClick={cancelRequest} disabled={state.busy}>
-            {state.busy ? "…" : existing.kind === "note" ? "Cancel note" : "Cancel request"}
+            {state.busy ? "…" : "Cancel request"}
           </button>
+          <Link href={`/app/messages/${existing.id}`} className="muted" style={{ marginLeft: 8 }}>
+            Open chat
+          </Link>
           <div className="muted">{state.message ? (state.error ? `${state.message} (${state.error})` : state.message) : ""}</div>
         </div>
       </div>
@@ -295,40 +260,45 @@ export default function BorrowRequestWidget({
   }
 
   if (!borrowable) {
-    return (
-      <div>
-        <div className="muted">Not borrowable, but you can send a note.</div>
-        <div style={{ marginTop: 8 }}>
-          <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note" rows={3} style={{ width: "100%" }} />
-        </div>
-        <div className="row" style={{ marginTop: 8 }}>
-          <button onClick={sendNote} disabled={state.busy || !note.trim()}>
-            {state.busy ? "Sending…" : "Send note"}
-          </button>
-          <div className="muted">{state.message ? (state.error ? `${state.message} (${state.error})` : state.message) : ""}</div>
-        </div>
-      </div>
-    );
+    return <div className="muted">Not borrowable.</div>;
   }
 
   return (
     <div>
       <div className="muted">Request to borrow: {bookTitle}</div>
-      <div style={{ marginTop: 8 }}>
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Optional note"
-          rows={3}
-          style={{ width: "100%" }}
-        />
-      </div>
-      <div className="row" style={{ marginTop: 8 }}>
-        <button onClick={requestBorrow} disabled={!canRequest || state.busy}>
-          {state.busy ? "Sending…" : "Send request"}
-        </button>
-        <div className="muted">{state.message ? (state.error ? `${state.message} (${state.error})` : state.message) : ""}</div>
-      </div>
+      {!composerOpen ? (
+        <div className="row" style={{ marginTop: 8 }}>
+          <button
+            onClick={() => setComposerOpen(true)}
+            disabled={!canRequest || state.busy}
+            aria-label="Ask to borrow"
+          >
+            Ask to borrow
+          </button>
+          <div className="muted">{!canRequest ? "Not allowed." : ""}</div>
+        </div>
+      ) : (
+        <>
+          <div style={{ marginTop: 8 }}>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Message (required)"
+              rows={3}
+              style={{ width: "100%" }}
+            />
+          </div>
+          <div className="row" style={{ marginTop: 8 }}>
+            <button onClick={requestBorrow} disabled={!canRequest || state.busy || !message.trim()}>
+              {state.busy ? "Sending…" : "Send request"}
+            </button>
+            <button onClick={() => { setComposerOpen(false); setMessage(""); }} disabled={state.busy}>
+              Cancel
+            </button>
+            <div className="muted">{state.message ? (state.error ? `${state.message} (${state.error})` : state.message) : ""}</div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

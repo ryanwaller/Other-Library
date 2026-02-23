@@ -111,6 +111,7 @@ export default function GlobalNav() {
         .from("borrow_requests")
         .select("id", { count: "exact", head: true })
         .eq("owner_id", sessionUserId)
+        .eq("kind", "borrow")
         .eq("status", "pending");
       if (!alive) return;
       if (res.error) {
@@ -202,7 +203,7 @@ export default function GlobalNav() {
             <Link href="/app/settings">Settings</Link>
             {me?.username ? <Link href={`/u/${me.username}`}>My public page</Link> : null}
             {pendingBorrowRequests > 0 ? (
-              <Link href="/app/borrow-requests" aria-label={`${pendingBorrowRequests} pending borrow requests`} style={{ textDecoration: "none" }}>
+              <Link href="/app/messages" aria-label={`${pendingBorrowRequests} pending borrow requests`} style={{ textDecoration: "none" }}>
                 <span
                   style={{
                     display: "inline-flex",

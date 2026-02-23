@@ -1,24 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
 
-function notifyBorrowRequestsChanged() {
-  window.dispatchEvent(new Event("om:borrow-requests-changed"));
-}
-
-type BorrowRequest = {
+type BorrowRequestRow = {
   id: number;
   user_book_id: number;
-  requester_id: string;
   owner_id: string;
+  requester_id: string;
   kind: "borrow" | "note";
   status: "pending" | "approved" | "rejected" | "cancelled";
   message: string | null;
   created_at: string;
+  updated_at: string;
 };
 
 type ProfileLite = { id: string; username: string; avatar_path: string | null };
@@ -26,24 +23,23 @@ type ProfileLite = { id: string; username: string; avatar_path: string | null };
 type BookLite = {
   id: number;
   title_override: string | null;
-  edition: { title: string | null; isbn13: string | null; isbn10: string | null } | null;
+  edition: { title: string | null; isbn13: string | null } | null;
 };
 
-export default function BorrowRequestsPage() {
+type MsgLite = { id: number; borrow_request_id: number; sender_id: string; message: string; created_at: string };
+
+export default function MessagesPage() {
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<BorrowRequest[]>([]);
+  const [rows, setRows] = useState<BorrowRequestRow[]>([]);
 
   const [profilesById, setProfilesById] = useState<Record<string, ProfileLite>>({});
   const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<string, string>>({});
   const [booksById, setBooksById] = useState<Record<number, BookLite>>({});
-
-  const [actionStateByRequestId, setActionStateByRequestId] = useState<Record<number, { busy: boolean; error: string | null; message: string | null } | undefined>>(
-    {}
-  );
+  const [lastMsgByRequestId, setLastMsgByRequestId] = useState<Record<number, MsgLite | null>>({});
 
   useEffect(() => {
     if (!supabase) return;
@@ -59,20 +55,20 @@ export default function BorrowRequestsPage() {
     try {
       const res = await supabase
         .from("borrow_requests")
-        .select("id,user_book_id,requester_id,owner_id,kind,status,message,created_at")
-        .eq("owner_id", userId)
-        .eq("kind", "borrow")
-        .order("created_at", { ascending: false })
+        .select("id,user_book_id,owner_id,requester_id,kind,status,message,created_at,updated_at")
+        .or(`owner_id.eq.${userId},requester_id.eq.${userId}`)
+        .order("updated_at", { ascending: false })
         .limit(200);
       if (res.error) throw new Error(res.error.message);
-      const nextRows = ((res.data as any) ?? []) as BorrowRequest[];
+      const nextRows = ((((res.data as any) ?? []) as BorrowRequestRow[]) ?? []).filter((r) => r.kind === "borrow");
       setRows(nextRows);
 
-      const requesterIds = Array.from(new Set(nextRows.map((r) => r.requester_id).filter(Boolean)));
+      const userIds = Array.from(new Set(nextRows.flatMap((r) => [r.owner_id, r.requester_id]).filter(Boolean)));
       const bookIds = Array.from(new Set(nextRows.map((r) => r.user_book_id).filter((n) => Number.isFinite(n))));
+      const requestIds = Array.from(new Set(nextRows.map((r) => r.id).filter((n) => Number.isFinite(n))));
 
-      if (requesterIds.length > 0) {
-        const pr = await supabase.from("profiles").select("id,username,avatar_path").in("id", requesterIds);
+      if (userIds.length > 0) {
+        const pr = await supabase.from("profiles").select("id,username,avatar_path").in("id", userIds);
         if (!pr.error) {
           const map: Record<string, ProfileLite> = {};
           for (const p of (pr.data as any[]) ?? []) {
@@ -95,7 +91,7 @@ export default function BorrowRequestsPage() {
       }
 
       if (bookIds.length > 0) {
-        const br = await supabase.from("user_books").select("id,title_override,edition:editions(title,isbn13,isbn10)").in("id", bookIds);
+        const br = await supabase.from("user_books").select("id,title_override,edition:editions(title,isbn13)").in("id", bookIds);
         if (!br.error) {
           const map: Record<number, BookLite> = {};
           for (const b of (br.data as any[]) ?? []) {
@@ -111,8 +107,31 @@ export default function BorrowRequestsPage() {
       } else {
         setBooksById({});
       }
+
+      if (requestIds.length > 0) {
+        const mr = await supabase
+          .from("borrow_request_messages")
+          .select("id,borrow_request_id,sender_id,message,created_at")
+          .in("borrow_request_id", requestIds)
+          .order("created_at", { ascending: false })
+          .limit(500);
+        if (mr.error) {
+          setLastMsgByRequestId({});
+        } else {
+          const by: Record<number, MsgLite | null> = {};
+          for (const msg of (mr.data as any[]) ?? []) {
+            const brId = Number((msg as any).borrow_request_id);
+            if (!Number.isFinite(brId)) continue;
+            if (by[brId]) continue;
+            by[brId] = msg as any;
+          }
+          setLastMsgByRequestId(by);
+        }
+      } else {
+        setLastMsgByRequestId({});
+      }
     } catch (e: any) {
-      setError(e?.message ?? "Failed to load requests");
+      setError(e?.message ?? "Failed to load messages");
     } finally {
       setBusy(false);
     }
@@ -123,19 +142,10 @@ export default function BorrowRequestsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  async function setStatus(requestId: number, status: "approved" | "rejected") {
-    if (!supabase || !userId) return;
-    setActionStateByRequestId((prev) => ({ ...prev, [requestId]: { busy: true, error: null, message: "Saving…" } }));
-    const res = await supabase.from("borrow_requests").update({ status }).eq("id", requestId);
-    if (res.error) {
-      setActionStateByRequestId((prev) => ({ ...prev, [requestId]: { busy: false, error: res.error?.message ?? "Failed", message: "Failed" } }));
-      return;
-    }
-    notifyBorrowRequestsChanged();
-    await refresh();
-    setActionStateByRequestId((prev) => ({ ...prev, [requestId]: { busy: false, error: null, message: "Saved" } }));
-    window.setTimeout(() => setActionStateByRequestId((prev) => ({ ...prev, [requestId]: undefined })), 1200);
-  }
+  const pendingIncomingCount = useMemo(() => {
+    if (!userId) return 0;
+    return rows.filter((r) => r.owner_id === userId && r.status === "pending").length;
+  }, [rows, userId]);
 
   if (!supabase) {
     return (
@@ -156,32 +166,40 @@ export default function BorrowRequestsPage() {
         <div className="muted">
           <Link href="/app">Home</Link>
         </div>
-        <div className="row">{session ? <button onClick={() => supabase?.auth.signOut()}>Sign out</button> : null}</div>
+        <div className="row" style={{ gap: 10 }}>
+          <button onClick={refresh} disabled={busy}>
+            Refresh
+          </button>
+          {session ? <button onClick={() => supabase?.auth.signOut()}>Sign out</button> : null}
+        </div>
       </div>
 
       {!session ? (
-        <SignInCard note="Sign in to manage borrow requests." />
+        <SignInCard note="Sign in to view borrow request chats." />
       ) : (
         <div className="card">
           <div className="row" style={{ justifyContent: "space-between" }}>
-            <div>Borrow requests</div>
+            <div>Messages</div>
             <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
           </div>
-
           <div className="muted" style={{ marginTop: 8 }}>
-            Incoming borrow requests. Open a request to view and reply in chat.
+            Borrow request conversations. Pending incoming: {pendingIncomingCount}.
           </div>
 
           <div style={{ marginTop: 12 }}>
             {rows.length === 0 ? (
-              <div className="muted">No requests yet.</div>
+              <div className="muted">No conversations yet.</div>
             ) : (
               rows.map((r) => {
-                const requester = profilesById[r.requester_id];
-                const avatarUrl = avatarUrlByUserId[r.requester_id] ?? null;
+                const isOwner = r.owner_id === userId;
+                const otherId = isOwner ? r.requester_id : r.owner_id;
+                const other = profilesById[otherId];
+                const avatarUrl = avatarUrlByUserId[otherId] ?? null;
                 const book = booksById[r.user_book_id];
                 const title = (book?.title_override ?? "").trim() || book?.edition?.title || "(untitled)";
-                const reqState = actionStateByRequestId[r.id] ?? { busy: false, error: null, message: null };
+                const lastMsg = lastMsgByRequestId[r.id] ?? null;
+                const preview = (lastMsg?.message ?? r.message ?? "").trim();
+
                 return (
                   <div key={r.id} className="card" style={{ marginTop: 10 }}>
                     <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
@@ -199,41 +217,33 @@ export default function BorrowRequestsPage() {
                           <div style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
                         )}
                         <div>
-                          <span className="muted">from </span>
-                          {requester?.username ? <Link href={`/u/${requester.username}`}>{requester.username}</Link> : <span className="muted">{r.requester_id}</span>}
+                          <span className="muted">{isOwner ? "request from " : "to "}</span>
+                          {other?.username ? <Link href={`/u/${other.username}`}>{other.username}</Link> : <span className="muted">{otherId}</span>}
                         </div>
                       </div>
-                    <div className="muted">borrow request • {r.status}</div>
-                  </div>
+                      <div className="muted">{r.status}</div>
+                    </div>
 
                     <div style={{ marginTop: 8 }}>
                       <span className="muted">Book: </span>
-                      {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
+                      <span>{title}</span>
                     </div>
 
-                    {r.message ? (
+                    {preview ? (
                       <div className="muted" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
-                        {r.message}
+                        {preview}
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="muted" style={{ marginTop: 8 }}>
+                        (no messages yet)
+                      </div>
+                    )}
 
-                    <div className="row" style={{ marginTop: 10 }}>
+                    <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
                       <Link href={`/app/messages/${r.id}`} className="muted">
                         Open chat
                       </Link>
-                      {r.status === "pending" ? (
-                        <>
-                          <button onClick={() => setStatus(r.id, "approved")} disabled={reqState.busy}>
-                            Approve
-                          </button>
-                          <button onClick={() => setStatus(r.id, "rejected")} disabled={reqState.busy}>
-                            Reject
-                          </button>
-                        </>
-                      ) : null}
-                      <span className="muted">
-                        {reqState.message ? (reqState.error ? `${reqState.message} (${reqState.error})` : reqState.message) : ""}
-                      </span>
+                      {isOwner && r.status === "pending" ? <Link href="/app/borrow-requests">Manage</Link> : null}
                     </div>
                   </div>
                 );
