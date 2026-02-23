@@ -8,4 +8,4 @@ build
 .next
 .expo
 coverage
-
+*.tsbuildinfo

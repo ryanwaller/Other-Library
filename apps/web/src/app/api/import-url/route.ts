@@ -122,6 +122,79 @@ function decodeEntities(input: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
+function stripTitleSuffix(input: string, hostname: string): string {
+  const t = input.trim().replace(/\s+/g, " ");
+  if (!t) return t;
+
+  const host = hostname.toLowerCase().replace(/^www\./, "");
+  const hostLabel = host.split(".")[0] ?? host;
+  const hostWords = hostLabel.replace(/[^a-z0-9]+/g, " ").trim();
+
+  const candidates = [
+    { sep: " | ", preferLeft: true },
+    { sep: " — ", preferLeft: true },
+    { sep: " - ", preferLeft: true },
+    { sep: " · ", preferLeft: true }
+  ];
+
+  for (const { sep } of candidates) {
+    if (!t.includes(sep)) continue;
+    const parts = t.split(sep).map((p) => p.trim()).filter(Boolean);
+    if (parts.length < 2) continue;
+    const right = parts[parts.length - 1] ?? "";
+    const rightLc = right.toLowerCase();
+    const hostHit =
+      (hostWords && rightLc.includes(hostWords)) ||
+      (hostLabel && rightLc.includes(hostLabel)) ||
+      rightLc.includes(host);
+    const shortRight = right.length <= 28;
+    if (hostHit || shortRight) return parts[0] ?? t;
+  }
+
+  return t;
+}
+
+function looksLikeBookishJsonLd(typesLc: string[]): boolean {
+  return (
+    typesLc.includes("book") ||
+    typesLc.includes("creativework") ||
+    typesLc.includes("publicationvolume") ||
+    typesLc.includes("bookseries") ||
+    typesLc.includes("comicstory") ||
+    typesLc.includes("thesis")
+  );
+}
+
+function looksLikeBoilerplateDescription(desc: string): boolean {
+  const d = desc.toLowerCase();
+  const bad = [
+    "add to cart",
+    "in stock",
+    "out of stock",
+    "free shipping",
+    "shipping",
+    "returns",
+    "privacy policy",
+    "terms of service",
+    "subscribe to our newsletter",
+    "cookie",
+    "sign up",
+    "checkout"
+  ];
+  return bad.some((b) => d.includes(b));
+}
+
+function normalizeDescription(value: string | null, allowBoilerplate: boolean): string | null {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+  const s = raw.replace(/\s+/g, " ").trim();
+  if (!s) return null;
+  if (!allowBoilerplate && looksLikeBoilerplateDescription(s)) return null;
+  // Avoid extremely long blobs from store pages.
+  if (s.length > 2000) return s.slice(0, 2000);
+  return s;
+}
+
 function parseTagAttributes(tag: string): Record<string, string> {
   const attrs: Record<string, string> = {};
   const re = /([a-zA-Z_:][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
@@ -436,30 +509,38 @@ export async function POST(req: NextRequest) {
   const jsonldNodes = extractJsonLdObjects(html);
   const jsonld = pickJsonLdCandidate(jsonldNodes);
 
-  const jsonldTitle = typeof jsonld?.name === "string" ? String(jsonld.name).trim() : typeof jsonld?.headline === "string" ? String(jsonld.headline).trim() : null;
-  const jsonldAuthors = normalizeAuthors(jsonld?.author);
-  const jsonldPublisher = normalizePublisher(jsonld?.publisher ?? jsonld?.brand);
-  const jsonldPublishDate = parseDateToIso(jsonld?.datePublished);
-  const jsonldDescription = typeof jsonld?.description === "string" ? String(jsonld.description).trim() : null;
+  const typesLc = jsonLdType(jsonld).map((x) => x.toLowerCase());
+  const bookish = looksLikeBookishJsonLd(typesLc);
+
+  const jsonldTitleRaw =
+    typeof jsonld?.name === "string" ? String(jsonld.name).trim() : typeof jsonld?.headline === "string" ? String(jsonld.headline).trim() : null;
+  const jsonldTitle = jsonldTitleRaw ? stripTitleSuffix(jsonldTitleRaw, parsed.hostname) : null;
+  const jsonldAuthors = bookish ? normalizeAuthors(jsonld?.author) : [];
+  const jsonldPublisher = bookish ? normalizePublisher(jsonld?.publisher) : null;
+  const jsonldPublishDate = bookish ? parseDateToIso(jsonld?.datePublished) : null;
+  const jsonldDescription = bookish ? normalizeDescription(typeof jsonld?.description === "string" ? String(jsonld.description) : null, true) : null;
   const jsonldIsbn = typeof jsonld?.isbn === "string" ? String(jsonld.isbn).trim() : null;
-  const jsonldSubjects = uniqStrings([
-    ...normalizeKeywords(jsonld?.keywords),
-    ...normalizeKeywords(jsonld?.about),
-    ...normalizeKeywords(jsonld?.genre)
-  ]);
+  const jsonldSubjects = bookish
+    ? uniqStrings([...normalizeKeywords(jsonld?.keywords), ...normalizeKeywords(jsonld?.about), ...normalizeKeywords(jsonld?.genre)])
+    : [];
   const jsonldImages = normalizeImage(jsonld?.image);
 
-  const ogTitle = meta["og:title"] ?? null;
-  const ogDescription = meta["og:description"] ?? meta["description"] ?? null;
+  const ogTitle = meta["og:title"] ? stripTitleSuffix(String(meta["og:title"]), parsed.hostname) : null;
+  const ogDescription = normalizeDescription(
+    (meta["og:description"] ?? meta["description"] ?? null) ? String(meta["og:description"] ?? meta["description"]) : null,
+    bookish
+  );
   const ogImage = meta["og:image:secure_url"] ?? meta["og:image"] ?? null;
   const twitterImage = meta["twitter:image"] ?? meta["twitter:image:src"] ?? null;
 
-  const titleTag = extractTitleTag(html);
+  const titleTagRaw = extractTitleTag(html);
+  const titleTag = titleTagRaw ? stripTitleSuffix(titleTagRaw, parsed.hostname) : null;
 
   const isbnCandidates = uniqStrings([
     jsonldIsbn,
     meta["product:isbn"],
     meta["books:isbn"],
+    meta["book:isbn"],
     meta["isbn"],
     ...extractLikelyIsbnsFromHtml(html)
   ]);
@@ -564,4 +645,3 @@ export async function POST(req: NextRequest) {
     preview: merged
   });
 }
-

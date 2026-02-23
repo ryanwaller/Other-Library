@@ -218,6 +218,12 @@ export default function BookDetailPage() {
     domain_kind: null,
     scraped_sources: []
   });
+  const [suggestedCoverUrl, setSuggestedCoverUrl] = useState<string | null>(null);
+  const [suggestedCoverState, setSuggestedCoverState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
 
   const [pendingCover, setPendingCover] = useState<File | null>(null);
   const [coverState, setCoverState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
@@ -556,6 +562,13 @@ export default function BookDetailPage() {
     }
   }, [publicBookPath]);
 
+  const importPreviewIsbn = useMemo(() => {
+    if (!importPreview) return "";
+    return String(importPreview.isbn13 ?? importPreview.isbn10 ?? "").trim();
+  }, [importPreview]);
+
+  const importPreviewHasIsbn = Boolean(importPreviewIsbn);
+
   const isPubliclyVisible = useMemo(() => {
     if (!book) return false;
     if (book.visibility === "public") return true;
@@ -849,6 +862,63 @@ export default function BookDetailPage() {
     setCoverInputKey((k) => k + 1);
     await refresh();
     setCoverState({ busy: false, error: null, message: "Cover uploaded" });
+  }
+
+  function extFromContentType(contentType: string | null): string {
+    const ct = (contentType ?? "").toLowerCase();
+    if (ct.includes("image/png")) return "png";
+    if (ct.includes("image/webp")) return "webp";
+    if (ct.includes("image/avif")) return "avif";
+    if (ct.includes("image/gif")) return "gif";
+    if (ct.includes("image/jpeg") || ct.includes("image/jpg")) return "jpg";
+    return "jpg";
+  }
+
+  async function importCoverFromUrl(url: string) {
+    if (!supabase || !book || !userId) return;
+    if (book.owner_id !== userId) return;
+    const value = url.trim();
+    if (!value) return;
+
+    setSuggestedCoverState({ busy: true, error: null, message: "Importing cover…" });
+    try {
+      const res = await fetch(`/api/image-proxy?url=${encodeURIComponent(value)}`);
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error ?? `Fetch failed (${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const ext = extFromContentType(res.headers.get("content-type"));
+      const path = `${userId}/${book.id}/cover-import-${Date.now()}.${ext}`;
+
+      const existing = (book.media ?? []).filter((m) => m.kind === "cover");
+      for (const m of existing) {
+        if (m?.storage_path) {
+          await supabase.storage.from("user-book-media").remove([m.storage_path]);
+        }
+        if (m?.id) {
+          await supabase.from("user_book_media").delete().eq("id", m.id);
+        }
+      }
+
+      const up = await supabase.storage.from("user-book-media").upload(path, blob, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: blob.type || "application/octet-stream"
+      });
+      if (up.error) throw new Error(up.error.message);
+
+      const inserted = await supabase.from("user_book_media").insert({ user_book_id: book.id, kind: "cover", storage_path: path, caption: null });
+      if (inserted.error) throw new Error(inserted.error.message);
+
+      setSuggestedCoverUrl(null);
+      await refresh();
+      setSuggestedCoverState({ busy: false, error: null, message: "Cover imported" });
+      window.setTimeout(() => setSuggestedCoverState({ busy: false, error: null, message: null }), 1500);
+    } catch (e: any) {
+      setSuggestedCoverState({ busy: false, error: e?.message ?? "Cover import failed", message: "Cover import failed" });
+    }
   }
 
   async function setAsCover(mediaId: number) {
@@ -1225,6 +1295,43 @@ export default function BookDetailPage() {
                     {coverState.error ? `${coverState.message} (${coverState.error})` : coverState.message}
                   </div>
                 ) : null}
+                {book?.owner_id === userId && suggestedCoverUrl ? (
+                  <div style={{ marginTop: 10 }}>
+                    <div className="muted">Cover from preview</div>
+                    <div className="row" style={{ marginTop: 6, justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={suggestedCoverUrl}
+                          alt=""
+                          width={44}
+                          height={66}
+                          style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
+                        />
+                        <div className="muted" style={{ maxWidth: 140, wordBreak: "break-word" }}>
+                          <a href={suggestedCoverUrl} target="_blank" rel="noreferrer">
+                            open
+                          </a>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                        <button onClick={() => importCoverFromUrl(suggestedCoverUrl)} disabled={suggestedCoverState.busy}>
+                          {suggestedCoverState.busy ? "Importing…" : "Use as cover"}
+                        </button>
+                        <button onClick={() => setSuggestedCoverUrl(null)} disabled={suggestedCoverState.busy}>
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                    {suggestedCoverState.message ? (
+                      <div className="muted" style={{ marginTop: 6 }}>
+                        {suggestedCoverState.error
+                          ? `${suggestedCoverState.message} (${suggestedCoverState.error})`
+                          : suggestedCoverState.message}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -1359,6 +1466,7 @@ export default function BookDetailPage() {
                   <div style={{ marginTop: 10 }}>
                     {searchResults.map((r, idx) => {
                       const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
+                      const hasIsbn = Boolean(bestIsbn);
                       const title = (r.title ?? "").trim() || "—";
                       const authors = (r.authors ?? []).filter(Boolean).join(", ");
                       const pub = [r.publisher ?? "", r.publish_date ?? (r.publish_year ? String(r.publish_year) : "")]
@@ -1403,21 +1511,25 @@ export default function BookDetailPage() {
                             </div>
                             <div>
                               <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                                <button onClick={() => linkEditionByIsbn(bestIsbn)} disabled={linkState.busy || !bestIsbn}>
-                                  Link ISBN
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    if (r.title) setFormTitle(r.title);
-                                    setFormAuthors((r.authors ?? []).filter(Boolean).join(", "));
-                                    if (r.publisher) setFormPublisher(r.publisher);
-                                    if (r.publish_date) setFormPublishDate(r.publish_date);
-                                    setSearchState((s) => ({ ...s, message: "Filled fields (not saved)" }));
-                                  }}
-                                  disabled={!r.title && (!r.authors || r.authors.length === 0) && !r.publisher && !r.publish_date}
-                                >
-                                  Fill fields
-                                </button>
+                                {hasIsbn ? (
+                                  <button onClick={() => linkEditionByIsbn(bestIsbn)} disabled={linkState.busy || !bestIsbn}>
+                                    Link ISBN
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      if (r.title) setFormTitle(r.title);
+                                      setFormAuthors((r.authors ?? []).filter(Boolean).join(", "));
+                                      if (r.publisher) setFormPublisher(r.publisher);
+                                      if (r.publish_date) setFormPublishDate(r.publish_date);
+                                      if (r.cover_url) setSuggestedCoverUrl(r.cover_url);
+                                      setSearchState((s) => ({ ...s, message: "Filled fields (not saved)" }));
+                                    }}
+                                    disabled={!r.title && (!r.authors || r.authors.length === 0) && !r.publisher && !r.publish_date}
+                                  >
+                                    Fill fields
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1501,31 +1613,32 @@ export default function BookDetailPage() {
                       </div>
                       <div style={{ flex: "0 0 auto" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                          <button
-                            onClick={() => linkEditionByIsbn(importPreview.isbn13 ?? importPreview.isbn10 ?? "")}
-                            disabled={linkState.busy || !(importPreview.isbn13 ?? importPreview.isbn10)}
-                          >
-                            Link ISBN
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (importPreview.title) setFormTitle(importPreview.title);
-                              setFormAuthors((importPreview.authors ?? []).filter(Boolean).join(", "));
-                              if (importPreview.publisher) setFormPublisher(importPreview.publisher);
-                              if (importPreview.publish_date) setFormPublishDate(importPreview.publish_date);
-                              if (importPreview.description) setFormDescription(importPreview.description);
-                              setImportState((s) => ({ ...s, message: "Filled fields (not saved)" }));
-                            }}
-                            disabled={
-                              !importPreview.title &&
-                              (!importPreview.authors || importPreview.authors.length === 0) &&
-                              !importPreview.publisher &&
-                              !importPreview.publish_date &&
-                              !importPreview.description
-                            }
-                          >
-                            Fill fields
-                          </button>
+                          {importPreviewHasIsbn ? (
+                            <button onClick={() => linkEditionByIsbn(importPreviewIsbn)} disabled={linkState.busy || !importPreviewIsbn}>
+                              Link ISBN
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                if (importPreview.title) setFormTitle(importPreview.title);
+                                setFormAuthors((importPreview.authors ?? []).filter(Boolean).join(", "));
+                                if (importPreview.publisher) setFormPublisher(importPreview.publisher);
+                                if (importPreview.publish_date) setFormPublishDate(importPreview.publish_date);
+                                if (importPreview.description) setFormDescription(importPreview.description);
+                                if (importPreview.cover_url) setSuggestedCoverUrl(importPreview.cover_url);
+                                setImportState((s) => ({ ...s, message: "Filled fields (not saved)" }));
+                              }}
+                              disabled={
+                                !importPreview.title &&
+                                (!importPreview.authors || importPreview.authors.length === 0) &&
+                                !importPreview.publisher &&
+                                !importPreview.publish_date &&
+                                !importPreview.description
+                              }
+                            >
+                              Fill fields
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
