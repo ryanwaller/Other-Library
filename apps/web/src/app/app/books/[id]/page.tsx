@@ -87,6 +87,10 @@ function normalizeTagName(input: string): string {
   return input.trim().replace(/\s+/g, " ");
 }
 
+function normalizeAuthorName(input: string): string {
+  return input.trim().replace(/\s+/g, " ");
+}
+
 function normalizeSubjectName(input: string): string {
   return input.trim().replace(/\s+/g, " ");
 }
@@ -152,6 +156,7 @@ export default function BookDetailPage() {
 
   const [formTitle, setFormTitle] = useState("");
   const [formAuthors, setFormAuthors] = useState("");
+  const [newAuthor, setNewAuthor] = useState("");
   const [formPublisher, setFormPublisher] = useState("");
   const [formPublishDate, setFormPublishDate] = useState("");
   const [formDescription, setFormDescription] = useState("");
@@ -362,7 +367,7 @@ export default function BookDetailPage() {
             const countRes = await q;
             if (countRes.error) throw new Error(countRes.error.message);
             setCopiesCount(countRes.count ?? 0);
-            if (countWithinLibrary) setCopiesDraft(String(countRes.count ?? 0));
+            if (userId && ownerId === userId) setCopiesDraft(String(countRes.count ?? 0));
           } else {
             let q = supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", ownerId).is("edition_id", null);
             if (countWithinLibrary) q = q.eq("library_id", countWithinLibrary);
@@ -373,7 +378,7 @@ export default function BookDetailPage() {
             const countRes = await q;
             if ((countRes as any).error) throw new Error((countRes as any).error.message);
             setCopiesCount((countRes as any).count ?? 0);
-            if (countWithinLibrary) setCopiesDraft(String((countRes as any).count ?? 0));
+            if (userId && ownerId === userId) setCopiesDraft(String((countRes as any).count ?? 0));
           }
           setCopiesCountState({ busy: false, error: null });
         } catch (e: any) {
@@ -621,6 +626,27 @@ export default function BookDetailPage() {
     }
     await refresh();
     setSaveState({ busy: false, error: null, message: "Saved" });
+  }
+
+  function setAuthorsFromList(list: string[]) {
+    setFormAuthors(list.join(", "));
+  }
+
+  function removeAuthor(name: string) {
+    const target = name.trim().toLowerCase();
+    if (!target) return;
+    const next = (effectiveAuthors ?? []).filter((a) => a.trim().toLowerCase() !== target);
+    setAuthorsFromList(next);
+  }
+
+  function addAuthor() {
+    const name = normalizeAuthorName(newAuthor);
+    if (!name) return;
+    const existing = (effectiveAuthors ?? []).slice();
+    const key = name.toLowerCase();
+    if (!existing.some((a) => a.trim().toLowerCase() === key)) existing.push(name);
+    setAuthorsFromList(existing);
+    setNewAuthor("");
   }
 
   async function moveToLibrary(nextLibraryId: number) {
@@ -1201,55 +1227,6 @@ export default function BookDetailPage() {
             <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
           </div>
 
-          <div style={{ marginTop: 10 }} className="card">
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <div>Share public link</div>
-              <div className="muted">{isPubliclyVisible ? "public" : "not public"}</div>
-            </div>
-            {publicBookUrl ? (
-              <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
-                <a href={publicBookUrl} target="_blank" rel="noreferrer">
-                  {publicBookUrl}
-                </a>
-                <button onClick={copyPublicLink}>
-                  Copy
-                </button>
-              </div>
-            ) : (
-              <div className="muted" style={{ marginTop: 8 }}>
-                Loading…
-              </div>
-            )}
-            {!isPubliclyVisible ? (
-              <div className="muted" style={{ marginTop: 8 }}>
-                To make this link work for anyone, set Visibility to <span>public</span> (in Your fields) and save.
-              </div>
-            ) : null}
-            {shareState.message ? (
-              <div className="muted" style={{ marginTop: 6 }}>
-                {shareState.error ? `${shareState.message} (${shareState.error})` : shareState.message}
-              </div>
-            ) : null}
-          </div>
-
-          {mergeSource && book?.owner_id === userId ? (
-            <div style={{ marginTop: 10 }} className="card">
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <div>Merge from community</div>
-                <div className="muted">{mergeSource.owner_username ? `@${mergeSource.owner_username}` : "available"}</div>
-              </div>
-              <div className="muted" style={{ marginTop: 8 }}>
-                If another user has added a cover, images, or filled-in metadata for this same edition, you can copy it into your copy (fills missing fields only).
-              </div>
-              <div className="row" style={{ marginTop: 10 }}>
-                <button onClick={mergeFromSource} disabled={mergeState.busy}>
-                  {mergeState.busy ? "Merging…" : "Merge missing fields + images"}
-                </button>
-                <div className="muted">{mergeState.message ? (mergeState.error ? `${mergeState.message} (${mergeState.error})` : mergeState.message) : ""}</div>
-              </div>
-            </div>
-          ) : null}
-
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "220px 1fr", gap: 14 }}>
             <div>
               {coverUrl ? (
@@ -1414,7 +1391,7 @@ export default function BookDetailPage() {
                 </>
               ) : null}
 
-              {isOwner ? (
+              {false && isOwner ? (
                 <details style={{ marginTop: 14 }}>
                   <summary className="muted">Lookup &amp; import</summary>
                   <div style={{ marginTop: 10 }} className="card">
@@ -1567,98 +1544,102 @@ export default function BookDetailPage() {
                     {importState.message ? (importState.error ? `${importState.message} (${importState.error})` : importState.message) : ""}
                   </span>
                 </div>
-                {importPreview ? (
-                  <div style={{ marginTop: 10 }} className="card">
-                    <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                      <div style={{ width: 62, flex: "0 0 auto" }}>
-                        {importPreview.cover_url ? (
-                          <img
-                            src={importPreview.cover_url}
-                            alt=""
-                            width={60}
-                            height={90}
-                            style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
-                          />
-                        ) : (
-                          <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
-                        )}
-                      </div>
-                      <div style={{ flex: "1 1 auto" }}>
-                        <div>{(importPreview.title ?? "").trim() || "—"}</div>
-                        <div className="muted" style={{ marginTop: 4 }}>
-                          {(importPreview.authors ?? []).filter(Boolean).join(", ") || "—"}
-                        </div>
-                        <div className="muted" style={{ marginTop: 4 }}>
-                          {[importPreview.publisher ?? "", importPreview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
-                        </div>
-                        <div className="muted" style={{ marginTop: 4 }}>
-                          {importPreview.isbn13 || importPreview.isbn10 ? `ISBN: ${importPreview.isbn13 ?? importPreview.isbn10}` : "No ISBN found"}
-                          {" "}
-                          · sources: {(importPreview.sources ?? []).join(", ") || "—"}
-                        </div>
-                        <div className="muted" style={{ marginTop: 4 }}>
-                          {importMeta.domain ? `${importMeta.domain_kind ?? "generic"} · ${importMeta.domain}` : ""}
-                          {importMeta.final_url ? (
-                            <>
-                              {" "}
-                              ·{" "}
-                              <a href={importMeta.final_url} target="_blank" rel="noreferrer">
-                                open page
-                              </a>
-                            </>
+                {importPreview
+                  ? (() => {
+                      const preview = importPreview as ImportPreview;
+                      const previewCoverUrl = preview.cover_url ?? undefined;
+                      const previewFinalUrl = importMeta.final_url ?? undefined;
+                      return (
+                        <div style={{ marginTop: 10 }} className="card">
+                          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                            <div style={{ width: 62, flex: "0 0 auto" }}>
+                              {previewCoverUrl ? (
+                                <img
+                                  src={previewCoverUrl}
+                                  alt=""
+                                  width={60}
+                                  height={90}
+                                  style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
+                                />
+                              ) : (
+                                <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
+                              )}
+                            </div>
+                            <div style={{ flex: "1 1 auto" }}>
+                              <div>{(preview.title ?? "").trim() || "—"}</div>
+                              <div className="muted" style={{ marginTop: 4 }}>
+                                {(preview.authors ?? []).filter(Boolean).join(", ") || "—"}
+                              </div>
+                              <div className="muted" style={{ marginTop: 4 }}>
+                                {[preview.publisher ?? "", preview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
+                              </div>
+                              <div className="muted" style={{ marginTop: 4 }}>
+                                {preview.isbn13 || preview.isbn10 ? `ISBN: ${preview.isbn13 ?? preview.isbn10}` : "No ISBN found"} · sources:{" "}
+                                {(preview.sources ?? []).join(", ") || "—"}
+                              </div>
+                              <div className="muted" style={{ marginTop: 4 }}>
+                                {importMeta.domain ? `${importMeta.domain_kind ?? "generic"} · ${importMeta.domain}` : ""}
+                                {previewFinalUrl ? (
+                                  <>
+                                    {" "}
+                                    ·{" "}
+                                    <a href={previewFinalUrl} target="_blank" rel="noreferrer">
+                                      open page
+                                    </a>
+                                  </>
+                                ) : null}
+                                {previewCoverUrl ? (
+                                  <>
+                                    {" "}
+                                    ·{" "}
+                                    <a href={previewCoverUrl} target="_blank" rel="noreferrer">
+                                      open cover
+                                    </a>
+                                  </>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div style={{ flex: "0 0 auto" }}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                                {importPreviewHasIsbn ? (
+                                  <button onClick={() => linkEditionByIsbn(importPreviewIsbn)} disabled={linkState.busy || !importPreviewIsbn}>
+                                    Link ISBN
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      if (preview.title) setFormTitle(preview.title);
+                                      setFormAuthors((preview.authors ?? []).filter(Boolean).join(", "));
+                                      if (preview.publisher) setFormPublisher(preview.publisher);
+                                      if (preview.publish_date) setFormPublishDate(preview.publish_date);
+                                      if (preview.description) setFormDescription(preview.description);
+                                      if (preview.cover_url) setSuggestedCoverUrl(preview.cover_url);
+                                      setImportState((s) => ({ ...s, message: "Filled fields (not saved)" }));
+                                    }}
+                                    disabled={
+                                      !preview.title &&
+                                      (!preview.authors || preview.authors.length === 0) &&
+                                      !preview.publisher &&
+                                      !preview.publish_date &&
+                                      !preview.description
+                                    }
+                                  >
+                                    Fill fields
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {preview.subjects && preview.subjects.length > 0 ? (
+                            <div className="muted" style={{ marginTop: 10 }}>
+                              Subjects found: {preview.subjects.slice(0, 12).join(", ")}
+                              {preview.subjects.length > 12 ? "…" : ""} (you can add them below)
+                            </div>
                           ) : null}
-                          {importPreview.cover_url ? (
-                            <>
-                              {" "}
-                              ·{" "}
-                              <a href={importPreview.cover_url} target="_blank" rel="noreferrer">
-                                open cover
-                              </a>
-                            </>
-                          ) : null}
                         </div>
-                      </div>
-                      <div style={{ flex: "0 0 auto" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                          {importPreviewHasIsbn ? (
-                            <button onClick={() => linkEditionByIsbn(importPreviewIsbn)} disabled={linkState.busy || !importPreviewIsbn}>
-                              Link ISBN
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                if (importPreview.title) setFormTitle(importPreview.title);
-                                setFormAuthors((importPreview.authors ?? []).filter(Boolean).join(", "));
-                                if (importPreview.publisher) setFormPublisher(importPreview.publisher);
-                                if (importPreview.publish_date) setFormPublishDate(importPreview.publish_date);
-                                if (importPreview.description) setFormDescription(importPreview.description);
-                                if (importPreview.cover_url) setSuggestedCoverUrl(importPreview.cover_url);
-                                setImportState((s) => ({ ...s, message: "Filled fields (not saved)" }));
-                              }}
-                              disabled={
-                                !importPreview.title &&
-                                (!importPreview.authors || importPreview.authors.length === 0) &&
-                                !importPreview.publisher &&
-                                !importPreview.publish_date &&
-                                !importPreview.description
-                              }
-                            >
-                              Fill fields
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {importPreview.subjects && importPreview.subjects.length > 0 ? (
-                      <div className="muted" style={{ marginTop: 10 }}>
-                        Subjects found: {importPreview.subjects.slice(0, 12).join(", ")}
-                        {importPreview.subjects.length > 12 ? "…" : ""}
-                        {" "}
-                        (you can add them below)
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
+                      );
+                    })()
+                  : null}
               </div>
                 </details>
               ) : null}
@@ -1666,127 +1647,9 @@ export default function BookDetailPage() {
               {isOwner ? (
                 <>
                   <div style={{ marginTop: 16 }} className="muted">
-                    Details
+                    Metadata
                   </div>
                   <div style={{ marginTop: 8 }}>
-                <div className="row">
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Visibility
-                  </div>
-                  <select value={formVisibility} onChange={(e) => setFormVisibility(e.target.value as any)}>
-                    <option value="inherit">inherit</option>
-                    <option value="followers_only">followers_only</option>
-                    <option value="public">public</option>
-                  </select>
-                  <div className="muted">Per-book override.</div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Status
-                  </div>
-                  <select value={formStatus} onChange={(e) => setFormStatus(e.target.value as any)}>
-                    <option value="owned">owned</option>
-                    <option value="loaned">loaned</option>
-                    <option value="selling">selling</option>
-                    <option value="trading">trading</option>
-                  </select>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Borrowable
-                  </div>
-                  <select
-                    value={formBorrowable}
-                    onChange={(e) => setFormBorrowable(e.target.value as any)}
-                    disabled={!book || book.owner_id !== userId}
-                  >
-                    <option value="inherit">inherit</option>
-                    <option value="yes">yes</option>
-                    <option value="no">no</option>
-                  </select>
-                  <div className="muted">
-                    Default: {ownerBorrowDefaults ? (ownerBorrowDefaults.borrowable_default ? "yes" : "no") : "…"}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Requests
-                  </div>
-                  <select
-                    value={formBorrowScope}
-                    onChange={(e) => setFormBorrowScope(e.target.value as any)}
-                    disabled={!book || book.owner_id !== userId}
-                  >
-                    <option value="inherit">inherit</option>
-                    <option value="approved_followers">approved_followers</option>
-                    <option value="anyone">anyone</option>
-                  </select>
-                  <div className="muted">
-                    Default: {ownerBorrowDefaults ? ownerBorrowDefaults.borrow_request_scope : "…"}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Catalog
-                  </div>
-                  {book?.owner_id === userId ? (
-                    libraries.length > 1 ? (
-                      <select
-                        value={formLibraryId ?? ""}
-                        onChange={(e) => moveToLibrary(Number(e.target.value))}
-                        disabled={libraryMoveState.busy || !formLibraryId}
-                      >
-                        {libraries.map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div>{libraries[0]?.name ?? "Your catalog"}</div>
-                    )
-                  ) : (
-                    <div className="muted">—</div>
-                  )}
-                  <div className="muted">
-                    {libraryMoveState.message ? (libraryMoveState.error ? `${libraryMoveState.message} (${libraryMoveState.error})` : libraryMoveState.message) : ""}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    {copiesLabel}
-                  </div>
-                  {book?.owner_id === userId ? (
-                    <div className="row" style={{ gap: 8 }}>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={copiesDraft}
-                        onChange={(e) => setCopiesDraft(e.target.value)}
-                        onKeyDown={(e) => onEnter(e, updateCopies)}
-                        style={{ width: 90 }}
-                      />
-                      <button onClick={updateCopies} disabled={copiesUpdateState.busy || !copiesDraft.trim()}>
-                        {copiesUpdateState.busy ? "Updating…" : "Update"}
-                      </button>
-                      <span className="muted">
-                        {copiesCountState.busy ? "…" : copiesCountState.error ? copiesCountState.error : `${copiesCount ?? "—"} current`}
-                      </span>
-                      <span className="muted">
-                        {copiesUpdateState.message ? (copiesUpdateState.error ? `${copiesUpdateState.message} (${copiesUpdateState.error})` : copiesUpdateState.message) : ""}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="muted">{copiesCountState.busy ? "…" : copiesCountState.error ? copiesCountState.error : copiesCount ?? "—"}</div>
-                  )}
-                </div>
-
                 <div className="row" style={{ marginTop: 6 }}>
                   <div style={{ minWidth: 110 }} className="muted">
                     ISBN
@@ -1801,17 +1664,47 @@ export default function BookDetailPage() {
                   <input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} style={{ width: 360 }} />
                 </div>
 
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Authors
+                <div style={{ marginTop: 8 }}>
+                  <div className="muted">Authors</div>
+                  <div style={{ marginTop: 6 }}>
+                    {effectiveAuthors.length > 0 ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {effectiveAuthors.map((a) => (
+                          <span
+                            key={a}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              border: "1px solid var(--border)",
+                              padding: "2px 6px"
+                            }}
+                          >
+                            <Link href={`/app?author=${encodeURIComponent(a)}`} style={{ textDecoration: "none" }}>
+                              {a}
+                            </Link>
+                            <button onClick={() => removeAuthor(a)} aria-label={`Remove author ${a}`}>
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="muted">—</div>
+                    )}
                   </div>
-                  <input
-                    value={formAuthors}
-                    onChange={(e) => setFormAuthors(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, saveEdits)}
-                    placeholder="Comma-separated"
-                    style={{ width: 360 }}
-                  />
+                  <div className="row" style={{ marginTop: 8 }}>
+                    <input
+                      value={newAuthor}
+                      onChange={(e) => setNewAuthor(e.target.value)}
+                      onKeyDown={(e) => onEnter(e, addAuthor)}
+                      placeholder="Add an author"
+                      style={{ width: 220 }}
+                    />
+                    <button onClick={addAuthor} disabled={!newAuthor.trim()}>
+                      Add
+                    </button>
+                  </div>
                 </div>
 
                 <div className="row" style={{ marginTop: 6 }}>
@@ -1835,37 +1728,82 @@ export default function BookDetailPage() {
                   <div className="muted">Description</div>
                   <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} rows={4} style={{ width: "100%", marginTop: 6 }} />
                 </div>
+              </div>
+
+              {mergeSource && book?.owner_id === userId ? (
+                <div style={{ marginTop: 16 }} className="card">
+                  <div className="row" style={{ justifyContent: "space-between" }}>
+                    <div>Merge from community</div>
+                    <div className="muted">{mergeSource.owner_username ? `@${mergeSource.owner_username}` : "available"}</div>
+                  </div>
+                  <div className="muted" style={{ marginTop: 8 }}>
+                    Copy missing metadata + images from another visible copy of this same edition.
+                  </div>
+                  <div className="row" style={{ marginTop: 10 }}>
+                    <button onClick={mergeFromSource} disabled={mergeState.busy}>
+                      {mergeState.busy ? "Merging…" : "Merge"}
+                    </button>
+                    <div className="muted">{mergeState.message ? (mergeState.error ? `${mergeState.message} (${mergeState.error})` : mergeState.message) : ""}</div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div style={{ marginTop: 16 }} className="muted">
+                Book info
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <div className="row">
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Catalog
+                  </div>
+                  <select
+                    value={formLibraryId ?? ""}
+                    onChange={(e) => moveToLibrary(Number(e.target.value))}
+                    disabled={libraryMoveState.busy || libraries.length === 0}
+                    style={{ width: 220 }}
+                  >
+                    <option value="" disabled>
+                      —
+                    </option>
+                    {libraries.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="muted" style={{ marginLeft: 10 }}>
+                    {libraryMoveState.message ? (libraryMoveState.error ? `${libraryMoveState.message} (${libraryMoveState.error})` : libraryMoveState.message) : ""}
+                  </div>
+                </div>
 
                 <div className="row" style={{ marginTop: 6 }}>
                   <div style={{ minWidth: 110 }} className="muted">
-                    Location
+                    {copiesLabel}
                   </div>
                   <input
-                    value={formLocation}
-                    onChange={(e) => setFormLocation(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, saveEdits)}
-                    placeholder="Home, Studio…"
-                    style={{ width: 360 }}
+                    type="number"
+                    min={1}
+                    value={copiesDraft || ""}
+                    onChange={(e) => setCopiesDraft(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, updateCopies)}
+                    style={{ width: 90 }}
                   />
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Shelf
-                  </div>
-                  <input value={formShelf} onChange={(e) => setFormShelf(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} placeholder="Shelf #" style={{ width: 360 }} />
-                </div>
-
-                <div style={{ marginTop: 8 }}>
-                  <div className="muted">Notes</div>
-                  <textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} rows={4} style={{ width: "100%", marginTop: 6 }} />
-                </div>
-
-                <div className="row" style={{ marginTop: 10 }}>
-                  <button onClick={saveEdits} disabled={saveState.busy || !book || book.owner_id !== userId}>
-                    {saveState.busy ? "Saving…" : "Save"}
+                  <button onClick={updateCopies} disabled={copiesUpdateState.busy || copiesCountState.busy || !copiesDraft.trim()}>
+                    {copiesUpdateState.busy ? "Updating…" : "Update"}
                   </button>
-                  <div className="muted">{saveState.message ? (saveState.error ? `${saveState.message} (${saveState.error})` : saveState.message) : ""}</div>
+                  <div className="muted" style={{ marginLeft: 10 }}>
+                    {copiesUpdateState.message
+                      ? copiesUpdateState.error
+                        ? `${copiesUpdateState.message} (${copiesUpdateState.error})`
+                        : copiesUpdateState.message
+                      : copiesCountState.error
+                        ? copiesCountState.error
+                        : copiesCountState.busy
+                          ? "…"
+                          : copiesCount !== null
+                            ? `${copiesCount}`
+                            : ""}
+                  </div>
                 </div>
               </div>
 
@@ -2013,6 +1951,123 @@ export default function BookDetailPage() {
               </div>
 
               <div style={{ marginTop: 16 }} className="muted">
+                Privacy &amp; lending
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <div className="row">
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Visibility
+                  </div>
+                  <select value={formVisibility} onChange={(e) => setFormVisibility(e.target.value as any)} style={{ width: 220 }}>
+                    <option value="inherit">inherit</option>
+                    <option value="followers_only">followers_only</option>
+                    <option value="public">public</option>
+                  </select>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Status
+                  </div>
+                  <select value={formStatus} onChange={(e) => setFormStatus(e.target.value as any)} style={{ width: 220 }}>
+                    <option value="owned">owned</option>
+                    <option value="loaned">loaned</option>
+                    <option value="selling">selling</option>
+                    <option value="trading">trading</option>
+                  </select>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Borrowable
+                  </div>
+                  <select value={formBorrowable} onChange={(e) => setFormBorrowable(e.target.value as any)} style={{ width: 220 }}>
+                    <option value="inherit">inherit</option>
+                    <option value="yes">yes</option>
+                    <option value="no">no</option>
+                  </select>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Requests
+                  </div>
+                  <select value={formBorrowScope} onChange={(e) => setFormBorrowScope(e.target.value as any)} style={{ width: 220 }}>
+                    <option value="inherit">inherit</option>
+                    <option value="anyone">anyone</option>
+                    <option value="approved_followers">approved_followers</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 10 }} className="card">
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div>Share public link</div>
+                  <div className="muted">
+                    {formVisibility === "public" || (formVisibility === "inherit" && ownerProfile?.visibility === "public") ? "public" : "not public"}
+                  </div>
+                </div>
+                {publicBookUrl ? (
+                  <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
+                    <a href={publicBookUrl} target="_blank" rel="noreferrer">
+                      {publicBookUrl}
+                    </a>
+                    <button onClick={copyPublicLink}>Copy</button>
+                  </div>
+                ) : (
+                  <div className="muted" style={{ marginTop: 8 }}>
+                    Loading…
+                  </div>
+                )}
+                {formVisibility !== "public" && !(formVisibility === "inherit" && ownerProfile?.visibility === "public") ? (
+                  <div className="muted" style={{ marginTop: 8 }}>
+                    Set Visibility to <span>public</span>, then save.
+                  </div>
+                ) : null}
+                {shareState.message ? (
+                  <div className="muted" style={{ marginTop: 6 }}>
+                    {shareState.error ? `${shareState.message} (${shareState.error})` : shareState.message}
+                  </div>
+                ) : null}
+              </div>
+
+              <div style={{ marginTop: 16 }} className="muted">
+                Location
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <div className="row">
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Location
+                  </div>
+                  <input
+                    value={formLocation}
+                    onChange={(e) => setFormLocation(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, saveEdits)}
+                    placeholder="Home, Studio…"
+                    style={{ width: 360 }}
+                  />
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Shelf
+                  </div>
+                  <input
+                    value={formShelf}
+                    onChange={(e) => setFormShelf(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, saveEdits)}
+                    placeholder="Shelf #"
+                    style={{ width: 360 }}
+                  />
+                </div>
+
+                <div style={{ marginTop: 8 }}>
+                  <div className="muted">Notes</div>
+                  <textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} rows={4} style={{ width: "100%", marginTop: 6 }} />
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16 }} className="muted">
                 Images
               </div>
               <div style={{ marginTop: 8 }}>
@@ -2078,6 +2133,13 @@ export default function BookDetailPage() {
                     No images yet.
                   </div>
                 )}
+              </div>
+
+              <div className="row" style={{ marginTop: 10 }}>
+                <button onClick={saveEdits} disabled={saveState.busy || !book || book.owner_id !== userId}>
+                  {saveState.busy ? "Saving…" : "Save"}
+                </button>
+                <div className="muted">{saveState.message ? (saveState.error ? `${saveState.message} (${saveState.error})` : saveState.message) : ""}</div>
               </div>
                 </>
               ) : null}

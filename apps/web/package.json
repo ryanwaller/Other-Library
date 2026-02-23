@@ -7,7 +7,7 @@
     "dev:turbo": "next dev --turbo",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json --noEmit --incremental false"
   },
   "dependencies": {
     "@om/shared": "0.0.0",
