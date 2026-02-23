@@ -14,6 +14,20 @@ function parseViewingUsername(pathname: string): string | null {
   return username ? username : null;
 }
 
+function parsePublicBookId(pathname: string): number | null {
+  const p = (pathname ?? "").trim();
+  if (!p.startsWith("/u/")) return null;
+  const parts = p.split("/").filter(Boolean);
+  // ["u", "<username>", "b", "<idSlug>", ...]
+  const bIdx = parts.findIndex((x) => x === "b");
+  if (bIdx < 0) return null;
+  const idSlug = parts[bIdx + 1] ?? "";
+  const m = String(idSlug).match(/^(\d+)/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export default function GlobalNav() {
   const pathname = usePathname();
   const viewingUsername = useMemo(() => parseViewingUsername(pathname), [pathname]);
@@ -107,18 +121,21 @@ export default function GlobalNav() {
         setPendingBorrowRequests(0);
         return;
       }
-      const res = await supabase
-        .from("borrow_requests")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", sessionUserId)
-        .eq("kind", "borrow")
-        .eq("status", "pending");
+      const res = await supabase.rpc("unread_incoming_borrow_requests_count");
       if (!alive) return;
       if (res.error) {
-        setPendingBorrowRequests(0);
+        // Fallback to "all pending" if the unread RPC isn't installed yet.
+        const fb = await supabase
+          .from("borrow_requests")
+          .select("id", { count: "exact", head: true })
+          .eq("owner_id", sessionUserId)
+          .eq("kind", "borrow")
+          .eq("status", "pending");
+        if (!alive) return;
+        setPendingBorrowRequests(fb.error ? 0 : (fb.count ?? 0));
         return;
       }
-      setPendingBorrowRequests(res.count ?? 0);
+      setPendingBorrowRequests((res.data as any) ?? 0);
     }
 
     refreshPendingBorrow();
@@ -172,6 +189,16 @@ export default function GlobalNav() {
     return `Signed in as ${me.username}. Viewing ${viewingUsername}.`;
   }, [me?.username, viewingUsername]);
 
+  const editInAppHref = useMemo(() => {
+    if (!me?.username) return null;
+    const viewing = (viewingUsername ?? "").trim().toLowerCase();
+    const meUser = me.username.trim().toLowerCase();
+    if (!viewing || viewing !== meUser) return null;
+    const publicBookId = parsePublicBookId(pathname ?? "");
+    if (publicBookId) return `/app/books/${publicBookId}`;
+    return "/app";
+  }, [me?.username, viewingUsername, pathname]);
+
   if (!supabase) return null;
   if (!sessionUserId) return null;
 
@@ -202,6 +229,11 @@ export default function GlobalNav() {
             <Link href="/app">App home</Link>
             <Link href="/app/settings">Settings</Link>
             {me?.username ? <Link href={`/u/${me.username}`}>My public page</Link> : null}
+            {editInAppHref ? (
+              <Link href={editInAppHref} style={{ fontWeight: 600 }} aria-label="Edit this page in the app">
+                Edit in app
+              </Link>
+            ) : null}
             {pendingBorrowRequests > 0 ? (
               <Link href="/app/messages" aria-label={`${pendingBorrowRequests} pending borrow requests`} style={{ textDecoration: "none" }}>
                 <span

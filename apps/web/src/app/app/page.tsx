@@ -117,6 +117,7 @@ function AppShell({
   const [gridCols, setGridCols] = useState<2 | 4 | 8>(4);
   const [sortMode, setSortMode] = useState<"latest" | "earliest" | "title_asc" | "title_desc">("latest");
   const [categoryMode, setCategoryMode] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [deleteStateByBookId, setDeleteStateByBookId] = useState<Record<number, { busy: boolean; error: string | null; message: string | null } | undefined>>(
     {}
   );
@@ -669,6 +670,7 @@ function AppShell({
     const publisher = (filterPublisher ?? "").trim().toLowerCase();
     const activeCategoryMode = (filterCategory ?? categoryMode) || "all";
     const categoryTag = (activeCategoryMode === "all" ? "" : String(activeCategoryMode)).trim().toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
 
     const byKey = new Map<string, CatalogItem[]>();
     for (const it of filteredItems) {
@@ -744,6 +746,25 @@ function AppShell({
     if (categoryTag) {
       groups = groups.filter((g) => g.categoryNames.some((t) => t.toLowerCase() === categoryTag));
     }
+    if (q) {
+      groups = groups.filter((g) => {
+        const e = g.primary.edition;
+        const title = (g.title ?? "").toLowerCase();
+        const authors = (g.filterAuthors ?? []).join(" ").toLowerCase();
+        const subjects = (g.filterSubjects ?? []).join(" ").toLowerCase();
+        const publishers = (g.filterPublishers ?? []).join(" ").toLowerCase();
+        const tags = (g.tagNames ?? []).join(" ").toLowerCase();
+        const isbn = String(e?.isbn13 ?? "").toLowerCase();
+        return (
+          title.includes(q) ||
+          authors.includes(q) ||
+          subjects.includes(q) ||
+          publishers.includes(q) ||
+          tags.includes(q) ||
+          (q.length >= 6 && isbn.includes(q))
+        );
+      });
+    }
 
     const titleKey = (g: CatalogGroup) => normalizeKeyPart(g.title);
     groups.sort((a, b) => {
@@ -754,7 +775,7 @@ function AppShell({
     });
 
     return groups;
-  }, [filteredItems, filterTag, filterAuthor, filterSubject, filterPublisher, filterCategory, categoryMode, sortMode]);
+  }, [filteredItems, filterTag, filterAuthor, filterSubject, filterPublisher, filterCategory, categoryMode, sortMode, searchQuery]);
 
   const displayCopiesCount = useMemo(() => displayGroups.reduce((sum, g) => sum + g.copiesCount, 0), [displayGroups]);
 
@@ -1269,6 +1290,23 @@ function AppShell({
               Selected: {bulkSelectedCount}
             </span>
           ) : null}
+        </div>
+        <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+          <span className="muted">Search</span>
+          <input
+            placeholder="Search your catalog…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ minWidth: 260 }}
+          />
+          {searchQuery.trim() ? (
+            <button onClick={() => setSearchQuery("")} aria-label="Clear search">
+              Clear
+            </button>
+          ) : null}
+          <span className="muted">
+            <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}>Search friends / public</Link>
+          </span>
         </div>
         <BulkBar
           bulkMode={bulkMode}

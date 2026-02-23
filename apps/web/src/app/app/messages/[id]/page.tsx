@@ -54,6 +54,7 @@ export default function MessageThreadPage() {
   const [draft, setDraft] = useState("");
   const [sendState, setSendState] = useState<{ busy: boolean; error: string | null; message: string | null }>({ busy: false, error: null, message: null });
   const [statusState, setStatusState] = useState<{ busy: boolean; error: string | null; message: string | null }>({ busy: false, error: null, message: null });
+  const [markedReadForId, setMarkedReadForId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -99,6 +100,17 @@ export default function MessageThreadPage() {
         return;
       }
       setReq(next);
+
+      // Mark read (so the red badge clears immediately).
+      if (markedReadForId !== next.id) {
+        try {
+          await supabase.rpc("mark_borrow_request_read", { input_borrow_request_id: next.id });
+          setMarkedReadForId(next.id);
+          window.dispatchEvent(new Event("om:borrow-requests-changed"));
+        } catch {
+          // ignore
+        }
+      }
 
       const ids = Array.from(new Set([next.owner_id, next.requester_id].filter(Boolean)));
       if (ids.length > 0) {

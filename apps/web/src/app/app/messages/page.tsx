@@ -40,6 +40,7 @@ export default function MessagesPage() {
   const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<string, string>>({});
   const [booksById, setBooksById] = useState<Record<number, BookLite>>({});
   const [lastMsgByRequestId, setLastMsgByRequestId] = useState<Record<number, MsgLite | null>>({});
+  const [readAtByRequestId, setReadAtByRequestId] = useState<Record<number, string | null>>({});
 
   useEffect(() => {
     if (!supabase) return;
@@ -109,6 +110,23 @@ export default function MessagesPage() {
       }
 
       if (requestIds.length > 0) {
+        const rr = await supabase
+          .from("borrow_request_reads")
+          .select("borrow_request_id,last_read_at")
+          .eq("user_id", userId)
+          .in("borrow_request_id", requestIds);
+        if (rr.error) {
+          setReadAtByRequestId({});
+        } else {
+          const map: Record<number, string | null> = {};
+          for (const row of (rr.data as any[]) ?? []) {
+            const id = Number((row as any).borrow_request_id);
+            if (!Number.isFinite(id)) continue;
+            map[id] = ((row as any).last_read_at as string) ?? null;
+          }
+          setReadAtByRequestId(map);
+        }
+
         const mr = await supabase
           .from("borrow_request_messages")
           .select("id,borrow_request_id,sender_id,message,created_at")
@@ -129,6 +147,7 @@ export default function MessagesPage() {
         }
       } else {
         setLastMsgByRequestId({});
+        setReadAtByRequestId({});
       }
     } catch (e: any) {
       setError(e?.message ?? "Failed to load messages");
@@ -199,6 +218,8 @@ export default function MessagesPage() {
                 const title = (book?.title_override ?? "").trim() || book?.edition?.title || "(untitled)";
                 const lastMsg = lastMsgByRequestId[r.id] ?? null;
                 const preview = (lastMsg?.message ?? r.message ?? "").trim();
+                const lastReadAt = readAtByRequestId[r.id] ?? null;
+                const isUnread = !lastReadAt || (r.updated_at && r.updated_at > lastReadAt);
 
                 return (
                   <div key={r.id} className="card" style={{ marginTop: 10 }}>
@@ -221,7 +242,11 @@ export default function MessagesPage() {
                           {other?.username ? <Link href={`/u/${other.username}`}>{other.username}</Link> : <span className="muted">{otherId}</span>}
                         </div>
                       </div>
-                      <div className="muted">{r.status}</div>
+                      <div className="muted">
+                        {isUnread ? <span style={{ color: "#b00020" }}>new</span> : null}
+                        {isUnread ? <span> · </span> : null}
+                        {r.status}
+                      </div>
                     </div>
 
                     <div style={{ marginTop: 8 }}>
