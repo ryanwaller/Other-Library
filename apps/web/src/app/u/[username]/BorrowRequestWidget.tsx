@@ -54,6 +54,7 @@ export default function BorrowRequestWidget({
         .select("id,kind,status,message,created_at")
         .eq("user_book_id", userBookId)
         .eq("requester_id", sessionUserId)
+        .eq("kind", "borrow")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
