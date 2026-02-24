@@ -650,6 +650,14 @@ function AppShell({
     await searchAddResults(title, author);
   }
 
+  function cancelAddPreview() {
+    setAddUrlPreview(null);
+    setAddUrlMeta({ final_url: null, domain: null, domain_kind: null });
+    setAddSearchResults([]);
+    setAddSearchState({ busy: false, error: null, message: null });
+    setAddState({ busy: false, error: null, message: null });
+  }
+
   async function updateUserBookVisibility(userBookId: number, nextVisibility: "inherit" | "followers_only" | "public") {
     if (!supabase) return;
     const { error } = await supabase.from("user_books").update({ visibility: nextVisibility }).eq("id", userBookId);
@@ -1345,6 +1353,11 @@ function AppShell({
           <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
             {addState.busy ? "Working…" : "Go"}
           </button>
+          {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
+            <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
+              Cancel
+            </button>
+          ) : null}
           <span className="muted">{addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}</span>
         </div>
 
@@ -1392,41 +1405,45 @@ function AppShell({
                 </div>
               </div>
               <div style={{ flex: "0 0 auto" }}>
-                <button
-                  onClick={async () => {
-                    if (!addUrlPreview) return;
-                    setAddState({ busy: true, error: null, message: "Adding…" });
-                    try {
-                      const isbn = String(addUrlPreview.isbn13 ?? addUrlPreview.isbn10 ?? "").trim();
-                      let id: number;
-                      if (isbn) id = await addByIsbnValue(isbn);
-                      else
-                        id = await addManualValue({
-                          title: (addUrlPreview.title ?? "").trim() || addInput.trim(),
-                          authors: (addUrlPreview.authors ?? []).filter(Boolean),
-                          publisher: addUrlPreview.publisher ?? null,
-                          publish_date: addUrlPreview.publish_date ?? null,
-                          description: addUrlPreview.description ?? null
-                        });
+                <div className="row" style={{ gap: 8 }}>
+                  <button
+                    onClick={async () => {
+                      if (!addUrlPreview) return;
+                      setAddState({ busy: true, error: null, message: "Adding…" });
+                      try {
+                        const isbn = String(addUrlPreview.isbn13 ?? addUrlPreview.isbn10 ?? "").trim();
+                        let id: number;
+                        if (isbn) id = await addByIsbnValue(isbn);
+                        else
+                          id = await addManualValue({
+                            title: (addUrlPreview.title ?? "").trim() || addInput.trim(),
+                            authors: (addUrlPreview.authors ?? []).filter(Boolean),
+                            publisher: addUrlPreview.publisher ?? null,
+                            publish_date: addUrlPreview.publish_date ?? null,
+                            description: addUrlPreview.description ?? null
+                          });
 
-                      if (addUrlPreview.cover_url) {
-                        await importCoverForBook(id, addUrlPreview.cover_url);
-                        await refreshAllBooks();
+                        if (addUrlPreview.cover_url) {
+                          await importCoverForBook(id, addUrlPreview.cover_url);
+                          await refreshAllBooks();
+                        }
+
+                        setAddInput("");
+                        cancelAddPreview();
+                        setAddState({ busy: false, error: null, message: "Added" });
+                        window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
+                      } catch (e: any) {
+                        setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
                       }
-
-                      setAddInput("");
-                      setAddUrlPreview(null);
-                      setAddUrlMeta({ final_url: null, domain: null, domain_kind: null });
-                      setAddState({ busy: false, error: null, message: "Added" });
-                      window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
-                    } catch (e: any) {
-                      setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
-                    }
-                  }}
-                  disabled={addState.busy}
-                >
-                  Add
-                </button>
+                    }}
+                    disabled={addState.busy}
+                  >
+                    Add
+                  </button>
+                  <button onClick={cancelAddPreview} disabled={addState.busy}>
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>
