@@ -1008,22 +1008,6 @@ function AppShell({
   }
 
   useEffect(() => {
-    if (!tagMenu.open && !categoryMenu.open) return;
-    const onDocMouseDown = (e: MouseEvent) => {
-      const target = e.target as Node | null;
-      if (!target) return;
-      if (tagButtonRef.current && tagButtonRef.current.contains(target)) return;
-      if (categoryButtonRef.current && categoryButtonRef.current.contains(target)) return;
-      closeTagMenu();
-      closeCategoryMenu();
-    };
-    document.addEventListener("mousedown", onDocMouseDown);
-    return () => {
-      document.removeEventListener("mousedown", onDocMouseDown);
-    };
-  }, [tagMenu.open, categoryMenu.open]);
-
-  useEffect(() => {
     if (!tagMenu.open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeTagMenu();
