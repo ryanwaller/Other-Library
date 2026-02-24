@@ -1865,7 +1865,33 @@ function AppShell({
                     category: <span>{filterCategory ?? categoryMode}</span>
                   </>
                 ) : null}{" "}
-                (<Link href="/app">clear</Link>)
+                (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTagMode("all");
+                    setCategoryMode("all");
+                    setTagSearch("");
+                    setCategorySearch("");
+                    setSearchQuery("");
+                    setVisibilityMode("all");
+                    closeTagMenu();
+                    closeCategoryMenu();
+                    router.push("/app");
+                  }}
+                  style={{
+                    background: "transparent",
+                    border: 0,
+                    padding: 0,
+                    font: "inherit",
+                    color: "inherit",
+                    textDecoration: "underline",
+                    cursor: "pointer"
+                  }}
+                >
+                  clear
+                </button>
+                )
               </>
             ) : null}
           </div>
