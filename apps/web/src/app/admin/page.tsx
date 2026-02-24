@@ -196,17 +196,6 @@ export default function AdminPage() {
   }, [view]);
 
   useEffect(() => {
-    if (!token) return;
-    if (view === "users") {
-      refreshUsers();
-      refreshInvites();
-      return;
-    }
-    refreshWaitlist();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, view]);
-
-  useEffect(() => {
     if (!token || view !== "users") return;
     refreshUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -731,4 +720,3 @@ export default function AdminPage() {
     </main>
   );
 }
-
