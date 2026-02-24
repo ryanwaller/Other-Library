@@ -1658,7 +1658,8 @@ export default function BookDetailPage() {
                           width: "100%",
                           height: 260,
                           border: "1px solid var(--border)",
-                          background: "var(--bg)"
+                          background: "var(--bg)",
+                          filter: `brightness(${coverBrightness}) contrast(${coverContrast})`
                         }}
                       >
                         <Cropper
