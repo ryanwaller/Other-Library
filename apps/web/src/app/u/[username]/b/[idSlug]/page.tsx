@@ -338,30 +338,28 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           </div>
         </div>
 
-        <div style={{ marginTop: 14 }} className="muted">
-          Images
-        </div>
         {images.length > 0 ? (
-          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-            {images.map((m) => {
-              const url = signedMap[m.storage_path];
-              return (
-                <a key={m.id} href={url || "#"} target="_blank" rel="noreferrer" className="card">
-                  {url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img alt="" src={url} style={{ width: "100%", height: 120, objectFit: "cover", border: "1px solid var(--border)" }} />
-                  ) : (
-                    <div style={{ width: "100%", height: 120, border: "1px solid var(--border)" }} />
-                  )}
-                </a>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="muted" style={{ marginTop: 8 }}>
-            none
-          </div>
-        )}
+          <>
+            <div style={{ marginTop: 14 }} className="muted">
+              Images
+            </div>
+            <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+              {images.map((m) => {
+                const url = signedMap[m.storage_path];
+                return (
+                  <a key={m.id} href={url || "#"} target="_blank" rel="noreferrer" className="card">
+                    {url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img alt="" src={url} style={{ width: "100%", height: 120, objectFit: "cover", border: "1px solid var(--border)" }} />
+                    ) : (
+                      <div style={{ width: "100%", height: 120, border: "1px solid var(--border)" }} />
+                    )}
+                  </a>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
       </div>
 
       {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={book.id} excludeOwnerId={book.owner_id} /> : null}

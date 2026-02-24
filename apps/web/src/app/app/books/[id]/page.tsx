@@ -188,6 +188,7 @@ export default function BookDetailPage() {
 
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
+  const [editMode, setEditMode] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -328,6 +329,10 @@ export default function BookDetailPage() {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSession(newSession));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    setEditMode(false);
+  }, [bookId]);
 
   useEffect(() => {
     let alive = true;
@@ -1425,7 +1430,14 @@ export default function BookDetailPage() {
         <div className="card">
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             <div>{effectiveTitle}</div>
-            <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
+            <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              {isOwner ? (
+                <button onClick={() => setEditMode((v) => !v)} disabled={busy}>
+                  {editMode ? "Done" : "Edit"}
+                </button>
+              ) : null}
+              <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
+            </div>
           </div>
 
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "220px 1fr", gap: 14 }}>
@@ -1441,7 +1453,7 @@ export default function BookDetailPage() {
                 <div style={{ width: "100%", height: 280, border: "1px solid var(--border)" }} />
               )}
 
-              {isOwner ? (
+              {isOwner && editMode ? (
                 <div style={{ marginTop: 10 }}>
                   <div className="muted">Cover override</div>
                   <input
@@ -1514,7 +1526,7 @@ export default function BookDetailPage() {
             </div>
 
             <div>
-              {!isOwner ? (
+              {!isOwner || (isOwner && !editMode) ? (
                 <>
                   <div className="muted">Authors</div>
                   <div style={{ marginTop: 4 }}>
@@ -1622,7 +1634,7 @@ export default function BookDetailPage() {
                 </>
               ) : null}
 
-              {isOwner ? (
+              {isOwner && editMode ? (
                 <details style={{ marginTop: 14 }}>
                   <summary className="muted">Find more metadata</summary>
                   <div style={{ marginTop: 10 }} className="card">
@@ -1841,7 +1853,7 @@ export default function BookDetailPage() {
                 </details>
               ) : null}
 
-              {isOwner ? (
+              {isOwner && editMode ? (
                 <>
                   <div style={{ marginTop: 16 }} className="muted">
                     Metadata
