@@ -81,7 +81,12 @@ type MergeSource = {
   owner_username: string | null;
   title_override: string | null;
   authors_override: string[] | null;
+  editors_override: string[] | null;
+  designers_override: string[] | null;
   publisher_override: string | null;
+  printer_override: string | null;
+  materials_override: string | null;
+  edition_override: string | null;
   publish_date_override: string | null;
   description_override: string | null;
   subjects_override: string[] | null;
@@ -509,7 +514,7 @@ export default function BookDetailPage() {
             const cand = await supabase
               .from("user_books")
               .select(
-                "id,owner_id,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,media:user_book_media(kind,storage_path)"
+                "id,owner_id,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,media:user_book_media(kind,storage_path)"
               )
               .eq("edition_id", row.edition.id)
               .neq("id", row.id)
@@ -534,6 +539,18 @@ export default function BookDetailPage() {
                 if (missingAuthors && Array.isArray(r.authors_override) && r.authors_override.length > 0) score += 1;
                 if (missingTitle && r.title_override) score += 1;
 
+                const missingEditors = (!row.editors_override || row.editors_override.length === 0);
+                const missingDesigners = (!row.designers_override || row.designers_override.length === 0);
+                const missingPrinter = !row.printer_override;
+                const missingMaterials = !row.materials_override;
+                const missingEdition = !row.edition_override;
+
+                if (missingEditors && Array.isArray(r.editors_override) && r.editors_override.length > 0) score += 1;
+                if (missingDesigners && Array.isArray(r.designers_override) && r.designers_override.length > 0) score += 1;
+                if (missingPrinter && r.printer_override) score += 1;
+                if (missingMaterials && r.materials_override) score += 1;
+                if (missingEdition && r.edition_override) score += 1;
+
                 if (score > bestScore) {
                   bestScore = score;
                   best = r;
@@ -549,7 +566,12 @@ export default function BookDetailPage() {
                   owner_username,
                   title_override: best.title_override ?? null,
                   authors_override: (best.authors_override ?? null) as any,
+                  editors_override: (best.editors_override ?? null) as any,
+                  designers_override: (best.designers_override ?? null) as any,
                   publisher_override: best.publisher_override ?? null,
+                  printer_override: best.printer_override ?? null,
+                  materials_override: best.materials_override ?? null,
+                  edition_override: best.edition_override ?? null,
                   publish_date_override: best.publish_date_override ?? null,
                   description_override: best.description_override ?? null,
                   subjects_override: (best.subjects_override ?? null) as any,
@@ -1357,13 +1379,29 @@ export default function BookDetailPage() {
       const needsPublishDate = !book.publish_date_override && !book.edition?.publish_date;
       const needsDescription = !book.description_override && !book.edition?.description;
       const needsSubjects = (!book.subjects_override || book.subjects_override.length === 0) && (!book.edition?.subjects || book.edition.subjects.length === 0);
+      const needsEditors = !book.editors_override || book.editors_override.length === 0;
+      const needsDesigners = !book.designers_override || book.designers_override.length === 0;
+      const needsPrinter = !book.printer_override;
+      const needsMaterials = !book.materials_override;
+      const needsEditionOverride = !book.edition_override;
 
       if (needsTitle && mergeSource.title_override) updates.title_override = mergeSource.title_override;
-      if (needsAuthors && mergeSource.authors_override && mergeSource.authors_override.length > 0) updates.authors_override = mergeSource.authors_override;
+      if (needsAuthors && mergeSource.authors_override && mergeSource.authors_override.length > 0) {
+        const base = (book.edition?.authors ?? []).filter(Boolean);
+        updates.authors_override = uniqStrings([...base, ...mergeSource.authors_override]);
+      }
       if (needsPublisher && mergeSource.publisher_override) updates.publisher_override = mergeSource.publisher_override;
       if (needsPublishDate && mergeSource.publish_date_override) updates.publish_date_override = mergeSource.publish_date_override;
       if (needsDescription && mergeSource.description_override) updates.description_override = mergeSource.description_override;
-      if (needsSubjects && mergeSource.subjects_override && mergeSource.subjects_override.length > 0) updates.subjects_override = mergeSource.subjects_override;
+      if (needsSubjects && mergeSource.subjects_override && mergeSource.subjects_override.length > 0) {
+        const base = (book.edition?.subjects ?? []).filter(Boolean);
+        updates.subjects_override = uniqStrings([...base, ...mergeSource.subjects_override]);
+      }
+      if (needsEditors && mergeSource.editors_override && mergeSource.editors_override.length > 0) updates.editors_override = mergeSource.editors_override;
+      if (needsDesigners && mergeSource.designers_override && mergeSource.designers_override.length > 0) updates.designers_override = mergeSource.designers_override;
+      if (needsPrinter && mergeSource.printer_override) updates.printer_override = mergeSource.printer_override;
+      if (needsMaterials && mergeSource.materials_override) updates.materials_override = mergeSource.materials_override;
+      if (needsEditionOverride && mergeSource.edition_override) updates.edition_override = mergeSource.edition_override;
 
       if (Object.keys(updates).length > 0) {
         const upd = await supabase.from("user_books").update(updates).eq("id", book.id);
