@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
@@ -30,6 +30,7 @@ function parsePublicBookId(pathname: string): number | null {
 
 export default function GlobalNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const viewingUsername = useMemo(() => parseViewingUsername(pathname), [pathname]);
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
@@ -42,6 +43,15 @@ export default function GlobalNav() {
   const [followersCount, setFollowersCount] = useState<number>(0);
   const [followingCount, setFollowingCount] = useState<number>(0);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+
+  async function signOut() {
+    try {
+      await supabase?.auth.signOut();
+    } finally {
+      router.push("/");
+      router.refresh();
+    }
+  }
 
   useEffect(() => {
     if (!supabase) return;
@@ -315,7 +325,7 @@ export default function GlobalNav() {
 
             {isAdmin ? <Link href="/admin">Admin</Link> : null}
             <Link href="/app/settings">Settings</Link>
-            <button onClick={() => supabase?.auth.signOut()}>Sign out</button>
+            <button onClick={signOut}>Sign out</button>
           </div>
         </div>
       </div>

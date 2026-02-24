@@ -38,10 +38,8 @@ export default function SignInCard({
       setError(err.message);
       return;
     }
-    if (redirectTo) {
-      router.push(redirectTo);
-      router.refresh();
-    }
+    router.push(redirectTo ?? "/app");
+    router.refresh();
   }
 
   async function onSubmit(e: FormEvent) {

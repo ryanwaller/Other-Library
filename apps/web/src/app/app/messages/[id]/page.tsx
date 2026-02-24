@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
@@ -46,6 +46,7 @@ function parseSystemMessage(raw: string): { status: "approved" | "rejected"; tex
 }
 
 export default function MessageThreadPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const requestId = Number(params?.id);
 
@@ -276,7 +277,18 @@ export default function MessageThreadPage() {
           <button onClick={refresh} disabled={busy}>
             Refresh
           </button>
-          <button onClick={() => supabase?.auth.signOut()}>Sign out</button>
+          <button
+            onClick={async () => {
+              try {
+                await supabase?.auth.signOut();
+              } finally {
+                router.push("/");
+                router.refresh();
+              }
+            }}
+          >
+            Sign out
+          </button>
         </div>
       </div>
 
