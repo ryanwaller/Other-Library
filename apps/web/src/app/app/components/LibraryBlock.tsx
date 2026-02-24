@@ -15,6 +15,7 @@ export default function LibraryBlock({
   onNameDraftChange,
   onSaveName,
   onCancelEdit,
+  onDelete,
   onMoveUp,
   onMoveDown,
   children
@@ -31,6 +32,7 @@ export default function LibraryBlock({
   onNameDraftChange: (next: string) => void;
   onSaveName: (libraryId: number, nameDraft: string) => void;
   onCancelEdit: () => void;
+  onDelete: (libraryId: number) => void;
   onMoveUp: (libraryId: number) => void;
   onMoveDown: (libraryId: number) => void;
   children: ReactNode;
@@ -62,6 +64,9 @@ export default function LibraryBlock({
               </button>
               <button onClick={onCancelEdit} disabled={busy}>
                 Cancel
+              </button>
+              <button onClick={() => onDelete(libraryId)} disabled={busy} style={{ marginLeft: 10 }}>
+                Delete…
               </button>
             </span>
           ) : (

@@ -19,7 +19,8 @@ export default function BookCard({
   coverHeight,
   onDeleteCopy,
   deleteState,
-  hideCopyCount
+  hideCopyCount,
+  showDeleteCopy = true
 }: {
   viewMode: BookCardViewMode;
   bulkMode: boolean;
@@ -36,6 +37,7 @@ export default function BookCard({
   onDeleteCopy: () => void;
   deleteState: { busy: boolean; error: string | null; message: string | null } | undefined;
   hideCopyCount?: boolean;
+  showDeleteCopy?: boolean;
 }) {
   const coverEl = coverUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
@@ -87,10 +89,14 @@ export default function BookCard({
             </div>
           ) : null}
           <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10 }}>
-            <button onClick={onDeleteCopy} disabled={deleteState?.busy ?? false} title="Deletes one copy">
-              Delete copy
-            </button>
-            <span className="muted">{deleteState?.message ? (deleteState?.error ? `${deleteState?.message} (${deleteState?.error})` : deleteState?.message) : ""}</span>
+            {showDeleteCopy ? (
+              <>
+                <button onClick={onDeleteCopy} disabled={deleteState?.busy ?? false} title="Deletes one copy">
+                  Delete copy
+                </button>
+                <span className="muted">{deleteState?.message ? (deleteState?.error ? `${deleteState?.message} (${deleteState?.error})` : deleteState?.message) : ""}</span>
+              </>
+            ) : null}
           </div>
         </div>
       </div>
@@ -145,11 +151,13 @@ export default function BookCard({
         <Link href={href} className="muted">
           Details
         </Link>
-        <button onClick={onDeleteCopy} disabled={deleteState?.busy ?? false} title="Deletes one copy">
-          Delete copy
-        </button>
+        {showDeleteCopy ? (
+          <button onClick={onDeleteCopy} disabled={deleteState?.busy ?? false} title="Deletes one copy">
+            Delete copy
+          </button>
+        ) : null}
       </div>
-      {deleteState?.message ? (
+      {showDeleteCopy && deleteState?.message ? (
         <div className="muted" style={{ marginTop: 6 }}>
           {deleteState?.error ? `${deleteState?.message} (${deleteState?.error})` : deleteState?.message}
         </div>

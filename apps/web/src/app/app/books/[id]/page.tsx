@@ -512,7 +512,7 @@ export default function BookDetailPage() {
                 "id,owner_id,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,media:user_book_media(kind,storage_path)"
               )
               .eq("edition_id", row.edition.id)
-              .neq("owner_id", userId)
+              .neq("id", row.id)
               .limit(20);
             if (!cand.error) {
               const rows = (cand.data ?? []) as any[];
@@ -1380,7 +1380,7 @@ export default function BookDetailPage() {
       for (const m of toCopy) {
         const signed = await supabase.storage.from("user-book-media").createSignedUrl(m.storage_path, 60 * 15);
         if (signed.error || !signed.data?.signedUrl) continue;
-        const resp = await fetch(signed.data.signedUrl);
+        const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(signed.data.signedUrl)}`);
         if (!resp.ok) continue;
         const blob = await resp.blob();
         const fileName = safeFileName(String(m.storage_path.split("/").pop() ?? "image"));

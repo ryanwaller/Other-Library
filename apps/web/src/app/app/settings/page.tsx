@@ -499,36 +499,6 @@ export default function SettingsPage() {
                 {profile && normalized && normalized !== profile.username ? usernameAvailability.message ?? "" : ""}
               </div>
             </div>
-            <div className="muted" style={{ marginTop: 8 }}>
-              Rules: 3–24 chars, lowercase letters/numbers/underscore. No leading/trailing underscore.
-            </div>
-            <details style={{ marginTop: 8 }}>
-              <summary className="muted">Reserved words</summary>
-              <div className="muted" style={{ marginTop: 6 }}>
-                {RESERVED_USERNAMES.join(", ")}
-              </div>
-            </details>
-            {profile ? (
-              <div className="muted" style={{ marginTop: 10 }}>
-                Public profile:{" "}
-                <a href={`/u/${profile.username}`} target="_blank" rel="noreferrer">
-                  /u/{profile.username}
-                </a>
-              </div>
-            ) : null}
-            {aliases.length > 0 ? (
-              <div className="muted" style={{ marginTop: 10 }}>
-                Redirects from old usernames:{" "}
-                {aliases.map((a, idx) => (
-                  <span key={a.old_username}>
-                    <a href={`/u/${a.old_username}`} target="_blank" rel="noreferrer">
-                      /u/{a.old_username}
-                    </a>
-                    {idx < aliases.length - 1 ? ", " : ""}
-                  </span>
-                ))}
-              </div>
-            ) : null}
 
             <div className="row" style={{ marginTop: 10 }}>
               <div style={{ width: 120 }} className="muted">
@@ -604,9 +574,6 @@ export default function SettingsPage() {
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Borrowing</div>
               <div className="muted">defaults</div>
-            </div>
-            <div className="muted" style={{ marginTop: 8 }}>
-              Set defaults for borrowability. You can override borrowable/not-borrowable per book; request rules apply to all borrowable books.
             </div>
             <div className="row" style={{ marginTop: 10 }}>
               <div style={{ width: 170 }} className="muted">

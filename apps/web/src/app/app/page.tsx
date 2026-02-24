@@ -361,6 +361,84 @@ function AppShell({
     }
   }
 
+  async function deleteLibrary(libraryId: number) {
+    if (!supabase) return;
+    const lib = libraries.find((l) => l.id === libraryId);
+    if (!lib) return;
+    if (libraries.length <= 1) {
+      window.alert("You must keep at least one catalog.");
+      return;
+    }
+
+    const choiceRaw = window.prompt(
+      `Delete catalog “${lib.name}”? Type MOVE to move its books into another catalog, or type DELETE to delete all books in this catalog.`
+    );
+    const choice = (choiceRaw ?? "").trim().toLowerCase();
+    if (!choice) return;
+
+    setLibraryState({ busy: true, error: null, message: "Deleting…" });
+    try {
+      if (choice === "move") {
+        const destOptions = libraries.filter((l) => l.id !== libraryId);
+        const destRaw = window.prompt(
+          `Move books from “${lib.name}” to which catalog?\n\nType the destination catalog name exactly:\n- ${destOptions.map((l) => l.name).join("\n- ")}`
+        );
+        const destName = (destRaw ?? "").trim();
+        if (!destName) {
+          setLibraryState({ busy: false, error: null, message: null });
+          return;
+        }
+        const dest = destOptions.find((l) => l.name === destName);
+        if (!dest) throw new Error("Destination catalog not found.");
+
+        const upd = await supabase.from("user_books").update({ library_id: dest.id }).eq("owner_id", userId).eq("library_id", libraryId);
+        if (upd.error) throw new Error(upd.error.message);
+      } else if (choice === "delete") {
+        const listRes = await supabase.from("user_books").select("id,media:user_book_media(storage_path)").eq("owner_id", userId).eq("library_id", libraryId).limit(2000);
+        if (listRes.error) throw new Error(listRes.error.message);
+        const rows = (listRes.data ?? []) as any[];
+        const ids = rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n) && n > 0);
+        const paths = Array.from(
+          new Set(
+            rows
+              .flatMap((r) => (Array.isArray(r.media) ? r.media : []))
+              .map((m: any) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
+              .filter(Boolean)
+          )
+        );
+
+        if (!window.confirm(`Delete ${ids.length} book(s) in “${lib.name}”? This cannot be undone.`)) {
+          setLibraryState({ busy: false, error: null, message: null });
+          return;
+        }
+
+        if (paths.length > 0) {
+          const rm = await supabase.storage.from("user-book-media").remove(paths);
+          if (rm.error) {
+            // continue
+          }
+        }
+        if (ids.length > 0) {
+          const del = await supabase.from("user_books").delete().in("id", ids);
+          if (del.error) throw new Error(del.error.message);
+        }
+      } else {
+        throw new Error("Please type MOVE or DELETE.");
+      }
+
+      const delLib = await supabase.from("libraries").delete().eq("id", libraryId).eq("owner_id", userId);
+      if (delLib.error) throw new Error(delLib.error.message);
+
+      setEditingLibraryId(null);
+      await refreshLibraries();
+      await refreshAllBooks();
+      setLibraryState({ busy: false, error: null, message: "Deleted" });
+      window.setTimeout(() => setLibraryState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setLibraryState({ busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" });
+    }
+  }
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -866,7 +944,33 @@ function AppShell({
 
     let groups: CatalogGroup[] = Array.from(byKey.entries()).map(([key, copies]) => {
       const sorted = copies.slice().sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
-      const primary = sorted[0]!;
+
+      // Pick a "primary" copy that best represents the group (prefer the one that actually has a cover/media).
+      const primary = sorted
+        .slice()
+        .sort((a, b) => {
+          const score = (c: CatalogItem): number => {
+            let s = 0;
+            const hasCoverMedia = (c.media ?? []).some((m) => m.kind === "cover");
+            const hasAnyMedia = (c.media ?? []).some((m) => m.kind === "cover" || m.kind === "image");
+            const hasEditionCover = Boolean(c.edition?.cover_url);
+            const hasTitle = Boolean(effectiveTitleFor(c));
+            const hasAuthors = effectiveAuthorsFor(c).length > 0;
+            const hasPublisher = Boolean(effectivePublisherFor(c));
+            const hasSubjects = effectiveSubjectsFor(c).length > 0;
+            if (hasCoverMedia) s += 1000;
+            else if (hasAnyMedia) s += 300;
+            if (hasEditionCover) s += 150;
+            if (hasTitle) s += 20;
+            if (hasAuthors) s += 10;
+            if (hasPublisher) s += 5;
+            if (hasSubjects) s += 3;
+            return s;
+          };
+          const diff = score(b) - score(a);
+          if (diff) return diff;
+          return Date.parse(b.created_at) - Date.parse(a.created_at);
+        })[0]!;
       const title = effectiveTitleFor(primary);
 
       const tagSet = new Set<string>();
@@ -1183,7 +1287,7 @@ function AppShell({
         }
       }
 
-      // Copy media objects into the new user_book ids.
+      // Copy media objects into the new user_book ids (server-side storage copy; avoids browser CORS).
       for (const [oldId, newId] of idMap.entries()) {
         const media = (mediaByBookId[oldId] ?? []).slice();
         if (media.length === 0) continue;
@@ -1192,19 +1296,11 @@ function AppShell({
         let coverCopied = false;
         for (const m of media) {
           try {
-            const signed = await supabase.storage.from("user-book-media").createSignedUrl(m.storage_path, 60 * 15);
-            if (signed.error || !signed.data?.signedUrl) continue;
-            const resp = await fetch(signed.data.signedUrl);
-            if (!resp.ok) continue;
-            const blob = await resp.blob();
             const base = safeFileName(String(m.storage_path.split("/").pop() ?? "image"));
             const destPath = `${userId}/${newId}/${Date.now()}-${base}`;
-            const up = await supabase.storage.from("user-book-media").upload(destPath, blob, {
-              cacheControl: "3600",
-              upsert: false,
-              contentType: resp.headers.get("content-type") || blob.type || "application/octet-stream"
-            });
-            if (up.error) continue;
+
+            const copiedObj = await supabase.storage.from("user-book-media").copy(m.storage_path, destPath);
+            if (copiedObj.error) continue;
 
             const kind: "cover" | "image" = m.kind === "cover" && !coverCopied ? "cover" : "image";
             if (kind === "cover") coverCopied = true;
@@ -1363,6 +1459,7 @@ function AppShell({
         coverHeight={coverHeight}
         onDeleteCopy={() => deleteEntry(it.id)}
         deleteState={delState as any}
+        showDeleteCopy={bulkMode}
       />
     );
   }
@@ -1676,18 +1773,6 @@ function AppShell({
             <option value="public">public</option>
             <option value="private">private</option>
           </select>
-          <label className="row" style={{ gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={bulkMode}
-              onChange={(e) => {
-                setBulkMode(e.target.checked);
-                setBulkSelectedKeys({});
-                setBulkState({ busy: false, error: null, message: null });
-              }}
-            />
-            <span className="muted">Bulk</span>
-          </label>
           <span className="muted">
             Showing {displayGroups.length} books
           </span>
@@ -1713,6 +1798,19 @@ function AppShell({
           <span className="muted">
             <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}>Search friends / public</Link>
           </span>
+          <span style={{ flex: "1 1 auto" }} />
+          <button
+            onClick={() => {
+              setBulkMode((prev) => {
+                const next = !prev;
+                if (!next) setBulkSelectedKeys({});
+                setBulkState({ busy: false, error: null, message: null });
+                return next;
+              });
+            }}
+          >
+            {bulkMode ? "Done" : "Edit"}
+          </button>
         </div>
         <BulkBar
           bulkMode={bulkMode}
@@ -1749,6 +1847,7 @@ function AppShell({
               onNameDraftChange={setLibraryNameDraft}
               onSaveName={saveLibraryName}
               onCancelEdit={cancelEditLibrary}
+              onDelete={deleteLibrary}
               onMoveUp={(id) => moveLibrary(id, -1)}
               onMoveDown={(id) => moveLibrary(id, 1)}
             >
