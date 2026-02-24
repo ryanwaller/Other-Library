@@ -56,6 +56,7 @@ function AppShell({
 }) {
   const router = useRouter();
   const tagButtonRef = useRef<HTMLButtonElement | null>(null);
+  const categoryButtonRef = useRef<HTMLButtonElement | null>(null);
   const userId = session.user.id;
   const [profile, setProfile] = useState<{ username: string; visibility: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -157,6 +158,13 @@ function AppShell({
   const [tagMode, setTagMode] = useState<string>("all");
   const [tagSearch, setTagSearch] = useState<string>("");
   const [tagMenu, setTagMenu] = useState<{ open: boolean; top: number; left: number; minWidth: number }>({
+    open: false,
+    top: 0,
+    left: 0,
+    minWidth: 260
+  });
+  const [categorySearch, setCategorySearch] = useState<string>("");
+  const [categoryMenu, setCategoryMenu] = useState<{ open: boolean; top: number; left: number; minWidth: number }>({
     open: false,
     top: 0,
     left: 0,
@@ -977,9 +985,43 @@ function AppShell({
     setTagMenu((p) => ({ ...p, open: false }));
   }
 
+  function openCategoryMenu() {
+    const el = categoryButtonRef.current;
+    if (!el) {
+      setCategoryMenu({ open: true, top: 0, left: 0, minWidth: 260 });
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    const minWidth = Math.max(260, Math.ceil(rect.width));
+    const left = clampNumber(rect.left, 8, Math.max(8, window.innerWidth - minWidth - 8));
+    const top = rect.bottom + 6;
+    setCategorySearch("");
+    setCategoryMenu({ open: true, top, left, minWidth });
+  }
+
+  function closeCategoryMenu() {
+    setCategoryMenu((p) => ({ ...p, open: false }));
+  }
+
   function clampNumber(n: number, min: number, max: number): number {
     return Math.min(max, Math.max(min, n));
   }
+
+  useEffect(() => {
+    if (!tagMenu.open && !categoryMenu.open) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (tagButtonRef.current && tagButtonRef.current.contains(target)) return;
+      if (categoryButtonRef.current && categoryButtonRef.current.contains(target)) return;
+      closeTagMenu();
+      closeCategoryMenu();
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocMouseDown);
+    };
+  }, [tagMenu.open, categoryMenu.open]);
 
   useEffect(() => {
     if (!tagMenu.open) return;
@@ -998,6 +1040,22 @@ function AppShell({
       window.removeEventListener("resize", onScroll);
     };
   }, [tagMenu.open]);
+
+  useEffect(() => {
+    if (!categoryMenu.open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeCategoryMenu();
+    };
+    const onScroll = () => closeCategoryMenu();
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [categoryMenu.open]);
 
   const displayGroups = useMemo(() => {
     const profileVis = profile?.visibility === "public" ? "public" : "followers_only";
@@ -1915,21 +1973,27 @@ function AppShell({
             </span>
           </button>
 
-          <select
-            value={categoryMode}
-            onChange={(e) => {
-              const v = e.target.value;
-              setCategoryMode(v);
-              setUrlFilters({ category: v === "all" ? null : v });
+          <button
+            ref={categoryButtonRef}
+            onClick={() => (categoryMenu.open ? closeCategoryMenu() : openCategoryMenu())}
+            style={{
+              border: "1px solid var(--border)",
+              padding: "4px 8px",
+              background: "transparent",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              minWidth: 160
             }}
+            aria-haspopup="menu"
+            aria-expanded={categoryMenu.open}
           >
-            <option value="all">category</option>
-            {availableCategories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            <span>{(filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : "category"}</span>
+            <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1 }}>
+              ▼
+            </span>
+          </button>
           <select value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
             <option value="all">all</option>
             <option value="public">public</option>
@@ -1988,6 +2052,58 @@ function AppShell({
                       style={{ textAlign: "left" }}
                     >
                       {t}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {categoryMenu.open ? (
+          <div style={{ position: "fixed", inset: 0, zIndex: 1000 }} onMouseDown={() => closeCategoryMenu()}>
+            <div
+              className="card"
+              style={{
+                position: "fixed",
+                top: categoryMenu.top,
+                left: categoryMenu.left,
+                minWidth: categoryMenu.minWidth,
+                maxHeight: 320,
+                overflow: "auto"
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <input
+                placeholder="Search…"
+                value={categorySearch}
+                onChange={(e) => setCategorySearch(e.target.value)}
+                style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }}
+                autoFocus
+              />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <button
+                  onClick={() => {
+                    setCategoryMode("all");
+                    setUrlFilters({ category: null });
+                    closeCategoryMenu();
+                  }}
+                  style={{ textAlign: "left" }}
+                >
+                  all
+                </button>
+                {availableCategories
+                  .filter((c) => c.toLowerCase().includes(categorySearch.trim().toLowerCase()))
+                  .slice(0, 400)
+                  .map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => {
+                        setCategoryMode(c);
+                        setUrlFilters({ category: c });
+                        closeCategoryMenu();
+                      }}
+                      style={{ textAlign: "left" }}
+                    >
+                      {c}
                     </button>
                   ))}
               </div>

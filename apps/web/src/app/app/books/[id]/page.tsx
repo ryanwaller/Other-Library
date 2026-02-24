@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
 import Cropper, { type Area } from "react-easy-crop";
 import { supabase } from "../../../../lib/supabaseClient";
@@ -132,6 +132,13 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
+function toProxyImageUrl(url: string): string {
+  const raw = (url ?? "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("blob:")) return raw;
+  return `/api/image-proxy?url=${encodeURIComponent(raw)}`;
+}
+
 function getRadianAngle(deg: number): number {
   return (deg * Math.PI) / 180;
 }
@@ -209,6 +216,11 @@ function onEnter(e: KeyboardEvent<HTMLInputElement>, fn: () => void) {
   if (e.key !== "Enter") return;
   e.preventDefault();
   fn();
+}
+
+function aspectFrom(w: number, h: number): number {
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return 2 / 3;
+  return w / h;
 }
 
 function parseAuthorsInput(input: string): string[] {
@@ -390,12 +402,15 @@ export default function BookDetailPage() {
   });
 
   const [pendingCover, setPendingCover] = useState<File | null>(null);
-  const [pendingCoverPreviewUrl, setPendingCoverPreviewUrl] = useState<string | null>(null);
+  const [coverEditorSrc, setCoverEditorSrc] = useState<string | null>(null);
+  const coverEditorObjectUrlRef = useRef<string | null>(null);
   const [coverCrop, setCoverCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [coverZoom, setCoverZoom] = useState<number>(1);
   const [coverRotation, setCoverRotation] = useState<number>(0);
   const [coverBrightness, setCoverBrightness] = useState<number>(1);
   const [coverContrast, setCoverContrast] = useState<number>(1);
+  const [coverAspectW, setCoverAspectW] = useState<number>(2);
+  const [coverAspectH, setCoverAspectH] = useState<number>(3);
   const [coverCroppedAreaPixels, setCoverCroppedAreaPixels] = useState<Area | null>(null);
   const [coverState, setCoverState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
@@ -436,35 +451,32 @@ export default function BookDetailPage() {
   }, [bookId]);
 
   useEffect(() => {
-    if (!pendingCover) {
-      setPendingCoverPreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
-      setCoverCrop({ x: 0, y: 0 });
-      setCoverZoom(1);
-      setCoverRotation(0);
-      setCoverBrightness(1);
-      setCoverContrast(1);
-      setCoverCroppedAreaPixels(null);
-      return;
-    }
-
+    if (!pendingCover) return;
     const url = URL.createObjectURL(pendingCover);
-    setPendingCoverPreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return url;
-    });
+    if (coverEditorObjectUrlRef.current) URL.revokeObjectURL(coverEditorObjectUrlRef.current);
+    coverEditorObjectUrlRef.current = url;
+    setCoverEditorSrc(url);
     setCoverCrop({ x: 0, y: 0 });
     setCoverZoom(1);
     setCoverRotation(0);
     setCoverBrightness(1);
     setCoverContrast(1);
+    setCoverAspectW(2);
+    setCoverAspectH(3);
     setCoverCroppedAreaPixels(null);
     return () => {
       URL.revokeObjectURL(url);
     };
   }, [pendingCover]);
+
+  useEffect(() => {
+    return () => {
+      if (coverEditorObjectUrlRef.current) {
+        URL.revokeObjectURL(coverEditorObjectUrlRef.current);
+        coverEditorObjectUrlRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!supabase) return;
@@ -802,6 +814,7 @@ export default function BookDetailPage() {
 
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
   const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : suggestedCoverUrl ?? book?.edition?.cover_url ?? null;
+  const coverAspect = useMemo(() => aspectFrom(coverAspectW, coverAspectH), [coverAspectW, coverAspectH]);
   const imageMedia = useMemo(() => (book?.media ?? []).filter((m) => m.kind === "image") ?? [], [book]);
 
   const publicBookPath = useMemo(() => {
@@ -1185,30 +1198,37 @@ export default function BookDetailPage() {
   async function uploadCover() {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
-    if (!pendingCover) return;
+    if (!coverEditorSrc) return;
     setCoverState({ busy: true, error: null, message: "Uploading cover…" });
 
     try {
-      const willEdit = Boolean(pendingCoverPreviewUrl && coverCroppedAreaPixels);
-      const baseName = safeFileName(pendingCover.name.replace(/\.[^/.]+$/, ""));
-      const ext = willEdit ? "jpg" : extFromContentType(pendingCover.type || null);
-      const path = `${userId}/${book.id}/cover-${Date.now()}-${baseName}.${ext}`;
+      if (!coverCroppedAreaPixels) {
+        setCoverState({ busy: false, error: null, message: "Adjust crop first." });
+        return;
+      }
 
-      const body: Blob | File = willEdit
-        ? await cropCoverToBlob({
-            imageSrc: pendingCoverPreviewUrl as string,
-            crop: coverCroppedAreaPixels as Area,
-            rotation: coverRotation,
-            brightness: clamp(coverBrightness, 0.5, 2),
-            contrast: clamp(coverContrast, 0.5, 2)
-          })
-        : pendingCover;
+      const baseName = pendingCover ? safeFileName(pendingCover.name.replace(/\.[^/.]+$/, "")) : "cover-edit";
+      const path = `${userId}/${book.id}/cover-${Date.now()}-${baseName}.jpg`;
 
-      const contentType = willEdit ? "image/jpeg" : pendingCover.type || "application/octet-stream";
+      // Remove existing cover(s) so we don't accumulate old covers.
+      const existing = (book.media ?? []).filter((m) => m.kind === "cover");
+      for (const m of existing) {
+        if (m?.storage_path) await supabase.storage.from("user-book-media").remove([m.storage_path]);
+        if (m?.id) await supabase.from("user_book_media").delete().eq("id", m.id);
+      }
+
+      const body: Blob = await cropCoverToBlob({
+        imageSrc: coverEditorSrc,
+        crop: coverCroppedAreaPixels,
+        rotation: coverRotation,
+        brightness: clamp(coverBrightness, 0.5, 2),
+        contrast: clamp(coverContrast, 0.5, 2)
+      });
+
       const up = await supabase.storage.from("user-book-media").upload(path, body, {
         cacheControl: "3600",
         upsert: false,
-        contentType
+        contentType: "image/jpeg"
       });
       if (up.error) {
         setCoverState({ busy: false, error: up.error.message, message: "Upload failed" });
@@ -1233,6 +1253,7 @@ export default function BookDetailPage() {
         .neq("id", inserted.data.id);
 
       setPendingCover(null);
+      setCoverEditorSrc(null);
       setCoverInputKey((k) => k + 1);
       await refresh();
       setCoverState({ busy: false, error: null, message: "Cover uploaded" });
@@ -1683,14 +1704,52 @@ export default function BookDetailPage() {
               {isOwner && editMode ? (
                 <div style={{ marginTop: 10 }}>
                   <div className="muted">Cover override</div>
-                  <input
-                    key={coverInputKey}
-                    type="file"
-                    accept="image/*"
-                    onChange={(ev) => setPendingCover((ev.target.files ?? [])[0] ?? null)}
-                    style={{ marginTop: 6 }}
-                  />
-                  {pendingCoverPreviewUrl ? (
+                  <div className="row" style={{ marginTop: 6, gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    <input
+                      key={coverInputKey}
+                      type="file"
+                      accept="image/*"
+                      onChange={(ev) => setPendingCover((ev.target.files ?? [])[0] ?? null)}
+                      style={{ marginTop: 0 }}
+                    />
+                    {coverUrl ? (
+                      <button
+                        onClick={() => {
+                          if (!coverUrl) return;
+                          setPendingCover(null);
+                          setCoverEditorSrc(toProxyImageUrl(coverUrl));
+                          setCoverCrop({ x: 0, y: 0 });
+                          setCoverZoom(1);
+                          setCoverRotation(0);
+                          setCoverBrightness(1);
+                          setCoverContrast(1);
+                          setCoverAspectW(2);
+                          setCoverAspectH(3);
+                          setCoverCroppedAreaPixels(null);
+                        }}
+                        disabled={coverState.busy}
+                      >
+                        Edit current cover
+                      </button>
+                    ) : null}
+                    {coverEditorSrc ? (
+                      <button
+                        onClick={() => {
+                          if (coverEditorObjectUrlRef.current) {
+                            URL.revokeObjectURL(coverEditorObjectUrlRef.current);
+                            coverEditorObjectUrlRef.current = null;
+                          }
+                          setPendingCover(null);
+                          setCoverEditorSrc(null);
+                          setCoverInputKey((k) => k + 1);
+                        }}
+                        disabled={coverState.busy}
+                      >
+                        Clear
+                      </button>
+                    ) : null}
+                  </div>
+                  {coverEditorSrc ? (
                     <div style={{ marginTop: 8 }}>
                       <div
                         style={{
@@ -1703,11 +1762,11 @@ export default function BookDetailPage() {
                         }}
                       >
                         <Cropper
-                          image={pendingCoverPreviewUrl}
+                          image={coverEditorSrc}
                           crop={coverCrop}
                           zoom={coverZoom}
                           rotation={coverRotation}
-                          aspect={2 / 3}
+                          aspect={coverAspect}
                           onCropChange={setCoverCrop}
                           onZoomChange={setCoverZoom}
                           onRotationChange={setCoverRotation}
@@ -1717,6 +1776,52 @@ export default function BookDetailPage() {
                       </div>
 
                       <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                          <div className="muted" style={{ width: 72 }}>
+                            Aspect
+                          </div>
+                          <input
+                            type="number"
+                            value={coverAspectW}
+                            min={1}
+                            step={1}
+                            onChange={(e) => setCoverAspectW(Math.max(1, Number(e.target.value) || 1))}
+                            style={{ width: 64 }}
+                          />
+                          <span className="muted">:</span>
+                          <input
+                            type="number"
+                            value={coverAspectH}
+                            min={1}
+                            step={1}
+                            onChange={(e) => setCoverAspectH(Math.max(1, Number(e.target.value) || 1))}
+                            style={{ width: 64 }}
+                          />
+                          <button
+                            onClick={() => {
+                              setCoverAspectW(2);
+                              setCoverAspectH(3);
+                            }}
+                          >
+                            2:3
+                          </button>
+                          <button
+                            onClick={() => {
+                              setCoverAspectW(1);
+                              setCoverAspectH(1);
+                            }}
+                          >
+                            1:1
+                          </button>
+                          <button
+                            onClick={() => {
+                              setCoverAspectW(3);
+                              setCoverAspectH(2);
+                            }}
+                          >
+                            3:2
+                          </button>
+                        </div>
                         <div className="row" style={{ gap: 8, alignItems: "center" }}>
                           <div className="muted" style={{ width: 72 }}>
                             Zoom
@@ -1776,19 +1881,10 @@ export default function BookDetailPage() {
                       </div>
                     </div>
                   ) : null}
-                  {pendingCover ? (
+                  {coverEditorSrc ? (
                     <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
                       <button onClick={uploadCover} disabled={coverState.busy}>
                         {coverState.busy ? "Uploading…" : "Submit cover"}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setPendingCover(null);
-                          setCoverInputKey((k) => k + 1);
-                        }}
-                        disabled={coverState.busy}
-                      >
-                        Clear
                       </button>
                     </div>
                   ) : null}
@@ -1994,10 +2090,24 @@ export default function BookDetailPage() {
                         </a>
                       </div>
                     ) : null}
-                    <details style={{ marginTop: 10 }}>
-                      <summary className="muted">Raw metadata</summary>
-                      <pre style={{ marginTop: 8, fontSize: 12, whiteSpace: "pre-wrap" }}>{JSON.stringify(book?.edition?.raw ?? {}, null, 2)}</pre>
-                    </details>
+                    {publicBookUrl ? (
+                      <div className="row" style={{ marginTop: 10, justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                        <div style={{ minWidth: 110 }} className="muted">
+                          URL
+                        </div>
+                        <div style={{ flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          <a href={publicBookUrl} target="_blank" rel="noreferrer">
+                            {publicBookUrl}
+                          </a>
+                        </div>
+                        <button onClick={copyPublicLink} style={{ flex: "0 0 auto" }}>
+                          Copy
+                        </button>
+                        <div className="muted" style={{ flex: "0 0 auto" }}>
+                          {shareState.message ? (shareState.error ? `${shareState.message} (${shareState.error})` : shareState.message) : ""}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </>
               ) : null}
@@ -2750,36 +2860,7 @@ export default function BookDetailPage() {
                 </div>
               </div>
 
-              <div style={{ marginTop: 10 }} className="card">
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <div>Share public link</div>
-                  <div className="muted">
-                    {formVisibility === "public" || (formVisibility === "inherit" && ownerProfile?.visibility === "public") ? "public" : "not public"}
-                  </div>
-                </div>
-                {publicBookUrl ? (
-                  <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
-                    <a href={publicBookUrl} target="_blank" rel="noreferrer">
-                      {publicBookUrl}
-                    </a>
-                    <button onClick={copyPublicLink}>Copy</button>
-                  </div>
-                ) : (
-                  <div className="muted" style={{ marginTop: 8 }}>
-                    Loading…
-                  </div>
-                )}
-                {formVisibility !== "public" && !(formVisibility === "inherit" && ownerProfile?.visibility === "public") ? (
-                  <div className="muted" style={{ marginTop: 8 }}>
-                    Set Visibility to <span>public</span>, then save.
-                  </div>
-                ) : null}
-                {shareState.message ? (
-                  <div className="muted" style={{ marginTop: 6 }}>
-                    {shareState.error ? `${shareState.message} (${shareState.error})` : shareState.message}
-                  </div>
-                ) : null}
-              </div>
+              {/* Share link is shown in view-mode under metadata */}
 
               <div style={{ marginTop: 16 }} className="muted">
                 Location
