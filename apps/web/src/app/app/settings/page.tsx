@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
+import Cropper, { type Area } from "react-easy-crop";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
 
@@ -57,6 +58,38 @@ function safeFileName(name: string): string {
   return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
 }
 
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
+}
+
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.crossOrigin = "anonymous";
+    img.src = src;
+  });
+}
+
+async function cropToBlob(imageSrc: string, crop: Area, outputSize = 512): Promise<Blob> {
+  const image = await loadImage(imageSrc);
+  const canvas = document.createElement("canvas");
+  canvas.width = outputSize;
+  canvas.height = outputSize;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not supported");
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, outputSize, outputSize);
+
+  const blob: Blob = await new Promise((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to encode image"))), "image/jpeg", 0.9);
+  });
+  return blob;
+}
+
 export default function SettingsPage() {
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
@@ -102,6 +135,10 @@ export default function SettingsPage() {
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
+  const [pendingAvatarPreviewUrl, setPendingAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarCrop, setAvatarCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [avatarZoom, setAvatarZoom] = useState<number>(1);
+  const [avatarCroppedAreaPixels, setAvatarCroppedAreaPixels] = useState<Area | null>(null);
   const [avatarState, setAvatarState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -192,6 +229,29 @@ export default function SettingsPage() {
       alive = false;
     };
   }, [profile?.avatar_path]);
+
+  useEffect(() => {
+    if (!pendingAvatar) {
+      setPendingAvatarPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      setAvatarCrop({ x: 0, y: 0 });
+      setAvatarZoom(1);
+      setAvatarCroppedAreaPixels(null);
+      return;
+    }
+
+    const url = URL.createObjectURL(pendingAvatar);
+    setPendingAvatarPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
+    setAvatarCrop({ x: 0, y: 0 });
+    setAvatarZoom(1);
+    setAvatarCroppedAreaPixels(null);
+    return () => URL.revokeObjectURL(url);
+  }, [pendingAvatar]);
 
   useEffect(() => {
     let alive = true;
@@ -307,33 +367,52 @@ export default function SettingsPage() {
   async function uploadAvatar() {
     if (!supabase || !userId || !pendingAvatar) return;
     setAvatarState({ busy: true, error: null, message: "Uploading…" });
-    const safe = safeFileName(pendingAvatar.name);
-    const fileName = `avatar_${Date.now()}_${safe}`;
-    const path = `${userId}/${fileName}`;
+    try {
+      const safe = safeFileName(pendingAvatar.name);
+      let fileName = `avatar_${Date.now()}_${safe}`;
+      let body: Blob | File = pendingAvatar;
+      let contentType = pendingAvatar.type || "application/octet-stream";
 
-    const up = await supabase.storage.from("avatars").upload(path, pendingAvatar, {
-      upsert: true,
-      contentType: pendingAvatar.type || "application/octet-stream"
-    });
-    if (up.error) {
-      setAvatarState({ busy: false, error: up.error.message, message: "Failed" });
-      return;
+      if (pendingAvatarPreviewUrl && avatarCroppedAreaPixels) {
+        body = await cropToBlob(pendingAvatarPreviewUrl, avatarCroppedAreaPixels, 512);
+        contentType = "image/jpeg";
+        fileName = `avatar_${Date.now()}.jpg`;
+      }
+
+      const path = `${userId}/${fileName}`;
+      const up = await supabase.storage.from("avatars").upload(path, body, {
+        upsert: true,
+        contentType
+      });
+      if (up.error) {
+        setAvatarState({ busy: false, error: up.error.message, message: "Failed" });
+        return;
+      }
+
+      const prevPath = profile?.avatar_path ?? null;
+      const res = await supabase.from("profiles").update({ avatar_path: path }).eq("id", userId).select("avatar_path").maybeSingle();
+      if (res.error) {
+        setAvatarState({ busy: false, error: res.error.message, message: "Failed" });
+        return;
+      }
+
+      if (prevPath && prevPath !== path) {
+        await supabase.storage.from("avatars").remove([prevPath]);
+      }
+
+      setProfile((p) => (p ? { ...p, avatar_path: path } : p));
+      setPendingAvatar(null);
+      setPendingAvatarPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      setAvatarCroppedAreaPixels(null);
+      setAvatarCrop({ x: 0, y: 0 });
+      setAvatarZoom(1);
+      setAvatarState({ busy: false, error: null, message: "Uploaded" });
+    } catch (e: any) {
+      setAvatarState({ busy: false, error: e?.message ?? "Failed", message: "Failed" });
     }
-
-    const prevPath = profile?.avatar_path ?? null;
-    const res = await supabase.from("profiles").update({ avatar_path: path }).eq("id", userId).select("avatar_path").maybeSingle();
-    if (res.error) {
-      setAvatarState({ busy: false, error: res.error.message, message: "Failed" });
-      return;
-    }
-
-    if (prevPath && prevPath !== path) {
-      await supabase.storage.from("avatars").remove([prevPath]);
-    }
-
-    setProfile((p) => (p ? { ...p, avatar_path: path } : p));
-    setPendingAvatar(null);
-    setAvatarState({ busy: false, error: null, message: "Uploaded" });
   }
 
   async function saveEmail() {
@@ -474,11 +553,59 @@ export default function SettingsPage() {
                 <button onClick={uploadAvatar} disabled={!pendingAvatar || avatarState.busy}>
                   {avatarState.busy ? "Uploading…" : "Submit"}
                 </button>
+                {pendingAvatar ? (
+                  <button
+                    onClick={() => {
+                      setPendingAvatar(null);
+                      setPendingAvatarPreviewUrl((prev) => {
+                        if (prev) URL.revokeObjectURL(prev);
+                        return null;
+                      });
+                      setAvatarCroppedAreaPixels(null);
+                      setAvatarCrop({ x: 0, y: 0 });
+                      setAvatarZoom(1);
+                      setAvatarState({ busy: false, error: null, message: null });
+                    }}
+                    disabled={avatarState.busy}
+                  >
+                    Clear
+                  </button>
+                ) : null}
                 <div className="muted">
                   {avatarState.message ? (avatarState.error ? `${avatarState.message} (${avatarState.error})` : avatarState.message) : ""}
                 </div>
               </div>
             </div>
+
+            {pendingAvatarPreviewUrl ? (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ position: "relative", width: 280, height: 180, border: "1px solid var(--border)", background: "black" }}>
+                  <Cropper
+                    image={pendingAvatarPreviewUrl}
+                    crop={avatarCrop}
+                    zoom={avatarZoom}
+                    aspect={1}
+                    cropShape="round"
+                    showGrid={false}
+                    onCropChange={setAvatarCrop}
+                    onZoomChange={(z: number) => setAvatarZoom(clamp(Number(z), 1, 3))}
+                    onCropComplete={(_area: Area, areaPixels: Area) => setAvatarCroppedAreaPixels(areaPixels)}
+                  />
+                </div>
+                <div className="row" style={{ marginTop: 10, gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                  <span className="muted">Zoom</span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={3}
+                    step={0.01}
+                    value={avatarZoom}
+                    onChange={(e) => setAvatarZoom(clamp(Number(e.target.value), 1, 3))}
+                    style={{ width: 220 }}
+                  />
+                </div>
+              </div>
+            ) : null}
 
             <div className="row" style={{ marginTop: 10 }}>
               <div style={{ width: 120 }} className="muted">
