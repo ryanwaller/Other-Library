@@ -76,6 +76,7 @@ function AppShell({
     cover_url: string | null;
     sources: string[];
   } | null>(null);
+  const [addPreviewCoverFailed, setAddPreviewCoverFailed] = useState(false);
   const [addUrlMeta, setAddUrlMeta] = useState<{ final_url: string | null; domain: string | null; domain_kind: string | null }>({
     final_url: null,
     domain: null,
@@ -562,6 +563,7 @@ function AppShell({
   async function previewUrl(url: string) {
     setAddState({ busy: true, error: null, message: "Importing…" });
     setAddUrlPreview(null);
+    setAddPreviewCoverFailed(false);
     setAddUrlMeta({ final_url: null, domain: null, domain_kind: null });
     try {
       const res = await fetch("/api/import-url", {
@@ -586,6 +588,7 @@ function AppShell({
   async function previewIsbn(isbn: string) {
     setAddState({ busy: true, error: null, message: "Looking up ISBN…" });
     setAddUrlPreview(null);
+    setAddPreviewCoverFailed(false);
     setAddUrlMeta({ final_url: null, domain: null, domain_kind: null });
     try {
       const res = await fetch(`/api/isbn?isbn=${encodeURIComponent(isbn)}`);
@@ -602,7 +605,7 @@ function AppShell({
         subjects: Array.isArray(edition.subjects) ? edition.subjects.filter(Boolean) : [],
         isbn10: typeof edition.isbn10 === "string" ? edition.isbn10 : null,
         isbn13: typeof edition.isbn13 === "string" ? edition.isbn13 : null,
-        cover_url: typeof edition.cover_url === "string" ? edition.cover_url : null,
+        cover_url: typeof edition.cover_url === "string" ? edition.cover_url.trim() || null : null,
         sources: Array.from(new Set(["isbn", ...((edition.sources ?? []) as any[]).map((s: any) => String(s))])).filter(Boolean)
       });
       setAddState({ busy: false, error: null, message: "Preview ready" });
@@ -656,6 +659,7 @@ function AppShell({
     setAddSearchResults([]);
     setAddSearchState({ busy: false, error: null, message: null });
     setAddState({ busy: false, error: null, message: null });
+    setAddPreviewCoverFailed(false);
   }
 
   async function updateUserBookVisibility(userBookId: number, nextVisibility: "inherit" | "followers_only" | "public") {
@@ -1103,7 +1107,7 @@ function AppShell({
       const srcRes = await supabase
         .from("user_books")
         .select(
-          "id,edition_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,subjects_override,publisher_override,publish_date_override,description_override,location,shelf,notes"
+          "id,edition_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes"
         )
         .in("id", ids);
       if (srcRes.error) throw new Error(srcRes.error.message);
@@ -1119,6 +1123,21 @@ function AppShell({
         (tagsByBookId[bid] ??= []).push(tid);
       }
 
+      const mediaRes = await supabase.from("user_book_media").select("user_book_id,kind,storage_path,caption").in("user_book_id", ids);
+      if (mediaRes.error) throw new Error(mediaRes.error.message);
+      const mediaByBookId: Record<number, Array<{ kind: "cover" | "image"; storage_path: string; caption: string | null }>> = {};
+      for (const m of (mediaRes.data ?? []) as any[]) {
+        const bid = Number((m as any).user_book_id);
+        const kind = String((m as any).kind ?? "").trim() as any;
+        const storage_path = String((m as any).storage_path ?? "").trim();
+        const caption = ((m as any).caption ?? null) as any;
+        if (!Number.isFinite(bid) || bid <= 0) continue;
+        if (!storage_path) continue;
+        if (kind !== "cover" && kind !== "image") continue;
+        (mediaByBookId[bid] ??= []).push({ kind, storage_path, caption: typeof caption === "string" ? caption : null });
+      }
+
+      const idMap = new Map<number, number>();
       let copied = 0;
       for (const r of srcRows) {
         const inserted = await supabase
@@ -1133,8 +1152,13 @@ function AppShell({
             borrow_request_scope_override: (r as any).borrow_request_scope_override ?? null,
             title_override: (r as any).title_override ?? null,
             authors_override: (r as any).authors_override ?? null,
+            editors_override: (r as any).editors_override ?? null,
+            designers_override: (r as any).designers_override ?? null,
             subjects_override: (r as any).subjects_override ?? null,
             publisher_override: (r as any).publisher_override ?? null,
+            printer_override: (r as any).printer_override ?? null,
+            materials_override: (r as any).materials_override ?? null,
+            edition_override: (r as any).edition_override ?? null,
             publish_date_override: (r as any).publish_date_override ?? null,
             description_override: (r as any).description_override ?? null,
             location: (r as any).location ?? null,
@@ -1148,12 +1172,49 @@ function AppShell({
         copied += 1;
         const newId = Number((inserted.data as any)?.id);
         const oldId = Number((r as any).id);
+        if (Number.isFinite(oldId) && Number.isFinite(newId) && newId > 0) idMap.set(oldId, newId);
         const tagIds = (tagsByBookId[oldId] ?? []).filter((t) => Number.isFinite(t) && t > 0);
         if (Number.isFinite(newId) && newId > 0 && tagIds.length > 0) {
           const rows = tagIds.map((tagId) => ({ user_book_id: newId, tag_id: tagId }));
           const insTags = await supabase.from("user_book_tags").insert(rows as any);
           if (insTags.error) {
             // continue; tags are optional
+          }
+        }
+      }
+
+      // Copy media objects into the new user_book ids.
+      for (const [oldId, newId] of idMap.entries()) {
+        const media = (mediaByBookId[oldId] ?? []).slice();
+        if (media.length === 0) continue;
+        media.sort((a, b) => (a.kind === "cover" ? -1 : 1) - (b.kind === "cover" ? -1 : 1));
+
+        let coverCopied = false;
+        for (const m of media) {
+          try {
+            const signed = await supabase.storage.from("user-book-media").createSignedUrl(m.storage_path, 60 * 15);
+            if (signed.error || !signed.data?.signedUrl) continue;
+            const resp = await fetch(signed.data.signedUrl);
+            if (!resp.ok) continue;
+            const blob = await resp.blob();
+            const base = safeFileName(String(m.storage_path.split("/").pop() ?? "image"));
+            const destPath = `${userId}/${newId}/${Date.now()}-${base}`;
+            const up = await supabase.storage.from("user-book-media").upload(destPath, blob, {
+              cacheControl: "3600",
+              upsert: false,
+              contentType: resp.headers.get("content-type") || blob.type || "application/octet-stream"
+            });
+            if (up.error) continue;
+
+            const kind: "cover" | "image" = m.kind === "cover" && !coverCopied ? "cover" : "image";
+            if (kind === "cover") coverCopied = true;
+
+            const ins = await supabase.from("user_book_media").insert({ user_book_id: newId, kind, storage_path: destPath, caption: m.caption ?? null });
+            if (ins.error) {
+              // ignore; still uploaded
+            }
+          } catch {
+            // ignore per-file errors
           }
         }
       }
@@ -1365,14 +1426,15 @@ function AppShell({
           <div style={{ marginTop: 10 }} className="card">
             <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
               <div style={{ width: 62, flex: "0 0 auto" }}>
-                {addUrlPreview.cover_url ? (
+                {addUrlPreview.cover_url && !addPreviewCoverFailed ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={addUrlPreview.cover_url}
+                    src={`/api/image-proxy?url=${encodeURIComponent(addUrlPreview.cover_url)}`}
                     alt=""
                     width={60}
                     height={90}
                     style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
+                    onError={() => setAddPreviewCoverFailed(true)}
                   />
                 ) : (
                   <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
@@ -1462,7 +1524,16 @@ function AppShell({
                     <div style={{ width: 62, flex: "0 0 auto" }}>
                       {r.cover_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={r.cover_url} alt="" width={60} height={90} style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }} />
+                        <img
+                          src={`/api/image-proxy?url=${encodeURIComponent(String(r.cover_url))}`}
+                          alt=""
+                          width={60}
+                          height={90}
+                          style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
                       ) : (
                         <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
                       )}
