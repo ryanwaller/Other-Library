@@ -61,7 +61,6 @@ export default function AdminPage() {
   const [waitlist, setWaitlist] = useState<WaitlistRow[]>([]);
 
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteDays, setInviteDays] = useState("14");
   const [inviteLink, setInviteLink] = useState<string | null>(null);
 
   useEffect(() => {
@@ -139,7 +138,6 @@ export default function AdminPage() {
             <div style={{ marginBottom: 8 }}>Create invite</div>
             <div className="row" style={{ gap: 10 }}>
               <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="Email (optional)" />
-              <input value={inviteDays} onChange={(e) => setInviteDays(e.target.value)} placeholder="Expires (days)" style={{ width: 120 }} />
               <button
                 onClick={async () => {
                   setBusy(true);
@@ -149,7 +147,7 @@ export default function AdminPage() {
                     const res = await api<{ link: string }>("/api/admin/invites", {
                       method: "POST",
                       token,
-                      body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: Number(inviteDays) || 14 })
+                      body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
                     });
                     setInviteLink(res.link);
                     await refreshAll();
