@@ -21,6 +21,12 @@
   }
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body {
   padding: 0;
@@ -51,6 +57,7 @@ select {
   background: var(--input-bg);
   border: 1px solid var(--border);
   padding: 4px 6px;
+  max-width: 100%;
 }
 
 button {

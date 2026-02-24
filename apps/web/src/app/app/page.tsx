@@ -1717,7 +1717,7 @@ function AppShell({
               e.preventDefault();
               smartAddOrSearch();
             }}
-            style={{ minWidth: 380, width: 520, maxWidth: "100%" }}
+            style={{ minWidth: isMobile ? 0 : 380, width: isMobile ? "100%" : 520, maxWidth: "100%" }}
           />
           <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
             {addState.busy ? "Working…" : "Go"}
@@ -1978,7 +1978,7 @@ function AppShell({
             placeholder="Search your catalog…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ minWidth: 260 }}
+            style={{ minWidth: isMobile ? 0 : 260, width: isMobile ? "100%" : undefined, maxWidth: "100%" }}
           />
           {searchQuery.trim() ? (
             <button onClick={() => setSearchQuery("")} aria-label="Clear search">

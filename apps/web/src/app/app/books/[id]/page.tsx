@@ -2358,7 +2358,12 @@ export default function BookDetailPage() {
                   <div style={{ minWidth: 110 }} className="muted">
                     Title
                   </div>
-                  <input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} style={{ width: 360 }} />
+                  <input
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, saveEdits)}
+                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
+                  />
                 </div>
 
                 <div style={{ marginTop: 8 }}>
@@ -2396,7 +2401,7 @@ export default function BookDetailPage() {
                       onChange={(e) => setNewAuthor(e.target.value)}
                       onKeyDown={(e) => onEnter(e, addAuthor)}
                       placeholder="Add an author"
-                      style={{ width: 220 }}
+                      style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
                     />
                     <button onClick={addAuthor} disabled={!newAuthor.trim()}>
                       Add
@@ -2437,7 +2442,7 @@ export default function BookDetailPage() {
                       onChange={(e) => setNewEditor(e.target.value)}
                       onKeyDown={(e) => onEnter(e, addEditor)}
                       placeholder="Add an editor"
-                      style={{ width: 220 }}
+                      style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
                     />
                     <button onClick={addEditor} disabled={!newEditor.trim()}>
                       Add
@@ -2478,7 +2483,7 @@ export default function BookDetailPage() {
                       onChange={(e) => setNewDesigner(e.target.value)}
                       onKeyDown={(e) => onEnter(e, addDesigner)}
                       placeholder="Add a designer"
-                      style={{ width: 220 }}
+                      style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
                     />
                     <button onClick={addDesigner} disabled={!newDesigner.trim()}>
                       Add
@@ -2494,7 +2499,7 @@ export default function BookDetailPage() {
                     value={formPrinter}
                     onChange={(e) => setFormPrinter(e.target.value)}
                     onKeyDown={(e) => onEnter(e, saveEdits)}
-                    style={{ width: 360 }}
+                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
                   />
                 </div>
 
@@ -2506,7 +2511,7 @@ export default function BookDetailPage() {
                     value={formMaterials}
                     onChange={(e) => setFormMaterials(e.target.value)}
                     onKeyDown={(e) => onEnter(e, saveEdits)}
-                    style={{ width: 360 }}
+                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
                   />
                 </div>
 
@@ -2518,7 +2523,7 @@ export default function BookDetailPage() {
                     value={formEditionOverride}
                     onChange={(e) => setFormEditionOverride(e.target.value)}
                     onKeyDown={(e) => onEnter(e, saveEdits)}
-                    style={{ width: 360 }}
+                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
                   />
                 </div>
 
@@ -2526,7 +2531,12 @@ export default function BookDetailPage() {
                   <div style={{ minWidth: 110 }} className="muted">
                     Publisher
                   </div>
-                  <input value={formPublisher} onChange={(e) => setFormPublisher(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} style={{ width: 360 }} />
+                  <input
+                    value={formPublisher}
+                    onChange={(e) => setFormPublisher(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, saveEdits)}
+                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
+                  />
                 </div>
 
                 <div className="row" style={{ marginTop: 6 }}>
@@ -2558,7 +2568,7 @@ export default function BookDetailPage() {
                     value={formGroupLabel}
                     onChange={(e) => setFormGroupLabel(e.target.value)}
                     onKeyDown={(e) => onEnter(e, saveEdits)}
-                    style={{ width: 360 }}
+                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
                   />
                 </div>
 
@@ -2566,7 +2576,7 @@ export default function BookDetailPage() {
                   <div style={{ minWidth: 110 }} className="muted">
                     Object type
                   </div>
-                  <select value={formObjectType} onChange={(e) => setFormObjectType(e.target.value)} style={{ width: 220 }}>
+                  <select value={formObjectType} onChange={(e) => setFormObjectType(e.target.value)} style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
                     <option value="">—</option>
                     <option value="book">book</option>
                     <option value="magazine">magazine</option>
@@ -2580,7 +2590,7 @@ export default function BookDetailPage() {
                   <div style={{ minWidth: 110 }} className="muted">
                     Decade
                   </div>
-                  <select value={formDecade} onChange={(e) => setFormDecade(e.target.value)} style={{ width: 220 }}>
+                  <select value={formDecade} onChange={(e) => setFormDecade(e.target.value)} style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
                     <option value="">—</option>
                     <option value="prewar">Prewar</option>
                     <option value="1950s">1950s</option>
@@ -2612,7 +2622,7 @@ export default function BookDetailPage() {
                     value={formLibraryId ?? ""}
                     onChange={(e) => moveToLibrary(Number(e.target.value))}
                     disabled={libraryMoveState.busy || libraries.length === 0}
-                    style={{ width: 220 }}
+                    style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
                   >
                     <option value="" disabled>
                       —
@@ -2662,19 +2672,19 @@ export default function BookDetailPage() {
               <div style={{ marginTop: 16 }} className="muted">
                 Subjects
               </div>
-              <div style={{ marginTop: 8 }}>
-                <div className="row">
-                  <input
-                    value={newSubject}
-                    onChange={(e) => setNewSubject(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, addSubject)}
-                    placeholder="Add a subject"
-                    style={{ width: 220 }}
-                  />
-                  <button onClick={addSubject} disabled={subjectState.busy || !newSubject.trim()}>
-                    Add
-                  </button>
-                  <div className="muted">
+                <div style={{ marginTop: 8 }}>
+                  <div className="row">
+                    <input
+                      value={newSubject}
+                      onChange={(e) => setNewSubject(e.target.value)}
+                      onKeyDown={(e) => onEnter(e, addSubject)}
+                      placeholder="Add a subject"
+                      style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
+                    />
+                    <button onClick={addSubject} disabled={subjectState.busy || !newSubject.trim()}>
+                      Add
+                    </button>
+                    <div className="muted">
                     {subjectState.message ? (subjectState.error ? `${subjectState.message} (${subjectState.error})` : subjectState.message) : ""}
                   </div>
                 </div>
@@ -2759,20 +2769,20 @@ export default function BookDetailPage() {
               <div style={{ marginTop: 16 }} className="muted">
                 Tags
               </div>
-              <div style={{ marginTop: 8 }}>
-                <div className="row">
-                  <input
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, addTag)}
-                    placeholder="Add a tag"
-                    style={{ width: 220 }}
-                  />
-                  <button onClick={addTag} disabled={tagState.busy || !newTag.trim()}>
-                    Add
-                  </button>
-                  <div className="muted">{tagState.message ? (tagState.error ? `${tagState.message} (${tagState.error})` : tagState.message) : ""}</div>
-                </div>
+                <div style={{ marginTop: 8 }}>
+                  <div className="row">
+                    <input
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => onEnter(e, addTag)}
+                      placeholder="Add a tag"
+                      style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
+                    />
+                    <button onClick={addTag} disabled={tagState.busy || !newTag.trim()}>
+                      Add
+                    </button>
+                    <div className="muted">{tagState.message ? (tagState.error ? `${tagState.message} (${tagState.error})` : tagState.message) : ""}</div>
+                  </div>
                 <div style={{ marginTop: 8 }}>
                   {tags.length > 0 ? (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
