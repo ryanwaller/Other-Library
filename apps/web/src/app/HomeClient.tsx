@@ -27,7 +27,7 @@ export default function HomeClient() {
         </div>
         <div className="row" style={{ alignItems: "flex-start" }}>
           <div style={{ flex: "1 1 320px" }}>
-            <SignInCard note="Existing users: sign in." />
+            <SignInCard note="Existing users: sign in." redirectTo="/app" />
           </div>
 
           <div style={{ flex: "1 1 320px" }} className="card">
@@ -102,4 +102,3 @@ export default function HomeClient() {
     </main>
   );
 }
-

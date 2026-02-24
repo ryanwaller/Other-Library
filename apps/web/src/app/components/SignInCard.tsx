@@ -1,9 +1,19 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
-export default function SignInCard({ note, showSignUp }: { note?: string; showSignUp?: boolean }) {
+export default function SignInCard({
+  note,
+  showSignUp,
+  redirectTo
+}: {
+  note?: string;
+  showSignUp?: boolean;
+  redirectTo?: string;
+}) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +34,14 @@ export default function SignInCard({ note, showSignUp }: { note?: string; showSi
     setError(null);
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (err) setError(err.message);
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    if (redirectTo) {
+      router.push(redirectTo);
+      router.refresh();
+    }
   }
 
   async function onSubmit(e: FormEvent) {
