@@ -36,7 +36,7 @@ export default function GlobalNav() {
   const [me, setMe] = useState<{ username: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<number>(0);
-  const [pendingBorrowRequests, setPendingBorrowRequests] = useState<number>(0);
+  const [unreadThreads, setUnreadThreads] = useState<number>(0);
   const [followersCount, setFollowersCount] = useState<number>(0);
   const [followingCount, setFollowingCount] = useState<number>(0);
 
@@ -116,36 +116,35 @@ export default function GlobalNav() {
     let alive = true;
     let timer: number | null = null;
 
-    async function refreshPendingBorrow() {
+    async function refreshUnreadThreads() {
       if (!supabase || !sessionUserId) {
-        setPendingBorrowRequests(0);
+        setUnreadThreads(0);
         return;
       }
-      const res = await supabase.rpc("unread_incoming_borrow_requests_count");
+      const res = await supabase.rpc("unread_borrow_threads_count");
       if (!alive) return;
       if (res.error) {
-        // Fallback to "all pending" if the unread RPC isn't installed yet.
-        const fb = await supabase
-          .from("borrow_requests")
-          .select("id", { count: "exact", head: true })
-          .eq("owner_id", sessionUserId)
-          .eq("kind", "borrow")
-          .eq("status", "pending");
+        // Fallback to the older RPC if 0018 isn't installed yet.
+        const old = await supabase.rpc("unread_incoming_borrow_requests_count");
         if (!alive) return;
-        setPendingBorrowRequests(fb.error ? 0 : (fb.count ?? 0));
+        if (!old.error) {
+          setUnreadThreads((old.data as any) ?? 0);
+          return;
+        }
+        setUnreadThreads(0);
         return;
       }
-      setPendingBorrowRequests((res.data as any) ?? 0);
+      setUnreadThreads((res.data as any) ?? 0);
     }
 
-    refreshPendingBorrow();
-    timer = window.setInterval(refreshPendingBorrow, 30_000);
-    window.addEventListener("om:borrow-requests-changed", refreshPendingBorrow);
+    refreshUnreadThreads();
+    timer = window.setInterval(refreshUnreadThreads, 30_000);
+    window.addEventListener("om:borrow-requests-changed", refreshUnreadThreads);
 
     return () => {
       alive = false;
       if (timer) window.clearInterval(timer);
-      window.removeEventListener("om:borrow-requests-changed", refreshPendingBorrow);
+      window.removeEventListener("om:borrow-requests-changed", refreshUnreadThreads);
     };
   }, [sessionUserId]);
 
@@ -210,8 +209,8 @@ export default function GlobalNav() {
               </Link>
             ) : null}
 
-            {pendingBorrowRequests > 0 ? (
-              <Link href="/app/messages" aria-label={`${pendingBorrowRequests} pending borrow requests`} style={{ textDecoration: "none" }}>
+            {unreadThreads > 0 ? (
+              <Link href="/app/messages" aria-label={`${unreadThreads} unread conversations`} style={{ textDecoration: "none" }}>
                 <span
                   style={{
                     display: "inline-flex",
@@ -227,7 +226,7 @@ export default function GlobalNav() {
                     lineHeight: "18px"
                   }}
                 >
-                  {pendingBorrowRequests}
+                  {unreadThreads}
                 </span>
               </Link>
             ) : null}

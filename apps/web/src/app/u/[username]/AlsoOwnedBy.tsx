@@ -92,6 +92,7 @@ export default function AlsoOwnedBy({
 
   if (!supabase) return null;
   if (!editionId) return null;
+  if (!busy && !error && owners.length === 0) return null;
 
   return (
     <div style={{ marginTop: 14 }} className="card">

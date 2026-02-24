@@ -205,11 +205,6 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           <div className="muted">public</div>
         </div>
         {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
-        {profile.bio ? (
-          <div className="muted" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
-            {profile.bio}
-          </div>
-        ) : null}
       </div>
 
       <div style={{ marginTop: 14 }} className="card">
@@ -242,47 +237,60 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           </div>
 
           <div>
-            <div className="muted">Authors</div>
-            <div style={{ marginTop: 6 }}>
-              {effectiveAuthors.length > 0 ? (
-                effectiveAuthors.map((a, idx) => (
-                  <span key={a}>
-                    <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                    {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                  </span>
-                ))
-              ) : (
-                <span className="muted">—</span>
-              )}
-            </div>
+            {effectiveAuthors.length > 0 ? (
+              <>
+                <div className="muted">Authors</div>
+                <div style={{ marginTop: 6 }}>
+                  {effectiveAuthors.map((a, idx) => (
+                    <span key={a}>
+                      <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                      {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                    </span>
+                  ))}
+                </div>
+              </>
+            ) : null}
 
-            <div style={{ marginTop: 12 }} className="muted">
-              Editors / designers
-            </div>
-            <div style={{ marginTop: 6 }} className="muted">
-              {effectiveEditors.length > 0 ? `Editors: ${effectiveEditors.join(", ")}` : "Editors: —"}
-              <br />
-              {effectiveDesigners.length > 0 ? `Designers: ${effectiveDesigners.join(", ")}` : "Designers: —"}
-            </div>
+            {effectiveEditors.length > 0 || effectiveDesigners.length > 0 ? (
+              <>
+                <div style={{ marginTop: 12 }} className="muted">
+                  Editors / designers
+                </div>
+                <div style={{ marginTop: 6 }} className="muted">
+                  {effectiveEditors.length > 0 ? `Editors: ${effectiveEditors.join(", ")}` : null}
+                  {effectiveEditors.length > 0 && effectiveDesigners.length > 0 ? <br /> : null}
+                  {effectiveDesigners.length > 0 ? `Designers: ${effectiveDesigners.join(", ")}` : null}
+                </div>
+              </>
+            ) : null}
 
-            <div style={{ marginTop: 12 }} className="muted">
-              Printer / materials / edition
-            </div>
-            <div style={{ marginTop: 6 }} className="muted">
-              {effectivePrinter ? `Printer: ${effectivePrinter}` : "Printer: —"}
-              <br />
-              {effectiveMaterials ? `Materials: ${effectiveMaterials}` : "Materials: —"}
-              <br />
-              {effectiveEdition ? `Edition: ${effectiveEdition}` : "Edition: —"}
-            </div>
+            {effectivePrinter || effectiveMaterials || effectiveEdition ? (
+              <>
+                <div style={{ marginTop: 12 }} className="muted">
+                  Printer / materials / edition
+                </div>
+                <div style={{ marginTop: 6 }} className="muted">
+                  {effectivePrinter ? `Printer: ${effectivePrinter}` : null}
+                  {effectivePrinter && (effectiveMaterials || effectiveEdition) ? <br /> : null}
+                  {effectiveMaterials ? `Materials: ${effectiveMaterials}` : null}
+                  {effectiveMaterials && effectiveEdition ? <br /> : null}
+                  {effectiveEdition ? `Edition: ${effectiveEdition}` : null}
+                </div>
+              </>
+            ) : null}
 
-            <div style={{ marginTop: 12 }} className="muted">
-              Publisher / date
-            </div>
-            <div style={{ marginTop: 6 }}>
-              {effectivePublisher ? <Link href={`/u/${profile.username}/p/${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link> : "—"}
-              {effectivePublishDate ? ` (${effectivePublishDate})` : ""}
-            </div>
+            {effectivePublisher || effectivePublishDate ? (
+              <>
+                <div style={{ marginTop: 12 }} className="muted">
+                  Publisher / date
+                </div>
+                <div style={{ marginTop: 6 }}>
+                  {effectivePublisher ? <Link href={`/u/${profile.username}/p/${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link> : null}
+                  {effectivePublisher && effectivePublishDate ? ` (${effectivePublishDate})` : null}
+                  {!effectivePublisher && effectivePublishDate ? <span className="muted">{effectivePublishDate}</span> : null}
+                </div>
+              </>
+            ) : null}
 
             <div style={{ marginTop: 12 }} className="muted">
               Borrowing
@@ -301,28 +309,32 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
               />
             </div>
 
-            <div style={{ marginTop: 12 }} className="muted">
-              Subjects
-            </div>
-            <div style={{ marginTop: 6 }}>
-              {subjects.length > 0 ? (
-                subjects.map((s, idx) => (
-                  <span key={s}>
-                    <Link href={`/u/${profile.username}/s/${encodeURIComponent(s)}`}>{s}</Link>
-                    {idx < subjects.length - 1 ? <span>, </span> : null}
-                  </span>
-                ))
-              ) : (
-                <span className="muted">—</span>
-              )}
-            </div>
+            {subjects.length > 0 ? (
+              <>
+                <div style={{ marginTop: 12 }} className="muted">
+                  Subjects
+                </div>
+                <div style={{ marginTop: 6 }}>
+                  {subjects.map((s, idx) => (
+                    <span key={s}>
+                      <Link href={`/u/${profile.username}/s/${encodeURIComponent(s)}`}>{s}</Link>
+                      {idx < subjects.length - 1 ? <span>, </span> : null}
+                    </span>
+                  ))}
+                </div>
+              </>
+            ) : null}
 
-            <div style={{ marginTop: 12 }} className="muted">
-              Description
-            </div>
-            <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-              {effectiveDescription || "—"}
-            </div>
+            {effectiveDescription ? (
+              <>
+                <div style={{ marginTop: 12 }} className="muted">
+                  Description
+                </div>
+                <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
+                  {effectiveDescription}
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
 
@@ -347,7 +359,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           </div>
         ) : (
           <div className="muted" style={{ marginTop: 8 }}>
-            None.
+            none
           </div>
         )}
       </div>

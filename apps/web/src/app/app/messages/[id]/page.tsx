@@ -183,6 +183,11 @@ export default function MessageThreadPage() {
       setSendState({ busy: false, error: res.error.message, message: "Failed" });
       return;
     }
+    try {
+      await supabase.rpc("mark_borrow_request_read", { input_borrow_request_id: req.id });
+    } catch {
+      // ignore
+    }
     setDraft("");
     setThread((prev) => [...prev, res.data as any]);
     setSendState({ busy: false, error: null, message: "Sent" });
@@ -197,6 +202,11 @@ export default function MessageThreadPage() {
     if (res.error) {
       setStatusState({ busy: false, error: res.error.message, message: "Failed" });
       return;
+    }
+    try {
+      await supabase.rpc("mark_borrow_request_read", { input_borrow_request_id: req.id });
+    } catch {
+      // ignore
     }
     notifyBorrowRequestsChanged();
     await refresh();

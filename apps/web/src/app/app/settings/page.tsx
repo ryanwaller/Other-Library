@@ -60,6 +60,7 @@ function safeFileName(name: string): string {
 export default function SettingsPage() {
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
+  const sessionEmail = session?.user?.email ?? null;
 
   const [profile, setProfile] = useState<{
     username: string;
@@ -107,12 +108,39 @@ export default function SettingsPage() {
     message: null
   });
 
+  const [emailDraft, setEmailDraft] = useState<string>("");
+  const [emailState, setEmailState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+
+  const [currentPassword, setCurrentPassword] = useState<string>("");
+  const [newPassword, setNewPassword] = useState<string>("");
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [passwordState, setPasswordState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+
+  const [deleteConfirm, setDeleteConfirm] = useState<string>("");
+  const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSession(newSession));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    setEmailDraft(sessionEmail ?? "");
+  }, [sessionEmail]);
 
   useEffect(() => {
     let alive = true;
@@ -308,6 +336,87 @@ export default function SettingsPage() {
     setAvatarState({ busy: false, error: null, message: "Uploaded" });
   }
 
+  async function saveEmail() {
+    if (!supabase) return;
+    const next = emailDraft.trim();
+    if (!next) {
+      setEmailState({ busy: false, error: "Email is required.", message: "Failed" });
+      return;
+    }
+    setEmailState({ busy: true, error: null, message: "Saving…" });
+    const res = await supabase.auth.updateUser({ email: next });
+    if (res.error) {
+      setEmailState({ busy: false, error: res.error.message, message: "Failed" });
+      return;
+    }
+    setEmailState({ busy: false, error: null, message: "Saved" });
+    window.setTimeout(() => setEmailState({ busy: false, error: null, message: null }), 900);
+  }
+
+  async function savePassword() {
+    if (!supabase) return;
+    const email = (sessionEmail ?? "").trim();
+    if (!email) {
+      setPasswordState({ busy: false, error: "No email on this session.", message: "Failed" });
+      return;
+    }
+    const cur = currentPassword;
+    const next = newPassword;
+    const confirm = confirmPassword;
+    if (!cur.trim()) {
+      setPasswordState({ busy: false, error: "Enter your current password.", message: "Failed" });
+      return;
+    }
+    if (next.length < 8) {
+      setPasswordState({ busy: false, error: "New password must be at least 8 characters.", message: "Failed" });
+      return;
+    }
+    if (next !== confirm) {
+      setPasswordState({ busy: false, error: "Passwords do not match.", message: "Failed" });
+      return;
+    }
+
+    setPasswordState({ busy: true, error: null, message: "Saving…" });
+    // Re-auth via password to confirm identity. (If you signed up via Google and never set a password, this will fail.)
+    const reauth = await supabase.auth.signInWithPassword({ email, password: cur });
+    if (reauth.error) {
+      setPasswordState({
+        busy: false,
+        error: `${reauth.error.message} (If you use Google sign-in and never set a password, use a reset-password flow later.)`,
+        message: "Failed"
+      });
+      return;
+    }
+
+    const res = await supabase.auth.updateUser({ password: next });
+    if (res.error) {
+      setPasswordState({ busy: false, error: res.error.message, message: "Failed" });
+      return;
+    }
+
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordState({ busy: false, error: null, message: "Saved" });
+    window.setTimeout(() => setPasswordState({ busy: false, error: null, message: null }), 900);
+  }
+
+  async function deleteAccount() {
+    if (!supabase) return;
+    if (deleteConfirm.trim() !== "DELETE") {
+      setDeleteState({ busy: false, error: "Type DELETE to confirm.", message: "Failed" });
+      return;
+    }
+    setDeleteState({ busy: true, error: null, message: "Deleting…" });
+    const res = await supabase.rpc("delete_my_account");
+    if (res.error) {
+      setDeleteState({ busy: false, error: res.error.message, message: "Failed" });
+      return;
+    }
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  }
+
   if (!supabase) {
     return (
       <main className="container">
@@ -334,98 +443,6 @@ export default function SettingsPage() {
 
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
-              <div>Avatar</div>
-              <div className="muted">{avatarState.message ? (avatarState.error ? `${avatarState.message} (${avatarState.error})` : avatarState.message) : ""}</div>
-            </div>
-            <div className="row" style={{ marginTop: 10 }}>
-              {avatarUrl ? (
-                <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt=""
-                    src={avatarUrl}
-                    style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
-                  />
-                </a>
-              ) : (
-                <div style={{ width: 28, height: 28, borderRadius: 999, border: "1px solid var(--border)" }} />
-              )}
-              <input type="file" accept="image/*" onChange={(e) => setPendingAvatar((e.target.files ?? [])[0] ?? null)} />
-              <button onClick={uploadAvatar} disabled={!pendingAvatar || avatarState.busy}>
-                {avatarState.busy ? "Uploading…" : "Submit avatar"}
-              </button>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 16 }} className="card">
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <div>Follows</div>
-              <div className="muted">requests + approvals</div>
-            </div>
-            <div className="muted" style={{ marginTop: 8 }}>
-              Manage who can see followers-only content.
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <Link href="/app/follows">Open follow settings</Link>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 16 }} className="card">
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <div>Borrowing</div>
-              <div className="muted">defaults</div>
-            </div>
-            <div className="muted" style={{ marginTop: 8 }}>
-              Set defaults for borrowability. You can override borrowable/not-borrowable per book; request rules apply to all borrowable books.
-            </div>
-            <div className="row" style={{ marginTop: 10 }}>
-              <div style={{ width: 170 }} className="muted">
-                Borrowable by default
-              </div>
-              <select
-                value={profileForm.borrowable_default ? "yes" : "no"}
-                onChange={(e) => setProfileForm((p) => ({ ...p, borrowable_default: e.target.value === "yes" }))}
-              >
-                <option value="no">no</option>
-                <option value="yes">yes</option>
-              </select>
-            </div>
-            <div className="row" style={{ marginTop: 10 }}>
-              <div style={{ width: 170 }} className="muted">
-                Who can request
-              </div>
-              <select
-                value={profileForm.borrow_request_scope}
-                onChange={(e) =>
-                  setProfileForm((p) => ({
-                    ...p,
-                    borrow_request_scope: (e.target.value === "anyone"
-                      ? "anyone"
-                      : e.target.value === "following"
-                        ? "following"
-                        : "followers") as any
-                  }))
-                }
-              >
-                <option value="followers">followers</option>
-                <option value="following">following</option>
-                <option value="anyone">anyone</option>
-              </select>
-              <div className="muted">
-                {profileForm.borrow_request_scope === "anyone"
-                  ? "Any signed-in user."
-                  : profileForm.borrow_request_scope === "following"
-                    ? "Only people you follow."
-                    : "Only approved followers."}
-              </div>
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <Link href="/app/borrow-requests">View borrow requests</Link>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 16 }} className="card">
-            <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Profile</div>
               <div className="muted">
                 {profileSaveState.message
@@ -433,6 +450,33 @@ export default function SettingsPage() {
                     ? `${profileSaveState.message} (${profileSaveState.error})`
                     : profileSaveState.message
                   : ""}
+              </div>
+            </div>
+
+            <div className="row" style={{ marginTop: 10 }}>
+              <div style={{ width: 120 }} className="muted">
+                Photo
+              </div>
+              <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                {avatarUrl ? (
+                  <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt=""
+                      src={avatarUrl}
+                      style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
+                    />
+                  </a>
+                ) : (
+                  <div style={{ width: 28, height: 28, borderRadius: 999, border: "1px solid var(--border)" }} />
+                )}
+                <input type="file" accept="image/*" onChange={(e) => setPendingAvatar((e.target.files ?? [])[0] ?? null)} />
+                <button onClick={uploadAvatar} disabled={!pendingAvatar || avatarState.busy}>
+                  {avatarState.busy ? "Uploading…" : "Submit"}
+                </button>
+                <div className="muted">
+                  {avatarState.message ? (avatarState.error ? `${avatarState.message} (${avatarState.error})` : avatarState.message) : ""}
+                </div>
               </div>
             </div>
 
@@ -540,6 +584,142 @@ export default function SettingsPage() {
                   View public profile
                 </a>
               ) : null}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }} className="card">
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <div>Follows</div>
+              <div className="muted">requests + approvals</div>
+            </div>
+            <div className="muted" style={{ marginTop: 8 }}>
+              Manage who can see followers-only content.
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <Link href="/app/follows">Open follow settings</Link>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }} className="card">
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <div>Borrowing</div>
+              <div className="muted">defaults</div>
+            </div>
+            <div className="muted" style={{ marginTop: 8 }}>
+              Set defaults for borrowability. You can override borrowable/not-borrowable per book; request rules apply to all borrowable books.
+            </div>
+            <div className="row" style={{ marginTop: 10 }}>
+              <div style={{ width: 170 }} className="muted">
+                Borrowable by default
+              </div>
+              <select
+                value={profileForm.borrowable_default ? "yes" : "no"}
+                onChange={(e) => setProfileForm((p) => ({ ...p, borrowable_default: e.target.value === "yes" }))}
+              >
+                <option value="no">no</option>
+                <option value="yes">yes</option>
+              </select>
+            </div>
+            <div className="row" style={{ marginTop: 10 }}>
+              <div style={{ width: 170 }} className="muted">
+                Who can request
+              </div>
+              <select
+                value={profileForm.borrow_request_scope}
+                onChange={(e) =>
+                  setProfileForm((p) => ({
+                    ...p,
+                    borrow_request_scope: (e.target.value === "anyone"
+                      ? "anyone"
+                      : e.target.value === "following"
+                        ? "following"
+                        : "followers") as any
+                  }))
+                }
+              >
+                <option value="followers">followers</option>
+                <option value="following">following</option>
+                <option value="anyone">anyone</option>
+              </select>
+              <div className="muted">
+                {profileForm.borrow_request_scope === "anyone"
+                  ? "Any signed-in user."
+                  : profileForm.borrow_request_scope === "following"
+                    ? "Only people you follow."
+                    : "Only approved followers."}
+              </div>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <Link href="/app/borrow-requests">View borrow requests</Link>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 16 }} className="card">
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <div>Account</div>
+              <div className="muted"></div>
+            </div>
+
+            <div style={{ marginTop: 10 }} className="muted">
+              Email
+            </div>
+            <div className="row" style={{ marginTop: 8 }}>
+              <input
+                value={emailDraft}
+                onChange={(e) => setEmailDraft(e.target.value)}
+                placeholder="you@example.com"
+                style={{ width: 360 }}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  saveEmail();
+                }}
+              />
+              <button onClick={saveEmail} disabled={emailState.busy || !emailDraft.trim()}>
+                {emailState.busy ? "Saving…" : "Save email"}
+              </button>
+              <div className="muted">{emailState.message ? (emailState.error ? `${emailState.message} (${emailState.error})` : emailState.message) : ""}</div>
+            </div>
+
+            <div style={{ marginTop: 12 }} className="muted">
+              Change password
+            </div>
+            <div className="row" style={{ marginTop: 8, alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Current password"
+                style={{ width: 220 }}
+              />
+              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" style={{ width: 220 }} />
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm"
+                style={{ width: 220 }}
+              />
+              <button onClick={savePassword} disabled={passwordState.busy}>
+                {passwordState.busy ? "Saving…" : "Save password"}
+              </button>
+              <div className="muted">
+                {passwordState.message ? (passwordState.error ? `${passwordState.message} (${passwordState.error})` : passwordState.message) : ""}
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12 }} className="muted">
+              Delete account
+            </div>
+            <div className="muted" style={{ marginTop: 6 }}>
+              This is permanent. Type <span style={{ fontWeight: 600 }}>DELETE</span> to confirm.
+            </div>
+            <div className="row" style={{ marginTop: 8, alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="DELETE" style={{ width: 160 }} />
+              <button onClick={deleteAccount} disabled={deleteState.busy}>
+                {deleteState.busy ? "Deleting…" : "Delete account"}
+              </button>
+              <div className="muted">{deleteState.message ? (deleteState.error ? `${deleteState.message} (${deleteState.error})` : deleteState.message) : ""}</div>
             </div>
           </div>
         </div>

@@ -126,6 +126,11 @@ export default function BorrowRequestWidget({
       return;
     }
     const created = res.data as any;
+    try {
+      await supabase.rpc("mark_borrow_request_read", { input_borrow_request_id: created.id });
+    } catch {
+      // ignore
+    }
     setExisting(created);
     setComposerOpen(false);
     setMessage("");
@@ -169,11 +174,6 @@ export default function BorrowRequestWidget({
     return (
       <div>
         <div className="muted">Borrow request: {existing.status}.</div>
-        {existing.message ? (
-          <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-            {existing.message}
-          </div>
-        ) : null}
         <div className="row" style={{ marginTop: 8 }}>
           {existing.status === "pending" ? (
             <button onClick={cancelRequest} disabled={state.busy}>

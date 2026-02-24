@@ -2270,11 +2270,27 @@ export default function BookDetailPage() {
                   <div style={{ minWidth: 110 }} className="muted">
                     Visibility
                   </div>
-                  <select value={formVisibility} onChange={(e) => setFormVisibility(e.target.value as any)} style={{ width: 220 }}>
-                    <option value="inherit">default</option>
-                    <option value="followers_only">private</option>
-                    <option value="public">public</option>
-                  </select>
+                  {formVisibility === "inherit" ? (
+                    <>
+                      <div className="muted" style={{ width: 220 }}>
+                        {ownerProfile ? `From settings: ${ownerProfile.visibility === "public" ? "public" : "private"}` : "From settings: …"}
+                      </div>
+                      <button
+                        onClick={() => setFormVisibility(ownerProfile?.visibility === "public" ? "public" : "followers_only")}
+                        disabled={!ownerProfile}
+                      >
+                        Override
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <select value={formVisibility} onChange={(e) => setFormVisibility(e.target.value as any)} style={{ width: 220 }}>
+                        <option value="followers_only">private</option>
+                        <option value="public">public</option>
+                      </select>
+                      <button onClick={() => setFormVisibility("inherit")}>Revert</button>
+                    </>
+                  )}
                 </div>
 
                 <div className="row" style={{ marginTop: 6 }}>
@@ -2293,11 +2309,24 @@ export default function BookDetailPage() {
                   <div style={{ minWidth: 110 }} className="muted">
                     Borrowable
                   </div>
-                  <select value={formBorrowable} onChange={(e) => setFormBorrowable(e.target.value as any)} style={{ width: 220 }}>
-                    <option value="inherit">default</option>
-                    <option value="yes">yes</option>
-                    <option value="no">no</option>
-                  </select>
+                  {formBorrowable === "inherit" ? (
+                    <>
+                      <div className="muted" style={{ width: 220 }}>
+                        {ownerBorrowDefaults ? `From settings: ${ownerBorrowDefaults.borrowable_default ? "yes" : "no"}` : "From settings: …"}
+                      </div>
+                      <button onClick={() => setFormBorrowable(ownerBorrowDefaults?.borrowable_default ? "yes" : "no")} disabled={!ownerBorrowDefaults}>
+                        Override
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <select value={formBorrowable} onChange={(e) => setFormBorrowable(e.target.value as any)} style={{ width: 220 }}>
+                        <option value="yes">yes</option>
+                        <option value="no">no</option>
+                      </select>
+                      <button onClick={() => setFormBorrowable("inherit")}>Revert</button>
+                    </>
+                  )}
                 </div>
               </div>
 
