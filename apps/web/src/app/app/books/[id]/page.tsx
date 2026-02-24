@@ -16,10 +16,15 @@ type UserBookDetail = {
   visibility: "inherit" | "followers_only" | "public";
   status: "owned" | "loaned" | "selling" | "trading";
   borrowable_override: boolean | null;
-  borrow_request_scope_override: "anyone" | "approved_followers" | null;
+  borrow_request_scope_override: string | null;
   title_override: string | null;
   authors_override: string[] | null;
+  editors_override: string[] | null;
+  designers_override: string[] | null;
   publisher_override: string | null;
+  printer_override: string | null;
+  materials_override: string | null;
+  edition_override: string | null;
   publish_date_override: string | null;
   description_override: string | null;
   subjects_override: string[] | null;
@@ -95,6 +100,20 @@ function normalizeSubjectName(input: string): string {
   return input.trim().replace(/\s+/g, " ");
 }
 
+function uniqStrings(values: Array<string | null | undefined>): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const v of values) {
+    const s = (v ?? "").trim();
+    if (!s) continue;
+    const k = s.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(s);
+  }
+  return out;
+}
+
 function safeFileName(name: string): string {
   return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
 }
@@ -121,6 +140,47 @@ function parseAuthorsInput(input: string): string[] {
   return out;
 }
 
+function normalizeIsbn(input: string): string {
+  return input
+    .trim()
+    .toUpperCase()
+    .replace(/[^0-9X]/g, "");
+}
+
+function looksLikeIsbn(input: string): boolean {
+  const n = normalizeIsbn(input);
+  return n.length === 10 || n.length === 13;
+}
+
+function tryParseUrl(input: string): URL | null {
+  const raw = input.trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw);
+  } catch {
+    if (raw.startsWith("www.")) {
+      try {
+        return new URL(`https://${raw}`);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+function parseTitleAndAuthor(input: string): { title: string; author: string | null } {
+  const s = input.trim().replace(/\s+/g, " ");
+  if (!s) return { title: "", author: null };
+  const by = s.split(/\s+by\s+/i);
+  if (by.length === 2 && by[0] && by[1]) return { title: by[0].trim(), author: by[1].trim() || null };
+  const dash = s.split(" - ");
+  if (dash.length === 2 && dash[0] && dash[1]) return { title: dash[0].trim(), author: dash[1].trim() || null };
+  const slash = s.split(" / ");
+  if (slash.length === 2 && slash[0] && slash[1]) return { title: slash[0].trim(), author: slash[1].trim() || null };
+  return { title: s, author: null };
+}
+
 export default function BookDetailPage() {
   const params = useParams();
   const idParam = (params as any)?.id;
@@ -134,9 +194,10 @@ export default function BookDetailPage() {
   const [book, setBook] = useState<UserBookDetail | null>(null);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
   const [ownerProfile, setOwnerProfile] = useState<{ username: string; visibility: "followers_only" | "public" } | null>(null);
-  const [ownerBorrowDefaults, setOwnerBorrowDefaults] = useState<{ borrowable_default: boolean; borrow_request_scope: "anyone" | "approved_followers" } | null>(
-    null
-  );
+  const [ownerBorrowDefaults, setOwnerBorrowDefaults] = useState<{
+    borrowable_default: boolean;
+    borrow_request_scope: "anyone" | "followers" | "following";
+  } | null>(null);
   const [shareState, setShareState] = useState<{ error: string | null; message: string | null }>({ error: null, message: null });
   const [copiesCount, setCopiesCount] = useState<number | null>(null);
   const [copiesCountState, setCopiesCountState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
@@ -157,7 +218,14 @@ export default function BookDetailPage() {
   const [formTitle, setFormTitle] = useState("");
   const [formAuthors, setFormAuthors] = useState("");
   const [newAuthor, setNewAuthor] = useState("");
+  const [formEditors, setFormEditors] = useState("");
+  const [newEditor, setNewEditor] = useState("");
+  const [formDesigners, setFormDesigners] = useState("");
+  const [newDesigner, setNewDesigner] = useState("");
   const [formPublisher, setFormPublisher] = useState("");
+  const [formPrinter, setFormPrinter] = useState("");
+  const [formMaterials, setFormMaterials] = useState("");
+  const [formEditionOverride, setFormEditionOverride] = useState("");
   const [formPublishDate, setFormPublishDate] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formLocation, setFormLocation] = useState("");
@@ -166,7 +234,6 @@ export default function BookDetailPage() {
   const [formVisibility, setFormVisibility] = useState<"inherit" | "followers_only" | "public">("inherit");
   const [formStatus, setFormStatus] = useState<"owned" | "loaned" | "selling" | "trading">("owned");
   const [formBorrowable, setFormBorrowable] = useState<"inherit" | "yes" | "no">("inherit");
-  const [formBorrowScope, setFormBorrowScope] = useState<"inherit" | "anyone" | "approved_followers">("inherit");
   const [saveState, setSaveState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -194,7 +261,7 @@ export default function BookDetailPage() {
     message: null
   });
 
-  const [linkIsbn, setLinkIsbn] = useState("");
+  const [lookupInput, setLookupInput] = useState("");
   const [linkState, setLinkState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -302,7 +369,7 @@ export default function BookDetailPage() {
       const res = await supabase
         .from("user_books")
         .select(
-          "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
+          "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
         )
         .eq("id", bookId)
         .maybeSingle();
@@ -317,7 +384,12 @@ export default function BookDetailPage() {
       setBook(row);
       setFormTitle(row.title_override ?? "");
       setFormAuthors((row.authors_override ?? []).filter(Boolean).join(", "));
+      setFormEditors((row.editors_override ?? []).filter(Boolean).join(", "));
+      setFormDesigners((row.designers_override ?? []).filter(Boolean).join(", "));
       setFormPublisher(row.publisher_override ?? row.edition?.publisher ?? "");
+      setFormPrinter(row.printer_override ?? "");
+      setFormMaterials(row.materials_override ?? "");
+      setFormEditionOverride(row.edition_override ?? "");
       setFormPublishDate(row.publish_date_override ?? row.edition?.publish_date ?? "");
       setFormDescription(row.description_override ?? row.edition?.description ?? "");
       setFormLocation(row.location ?? "");
@@ -327,9 +399,6 @@ export default function BookDetailPage() {
       setFormStatus(row.status);
       setFormLibraryId((row as any).library_id ?? null);
       setFormBorrowable(row.borrowable_override === null || row.borrowable_override === undefined ? "inherit" : row.borrowable_override ? "yes" : "no");
-      setFormBorrowScope(
-        row.borrow_request_scope_override === null || row.borrow_request_scope_override === undefined ? "inherit" : (row.borrow_request_scope_override as any)
-      );
 
       setSearchTitle((row.title_override ?? row.edition?.title ?? "").trim());
       setSearchAuthor(((row.authors_override ?? row.edition?.authors ?? []) as string[]).filter(Boolean).slice(0, 1).join(", "));
@@ -346,9 +415,14 @@ export default function BookDetailPage() {
           .maybeSingle();
         if (!profileRes.error && profileRes.data?.username) {
           setOwnerProfile({ username: profileRes.data.username, visibility: profileRes.data.visibility as any });
+          const rawScope = String((profileRes.data as any).borrow_request_scope ?? "").trim();
+          const normalizedScope = (rawScope === "anyone" ? "anyone" : rawScope === "following" ? "following" : "followers") as
+            | "anyone"
+            | "followers"
+            | "following";
           setOwnerBorrowDefaults({
             borrowable_default: Boolean((profileRes.data as any).borrowable_default),
-            borrow_request_scope: ((profileRes.data as any).borrow_request_scope === "anyone" ? "anyone" : "approved_followers") as any
+            borrow_request_scope: normalizedScope
           });
         }
       }
@@ -441,17 +515,20 @@ export default function BookDetailPage() {
               let bestScore = -1;
               for (const r of rows) {
                 const media = (r.media ?? []) as any[];
-                const hasCover = media.some((m) => m.kind === "cover" && m.storage_path);
-                const hasImgs = media.some((m) => m.kind === "image" && m.storage_path);
+                const candHasCover = media.some((m) => m.kind === "cover" && m.storage_path);
+                const candHasImgs = media.some((m) => m.kind === "image" && m.storage_path);
+
                 let score = 0;
-                if (hasCover) score += 100;
-                if (hasImgs) score += 10;
-                if (r.publisher_override) score += 2;
-                if (r.publish_date_override) score += 1;
-                if (r.description_override) score += 1;
-                if (Array.isArray(r.subjects_override) && r.subjects_override.length > 0) score += 1;
-                if (Array.isArray(r.authors_override) && r.authors_override.length > 0) score += 1;
-                if (r.title_override) score += 1;
+                // Only count improvements relative to what you're missing.
+                if (!hasCoverMedia && !hasEditionCover && candHasCover) score += 100;
+                if (!hasAnyImages && candHasImgs) score += 10;
+                if (missingPublisher && r.publisher_override) score += 2;
+                if (missingPublishDate && r.publish_date_override) score += 1;
+                if (missingDescription && r.description_override) score += 1;
+                if (missingSubjects && Array.isArray(r.subjects_override) && r.subjects_override.length > 0) score += 1;
+                if (missingAuthors && Array.isArray(r.authors_override) && r.authors_override.length > 0) score += 1;
+                if (missingTitle && r.title_override) score += 1;
+
                 if (score > bestScore) {
                   bestScore = score;
                   best = r;
@@ -516,6 +593,9 @@ export default function BookDetailPage() {
     return (book?.edition?.authors ?? []).filter(Boolean);
   }, [formAuthors, book]);
 
+  const effectiveEditors = useMemo(() => parseAuthorsInput(formEditors), [formEditors]);
+  const effectiveDesigners = useMemo(() => parseAuthorsInput(formDesigners), [formDesigners]);
+
   const isOwner = Boolean(book && userId && book.owner_id === userId);
 
   const copiesLabel = useMemo(() => {
@@ -547,7 +627,7 @@ export default function BookDetailPage() {
   }, [book]);
 
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
-  const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : book?.edition?.cover_url ?? null;
+  const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : suggestedCoverUrl ?? book?.edition?.cover_url ?? null;
   const imageMedia = useMemo(() => (book?.media ?? []).filter((m) => m.kind === "image") ?? [], [book]);
 
   const publicBookPath = useMemo(() => {
@@ -605,10 +685,17 @@ export default function BookDetailPage() {
     setSaveState({ busy: true, error: null, message: "Saving…" });
     const title_override = formTitle.trim() ? formTitle.trim() : null;
     const authors_override = parseAuthorsInput(formAuthors);
+    const editors_override = parseAuthorsInput(formEditors);
+    const designers_override = parseAuthorsInput(formDesigners);
     const payload = {
       title_override,
       authors_override: authors_override.length > 0 ? authors_override : null,
+      editors_override: editors_override.length > 0 ? editors_override : null,
+      designers_override: designers_override.length > 0 ? designers_override : null,
       publisher_override: formPublisher.trim() ? formPublisher.trim() : null,
+      printer_override: formPrinter.trim() ? formPrinter.trim() : null,
+      materials_override: formMaterials.trim() ? formMaterials.trim() : null,
+      edition_override: formEditionOverride.trim() ? formEditionOverride.trim() : null,
       publish_date_override: formPublishDate.trim() ? formPublishDate.trim() : null,
       description_override: formDescription.trim() ? formDescription.trim() : null,
       location: formLocation.trim() ? formLocation.trim() : null,
@@ -616,8 +703,7 @@ export default function BookDetailPage() {
       notes: formNotes.trim() ? formNotes.trim() : null,
       visibility: formVisibility,
       status: formStatus,
-      borrowable_override: formBorrowable === "inherit" ? null : formBorrowable === "yes",
-      borrow_request_scope_override: formBorrowScope === "inherit" ? null : formBorrowScope
+      borrowable_override: formBorrowable === "inherit" ? null : formBorrowable === "yes"
     };
     const res = await supabase.from("user_books").update(payload).eq("id", book.id);
     if (res.error) {
@@ -647,6 +733,48 @@ export default function BookDetailPage() {
     if (!existing.some((a) => a.trim().toLowerCase() === key)) existing.push(name);
     setAuthorsFromList(existing);
     setNewAuthor("");
+  }
+
+  function setEditorsFromList(list: string[]) {
+    setFormEditors(list.join(", "));
+  }
+
+  function removeEditor(name: string) {
+    const target = name.trim().toLowerCase();
+    if (!target) return;
+    const next = (effectiveEditors ?? []).filter((a) => a.trim().toLowerCase() !== target);
+    setEditorsFromList(next);
+  }
+
+  function addEditor() {
+    const name = normalizeAuthorName(newEditor);
+    if (!name) return;
+    const existing = (effectiveEditors ?? []).slice();
+    const key = name.toLowerCase();
+    if (!existing.some((a) => a.trim().toLowerCase() === key)) existing.push(name);
+    setEditorsFromList(existing);
+    setNewEditor("");
+  }
+
+  function setDesignersFromList(list: string[]) {
+    setFormDesigners(list.join(", "));
+  }
+
+  function removeDesigner(name: string) {
+    const target = name.trim().toLowerCase();
+    if (!target) return;
+    const next = (effectiveDesigners ?? []).filter((a) => a.trim().toLowerCase() !== target);
+    setDesignersFromList(next);
+  }
+
+  function addDesigner() {
+    const name = normalizeAuthorName(newDesigner);
+    if (!name) return;
+    const existing = (effectiveDesigners ?? []).slice();
+    const key = name.toLowerCase();
+    if (!existing.some((a) => a.trim().toLowerCase() === key)) existing.push(name);
+    setDesignersFromList(existing);
+    setNewDesigner("");
   }
 
   async function moveToLibrary(nextLibraryId: number) {
@@ -716,7 +844,12 @@ export default function BookDetailPage() {
           status: formStatus,
           title_override: book.title_override ?? null,
           authors_override: (book.authors_override ?? null) as any,
+          editors_override: (book.editors_override ?? null) as any,
+          designers_override: (book.designers_override ?? null) as any,
           publisher_override: book.publisher_override ?? null,
+          printer_override: book.printer_override ?? null,
+          materials_override: book.materials_override ?? null,
+          edition_override: book.edition_override ?? null,
           publish_date_override: book.publish_date_override ?? null,
           description_override: book.description_override ?? null,
           subjects_override: book.subjects_override ?? null,
@@ -1035,9 +1168,9 @@ export default function BookDetailPage() {
     });
   }
 
-  async function searchMetadata() {
-    const title = searchTitle.trim();
-    const author = searchAuthor.trim();
+  async function searchMetadata(titleOverride?: string, authorOverride?: string) {
+    const title = (titleOverride ?? searchTitle).trim();
+    const author = (authorOverride ?? searchAuthor).trim();
     if (!title) return;
     setSearchState({ busy: true, error: null, message: "Searching…" });
     setSearchResults([]);
@@ -1052,8 +1185,8 @@ export default function BookDetailPage() {
     }
   }
 
-  async function previewImportFromUrl() {
-    const url = importUrl.trim();
+  async function previewImportFromUrl(urlOverride?: string) {
+    const url = (urlOverride ?? importUrl).trim();
     if (!url) return;
     setImportState({ busy: true, error: null, message: "Importing…" });
     setImportPreview(null);
@@ -1078,6 +1211,75 @@ export default function BookDetailPage() {
     } catch (e: any) {
       setImportState({ busy: false, error: e?.message ?? "Import failed", message: "Import failed" });
     }
+  }
+
+  async function previewImportFromIsbn(isbn: string) {
+    const value = isbn.trim();
+    if (!value) return;
+    setImportState({ busy: true, error: null, message: "Looking up ISBN…" });
+    setImportPreview(null);
+    setImportMeta({ final_url: null, domain: null, domain_kind: "isbn", scraped_sources: [] });
+    try {
+      const res = await fetch(`/api/isbn?isbn=${encodeURIComponent(value)}`);
+      const json = await res.json();
+      if (!res.ok || !json?.ok) throw new Error(json?.error ?? "ISBN lookup failed");
+      const edition = (json.edition ?? null) as any;
+      if (!edition || typeof edition !== "object") throw new Error("No edition returned");
+      const preview: ImportPreview = {
+        title: typeof edition.title === "string" ? edition.title : null,
+        authors: Array.isArray(edition.authors) ? edition.authors.filter(Boolean) : [],
+        publisher: typeof edition.publisher === "string" ? edition.publisher : null,
+        publish_date: typeof edition.publish_date === "string" ? edition.publish_date : null,
+        description: typeof edition.description === "string" ? edition.description : null,
+        subjects: Array.isArray(edition.subjects) ? edition.subjects.filter(Boolean) : [],
+        isbn10: typeof edition.isbn10 === "string" ? edition.isbn10 : null,
+        isbn13: typeof edition.isbn13 === "string" ? edition.isbn13 : null,
+        cover_url: typeof edition.cover_url === "string" ? edition.cover_url : null,
+        cover_candidates: uniqStrings([typeof edition.cover_url === "string" ? edition.cover_url : null]),
+        sources: Array.from(new Set(["isbn", ...(((edition.sources ?? []) as any[]) ?? []).map((s: any) => String(s))])).filter(Boolean)
+      };
+      setImportPreview(preview);
+      setImportMeta({
+        final_url: null,
+        domain: null,
+        domain_kind: "isbn",
+        scraped_sources: Array.isArray(edition.sources) ? (edition.sources as any[]).map((s) => String(s)) : []
+      });
+      setImportState({ busy: false, error: null, message: "Preview ready" });
+    } catch (e: any) {
+      setImportState({ busy: false, error: e?.message ?? "ISBN lookup failed", message: "ISBN lookup failed" });
+    }
+  }
+
+  async function smartLookup() {
+    const value = lookupInput.trim();
+    if (!value) return;
+
+    setSearchResults([]);
+    setSearchState({ busy: false, error: null, message: null });
+    setImportPreview(null);
+    setImportMeta({ final_url: null, domain: null, domain_kind: null, scraped_sources: [] });
+    setImportState({ busy: false, error: null, message: null });
+    setLinkState({ busy: false, error: null, message: null });
+
+    if (looksLikeIsbn(value)) {
+      await previewImportFromIsbn(value);
+      return;
+    }
+
+    const parsedUrl = tryParseUrl(value);
+    if (parsedUrl) {
+      const url = parsedUrl.toString();
+      setImportUrl(url);
+      await previewImportFromUrl(url);
+      return;
+    }
+
+    const { title, author } = parseTitleAndAuthor(value);
+    if (!title) return;
+    setSearchTitle(title);
+    setSearchAuthor(author ?? "");
+    await searchMetadata(title, author ?? "");
   }
 
   async function linkEditionByIsbn(isbn: string) {
@@ -1125,7 +1327,6 @@ export default function BookDetailPage() {
       const upd = await supabase.from("user_books").update({ edition_id: editionId }).eq("id", book.id);
       if (upd.error) throw new Error(upd.error.message);
 
-      setLinkIsbn("");
       await refresh();
       setLinkState({ busy: false, error: null, message: "Linked" });
       window.setTimeout(() => setLinkState({ busy: false, error: null, message: null }), 1500);
@@ -1343,6 +1544,36 @@ export default function BookDetailPage() {
                     </div>
                     <div className="row" style={{ marginTop: 6 }}>
                       <div style={{ minWidth: 110 }} className="muted">
+                        Editors
+                      </div>
+                      <div>{effectiveEditors.length > 0 ? effectiveEditors.join(", ") : "—"}</div>
+                    </div>
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Designers
+                      </div>
+                      <div>{effectiveDesigners.length > 0 ? effectiveDesigners.join(", ") : "—"}</div>
+                    </div>
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Printer
+                      </div>
+                      <div>{formPrinter.trim() ? formPrinter.trim() : "—"}</div>
+                    </div>
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Materials
+                      </div>
+                      <div>{formMaterials.trim() ? formMaterials.trim() : "—"}</div>
+                    </div>
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Edition
+                      </div>
+                      <div>{formEditionOverride.trim() ? formEditionOverride.trim() : "—"}</div>
+                    </div>
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
                         Publisher
                       </div>
                       <div>
@@ -1391,256 +1622,222 @@ export default function BookDetailPage() {
                 </>
               ) : null}
 
-              {false && isOwner ? (
+              {isOwner ? (
                 <details style={{ marginTop: 14 }}>
-                  <summary className="muted">Lookup &amp; import</summary>
+                  <summary className="muted">Find more metadata</summary>
                   <div style={{ marginTop: 10 }} className="card">
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <div>Link edition (ISBN)</div>
-                  <div className="muted">{book?.edition ? "linked" : "not linked"}</div>
-                </div>
-                <div className="row" style={{ marginTop: 8 }}>
-                  <input
-                    placeholder="ISBN-10 or ISBN-13"
-                    value={linkIsbn}
-                    onChange={(e) => setLinkIsbn(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, () => linkEditionByIsbn(linkIsbn))}
-                    style={{ width: 260 }}
-                  />
-                  <button onClick={() => linkEditionByIsbn(linkIsbn)} disabled={linkState.busy || !linkIsbn.trim()}>
-                    {linkState.busy ? "Linking…" : "Link"}
-                  </button>
-                  <span className="muted" style={{ marginLeft: 10 }}>
-                    {linkState.message ? (linkState.error ? `${linkState.message} (${linkState.error})` : linkState.message) : ""}
-                  </span>
-                </div>
-                <div className="muted" style={{ marginTop: 8 }}>
-                  This upgrades a manual entry by attaching global metadata (covers/subjects/etc). Your overrides stay as-is.
-                </div>
-              </div>
-
-              <div style={{ marginTop: 10 }} className="card">
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <div>Find metadata by title/author</div>
-                  <div className="muted">free sources</div>
-                </div>
-                <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 8 }}>
-                  <input
-                    placeholder="Title"
-                    value={searchTitle}
-                    onChange={(e) => setSearchTitle(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, searchMetadata)}
-                    style={{ width: 260 }}
-                  />
-                  <input
-                    placeholder="Author (optional)"
-                    value={searchAuthor}
-                    onChange={(e) => setSearchAuthor(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, searchMetadata)}
-                    style={{ width: 220 }}
-                  />
-                  <button onClick={searchMetadata} disabled={searchState.busy || !searchTitle.trim()}>
-                    {searchState.busy ? "Searching…" : "Search"}
-                  </button>
-                  <span className="muted" style={{ marginLeft: 10 }}>
-                    {searchState.message ? (searchState.error ? `${searchState.message} (${searchState.error})` : searchState.message) : ""}
-                  </span>
-                </div>
-                {searchResults.length > 0 ? (
-                  <div style={{ marginTop: 10 }}>
-                    {searchResults.map((r, idx) => {
-                      const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
-                      const hasIsbn = Boolean(bestIsbn);
-                      const title = (r.title ?? "").trim() || "—";
-                      const authors = (r.authors ?? []).filter(Boolean).join(", ");
-                      const pub = [r.publisher ?? "", r.publish_date ?? (r.publish_year ? String(r.publish_year) : "")]
-                        .filter(Boolean)
-                        .join(" · ");
-                      return (
-                        <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="card" style={{ marginTop: 8 }}>
-                          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                            <div style={{ width: 62, flex: "0 0 auto" }}>
-                              {r.cover_url ? (
-                                <img
-                                  src={r.cover_url}
-                                  alt=""
-                                  width={60}
-                                  height={90}
-                                  style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
-                                />
-                              ) : (
-                                <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
-                              )}
-                            </div>
-                            <div>
-                              <div>{title}</div>
-                              <div className="muted" style={{ marginTop: 4 }}>
-                                {authors || "—"}
-                                {pub ? ` · ${pub}` : ""}
-                              </div>
-                              <div className="muted" style={{ marginTop: 4 }}>
-                                {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"}
-                                {r.cover_url ? (
-                                  <>
-                                    {" "}
-                                    ·{" "}
-                                    <a href={r.cover_url} target="_blank" rel="noreferrer">
-                                      cover
-                                    </a>
-                                  </>
-                                ) : null}
-                                {" "}
-                                · {r.source}
-                              </div>
-                            </div>
-                            <div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                                {hasIsbn ? (
-                                  <button onClick={() => linkEditionByIsbn(bestIsbn)} disabled={linkState.busy || !bestIsbn}>
-                                    Link ISBN
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => {
-                                      if (r.title) setFormTitle(r.title);
-                                      setFormAuthors((r.authors ?? []).filter(Boolean).join(", "));
-                                      if (r.publisher) setFormPublisher(r.publisher);
-                                      if (r.publish_date) setFormPublishDate(r.publish_date);
-                                      if (r.cover_url) setSuggestedCoverUrl(r.cover_url);
-                                      setSearchState((s) => ({ ...s, message: "Filled fields (not saved)" }));
-                                    }}
-                                    disabled={!r.title && (!r.authors || r.authors.length === 0) && !r.publisher && !r.publish_date}
-                                  >
-                                    Fill fields
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+                      <div>Lookup</div>
+                      <div className="muted">
+                        {importState.busy || searchState.busy ? "Working…" : importState.error || searchState.error ? "Error" : ""}
+                      </div>
+                    </div>
+                    <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                      <input
+                        placeholder='ISBN, URL, or "Title by Author"'
+                        value={lookupInput}
+                        onChange={(e) => setLookupInput(e.target.value)}
+                        onKeyDown={(e) => onEnter(e, smartLookup)}
+                        style={{ width: 520, maxWidth: "100%" }}
+                      />
+                      <button onClick={smartLookup} disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}>
+                        Find
+                      </button>
+                      <span className="muted" style={{ marginLeft: 10 }}>
+                        {importState.message
+                          ? importState.error
+                            ? `${importState.message} (${importState.error})`
+                            : importState.message
+                          : searchState.message
+                            ? searchState.error
+                              ? `${searchState.message} (${searchState.error})`
+                              : searchState.message
+                            : ""}
+                      </span>
+                    </div>
+                    <div className="muted" style={{ marginTop: 8 }}>
+                      Enter an ISBN, paste a link, or search by title/author. Review results, then click <span>Link ISBN</span> or <span>Fill fields</span>.
+                    </div>
                   </div>
-                ) : null}
-              </div>
 
-              <div style={{ marginTop: 10 }} className="card">
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <div>Import metadata from URL</div>
-                  <div className="muted">HTML (JSON-LD/OpenGraph)</div>
-                </div>
-                <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 8 }}>
-                  <input
-                    placeholder="Paste a product/publisher/shop link"
-                    value={importUrl}
-                    onChange={(e) => setImportUrl(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, previewImportFromUrl)}
-                    style={{ width: 520, maxWidth: "100%" }}
-                  />
-                  <button onClick={previewImportFromUrl} disabled={importState.busy || !importUrl.trim()}>
-                    {importState.busy ? "Importing…" : "Preview"}
-                  </button>
-                  <span className="muted" style={{ marginLeft: 10 }}>
-                    {importState.message ? (importState.error ? `${importState.message} (${importState.error})` : importState.message) : ""}
-                  </span>
-                </div>
-                {importPreview
-                  ? (() => {
-                      const preview = importPreview as ImportPreview;
-                      const previewCoverUrl = preview.cover_url ?? undefined;
-                      const previewFinalUrl = importMeta.final_url ?? undefined;
-                      return (
-                        <div style={{ marginTop: 10 }} className="card">
-                          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                            <div style={{ width: 62, flex: "0 0 auto" }}>
-                              {previewCoverUrl ? (
-                                <img
-                                  src={previewCoverUrl}
-                                  alt=""
-                                  width={60}
-                                  height={90}
-                                  style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
-                                />
-                              ) : (
-                                <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
-                              )}
-                            </div>
-                            <div style={{ flex: "1 1 auto" }}>
-                              <div>{(preview.title ?? "").trim() || "—"}</div>
-                              <div className="muted" style={{ marginTop: 4 }}>
-                                {(preview.authors ?? []).filter(Boolean).join(", ") || "—"}
-                              </div>
-                              <div className="muted" style={{ marginTop: 4 }}>
-                                {[preview.publisher ?? "", preview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
-                              </div>
-                              <div className="muted" style={{ marginTop: 4 }}>
-                                {preview.isbn13 || preview.isbn10 ? `ISBN: ${preview.isbn13 ?? preview.isbn10}` : "No ISBN found"} · sources:{" "}
-                                {(preview.sources ?? []).join(", ") || "—"}
-                              </div>
-                              <div className="muted" style={{ marginTop: 4 }}>
-                                {importMeta.domain ? `${importMeta.domain_kind ?? "generic"} · ${importMeta.domain}` : ""}
-                                {previewFinalUrl ? (
-                                  <>
-                                    {" "}
-                                    ·{" "}
-                                    <a href={previewFinalUrl} target="_blank" rel="noreferrer">
-                                      open page
-                                    </a>
-                                  </>
-                                ) : null}
-                                {previewCoverUrl ? (
-                                  <>
-                                    {" "}
-                                    ·{" "}
-                                    <a href={previewCoverUrl} target="_blank" rel="noreferrer">
-                                      open cover
-                                    </a>
-                                  </>
-                                ) : null}
+                  {searchResults.length > 0 ? (
+                    <div style={{ marginTop: 10 }} className="card">
+                      <div className="muted">Title/author results</div>
+                      <div style={{ marginTop: 6 }}>
+                        {searchResults.map((r, idx) => {
+                          const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
+                          const hasIsbn = Boolean(bestIsbn);
+                          const title = (r.title ?? "").trim() || "—";
+                          const authors = (r.authors ?? []).filter(Boolean).join(", ");
+                          const pub = [r.publisher ?? "", r.publish_date ?? (r.publish_year ? String(r.publish_year) : "")]
+                            .filter(Boolean)
+                            .join(" · ");
+                          return (
+                            <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="card" style={{ marginTop: 8 }}>
+                              <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                                <div style={{ width: 62, flex: "0 0 auto" }}>
+                                  {r.cover_url ? (
+                                    <img
+                                      src={r.cover_url}
+                                      alt=""
+                                      width={60}
+                                      height={90}
+                                      style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
+                                    />
+                                  ) : (
+                                    <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
+                                  )}
+                                </div>
+                                <div>
+                                  <div>{title}</div>
+                                  <div className="muted" style={{ marginTop: 4 }}>
+                                    {authors || "—"}
+                                    {pub ? ` · ${pub}` : ""}
+                                  </div>
+                                  <div className="muted" style={{ marginTop: 4 }}>
+                                    {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"}
+                                    {r.cover_url ? (
+                                      <>
+                                        {" "}
+                                        ·{" "}
+                                        <a href={r.cover_url} target="_blank" rel="noreferrer">
+                                          cover
+                                        </a>
+                                      </>
+                                    ) : null}{" "}
+                                    · {r.source}
+                                  </div>
+                                </div>
+                                <div style={{ flex: "0 0 auto" }}>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                                    {hasIsbn ? (
+                                      <button onClick={() => linkEditionByIsbn(bestIsbn)} disabled={linkState.busy || !bestIsbn}>
+                                        Link ISBN
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          if (r.title) setFormTitle(r.title);
+                                          setFormAuthors((r.authors ?? []).filter(Boolean).join(", "));
+                                          if (r.publisher) setFormPublisher(r.publisher);
+                                          if (r.publish_date) setFormPublishDate(r.publish_date);
+                                          if (r.cover_url) setSuggestedCoverUrl(r.cover_url);
+                                          setSearchState((s) => ({ ...s, message: "Filled fields (not saved)" }));
+                                        }}
+                                        disabled={!r.title && (!r.authors || r.authors.length === 0) && !r.publisher && !r.publish_date}
+                                      >
+                                        Fill fields
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                            <div style={{ flex: "0 0 auto" }}>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                                {importPreviewHasIsbn ? (
-                                  <button onClick={() => linkEditionByIsbn(importPreviewIsbn)} disabled={linkState.busy || !importPreviewIsbn}>
-                                    Link ISBN
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => {
-                                      if (preview.title) setFormTitle(preview.title);
-                                      setFormAuthors((preview.authors ?? []).filter(Boolean).join(", "));
-                                      if (preview.publisher) setFormPublisher(preview.publisher);
-                                      if (preview.publish_date) setFormPublishDate(preview.publish_date);
-                                      if (preview.description) setFormDescription(preview.description);
-                                      if (preview.cover_url) setSuggestedCoverUrl(preview.cover_url);
-                                      setImportState((s) => ({ ...s, message: "Filled fields (not saved)" }));
-                                    }}
-                                    disabled={
-                                      !preview.title &&
-                                      (!preview.authors || preview.authors.length === 0) &&
-                                      !preview.publisher &&
-                                      !preview.publish_date &&
-                                      !preview.description
-                                    }
-                                  >
-                                    Fill fields
-                                  </button>
-                                )}
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {importPreview
+                    ? (() => {
+                        const preview = importPreview as ImportPreview;
+                        const previewCoverUrl = preview.cover_url ?? undefined;
+                        const previewFinalUrl = importMeta.final_url ?? undefined;
+                        return (
+                          <div style={{ marginTop: 10 }} className="card">
+                            <div className="muted">Preview</div>
+                            <div style={{ marginTop: 6 }} className="card">
+                              <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                                <div style={{ width: 62, flex: "0 0 auto" }}>
+                                  {previewCoverUrl ? (
+                                    <img
+                                      src={previewCoverUrl}
+                                      alt=""
+                                      width={60}
+                                      height={90}
+                                      style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
+                                    />
+                                  ) : (
+                                    <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
+                                  )}
+                                </div>
+                                <div style={{ flex: "1 1 auto" }}>
+                                  <div>{(preview.title ?? "").trim() || "—"}</div>
+                                  <div className="muted" style={{ marginTop: 4 }}>
+                                    {(preview.authors ?? []).filter(Boolean).join(", ") || "—"}
+                                  </div>
+                                  <div className="muted" style={{ marginTop: 4 }}>
+                                    {[preview.publisher ?? "", preview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
+                                  </div>
+                                  <div className="muted" style={{ marginTop: 4 }}>
+                                    {preview.isbn13 || preview.isbn10 ? `ISBN: ${preview.isbn13 ?? preview.isbn10}` : "No ISBN found"} · sources:{" "}
+                                    {(preview.sources ?? []).join(", ") || "—"}
+                                  </div>
+                                  <div className="muted" style={{ marginTop: 4 }}>
+                                    {importMeta.domain ? `${importMeta.domain_kind ?? "generic"} · ${importMeta.domain}` : importMeta.domain_kind ?? ""}
+                                    {previewFinalUrl ? (
+                                      <>
+                                        {" "}
+                                        ·{" "}
+                                        <a href={previewFinalUrl} target="_blank" rel="noreferrer">
+                                          open page
+                                        </a>
+                                      </>
+                                    ) : null}
+                                    {previewCoverUrl ? (
+                                      <>
+                                        {" "}
+                                        ·{" "}
+                                        <a href={previewCoverUrl} target="_blank" rel="noreferrer">
+                                          open cover
+                                        </a>
+                                      </>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                <div style={{ flex: "0 0 auto" }}>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                                    {importPreviewHasIsbn ? (
+                                      <button onClick={() => linkEditionByIsbn(importPreviewIsbn)} disabled={linkState.busy || !importPreviewIsbn}>
+                                        Link ISBN
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          if (preview.title) setFormTitle(preview.title);
+                                          setFormAuthors((preview.authors ?? []).filter(Boolean).join(", "));
+                                          if (preview.publisher) setFormPublisher(preview.publisher);
+                                          if (preview.publish_date) setFormPublishDate(preview.publish_date);
+                                          if (preview.description) setFormDescription(preview.description);
+                                          if (preview.cover_url) setSuggestedCoverUrl(preview.cover_url);
+                                          setImportState((s) => ({ ...s, message: "Filled fields (not saved)" }));
+                                        }}
+                                        disabled={
+                                          !preview.title &&
+                                          (!preview.authors || preview.authors.length === 0) &&
+                                          !preview.publisher &&
+                                          !preview.publish_date &&
+                                          !preview.description
+                                        }
+                                      >
+                                        Fill fields
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
+                              {preview.subjects && preview.subjects.length > 0 ? (
+                                <div className="muted" style={{ marginTop: 10 }}>
+                                  Subjects found: {preview.subjects.slice(0, 12).join(", ")}
+                                  {preview.subjects.length > 12 ? "…" : ""} (you can add them below)
+                                </div>
+                              ) : null}
                             </div>
                           </div>
-                          {preview.subjects && preview.subjects.length > 0 ? (
-                            <div className="muted" style={{ marginTop: 10 }}>
-                              Subjects found: {preview.subjects.slice(0, 12).join(", ")}
-                              {preview.subjects.length > 12 ? "…" : ""} (you can add them below)
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })()
-                  : null}
-              </div>
+                        );
+                      })()
+                    : null}
                 </details>
               ) : null}
 
@@ -1707,14 +1904,129 @@ export default function BookDetailPage() {
                   </div>
                 </div>
 
+                <div style={{ marginTop: 10 }}>
+                  <div className="muted">Editors</div>
+                  <div style={{ marginTop: 6 }}>
+                    {effectiveEditors.length > 0 ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {effectiveEditors.map((a) => (
+                          <span
+                            key={a}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              border: "1px solid var(--border)",
+                              padding: "2px 6px"
+                            }}
+                          >
+                            <span>{a}</span>
+                            <button onClick={() => removeEditor(a)} aria-label={`Remove editor ${a}`}>
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="muted">—</div>
+                    )}
+                  </div>
+                  <div className="row" style={{ marginTop: 8 }}>
+                    <input
+                      value={newEditor}
+                      onChange={(e) => setNewEditor(e.target.value)}
+                      onKeyDown={(e) => onEnter(e, addEditor)}
+                      placeholder="Add an editor"
+                      style={{ width: 220 }}
+                    />
+                    <button onClick={addEditor} disabled={!newEditor.trim()}>
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 10 }}>
+                  <div className="muted">Designers</div>
+                  <div style={{ marginTop: 6 }}>
+                    {effectiveDesigners.length > 0 ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {effectiveDesigners.map((a) => (
+                          <span
+                            key={a}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              border: "1px solid var(--border)",
+                              padding: "2px 6px"
+                            }}
+                          >
+                            <span>{a}</span>
+                            <button onClick={() => removeDesigner(a)} aria-label={`Remove designer ${a}`}>
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="muted">—</div>
+                    )}
+                  </div>
+                  <div className="row" style={{ marginTop: 8 }}>
+                    <input
+                      value={newDesigner}
+                      onChange={(e) => setNewDesigner(e.target.value)}
+                      onKeyDown={(e) => onEnter(e, addDesigner)}
+                      placeholder="Add a designer"
+                      style={{ width: 220 }}
+                    />
+                    <button onClick={addDesigner} disabled={!newDesigner.trim()}>
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 10 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Printer
+                  </div>
+                  <input
+                    value={formPrinter}
+                    onChange={(e) => setFormPrinter(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, saveEdits)}
+                    style={{ width: 360 }}
+                  />
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Materials
+                  </div>
+                  <input
+                    value={formMaterials}
+                    onChange={(e) => setFormMaterials(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, saveEdits)}
+                    style={{ width: 360 }}
+                  />
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Edition
+                  </div>
+                  <input
+                    value={formEditionOverride}
+                    onChange={(e) => setFormEditionOverride(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, saveEdits)}
+                    style={{ width: 360 }}
+                  />
+                </div>
+
                 <div className="row" style={{ marginTop: 6 }}>
                   <div style={{ minWidth: 110 }} className="muted">
                     Publisher
                   </div>
                   <input value={formPublisher} onChange={(e) => setFormPublisher(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} style={{ width: 360 }} />
-                  <div className="muted">
-                    {effectivePublisher ? <Link href={`/app?publisher=${encodeURIComponent(effectivePublisher)}`}>browse</Link> : ""}
-                  </div>
                 </div>
 
                 <div className="row" style={{ marginTop: 6 }}>
@@ -1959,8 +2271,8 @@ export default function BookDetailPage() {
                     Visibility
                   </div>
                   <select value={formVisibility} onChange={(e) => setFormVisibility(e.target.value as any)} style={{ width: 220 }}>
-                    <option value="inherit">inherit</option>
-                    <option value="followers_only">followers_only</option>
+                    <option value="inherit">default</option>
+                    <option value="followers_only">private</option>
                     <option value="public">public</option>
                   </select>
                 </div>
@@ -1982,20 +2294,9 @@ export default function BookDetailPage() {
                     Borrowable
                   </div>
                   <select value={formBorrowable} onChange={(e) => setFormBorrowable(e.target.value as any)} style={{ width: 220 }}>
-                    <option value="inherit">inherit</option>
+                    <option value="inherit">default</option>
                     <option value="yes">yes</option>
                     <option value="no">no</option>
-                  </select>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Requests
-                  </div>
-                  <select value={formBorrowScope} onChange={(e) => setFormBorrowScope(e.target.value as any)} style={{ width: 220 }}>
-                    <option value="inherit">inherit</option>
-                    <option value="anyone">anyone</option>
-                    <option value="approved_followers">approved_followers</option>
                   </select>
                 </div>
               </div>

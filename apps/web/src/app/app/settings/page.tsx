@@ -68,34 +68,30 @@ export default function SettingsPage() {
     visibility: string;
     avatar_path: string | null;
     borrowable_default: boolean;
-    borrow_request_scope: "anyone" | "approved_followers";
+    borrow_request_scope: "anyone" | "followers" | "following";
   } | null>(null);
   const [aliases, setAliases] = useState<Array<{ old_username: string; created_at: string }>>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [newUsername, setNewUsername] = useState("");
-  const [changeState, setChangeState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
-    busy: false,
-    error: null,
-    message: null
-  });
   const [usernameAvailability, setUsernameAvailability] = useState<{ state: "idle" | "checking" | "available" | "taken" | "error"; message: string | null }>(
     { state: "idle", message: null }
   );
 
   const [profileForm, setProfileForm] = useState<{
+    username: string;
     display_name: string;
     bio: string;
     visibility: "followers_only" | "public";
     borrowable_default: boolean;
-    borrow_request_scope: "anyone" | "approved_followers";
+    borrow_request_scope: "anyone" | "followers" | "following";
   }>({
+    username: "",
     display_name: "",
     bio: "",
     visibility: "followers_only",
     borrowable_default: false,
-    borrow_request_scope: "approved_followers"
+    borrow_request_scope: "followers"
   });
   const [profileSaveState, setProfileSaveState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
@@ -134,12 +130,16 @@ export default function SettingsPage() {
       const nextProfile = ((res.data as any) ?? null) as typeof profile;
       setProfile(nextProfile);
       if (nextProfile) {
+        const rawScope = String((nextProfile as any).borrow_request_scope ?? "").trim();
+        const normalizedScope =
+          rawScope === "anyone" ? "anyone" : rawScope === "following" ? "following" : rawScope === "followers" ? "followers" : "followers";
         setProfileForm({
+          username: (nextProfile.username ?? "") as string,
           display_name: (nextProfile.display_name ?? "") as string,
           bio: (nextProfile.bio ?? "") as string,
           visibility: (nextProfile.visibility === "public" ? "public" : "followers_only") as any,
           borrowable_default: Boolean((nextProfile as any).borrowable_default),
-          borrow_request_scope: (((nextProfile as any).borrow_request_scope as string) === "anyone" ? "anyone" : "approved_followers") as any
+          borrow_request_scope: normalizedScope as any
         });
       }
       setBusy(false);
@@ -183,27 +183,41 @@ export default function SettingsPage() {
     };
   }, [userId, profile?.username]);
 
-  const normalized = useMemo(() => normalizeUsername(newUsername), [newUsername]);
+  const normalized = useMemo(() => normalizeUsername(profileForm.username), [profileForm.username]);
   const localUsernameIssue = useMemo(() => {
-    if (!normalized) return null;
+    if (!normalized) {
+      if (profile && (profileForm.username ?? "").trim() === "") return "invalid";
+      return null;
+    }
+    if (profile && normalized === profile.username) return null;
     if (!isValidUsername(normalized)) return "invalid";
     if (isReservedUsername(normalized)) return "reserved";
     return null;
-  }, [normalized]);
+  }, [normalized, profile?.username, profileForm.username]);
+
+  const usernameSaveBlocked = useMemo(() => {
+    if (!profile) return false;
+    if (normalized === profile.username) return false;
+    if (!normalized) return true;
+    if (localUsernameIssue) return true;
+    if (usernameAvailability.state === "checking") return true;
+    if (usernameAvailability.state === "taken") return true;
+    return false;
+  }, [profile?.username, normalized, localUsernameIssue, usernameAvailability.state]);
 
   useEffect(() => {
-    if (!supabase) return;
     const client = supabase;
-    if (!normalized) {
-      setUsernameAvailability({ state: "idle", message: null });
-      return;
-    }
+    if (!client) return;
     if (localUsernameIssue === "invalid") {
-      setUsernameAvailability({ state: "idle", message: "Invalid format." });
+      setUsernameAvailability({ state: "idle", message: normalized ? "Invalid format." : "Required." });
       return;
     }
     if (localUsernameIssue === "reserved") {
       setUsernameAvailability({ state: "idle", message: "Reserved word." });
+      return;
+    }
+    if (!normalized || (profile && normalized === profile.username)) {
+      setUsernameAvailability({ state: "idle", message: null });
       return;
     }
 
@@ -218,59 +232,48 @@ export default function SettingsPage() {
       setUsernameAvailability({ state: available ? "available" : "taken", message: available ? "Available." : "Taken." });
     }, 350);
     return () => window.clearTimeout(t);
-  }, [normalized, localUsernameIssue]);
-
-  const canSubmit = useMemo(() => {
-    if (!profile) return false;
-    if (!normalized) return false;
-    if (normalized === profile.username) return false;
-    if (!isValidUsername(normalized)) return false;
-    if (isReservedUsername(normalized)) return false;
-    if (usernameAvailability.state === "checking") return false;
-    if (usernameAvailability.state === "taken") return false;
-    return true;
-  }, [profile, normalized, usernameAvailability.state]);
-
-  async function changeUsername() {
-    if (!supabase || !userId || !profile) return;
-    setChangeState({ busy: true, error: null, message: "Saving…" });
-    const next = normalized;
-    const res = await supabase.rpc("change_username", { new_username: next });
-    if (res.error) {
-      setChangeState({ busy: false, error: humanizeUsernameError(res.error.message), message: "Failed" });
-      return;
-    }
-    const payload = (res.data as any) ?? null;
-    const actualNext = typeof payload?.new === "string" ? payload.new : next;
-    const actualPrev = typeof payload?.old === "string" ? payload.old : profile.username;
-    setProfile((p) => (p ? { ...p, username: actualNext } : p));
-    setNewUsername("");
-    setChangeState({ busy: false, error: null, message: actualPrev !== actualNext ? `Saved (@${actualPrev} → @${actualNext})` : "Saved" });
-  }
+  }, [normalized, localUsernameIssue, profile?.username]);
 
   async function saveProfile() {
     if (!supabase || !userId) return;
     setProfileSaveState({ busy: true, error: null, message: "Saving…" });
-    const payload = {
-      display_name: profileForm.display_name.trim() ? profileForm.display_name.trim() : null,
-      bio: profileForm.bio.trim() ? profileForm.bio.trim() : null,
-      visibility: profileForm.visibility,
-      borrowable_default: Boolean(profileForm.borrowable_default),
-      borrow_request_scope: profileForm.borrow_request_scope
-    };
-    const res = await supabase
-      .from("profiles")
-      .update(payload)
-      .eq("id", userId)
-      .select("username,display_name,bio,visibility,avatar_path,borrowable_default,borrow_request_scope")
-      .maybeSingle();
-    if (res.error) {
-      setProfileSaveState({ busy: false, error: res.error.message, message: "Failed" });
-      return;
+    try {
+      // Username change (optional), but saved via the same Profile save button.
+      const nextUsername = normalizeUsername(profileForm.username);
+      if (profile && nextUsername && nextUsername !== profile.username) {
+        if (!isValidUsername(nextUsername)) throw new Error("Username is invalid.");
+        if (isReservedUsername(nextUsername)) throw new Error("That username is reserved.");
+        if (usernameAvailability.state === "checking") throw new Error("Still checking username availability…");
+        if (usernameAvailability.state === "taken") throw new Error("That username is already taken (or previously used).");
+
+        const changed = await supabase.rpc("change_username", { new_username: nextUsername });
+        if (changed.error) throw new Error(humanizeUsernameError(changed.error.message));
+        const payload = (changed.data as any) ?? null;
+        const actualNext = typeof payload?.new === "string" ? payload.new : nextUsername;
+        setProfile((p) => (p ? { ...p, username: actualNext } : p));
+        setProfileForm((p) => ({ ...p, username: actualNext }));
+      }
+
+      const payload = {
+        display_name: profileForm.display_name.trim() ? profileForm.display_name.trim() : null,
+        bio: profileForm.bio.trim() ? profileForm.bio.trim() : null,
+        visibility: profileForm.visibility,
+        borrowable_default: Boolean(profileForm.borrowable_default),
+        borrow_request_scope: profileForm.borrow_request_scope
+      };
+      const res = await supabase
+        .from("profiles")
+        .update(payload)
+        .eq("id", userId)
+        .select("username,display_name,bio,visibility,avatar_path,borrowable_default,borrow_request_scope")
+        .maybeSingle();
+      if (res.error) throw new Error(res.error.message);
+      const nextProfile = ((res.data as any) ?? null) as typeof profile;
+      if (nextProfile) setProfile(nextProfile);
+      setProfileSaveState({ busy: false, error: null, message: "Saved" });
+    } catch (e: any) {
+      setProfileSaveState({ busy: false, error: e?.message ?? "Failed", message: "Failed" });
     }
-    const nextProfile = ((res.data as any) ?? null) as typeof profile;
-    if (nextProfile) setProfile(nextProfile);
-    setProfileSaveState({ busy: false, error: null, message: "Saved" });
   }
 
   async function uploadAvatar() {
@@ -373,7 +376,7 @@ export default function SettingsPage() {
               <div className="muted">defaults</div>
             </div>
             <div className="muted" style={{ marginTop: 8 }}>
-              Set defaults for whether books are borrowable. You can override per-book on the detail page.
+              Set defaults for borrowability. You can override borrowable/not-borrowable per book; request rules apply to all borrowable books.
             </div>
             <div className="row" style={{ marginTop: 10 }}>
               <div style={{ width: 170 }} className="muted">
@@ -396,86 +399,29 @@ export default function SettingsPage() {
                 onChange={(e) =>
                   setProfileForm((p) => ({
                     ...p,
-                    borrow_request_scope: (e.target.value === "anyone" ? "anyone" : "approved_followers") as any
+                    borrow_request_scope: (e.target.value === "anyone"
+                      ? "anyone"
+                      : e.target.value === "following"
+                        ? "following"
+                        : "followers") as any
                   }))
                 }
               >
-                <option value="approved_followers">approved_followers</option>
+                <option value="followers">followers</option>
+                <option value="following">following</option>
                 <option value="anyone">anyone</option>
               </select>
-              <div className="muted">{profileForm.borrow_request_scope === "anyone" ? "Any signed-in user." : "Only approved followers."}</div>
+              <div className="muted">
+                {profileForm.borrow_request_scope === "anyone"
+                  ? "Any signed-in user."
+                  : profileForm.borrow_request_scope === "following"
+                    ? "Only people you follow."
+                    : "Only approved followers."}
+              </div>
             </div>
             <div style={{ marginTop: 10 }}>
               <Link href="/app/borrow-requests">View borrow requests</Link>
             </div>
-          </div>
-
-          <div style={{ marginTop: 16 }} className="card">
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <div>Username</div>
-              <div className="muted">{profile ? `@${profile.username}` : ""}</div>
-            </div>
-
-            <div className="muted" style={{ marginTop: 8 }}>
-              This affects your public/crawlable URLs. Old usernames permanently redirect to the new one.
-            </div>
-
-            <div className="row" style={{ marginTop: 10 }}>
-              <input
-                placeholder="new_username"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
-                  changeUsername();
-                }}
-                style={{ width: 220 }}
-              />
-              <button onClick={changeUsername} disabled={!canSubmit || changeState.busy}>
-                {changeState.busy ? "Saving…" : "Change username"}
-              </button>
-              <div className="muted">
-                {changeState.message ? (changeState.error ? `${changeState.message} (${changeState.error})` : changeState.message) : ""}
-                {!changeState.busy && !changeState.message && normalized
-                  ? ` ${usernameAvailability.message ?? ""}`
-                  : ""}
-              </div>
-            </div>
-
-            <div className="muted" style={{ marginTop: 8 }}>
-              Rules: 3–24 chars, lowercase letters/numbers/underscore. No leading/trailing underscore.
-            </div>
-
-            <details style={{ marginTop: 8 }}>
-              <summary className="muted">Reserved words</summary>
-              <div className="muted" style={{ marginTop: 6 }}>
-                {RESERVED_USERNAMES.join(", ")}
-              </div>
-            </details>
-
-            {profile ? (
-              <div className="muted" style={{ marginTop: 10 }}>
-                Public profile:{" "}
-                <a href={`/u/${profile.username}`} target="_blank" rel="noreferrer">
-                  /u/{profile.username}
-                </a>
-              </div>
-            ) : null}
-
-            {aliases.length > 0 ? (
-              <div className="muted" style={{ marginTop: 10 }}>
-                Redirects from old usernames:{" "}
-                {aliases.map((a, idx) => (
-                  <span key={a.old_username}>
-                    <a href={`/u/${a.old_username}`} target="_blank" rel="noreferrer">
-                      /u/{a.old_username}
-                    </a>
-                    {idx < aliases.length - 1 ? ", " : ""}
-                  </span>
-                ))}
-              </div>
-            ) : null}
           </div>
 
           <div style={{ marginTop: 16 }} className="card">
@@ -489,6 +435,56 @@ export default function SettingsPage() {
                   : ""}
               </div>
             </div>
+
+            <div className="row" style={{ marginTop: 10 }}>
+              <div style={{ width: 120 }} className="muted">
+                Username
+              </div>
+              <input
+                value={profileForm.username}
+                onChange={(e) => setProfileForm((p) => ({ ...p, username: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  saveProfile();
+                }}
+                placeholder="username"
+                style={{ width: 220 }}
+              />
+              <div className="muted">
+                {profile && normalized && normalized !== profile.username ? usernameAvailability.message ?? "" : ""}
+              </div>
+            </div>
+            <div className="muted" style={{ marginTop: 8 }}>
+              Rules: 3–24 chars, lowercase letters/numbers/underscore. No leading/trailing underscore.
+            </div>
+            <details style={{ marginTop: 8 }}>
+              <summary className="muted">Reserved words</summary>
+              <div className="muted" style={{ marginTop: 6 }}>
+                {RESERVED_USERNAMES.join(", ")}
+              </div>
+            </details>
+            {profile ? (
+              <div className="muted" style={{ marginTop: 10 }}>
+                Public profile:{" "}
+                <a href={`/u/${profile.username}`} target="_blank" rel="noreferrer">
+                  /u/{profile.username}
+                </a>
+              </div>
+            ) : null}
+            {aliases.length > 0 ? (
+              <div className="muted" style={{ marginTop: 10 }}>
+                Redirects from old usernames:{" "}
+                {aliases.map((a, idx) => (
+                  <span key={a.old_username}>
+                    <a href={`/u/${a.old_username}`} target="_blank" rel="noreferrer">
+                      /u/{a.old_username}
+                    </a>
+                    {idx < aliases.length - 1 ? ", " : ""}
+                  </span>
+                ))}
+              </div>
+            ) : null}
 
             <div className="row" style={{ marginTop: 10 }}>
               <div style={{ width: 120 }} className="muted">
@@ -536,7 +532,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="row" style={{ marginTop: 12 }}>
-              <button onClick={saveProfile} disabled={profileSaveState.busy}>
+              <button onClick={saveProfile} disabled={profileSaveState.busy || usernameSaveBlocked}>
                 {profileSaveState.busy ? "Saving…" : "Save profile"}
               </button>
               {profile ? (

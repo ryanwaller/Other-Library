@@ -15,12 +15,12 @@ type PublicBook = {
   title_override: string | null;
   authors_override: string[] | null;
   borrowable_override: boolean | null;
-  borrow_request_scope_override: "anyone" | "approved_followers" | null;
+  borrow_request_scope_override: string | null;
   edition: { id: number; isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
 
-type BorrowScope = "anyone" | "approved_followers";
+type BorrowScope = "anyone" | "followers" | "following";
 
 function normalizeKeyPart(input: string): string {
   return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -55,8 +55,10 @@ function effectiveBorrowableFor(b: PublicBook, profile: any): boolean {
 }
 
 function effectiveScopeFor(b: PublicBook, profile: any): BorrowScope {
-  const raw = (b.borrow_request_scope_override ?? profile?.borrow_request_scope ?? "approved_followers") as string;
-  return raw === "anyone" ? "anyone" : "approved_followers";
+  const raw = String(profile?.borrow_request_scope ?? "").trim();
+  if (raw === "anyone") return "anyone";
+  if (raw === "following") return "following";
+  return "followers";
 }
 
 export default async function PublicProfilePage({ params }: { params: Promise<{ username: string }> }) {
@@ -234,13 +236,12 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             {libraries.map((lib) => {
               const groups = groupsByLibraryId.get(lib.id) ?? [];
               if (groups.length === 0) return null;
-              const copiesCount = groups.reduce((sum, g) => sum + g.copies.length, 0);
               return (
                 <div key={lib.id} className="card">
                   <div className="row" style={{ justifyContent: "space-between" }}>
                     <div>{lib.name}</div>
                     <div className="muted">
-                      {groups.length} book{groups.length === 1 ? "" : "s"} / {copiesCount} cop{copiesCount === 1 ? "y" : "ies"}
+                      {groups.length} book{groups.length === 1 ? "" : "s"}
                     </div>
                   </div>
                   <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>

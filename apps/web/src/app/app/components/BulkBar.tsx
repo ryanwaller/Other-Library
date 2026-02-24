@@ -15,6 +15,8 @@ export default function BulkBar({
   bulkMoveLibraryId,
   setBulkMoveLibraryId,
   onBulkDeleteSelected,
+  onBulkMakePublic,
+  onBulkMakePrivate,
   onBulkAssignCategory,
   onBulkMoveSelected,
   onBulkCopySelected
@@ -28,6 +30,8 @@ export default function BulkBar({
   bulkMoveLibraryId: number | null;
   setBulkMoveLibraryId: (next: number) => void;
   onBulkDeleteSelected: () => void;
+  onBulkMakePublic: () => void;
+  onBulkMakePrivate: () => void;
   onBulkAssignCategory: () => void;
   onBulkMoveSelected: () => void;
   onBulkCopySelected: () => void;
@@ -39,6 +43,12 @@ export default function BulkBar({
     <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
       <button onClick={onBulkDeleteSelected} disabled={!canAct}>
         Delete selected
+      </button>
+      <button onClick={onBulkMakePublic} disabled={!canAct}>
+        Make public
+      </button>
+      <button onClick={onBulkMakePrivate} disabled={!canAct}>
+        Make private
       </button>
       <span className="muted">Category</span>
       <input
@@ -77,4 +87,3 @@ export default function BulkBar({
     </div>
   );
 }
-

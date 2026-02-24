@@ -139,6 +139,7 @@ function AppShell({
     filterPublishers: string[];
     title: string;
     visibility: "inherit" | "followers_only" | "public" | "mixed";
+    effectiveVisibility: "public" | "followers_only" | "mixed";
     latestCreatedAt: number;
     earliestCreatedAt: number;
   };
@@ -149,6 +150,7 @@ function AppShell({
   const [gridCols, setGridCols] = useState<2 | 4 | 8>(4);
   const [sortMode, setSortMode] = useState<"latest" | "earliest" | "title_asc" | "title_desc">("latest");
   const [categoryMode, setCategoryMode] = useState<string>("all");
+  const [visibilityMode, setVisibilityMode] = useState<"all" | "public" | "private">("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [deleteStateByBookId, setDeleteStateByBookId] = useState<Record<number, { busy: boolean; error: string | null; message: string | null } | undefined>>(
     {}
@@ -181,10 +183,12 @@ function AppShell({
       const gc = window.localStorage.getItem("om_gridCols");
       const sm = window.localStorage.getItem("om_sortMode");
       const cm = window.localStorage.getItem("om_categoryMode");
+      const vis = window.localStorage.getItem("om_visibilityMode");
       if (vm === "grid" || vm === "list") setViewMode(vm);
       if (gc === "2" || gc === "4" || gc === "8") setGridCols(Number(gc) as any);
       if (sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
       if (cm && typeof cm === "string") setCategoryMode(cm);
+      if (vis === "all" || vis === "public" || vis === "private") setVisibilityMode(vis);
     } catch {
       // ignore
     }
@@ -196,10 +200,11 @@ function AppShell({
       window.localStorage.setItem("om_gridCols", String(gridCols));
       window.localStorage.setItem("om_sortMode", sortMode);
       if (!filterCategory) window.localStorage.setItem("om_categoryMode", categoryMode);
+      window.localStorage.setItem("om_visibilityMode", visibilityMode);
     } catch {
       // ignore
     }
-  }, [viewMode, gridCols, sortMode, categoryMode, filterCategory]);
+  }, [viewMode, gridCols, sortMode, categoryMode, filterCategory, visibilityMode]);
 
   useEffect(() => {
     const normalized = (filterCategory ?? "").trim();
@@ -578,6 +583,34 @@ function AppShell({
     }
   }
 
+  async function previewIsbn(isbn: string) {
+    setAddState({ busy: true, error: null, message: "Looking up ISBN…" });
+    setAddUrlPreview(null);
+    setAddUrlMeta({ final_url: null, domain: null, domain_kind: null });
+    try {
+      const res = await fetch(`/api/isbn?isbn=${encodeURIComponent(isbn)}`);
+      const json = await res.json();
+      if (!res.ok || !json?.ok) throw new Error(json?.error ?? "ISBN lookup failed");
+      const edition = (json.edition ?? null) as any;
+      if (!edition || typeof edition !== "object") throw new Error("No edition returned");
+      setAddUrlPreview({
+        title: typeof edition.title === "string" ? edition.title : null,
+        authors: Array.isArray(edition.authors) ? edition.authors.filter(Boolean) : [],
+        publisher: typeof edition.publisher === "string" ? edition.publisher : null,
+        publish_date: typeof edition.publish_date === "string" ? edition.publish_date : null,
+        description: typeof edition.description === "string" ? edition.description : null,
+        subjects: Array.isArray(edition.subjects) ? edition.subjects.filter(Boolean) : [],
+        isbn10: typeof edition.isbn10 === "string" ? edition.isbn10 : null,
+        isbn13: typeof edition.isbn13 === "string" ? edition.isbn13 : null,
+        cover_url: typeof edition.cover_url === "string" ? edition.cover_url : null,
+        sources: Array.from(new Set(["isbn", ...((edition.sources ?? []) as any[]).map((s: any) => String(s))])).filter(Boolean)
+      });
+      setAddState({ busy: false, error: null, message: "Preview ready" });
+    } catch (e: any) {
+      setAddState({ busy: false, error: e?.message ?? "ISBN lookup failed", message: "ISBN lookup failed" });
+    }
+  }
+
   async function searchAddResults(title: string, author: string | null) {
     setAddSearchState({ busy: true, error: null, message: "Searching…" });
     setAddSearchResults([]);
@@ -602,15 +635,7 @@ function AppShell({
     setAddSearchState({ busy: false, error: null, message: null });
 
     if (looksLikeIsbn(value)) {
-      setAddState({ busy: true, error: null, message: "Adding…" });
-      try {
-        await addByIsbnValue(value);
-        setAddInput("");
-        setAddState({ busy: false, error: null, message: "Added" });
-        window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
-      } catch (e: any) {
-        setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
-      }
+      await previewIsbn(value);
       return;
     }
 
@@ -809,6 +834,7 @@ function AppShell({
   }
 
   const displayGroups = useMemo(() => {
+    const profileVis = profile?.visibility === "public" ? "public" : "followers_only";
     const tag = (filterTag ?? "").trim().toLowerCase();
     const author = (filterAuthor ?? "").trim().toLowerCase();
     const subject = (filterSubject ?? "").trim().toLowerCase();
@@ -837,6 +863,7 @@ function AppShell({
       const subjectsSet = new Set<string>();
       const publishersSet = new Set<string>();
       const visSet = new Set<string>();
+      const effVisSet = new Set<string>();
       let latest = -Infinity;
       let earliest = Infinity;
       for (const c of sorted) {
@@ -849,6 +876,8 @@ function AppShell({
         const p = effectivePublisherFor(c);
         if (p) publishersSet.add(p);
         visSet.add(c.visibility);
+        const eff = (c.visibility === "inherit" || !c.visibility ? profileVis : c.visibility) as string;
+        effVisSet.add(eff);
         const ts = Date.parse(c.created_at);
         if (Number.isFinite(ts)) {
           latest = Math.max(latest, ts);
@@ -857,6 +886,10 @@ function AppShell({
       }
 
       const visibility = visSet.size === 1 ? (primary.visibility as any) : "mixed";
+      const effectiveVisibility =
+        effVisSet.size === 1
+          ? ((Array.from(effVisSet.values())[0] as string) === "public" ? "public" : "followers_only")
+          : ("mixed" as const);
 
       return {
         key,
@@ -871,6 +904,7 @@ function AppShell({
         filterPublishers: Array.from(publishersSet.values()),
         title,
         visibility,
+        effectiveVisibility,
         latestCreatedAt: Number.isFinite(latest) ? latest : Date.now(),
         earliestCreatedAt: Number.isFinite(earliest) ? earliest : Date.now()
       };
@@ -890,6 +924,13 @@ function AppShell({
     }
     if (categoryTag) {
       groups = groups.filter((g) => g.categoryNames.some((t) => t.toLowerCase() === categoryTag));
+    }
+    if (visibilityMode !== "all") {
+      groups = groups.filter((g) => {
+        const eff = g.effectiveVisibility;
+        if (visibilityMode === "public") return eff === "public" || eff === "mixed";
+        return eff === "followers_only" || eff === "mixed";
+      });
     }
     if (q) {
       groups = groups.filter((g) => {
@@ -920,9 +961,7 @@ function AppShell({
     });
 
     return groups;
-  }, [filteredItems, filterTag, filterAuthor, filterSubject, filterPublisher, filterCategory, categoryMode, sortMode, searchQuery]);
-
-  const displayCopiesCount = useMemo(() => displayGroups.reduce((sum, g) => sum + g.copiesCount, 0), [displayGroups]);
+  }, [filteredItems, filterTag, filterAuthor, filterSubject, filterPublisher, filterCategory, categoryMode, visibilityMode, sortMode, searchQuery, profile?.visibility]);
 
   const displayGroupsByLibraryId = useMemo(() => {
     const by: Record<number, CatalogGroup[]> = {};
@@ -1177,6 +1216,42 @@ function AppShell({
     }
   }
 
+  function desiredVisibilityForAction(action: "public" | "private"): "inherit" | "followers_only" | "public" {
+    const profileVis = profile?.visibility === "public" ? "public" : "followers_only";
+    if (action === "public") return profileVis === "public" ? "inherit" : "public";
+    return profileVis === "public" ? "followers_only" : "inherit";
+  }
+
+  async function bulkMakePublic() {
+    if (!supabase) return;
+    if (!bulkSelectedGroups.length) return;
+    setBulkState({ busy: true, error: null, message: "Applying…" });
+    try {
+      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
+      await updateUserBookVisibilityGroup(ids, desiredVisibilityForAction("public"));
+      await refreshAllBooks();
+      setBulkState({ busy: false, error: null, message: "Applied" });
+      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setBulkState({ busy: false, error: e?.message ?? "Apply failed", message: "Apply failed" });
+    }
+  }
+
+  async function bulkMakePrivate() {
+    if (!supabase) return;
+    if (!bulkSelectedGroups.length) return;
+    setBulkState({ busy: true, error: null, message: "Applying…" });
+    try {
+      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
+      await updateUserBookVisibilityGroup(ids, desiredVisibilityForAction("private"));
+      await refreshAllBooks();
+      setBulkState({ busy: false, error: null, message: "Applied" });
+      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setBulkState({ busy: false, error: e?.message ?? "Apply failed", message: "Apply failed" });
+    }
+  }
+
   const booksContainerStyle = useMemo<CSSProperties>(
     () => ({
       display: viewMode === "grid" ? "grid" : "flex",
@@ -1202,8 +1277,6 @@ function AppShell({
           return mediaUrlsByPath[cover.storage_path] ?? null;
         })
         .find(Boolean) ?? e?.cover_url ?? null;
-    const pendingCover = pendingCoverByBookId[it.id];
-    const coverState = coverUploadStateByBookId[it.id];
     const delState = deleteStateByBookId[it.id];
     return (
       <BookCard
@@ -1216,17 +1289,9 @@ function AppShell({
         isbn13={e?.isbn13 ?? null}
         tags={tags}
         copiesCount={g.copiesCount}
-        visibility={g.visibility}
-        onChangeVisibility={(next) => updateUserBookVisibilityGroup(g.copies.map((c) => c.id), next)}
         href={`/app/books/${it.id}`}
         coverUrl={coverUrl}
         coverHeight={coverHeight}
-        coverInputKey={coverInputKeyByBookId[it.id] ?? 0}
-        onSelectCover={(files) => selectPendingCover(it.id, files)}
-        pendingCover={pendingCover}
-        coverState={coverState as any}
-        onUploadCover={() => uploadSelectedCover(it.id)}
-        onClearCover={() => clearPendingCover(it.id)}
         onDeleteCopy={() => deleteEntry(it.id)}
         deleteState={delState as any}
       />
@@ -1482,9 +1547,7 @@ function AppShell({
                 ) : null}{" "}
                 (<Link href="/app">clear</Link>)
               </>
-            ) : (
-              <>(most recent first)</>
-            )}
+            ) : null}
           </div>
         </div>
         <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
@@ -1519,6 +1582,12 @@ function AppShell({
               </option>
             ))}
           </select>
+          <span className="muted">Visibility</span>
+          <select value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
+            <option value="all">all</option>
+            <option value="public">public</option>
+            <option value="private">private</option>
+          </select>
           <label className="row" style={{ gap: 6 }}>
             <input
               type="checkbox"
@@ -1533,7 +1602,6 @@ function AppShell({
           </label>
           <span className="muted">
             Showing {displayGroups.length} books
-            {typeof userBooksCount === "number" ? ` / ${userBooksCount} copies` : ` (${displayCopiesCount} copies)`}
           </span>
           {bulkMode ? (
             <span className="muted">
@@ -1568,6 +1636,8 @@ function AppShell({
           bulkMoveLibraryId={bulkMoveLibraryId}
           setBulkMoveLibraryId={(next) => setBulkMoveLibraryId(next)}
           onBulkDeleteSelected={bulkDeleteSelected}
+          onBulkMakePublic={bulkMakePublic}
+          onBulkMakePrivate={bulkMakePrivate}
           onBulkAssignCategory={bulkAssignCategory}
           onBulkMoveSelected={bulkMoveSelected}
           onBulkCopySelected={bulkCopySelected}
@@ -1575,7 +1645,6 @@ function AppShell({
 
         {libraries.map((lib, idx) => {
           const groups = displayGroupsByLibraryId[lib.id] ?? [];
-          const copiesInLibrary = groups.reduce((sum, g) => sum + g.copiesCount, 0);
           const isEditing = editingLibraryId === lib.id;
           return (
             <LibraryBlock
@@ -1583,7 +1652,6 @@ function AppShell({
               libraryId={lib.id}
               libraryName={lib.name}
               bookCount={groups.length}
-              copyCount={copiesInLibrary}
               index={idx}
               total={libraries.length}
               busy={libraryState.busy}

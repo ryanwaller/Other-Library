@@ -14,12 +14,17 @@ type PublicBookDetail = {
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
   authors_override: string[] | null;
+  editors_override: string[] | null;
+  designers_override: string[] | null;
   publisher_override: string | null;
+  printer_override: string | null;
+  materials_override: string | null;
+  edition_override: string | null;
   publish_date_override: string | null;
   description_override: string | null;
   subjects_override: string[] | null;
   borrowable_override: boolean | null;
-  borrow_request_scope_override: "anyone" | "approved_followers" | null;
+  borrow_request_scope_override: string | null;
   edition: {
     id: number;
     isbn13: string | null;
@@ -101,7 +106,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const bookRes = await supabase
     .from("user_books")
     .select(
-      "id,owner_id,visibility,title_override,authors_override,publisher_override,publish_date_override,description_override,subjects_override,borrowable_override,borrow_request_scope_override,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
+      "id,owner_id,visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,borrowable_override,borrow_request_scope_override,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
     )
     .eq("id", bookId)
     .eq("owner_id", profile.id)
@@ -134,6 +139,12 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       ? (book.authors_override ?? []).filter(Boolean)
       : (book.edition?.authors ?? []).filter(Boolean);
 
+  const effectiveEditors = (book.editors_override ?? []).filter(Boolean);
+  const effectiveDesigners = (book.designers_override ?? []).filter(Boolean);
+  const effectivePrinter = (book.printer_override ?? "").trim();
+  const effectiveMaterials = (book.materials_override ?? "").trim();
+  const effectiveEdition = (book.edition_override ?? "").trim();
+
   const effectivePublisher = (book.publisher_override ?? "").trim() || book.edition?.publisher || "";
   const effectivePublishDate = (book.publish_date_override ?? "").trim() || book.edition?.publish_date || "";
   const effectiveDescription = (book.description_override ?? "").trim() || book.edition?.description || "";
@@ -164,9 +175,13 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const editionId = book.edition?.id ?? null;
 
   const borrowableDefault = Boolean((profile as any).borrowable_default);
-  const borrowScopeDefault = (((profile as any).borrow_request_scope as string) || "approved_followers") as "anyone" | "approved_followers";
+  const rawScope = String((profile as any).borrow_request_scope ?? "").trim();
+  const borrowScopeDefault = (rawScope === "anyone" ? "anyone" : rawScope === "following" ? "following" : "followers") as
+    | "anyone"
+    | "followers"
+    | "following";
   const effectiveBorrowable = book.borrowable_override === null || book.borrowable_override === undefined ? borrowableDefault : Boolean(book.borrowable_override);
-  const effectiveBorrowScope = (book.borrow_request_scope_override ?? borrowScopeDefault) as "anyone" | "approved_followers";
+  const effectiveBorrowScope = borrowScopeDefault;
 
   return (
     <main className="container">
@@ -239,6 +254,26 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
               ) : (
                 <span className="muted">—</span>
               )}
+            </div>
+
+            <div style={{ marginTop: 12 }} className="muted">
+              Editors / designers
+            </div>
+            <div style={{ marginTop: 6 }} className="muted">
+              {effectiveEditors.length > 0 ? `Editors: ${effectiveEditors.join(", ")}` : "Editors: —"}
+              <br />
+              {effectiveDesigners.length > 0 ? `Designers: ${effectiveDesigners.join(", ")}` : "Designers: —"}
+            </div>
+
+            <div style={{ marginTop: 12 }} className="muted">
+              Printer / materials / edition
+            </div>
+            <div style={{ marginTop: 6 }} className="muted">
+              {effectivePrinter ? `Printer: ${effectivePrinter}` : "Printer: —"}
+              <br />
+              {effectiveMaterials ? `Materials: ${effectiveMaterials}` : "Materials: —"}
+              <br />
+              {effectiveEdition ? `Edition: ${effectiveEdition}` : "Edition: —"}
             </div>
 
             <div style={{ marginTop: 12 }} className="muted">

@@ -6,7 +6,6 @@ export default function LibraryBlock({
   libraryId,
   libraryName,
   bookCount,
-  copyCount,
   index,
   total,
   busy,
@@ -23,7 +22,6 @@ export default function LibraryBlock({
   libraryId: number;
   libraryName: string;
   bookCount: number;
-  copyCount: number;
   index: number;
   total: number;
   busy: boolean;
@@ -76,7 +74,7 @@ export default function LibraryBlock({
             </button>
           )}
           <span className="muted">
-            {bookCount} book{bookCount === 1 ? "" : "s"} / {copyCount} cop{copyCount === 1 ? "y" : "ies"}
+            {bookCount} book{bookCount === 1 ? "" : "s"}
           </span>
         </div>
         <div className="row" style={{ gap: 8 }}>
@@ -96,4 +94,3 @@ export default function LibraryBlock({
     </div>
   );
 }
-

@@ -154,6 +154,39 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
     }
   }
 
+  async function removeOne() {
+    if (!supabase || !sessionUserId) return;
+    if (!editionId) return;
+    let id = latestId;
+    if (!id) {
+      const latestRes = await supabase
+        .from("user_books")
+        .select("id")
+        .eq("owner_id", sessionUserId)
+        .eq("edition_id", editionId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestRes.error) return;
+      id = (latestRes.data as any)?.id ?? null;
+    }
+    if (!id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const del = await supabase.from("user_books").delete().eq("id", id).eq("owner_id", sessionUserId);
+      if (del.error) throw new Error(del.error.message);
+      setCount((c) => Math.max(0, c - 1));
+      setCreatedId(null);
+      await ctx?.refresh(editionId);
+      await refreshExisting();
+    } catch (e: any) {
+      setError(e?.message ?? "Remove failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!supabase) return null;
   if (!canAdd) return null;
 
@@ -169,6 +202,9 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
               {count}
             </span>
           </Link>
+          <button onClick={removeOne} disabled={busy} title="Remove one copy">
+            {busy ? (compact ? "…" : "Removing…") : compact ? "－" : "Remove copy"}
+          </button>
           <button onClick={add} disabled={busy} title="Add another copy">
             {busy ? (compact ? "…" : "Adding…") : compact ? "＋" : "Add copy"}
           </button>

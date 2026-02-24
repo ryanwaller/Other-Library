@@ -3,9 +3,6 @@
 import Link from "next/link";
 
 export type BookCardViewMode = "grid" | "list";
-export type BookVisibility = "inherit" | "followers_only" | "public" | "mixed";
-
-export type InlineState = { busy: boolean; error: string | null; message: string | null };
 
 export default function BookCard({
   viewMode,
@@ -17,19 +14,12 @@ export default function BookCard({
   isbn13,
   tags,
   copiesCount,
-  visibility,
-  onChangeVisibility,
   href,
   coverUrl,
   coverHeight,
-  coverInputKey,
-  onSelectCover,
-  pendingCover,
-  coverState,
-  onUploadCover,
-  onClearCover,
   onDeleteCopy,
-  deleteState
+  deleteState,
+  hideCopyCount
 }: {
   viewMode: BookCardViewMode;
   bulkMode: boolean;
@@ -40,19 +30,12 @@ export default function BookCard({
   isbn13: string | null;
   tags: string[];
   copiesCount: number;
-  visibility: BookVisibility;
-  onChangeVisibility: (next: Exclude<BookVisibility, "mixed">) => void;
   href: string;
   coverUrl: string | null;
   coverHeight: number;
-  coverInputKey: number;
-  onSelectCover: (files: FileList | null) => void;
-  pendingCover: File | undefined;
-  coverState: InlineState | undefined;
-  onUploadCover: () => void;
-  onClearCover: () => void;
   onDeleteCopy: () => void;
-  deleteState: InlineState | undefined;
+  deleteState: { busy: boolean; error: string | null; message: string | null } | undefined;
+  hideCopyCount?: boolean;
 }) {
   const coverEl = coverUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
@@ -75,7 +58,8 @@ export default function BookCard({
         </Link>
         <div>
           <div>
-            <Link href={href}>{title}</Link> <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span>
+            <Link href={href}>{title}</Link>{" "}
+            {!hideCopyCount ? <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span> : null}
           </div>
           <div className="muted" style={{ marginTop: 4 }}>
             {authors.length > 0 ? (
@@ -103,29 +87,6 @@ export default function BookCard({
             </div>
           ) : null}
           <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10 }}>
-            <span className="muted">Visibility</span>
-            <select value={visibility} onChange={(ev) => onChangeVisibility(ev.target.value as any)}>
-              {visibility === "mixed" ? (
-                <option value="mixed" disabled>
-                  mixed
-                </option>
-              ) : null}
-              <option value="inherit">inherit</option>
-              <option value="followers_only">followers_only</option>
-              <option value="public">public</option>
-            </select>
-            <span className="muted">Cover</span>
-            <input key={coverInputKey} type="file" accept="image/*" onChange={(ev) => onSelectCover(ev.target.files)} />
-            {pendingCover ? (
-              <>
-                <button onClick={onUploadCover} disabled={coverState?.busy ?? false}>
-                  {coverState?.busy ? "Uploading…" : "Submit"}
-                </button>
-                <button onClick={onClearCover} disabled={coverState?.busy ?? false}>
-                  Clear
-                </button>
-              </>
-            ) : null}
             <button onClick={onDeleteCopy} disabled={deleteState?.busy ?? false} title="Deletes one copy">
               Delete copy
             </button>
@@ -141,7 +102,7 @@ export default function BookCard({
       {bulkMode ? (
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
           <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" />
-          <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span>
+          {!hideCopyCount ? <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span> : null}
         </div>
       ) : null}
       <Link href={href} style={{ display: "block" }}>
@@ -150,7 +111,7 @@ export default function BookCard({
       <div style={{ marginTop: 8 }}>
         <div className="row" style={{ justifyContent: "space-between", gap: 10 }}>
           <Link href={href}>{title}</Link>
-          {!bulkMode ? <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span> : null}
+          {!bulkMode && !hideCopyCount ? <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span> : null}
         </div>
       </div>
       <div className="muted" style={{ marginTop: 4 }}>
@@ -181,46 +142,6 @@ export default function BookCard({
       ) : null}
 
       <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
-        <div className="muted">Visibility</div>
-        <select value={visibility} onChange={(ev) => onChangeVisibility(ev.target.value as any)}>
-          {visibility === "mixed" ? (
-            <option value="mixed" disabled>
-              mixed
-            </option>
-          ) : null}
-          <option value="inherit">inherit</option>
-          <option value="followers_only">followers_only</option>
-          <option value="public">public</option>
-        </select>
-      </div>
-
-      <div style={{ marginTop: 10 }}>
-        <div className="muted">Cover override</div>
-        <input key={coverInputKey} type="file" accept="image/*" onChange={(ev) => onSelectCover(ev.target.files)} style={{ marginTop: 6 }} />
-        {pendingCover ? (
-          <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
-            <div className="row">
-              <button onClick={onUploadCover} disabled={coverState?.busy ?? false}>
-                {coverState?.busy ? "Uploading…" : "Submit"}
-              </button>
-              <button onClick={onClearCover} disabled={coverState?.busy ?? false} style={{ marginLeft: 8 }}>
-                Clear
-              </button>
-            </div>
-            <div className="muted">{coverState?.message ? (coverState?.error ? `${coverState?.message} (${coverState?.error})` : coverState?.message) : ""}</div>
-          </div>
-        ) : coverState?.message ? (
-          <div className="muted" style={{ marginTop: 6 }}>
-            {coverState?.error ? `${coverState?.message} (${coverState?.error})` : coverState?.message}
-          </div>
-        ) : (
-          <div className="muted" style={{ marginTop: 6 }}>
-            Upload a cover if the book has no online cover.
-          </div>
-        )}
-      </div>
-
-      <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
         <Link href={href} className="muted">
           Details
         </Link>
@@ -236,4 +157,3 @@ export default function BookCard({
     </div>
   );
 }
-
