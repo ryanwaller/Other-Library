@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
@@ -55,6 +55,7 @@ function AppShell({
   filterCategory: string | null;
 }) {
   const router = useRouter();
+  const tagButtonRef = useRef<HTMLButtonElement | null>(null);
   const userId = session.user.id;
   const [profile, setProfile] = useState<{ username: string; visibility: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -155,6 +156,12 @@ function AppShell({
   const [visibilityMode, setVisibilityMode] = useState<"all" | "public" | "private">("all");
   const [tagMode, setTagMode] = useState<string>("all");
   const [tagSearch, setTagSearch] = useState<string>("");
+  const [tagMenu, setTagMenu] = useState<{ open: boolean; top: number; left: number; minWidth: number }>({
+    open: false,
+    top: 0,
+    left: 0,
+    minWidth: 260
+  });
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [deleteStateByBookId, setDeleteStateByBookId] = useState<Record<number, { busy: boolean; error: string | null; message: string | null } | undefined>>(
     {}
@@ -951,6 +958,44 @@ function AppShell({
     const url = params.toString() ? `/app?${params.toString()}` : "/app";
     router.push(url);
   }
+
+  function openTagMenu() {
+    const el = tagButtonRef.current;
+    if (!el) {
+      setTagMenu({ open: true, top: 0, left: 0, minWidth: 260 });
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    const minWidth = Math.max(260, Math.ceil(rect.width));
+    const left = clampNumber(rect.left, 8, Math.max(8, window.innerWidth - minWidth - 8));
+    const top = rect.bottom + 6;
+    setTagSearch("");
+    setTagMenu({ open: true, top, left, minWidth });
+  }
+
+  function closeTagMenu() {
+    setTagMenu((p) => ({ ...p, open: false }));
+  }
+
+  function clampNumber(n: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, n));
+  }
+
+  useEffect(() => {
+    if (!tagMenu.open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeTagMenu();
+    };
+    const onScroll = () => closeTagMenu();
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [tagMenu.open]);
 
   const displayGroups = useMemo(() => {
     const profileVis = profile?.visibility === "public" ? "public" : "followers_only";
@@ -1811,75 +1856,16 @@ function AppShell({
             <option value="title_asc">title A→Z</option>
             <option value="title_desc">title Z→A</option>
           </select>
-          <details
-            onToggle={(e) => {
-              if ((e.currentTarget as HTMLDetailsElement).open) setTagSearch("");
-            }}
-            style={{ position: "relative" }}
+          <button
+            ref={tagButtonRef}
+            onClick={() => (tagMenu.open ? closeTagMenu() : openTagMenu())}
+            style={{ border: "1px solid var(--border)", padding: "4px 8px", background: "transparent" }}
           >
-            <summary
-              style={{
-                listStyle: "none",
-                border: "1px solid var(--border)",
-                padding: "4px 8px",
-                cursor: "pointer",
-                userSelect: "none"
-              }}
-            >
-              {(() => {
-                const active = (filterTag ?? tagMode ?? "all").trim();
-                return `${active && active !== "all" ? active : "tag"} ▾`;
-              })()}
-            </summary>
-            <div
-              className="card"
-              style={{
-                position: "absolute",
-                zIndex: 50,
-                marginTop: 6,
-                minWidth: 260,
-                maxHeight: 320,
-                overflow: "auto"
-              }}
-            >
-              <input
-                placeholder="Search…"
-                value={tagSearch}
-                onChange={(e) => setTagSearch(e.target.value)}
-                style={{ width: "100%", marginBottom: 8 }}
-              />
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <button
-                  onClick={(e) => {
-                    setTagMode("all");
-                    setUrlFilters({ tag: null });
-                    const d = (e.currentTarget as HTMLElement).closest("details") as HTMLDetailsElement | null;
-                    if (d) d.open = false;
-                  }}
-                  style={{ textAlign: "left" }}
-                >
-                  all
-                </button>
-                {availableTags
-                  .filter((t) => t.toLowerCase().includes(tagSearch.trim().toLowerCase()))
-                  .slice(0, 400)
-                  .map((t) => (
-                    <button
-                      key={t}
-                      onClick={(e) => {
-                        setTagMode(t);
-                        setUrlFilters({ tag: t });
-                        const d = (e.currentTarget as HTMLElement).closest("details") as HTMLDetailsElement | null;
-                        if (d) d.open = false;
-                      }}
-                      style={{ textAlign: "left" }}
-                    >
-                      {t}
-                    </button>
-                  ))}
-              </div>
-            </div>
-          </details>
+            {(() => {
+              const active = (filterTag ?? tagMode ?? "all").trim();
+              return `${active && active !== "all" ? active : "tag"} ▾`;
+            })()}
+          </button>
 
           <select
             value={categoryMode}
@@ -1901,30 +1887,23 @@ function AppShell({
             <option value="public">public</option>
             <option value="private">private</option>
           </select>
-          <span className="muted">
-            Showing {displayGroups.length} books
-          </span>
-          {bulkMode ? (
-            <span className="muted">
-              Selected: {bulkSelectedCount}
-            </span>
-          ) : null}
-        </div>
-        <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
           <span className="muted">Search</span>
           <input
             placeholder="Search your catalog…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ minWidth: 260 }}
+            style={{ width: 240, flex: "0 0 auto" }}
           />
           {searchQuery.trim() ? (
             <button onClick={() => setSearchQuery("")} aria-label="Clear search">
               Clear
             </button>
           ) : null}
-          <span className="muted">
+          <span className="muted" style={{ whiteSpace: "nowrap" }}>
             <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}>Search friends / public</Link>
+          </span>
+          <span className="muted">
+            Showing {displayGroups.length} books{bulkMode ? ` · Selected: ${bulkSelectedCount}` : ""}
           </span>
           <span style={{ flex: "1 1 auto" }} />
           <button
@@ -1936,10 +1915,66 @@ function AppShell({
                 return next;
               });
             }}
+            style={{ flex: "0 0 auto" }}
           >
             {bulkMode ? "Done" : "Edit"}
           </button>
         </div>
+        {tagMenu.open ? (
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 1000 }}
+            onMouseDown={() => closeTagMenu()}
+          >
+            <div
+              className="card"
+              style={{
+                position: "fixed",
+                top: tagMenu.top,
+                left: tagMenu.left,
+                minWidth: tagMenu.minWidth,
+                maxHeight: 320,
+                overflow: "auto"
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <input
+                placeholder="Search…"
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }}
+                autoFocus
+              />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <button
+                  onClick={() => {
+                    setTagMode("all");
+                    setUrlFilters({ tag: null });
+                    closeTagMenu();
+                  }}
+                  style={{ textAlign: "left" }}
+                >
+                  all
+                </button>
+                {availableTags
+                  .filter((t) => t.toLowerCase().includes(tagSearch.trim().toLowerCase()))
+                  .slice(0, 400)
+                  .map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => {
+                        setTagMode(t);
+                        setUrlFilters({ tag: t });
+                        closeTagMenu();
+                      }}
+                      style={{ textAlign: "left" }}
+                    >
+                      {t}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
         <BulkBar
           bulkMode={bulkMode}
           bulkState={bulkState}

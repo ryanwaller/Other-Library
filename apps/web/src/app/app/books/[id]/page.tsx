@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
+import Cropper, { type Area } from "react-easy-crop";
 import { supabase } from "../../../../lib/supabaseClient";
 import { bookIdSlug } from "../../../../lib/slug";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
@@ -121,6 +122,83 @@ function uniqStrings(values: Array<string | null | undefined>): string[] {
 
 function safeFileName(name: string): string {
   return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
+}
+
+function getRadianAngle(deg: number): number {
+  return (deg * Math.PI) / 180;
+}
+
+function rotateSize(width: number, height: number, rotation: number): { width: number; height: number } {
+  const rotRad = getRadianAngle(rotation);
+  return {
+    width: Math.abs(Math.cos(rotRad) * width) + Math.abs(Math.sin(rotRad) * height),
+    height: Math.abs(Math.sin(rotRad) * width) + Math.abs(Math.cos(rotRad) * height)
+  };
+}
+
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.crossOrigin = "anonymous";
+    img.src = src;
+  });
+}
+
+async function cropCoverToBlob(opts: {
+  imageSrc: string;
+  crop: Area;
+  rotation: number;
+  brightness: number;
+  contrast: number;
+}): Promise<Blob> {
+  const image = await loadImage(opts.imageSrc);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not supported");
+
+  const { width: bW, height: bH } = rotateSize(image.width, image.height, opts.rotation);
+  canvas.width = Math.floor(bW);
+  canvas.height = Math.floor(bH);
+
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(getRadianAngle(opts.rotation));
+  ctx.translate(-image.width / 2, -image.height / 2);
+  ctx.filter = `brightness(${opts.brightness}) contrast(${opts.contrast})`;
+  ctx.drawImage(image, 0, 0);
+
+  const pixelCrop = opts.crop;
+  const cropCanvas = document.createElement("canvas");
+  cropCanvas.width = Math.floor(pixelCrop.width);
+  cropCanvas.height = Math.floor(pixelCrop.height);
+  const cropCtx = cropCanvas.getContext("2d");
+  if (!cropCtx) throw new Error("Canvas not supported");
+
+  const data = ctx.getImageData(Math.floor(pixelCrop.x), Math.floor(pixelCrop.y), Math.floor(pixelCrop.width), Math.floor(pixelCrop.height));
+  cropCtx.putImageData(data, 0, 0);
+
+  const maxDim = 1400;
+  const scale = Math.min(1, maxDim / Math.max(cropCanvas.width, cropCanvas.height));
+  const outW = Math.max(1, Math.floor(cropCanvas.width * scale));
+  const outH = Math.max(1, Math.floor(cropCanvas.height * scale));
+  const outCanvas = document.createElement("canvas");
+  outCanvas.width = outW;
+  outCanvas.height = outH;
+  const outCtx = outCanvas.getContext("2d");
+  if (!outCtx) throw new Error("Canvas not supported");
+  outCtx.imageSmoothingEnabled = true;
+  outCtx.imageSmoothingQuality = "high";
+  outCtx.drawImage(cropCanvas, 0, 0, outW, outH);
+
+  const blob: Blob = await new Promise((resolve, reject) => {
+    outCanvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to encode image"))), "image/jpeg", 0.9);
+  });
+  return blob;
 }
 
 function onEnter(e: KeyboardEvent<HTMLInputElement>, fn: () => void) {
@@ -304,6 +382,13 @@ export default function BookDetailPage() {
   });
 
   const [pendingCover, setPendingCover] = useState<File | null>(null);
+  const [pendingCoverPreviewUrl, setPendingCoverPreviewUrl] = useState<string | null>(null);
+  const [coverCrop, setCoverCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [coverZoom, setCoverZoom] = useState<number>(1);
+  const [coverRotation, setCoverRotation] = useState<number>(0);
+  const [coverBrightness, setCoverBrightness] = useState<number>(1);
+  const [coverContrast, setCoverContrast] = useState<number>(1);
+  const [coverCroppedAreaPixels, setCoverCroppedAreaPixels] = useState<Area | null>(null);
   const [coverState, setCoverState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -327,6 +412,51 @@ export default function BookDetailPage() {
     error: null,
     message: null
   });
+  const [mergeDismissed, setMergeDismissed] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (!Number.isFinite(bookId) || bookId <= 0) {
+        setMergeDismissed(false);
+        return;
+      }
+      const raw = window.localStorage.getItem(`om_mergeDismissed:${bookId}`);
+      setMergeDismissed(raw === "1");
+    } catch {
+      setMergeDismissed(false);
+    }
+  }, [bookId]);
+
+  useEffect(() => {
+    if (!pendingCover) {
+      setPendingCoverPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      setCoverCrop({ x: 0, y: 0 });
+      setCoverZoom(1);
+      setCoverRotation(0);
+      setCoverBrightness(1);
+      setCoverContrast(1);
+      setCoverCroppedAreaPixels(null);
+      return;
+    }
+
+    const url = URL.createObjectURL(pendingCover);
+    setPendingCoverPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
+    setCoverCrop({ x: 0, y: 0 });
+    setCoverZoom(1);
+    setCoverRotation(0);
+    setCoverBrightness(1);
+    setCoverContrast(1);
+    setCoverCroppedAreaPixels(null);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [pendingCover]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -493,7 +623,7 @@ export default function BookDetailPage() {
           const hasEditionCover = Boolean(row.edition.cover_url);
           const hasAnyImages = (row.media ?? []).some((m) => m.kind === "image");
 
-          const missingTitle = !row.title_override && !row.edition.title;
+          const missingTitle = !(row.title_override ?? "").trim();
           const missingAuthors = (!row.authors_override || row.authors_override.length === 0) && (!row.edition.authors || row.edition.authors.length === 0);
           const missingPublisher = !row.publisher_override && !row.edition.publisher;
           const missingPublishDate = !row.publish_date_override && !row.edition.publish_date;
@@ -1018,38 +1148,57 @@ export default function BookDetailPage() {
     if (!pendingCover) return;
     setCoverState({ busy: true, error: null, message: "Uploading cover…" });
 
-    const path = `${userId}/${book.id}/cover-${Date.now()}-${safeFileName(pendingCover.name)}`;
-    const up = await supabase.storage.from("user-book-media").upload(path, pendingCover, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: pendingCover.type || "application/octet-stream"
-    });
-    if (up.error) {
-      setCoverState({ busy: false, error: up.error.message, message: "Upload failed" });
-      return;
+    try {
+      const willEdit = Boolean(pendingCoverPreviewUrl && coverCroppedAreaPixels);
+      const baseName = safeFileName(pendingCover.name.replace(/\.[^/.]+$/, ""));
+      const ext = willEdit ? "jpg" : extFromContentType(pendingCover.type || null);
+      const path = `${userId}/${book.id}/cover-${Date.now()}-${baseName}.${ext}`;
+
+      const body: Blob | File = willEdit
+        ? await cropCoverToBlob({
+            imageSrc: pendingCoverPreviewUrl as string,
+            crop: coverCroppedAreaPixels as Area,
+            rotation: coverRotation,
+            brightness: clamp(coverBrightness, 0.5, 2),
+            contrast: clamp(coverContrast, 0.5, 2)
+          })
+        : pendingCover;
+
+      const contentType = willEdit ? "image/jpeg" : pendingCover.type || "application/octet-stream";
+      const up = await supabase.storage.from("user-book-media").upload(path, body, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType
+      });
+      if (up.error) {
+        setCoverState({ busy: false, error: up.error.message, message: "Upload failed" });
+        return;
+      }
+
+      const inserted = await supabase
+        .from("user_book_media")
+        .insert({ user_book_id: book.id, kind: "cover", storage_path: path, caption: null })
+        .select("id")
+        .single();
+      if (inserted.error) {
+        setCoverState({ busy: false, error: inserted.error.message, message: "Upload failed" });
+        return;
+      }
+
+      await supabase
+        .from("user_book_media")
+        .update({ kind: "image" })
+        .eq("user_book_id", book.id)
+        .eq("kind", "cover")
+        .neq("id", inserted.data.id);
+
+      setPendingCover(null);
+      setCoverInputKey((k) => k + 1);
+      await refresh();
+      setCoverState({ busy: false, error: null, message: "Cover uploaded" });
+    } catch (e: any) {
+      setCoverState({ busy: false, error: e?.message ?? "Upload failed", message: "Upload failed" });
     }
-
-    const inserted = await supabase
-      .from("user_book_media")
-      .insert({ user_book_id: book.id, kind: "cover", storage_path: path, caption: null })
-      .select("id")
-      .single();
-    if (inserted.error) {
-      setCoverState({ busy: false, error: inserted.error.message, message: "Upload failed" });
-      return;
-    }
-
-    await supabase
-      .from("user_book_media")
-      .update({ kind: "image" })
-      .eq("user_book_id", book.id)
-      .eq("kind", "cover")
-      .neq("id", inserted.data.id);
-
-    setPendingCover(null);
-    setCoverInputKey((k) => k + 1);
-    await refresh();
-    setCoverState({ busy: false, error: null, message: "Cover uploaded" });
   }
 
   function extFromContentType(contentType: string | null): string {
@@ -1373,35 +1522,35 @@ export default function BookDetailPage() {
     try {
       const updates: any = {};
 
-      const needsTitle = !book.title_override && !book.edition?.title;
+      const needsTitle = !(book.title_override ?? "").trim();
       const needsAuthors = (!book.authors_override || book.authors_override.length === 0) && (!book.edition?.authors || book.edition.authors.length === 0);
-      const needsPublisher = !book.publisher_override && !book.edition?.publisher;
-      const needsPublishDate = !book.publish_date_override && !book.edition?.publish_date;
-      const needsDescription = !book.description_override && !book.edition?.description;
+      const needsPublisher = !(book.publisher_override ?? "").trim() && !(book.edition?.publisher ?? "").trim();
+      const needsPublishDate = !(book.publish_date_override ?? "").trim() && !(book.edition?.publish_date ?? "").trim();
+      const needsDescription = !(book.description_override ?? "").trim() && !(book.edition?.description ?? "").trim();
       const needsSubjects = (!book.subjects_override || book.subjects_override.length === 0) && (!book.edition?.subjects || book.edition.subjects.length === 0);
       const needsEditors = !book.editors_override || book.editors_override.length === 0;
       const needsDesigners = !book.designers_override || book.designers_override.length === 0;
-      const needsPrinter = !book.printer_override;
-      const needsMaterials = !book.materials_override;
-      const needsEditionOverride = !book.edition_override;
+      const needsPrinter = !(book.printer_override ?? "").trim();
+      const needsMaterials = !(book.materials_override ?? "").trim();
+      const needsEditionOverride = !(book.edition_override ?? "").trim();
 
-      if (needsTitle && mergeSource.title_override) updates.title_override = mergeSource.title_override;
+      if (needsTitle && mergeSource.title_override) updates.title_override = mergeSource.title_override.trim();
       if (needsAuthors && mergeSource.authors_override && mergeSource.authors_override.length > 0) {
         const base = (book.edition?.authors ?? []).filter(Boolean);
         updates.authors_override = uniqStrings([...base, ...mergeSource.authors_override]);
       }
-      if (needsPublisher && mergeSource.publisher_override) updates.publisher_override = mergeSource.publisher_override;
-      if (needsPublishDate && mergeSource.publish_date_override) updates.publish_date_override = mergeSource.publish_date_override;
-      if (needsDescription && mergeSource.description_override) updates.description_override = mergeSource.description_override;
+      if (needsPublisher && mergeSource.publisher_override) updates.publisher_override = mergeSource.publisher_override.trim();
+      if (needsPublishDate && mergeSource.publish_date_override) updates.publish_date_override = mergeSource.publish_date_override.trim();
+      if (needsDescription && mergeSource.description_override) updates.description_override = mergeSource.description_override.trim();
       if (needsSubjects && mergeSource.subjects_override && mergeSource.subjects_override.length > 0) {
         const base = (book.edition?.subjects ?? []).filter(Boolean);
         updates.subjects_override = uniqStrings([...base, ...mergeSource.subjects_override]);
       }
       if (needsEditors && mergeSource.editors_override && mergeSource.editors_override.length > 0) updates.editors_override = mergeSource.editors_override;
       if (needsDesigners && mergeSource.designers_override && mergeSource.designers_override.length > 0) updates.designers_override = mergeSource.designers_override;
-      if (needsPrinter && mergeSource.printer_override) updates.printer_override = mergeSource.printer_override;
-      if (needsMaterials && mergeSource.materials_override) updates.materials_override = mergeSource.materials_override;
-      if (needsEditionOverride && mergeSource.edition_override) updates.edition_override = mergeSource.edition_override;
+      if (needsPrinter && mergeSource.printer_override) updates.printer_override = mergeSource.printer_override.trim();
+      if (needsMaterials && mergeSource.materials_override) updates.materials_override = mergeSource.materials_override.trim();
+      if (needsEditionOverride && mergeSource.edition_override) updates.edition_override = mergeSource.edition_override.trim();
 
       if (Object.keys(updates).length > 0) {
         const upd = await supabase.from("user_books").update(updates).eq("id", book.id);
@@ -1501,6 +1650,91 @@ export default function BookDetailPage() {
                     onChange={(ev) => setPendingCover((ev.target.files ?? [])[0] ?? null)}
                     style={{ marginTop: 6 }}
                   />
+                  {pendingCoverPreviewUrl ? (
+                    <div style={{ marginTop: 8 }}>
+                      <div
+                        style={{
+                          position: "relative",
+                          width: "100%",
+                          height: 260,
+                          border: "1px solid var(--border)",
+                          background: "var(--bg)"
+                        }}
+                      >
+                        <Cropper
+                          image={pendingCoverPreviewUrl}
+                          crop={coverCrop}
+                          zoom={coverZoom}
+                          rotation={coverRotation}
+                          aspect={2 / 3}
+                          onCropChange={setCoverCrop}
+                          onZoomChange={setCoverZoom}
+                          onRotationChange={setCoverRotation}
+                          onCropComplete={(_area, pixels) => setCoverCroppedAreaPixels(pixels)}
+                          showGrid={false}
+                        />
+                      </div>
+
+                      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                          <div className="muted" style={{ width: 72 }}>
+                            Zoom
+                          </div>
+                          <input
+                            type="range"
+                            min={1}
+                            max={3}
+                            step={0.01}
+                            value={coverZoom}
+                            onChange={(e) => setCoverZoom(Number(e.target.value))}
+                            style={{ flex: "1 1 auto" }}
+                          />
+                        </div>
+                        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                          <div className="muted" style={{ width: 72 }}>
+                            Rotate
+                          </div>
+                          <input
+                            type="range"
+                            min={-180}
+                            max={180}
+                            step={1}
+                            value={coverRotation}
+                            onChange={(e) => setCoverRotation(Number(e.target.value))}
+                            style={{ flex: "1 1 auto" }}
+                          />
+                        </div>
+                        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                          <div className="muted" style={{ width: 72 }}>
+                            Bright
+                          </div>
+                          <input
+                            type="range"
+                            min={0.7}
+                            max={1.3}
+                            step={0.01}
+                            value={coverBrightness}
+                            onChange={(e) => setCoverBrightness(Number(e.target.value))}
+                            style={{ flex: "1 1 auto" }}
+                          />
+                        </div>
+                        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                          <div className="muted" style={{ width: 72 }}>
+                            Contrast
+                          </div>
+                          <input
+                            type="range"
+                            min={0.7}
+                            max={1.3}
+                            step={0.01}
+                            value={coverContrast}
+                            onChange={(e) => setCoverContrast(Number(e.target.value))}
+                            style={{ flex: "1 1 auto" }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                   {pendingCover ? (
                     <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
                       <button onClick={uploadCover} disabled={coverState.busy}>
@@ -1564,7 +1798,7 @@ export default function BookDetailPage() {
             </div>
 
             <div>
-              {mergeSource && book?.owner_id === userId ? (
+              {mergeSource && book?.owner_id === userId && !mergeDismissed ? (
                 <div style={{ marginBottom: 12 }} className="card">
                   <div className="row" style={{ justifyContent: "space-between" }}>
                     <div>Merge from community</div>
@@ -1576,6 +1810,19 @@ export default function BookDetailPage() {
                   <div className="row" style={{ marginTop: 10 }}>
                     <button onClick={mergeFromSource} disabled={mergeState.busy || busy}>
                       {mergeState.busy ? "Merging…" : "Merge"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        try {
+                          window.localStorage.setItem(`om_mergeDismissed:${bookId}`, "1");
+                        } catch {
+                          // ignore
+                        }
+                        setMergeDismissed(true);
+                      }}
+                      disabled={mergeState.busy || busy}
+                    >
+                      Dismiss
                     </button>
                     <div className="muted">{mergeState.message ? (mergeState.error ? `${mergeState.message} (${mergeState.error})` : mergeState.message) : ""}</div>
                   </div>
