@@ -37,6 +37,8 @@ export default function GlobalNav() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<number>(0);
   const [unreadThreads, setUnreadThreads] = useState<number>(0);
+  const [unreadLatestId, setUnreadLatestId] = useState<number | null>(null);
+  const [unreadLatestStatus, setUnreadLatestStatus] = useState<string | null>(null);
   const [followersCount, setFollowersCount] = useState<number>(0);
   const [followingCount, setFollowingCount] = useState<number>(0);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
@@ -120,22 +122,37 @@ export default function GlobalNav() {
     async function refreshUnreadThreads() {
       if (!supabase || !sessionUserId) {
         setUnreadThreads(0);
+        setUnreadLatestId(null);
+        setUnreadLatestStatus(null);
         return;
       }
+      const summary = await supabase.rpc("unread_borrow_threads_summary");
+      if (!alive) return;
+      if (!summary.error && summary.data) {
+        const row = Array.isArray(summary.data) ? (summary.data[0] as any) : (summary.data as any);
+        const count = Number(row?.unread_count ?? 0);
+        const latestId = row?.latest_borrow_request_id ? Number(row.latest_borrow_request_id) : null;
+        setUnreadThreads(Number.isFinite(count) ? count : 0);
+        setUnreadLatestId(Number.isFinite(latestId as any) ? (latestId as number) : null);
+        setUnreadLatestStatus(row?.latest_status ? String(row.latest_status) : null);
+        return;
+      }
+
+      // Fallbacks (older RPCs).
       const res = await supabase.rpc("unread_borrow_threads_count");
       if (!alive) return;
-      if (res.error) {
-        // Fallback to the older RPC if 0018 isn't installed yet.
-        const old = await supabase.rpc("unread_incoming_borrow_requests_count");
-        if (!alive) return;
-        if (!old.error) {
-          setUnreadThreads((old.data as any) ?? 0);
-          return;
-        }
-        setUnreadThreads(0);
+      if (!res.error) {
+        setUnreadThreads((res.data as any) ?? 0);
+        setUnreadLatestId(null);
+        setUnreadLatestStatus(null);
         return;
       }
-      setUnreadThreads((res.data as any) ?? 0);
+
+      const old = await supabase.rpc("unread_incoming_borrow_requests_count");
+      if (!alive) return;
+      setUnreadThreads(old.error ? 0 : ((old.data as any) ?? 0));
+      setUnreadLatestId(null);
+      setUnreadLatestStatus(null);
     }
 
     refreshUnreadThreads();
@@ -198,6 +215,23 @@ export default function GlobalNav() {
     return "/app";
   }, [me?.username, viewingUsername, pathname]);
 
+  const messagesHref = useMemo(() => {
+    if (unreadLatestId) return `/app/messages/${unreadLatestId}`;
+    return "/app/messages";
+  }, [unreadThreads, unreadLatestId]);
+
+  const messagesBadge = useMemo(() => {
+    if (unreadThreads <= 0) return null;
+    const status = String(unreadLatestStatus ?? "").toLowerCase();
+    if (unreadThreads === 1 && (status === "approved" || status === "rejected")) {
+      return {
+        text: status === "approved" ? "✓" : "×",
+        bg: status === "approved" ? "#0b6b2e" : "#b00020"
+      };
+    }
+    return { text: String(unreadThreads), bg: "#b00020" };
+  }, [unreadThreads, unreadLatestStatus]);
+
   if (!supabase) return null;
   if (!sessionUserId) return null;
 
@@ -218,8 +252,8 @@ export default function GlobalNav() {
               </Link>
             ) : null}
 
-            {unreadThreads > 0 ? (
-              <Link href="/app/messages" aria-label={`${unreadThreads} unread conversations`} style={{ textDecoration: "none" }}>
+            {messagesBadge ? (
+              <Link href={messagesHref} aria-label={`${unreadThreads} unread conversations`} style={{ textDecoration: "none" }}>
                 <span
                   style={{
                     display: "inline-flex",
@@ -229,13 +263,13 @@ export default function GlobalNav() {
                     height: 18,
                     padding: "0 6px",
                     borderRadius: 4,
-                    background: "#b00020",
+                    background: messagesBadge.bg,
                     color: "white",
                     fontSize: 12,
                     lineHeight: "18px"
                   }}
                 >
-                  {unreadThreads}
+                  {messagesBadge.text}
                 </span>
               </Link>
             ) : null}

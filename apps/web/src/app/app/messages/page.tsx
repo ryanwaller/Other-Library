@@ -22,6 +22,7 @@ type ProfileLite = { id: string; username: string; avatar_path: string | null };
 
 type BookLite = {
   id: number;
+  object_type: string | null;
   title_override: string | null;
   edition: { title: string | null; isbn13: string | null } | null;
 };
@@ -92,13 +93,14 @@ export default function MessagesPage() {
       }
 
       if (bookIds.length > 0) {
-        const br = await supabase.from("user_books").select("id,title_override,edition:editions(title,isbn13)").in("id", bookIds);
+        const br = await supabase.from("user_books").select("id,object_type,title_override,edition:editions(title,isbn13)").in("id", bookIds);
         if (!br.error) {
           const map: Record<number, BookLite> = {};
           for (const b of (br.data as any[]) ?? []) {
             if (!b?.id) continue;
             map[b.id as number] = {
               id: b.id as number,
+              object_type: (b as any).object_type ?? null,
               title_override: (b as any).title_override ?? null,
               edition: (b as any).edition ?? null
             };
@@ -235,10 +237,12 @@ export default function MessagesPage() {
                           {other?.username ? <Link href={`/u/${other.username}`}>{other.username}</Link> : <span className="muted">{otherId}</span>}
                         </div>
                       </div>
-                      <div className="muted">
+                      <div className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        {r.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
+                        {r.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
                         {isUnread ? <span style={{ color: "#b00020" }}>new</span> : null}
-                        {isUnread ? <span> · </span> : null}
-                        {r.status}
+                        {isUnread ? <span>·</span> : null}
+                        <span>{r.status}</span>
                       </div>
                     </div>
 

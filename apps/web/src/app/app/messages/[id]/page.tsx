@@ -27,11 +27,23 @@ type ProfileLite = { id: string; username: string; avatar_path: string | null };
 
 type BookLite = {
   id: number;
+  object_type: string | null;
   title_override: string | null;
   edition: { title: string | null; isbn13: string | null } | null;
 };
 
 type Msg = { id: number; sender_id: string; message: string; created_at: string };
+
+function parseSystemMessage(raw: string): { status: "approved" | "rejected"; text: string } | null {
+  const msg = (raw ?? "").trim();
+  if (!msg.startsWith("__system__:")) return null;
+  const rest = msg.slice("__system__:".length);
+  const [statusRaw, ...textParts] = rest.split("|");
+  const status = (statusRaw ?? "").trim().toLowerCase();
+  const text = textParts.join("|").trim();
+  if ((status !== "approved" && status !== "rejected") || !text) return null;
+  return { status: status as any, text };
+}
 
 export default function MessageThreadPage() {
   const params = useParams<{ id: string }>();
@@ -133,7 +145,7 @@ export default function MessageThreadPage() {
         }
       }
 
-      const br = await supabase.from("user_books").select("id,title_override,edition:editions(title,isbn13)").eq("id", next.user_book_id).maybeSingle();
+      const br = await supabase.from("user_books").select("id,object_type,title_override,edition:editions(title,isbn13)").eq("id", next.user_book_id).maybeSingle();
       if (!br.error && br.data) setBook(br.data as any);
 
       setThreadLoading(true);
@@ -172,7 +184,7 @@ export default function MessageThreadPage() {
     if (!supabase || !userId || !req) return;
     const msg = draft.trim();
     if (!msg) return;
-    if (req.status !== "pending" && req.status !== "approved") return;
+    if (req.status !== "pending" && req.status !== "approved" && req.status !== "rejected") return;
     setSendState({ busy: true, error: null, message: "Sending…" });
     const res = await supabase
       .from("borrow_request_messages")
@@ -203,6 +215,21 @@ export default function MessageThreadPage() {
       setStatusState({ busy: false, error: res.error.message, message: "Failed" });
       return;
     }
+
+    if (nextStatus === "approved" || nextStatus === "rejected") {
+      const ownerName = profilesById[req.owner_id]?.username ?? "user";
+      const requesterName = profilesById[req.requester_id]?.username ?? "user";
+      const thing = String(book?.object_type ?? "book").trim() || "book";
+      const verb = nextStatus === "approved" ? "approved" : "rejected";
+      const text = `${ownerName} has ${verb} ${requesterName}'s request to borrow this ${thing}.`;
+      const systemMsg = `__system__:${verb}|${text}`;
+      try {
+        await supabase.from("borrow_request_messages").insert({ borrow_request_id: req.id, sender_id: userId, message: systemMsg });
+      } catch {
+        // best-effort
+      }
+    }
+
     try {
       await supabase.rpc("mark_borrow_request_read", { input_borrow_request_id: req.id });
     } catch {
@@ -295,11 +322,22 @@ export default function MessageThreadPage() {
             </div>
           ) : (
             <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-              {thread.map((m) => (
-                <div key={m.id} className="muted" style={{ whiteSpace: "pre-wrap" }}>
-                  {(m.sender_id === userId ? "you" : "them")}: {m.message}
-                </div>
-              ))}
+              {thread.map((m) => {
+                const sys = parseSystemMessage(m.message);
+                if (sys) {
+                  const color = sys.status === "approved" ? "#0b6b2e" : "#b00020";
+                  return (
+                    <div key={m.id} style={{ whiteSpace: "pre-wrap", color }}>
+                      {sys.text}
+                    </div>
+                  );
+                }
+                return (
+                  <div key={m.id} className="muted" style={{ whiteSpace: "pre-wrap" }}>
+                    {(m.sender_id === userId ? "you" : "them")}: {m.message}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -320,7 +358,10 @@ export default function MessageThreadPage() {
           />
           <div className="row" style={{ marginTop: 8, justifyContent: "space-between", gap: 10 }}>
             <div className="row" style={{ gap: 10 }}>
-              <button onClick={send} disabled={sendState.busy || !draft.trim() || !req || (req.status !== "pending" && req.status !== "approved")}>
+              <button
+                onClick={send}
+                disabled={sendState.busy || !draft.trim() || !req || (req.status !== "pending" && req.status !== "approved" && req.status !== "rejected")}
+              >
                 {sendState.busy ? "Sending…" : "Send"}
               </button>
               <span className="muted">{sendState.message ? (sendState.error ? `${sendState.message} (${sendState.error})` : sendState.message) : ""}</span>
