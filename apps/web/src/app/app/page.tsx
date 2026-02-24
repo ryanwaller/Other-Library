@@ -151,7 +151,7 @@ function AppShell({
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [gridCols, setGridCols] = useState<2 | 4 | 8>(4);
+  const [gridCols, setGridCols] = useState<1 | 2 | 4 | 8>(4);
   const [sortMode, setSortMode] = useState<"latest" | "earliest" | "title_asc" | "title_desc">("latest");
   const [categoryMode, setCategoryMode] = useState<string>("all");
   const [visibilityMode, setVisibilityMode] = useState<"all" | "public" | "private">("all");
@@ -196,6 +196,81 @@ function AppShell({
     message: null
   });
 
+  const [isMobile, setIsMobile] = useState(false);
+  const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, true | undefined>>({});
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 720px)");
+    const update = () => setIsMobile(!!mq.matches);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    setGridCols((prev) => (prev === 4 || prev === 8 ? 2 : prev));
+  }, [isMobile]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("om_collapsedLibraries");
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const next: Record<number, true> = {};
+        for (const v of parsed) {
+          const id = Number(v);
+          if (Number.isFinite(id) && id > 0) next[id] = true;
+        }
+        setCollapsedByLibraryId(next);
+        return;
+      }
+      if (parsed && typeof parsed === "object") {
+        const next: Record<number, true> = {};
+        for (const [k, v] of Object.entries(parsed as Record<string, any>)) {
+          if (!v) continue;
+          const id = Number(k);
+          if (Number.isFinite(id) && id > 0) next[id] = true;
+        }
+        setCollapsedByLibraryId(next);
+      }
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    try {
+      const ids = Object.keys(collapsedByLibraryId)
+        .map((k) => Number(k))
+        .filter((n) => Number.isFinite(n) && n > 0 && collapsedByLibraryId[n]);
+      window.localStorage.setItem("om_collapsedLibraries", JSON.stringify(ids));
+    } catch {
+      // ignore
+    }
+  }, [collapsedByLibraryId]);
+
+  useEffect(() => {
+    const validIds = new Set((libraries ?? []).map((l) => l.id));
+    setCollapsedByLibraryId((prev) => {
+      const next: Record<number, true> = {};
+      let changed = false;
+      for (const [k, v] of Object.entries(prev)) {
+        const id = Number(k);
+        if (!v) continue;
+        if (!validIds.has(id)) {
+          changed = true;
+          continue;
+        }
+        next[id] = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [libraries]);
+
   useEffect(() => {
     try {
       const vm = window.localStorage.getItem("om_viewMode");
@@ -205,7 +280,7 @@ function AppShell({
       const vis = window.localStorage.getItem("om_visibilityMode");
       const tm = window.localStorage.getItem("om_tagMode");
       if (vm === "grid" || vm === "list") setViewMode(vm);
-      if (gc === "2" || gc === "4" || gc === "8") setGridCols(Number(gc) as any);
+      if (gc === "1" || gc === "2" || gc === "4" || gc === "8") setGridCols(Number(gc) as any);
       if (sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
       if (cm && typeof cm === "string") setCategoryMode(cm);
       if (tm && typeof tm === "string") setTagMode(tm);
@@ -1211,6 +1286,7 @@ function AppShell({
 
   const coverHeight = useMemo(() => {
     if (viewMode === "list") return 56;
+    if (gridCols === 1) return 420;
     if (gridCols === 2) return 320;
     if (gridCols === 8) return 140;
     return 220;
@@ -1930,10 +2006,10 @@ function AppShell({
           className="row"
           style={{
             marginTop: 10,
-            flexWrap: "nowrap",
+            flexWrap: isMobile ? "wrap" : "nowrap",
             gap: 10,
             alignItems: "center",
-            overflowX: "auto",
+            overflowX: isMobile ? ("visible" as const) : "auto",
             paddingBottom: 4
           }}
         >
@@ -1944,9 +2020,10 @@ function AppShell({
           {viewMode === "grid" ? (
             <>
               <select value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
+                {isMobile ? <option value={1}>1</option> : null}
                 <option value={2}>2</option>
-                <option value={4}>4</option>
-                <option value={8}>8</option>
+                {!isMobile ? <option value={4}>4</option> : null}
+                {!isMobile ? <option value={8}>8</option> : null}
               </select>
             </>
           ) : null}
@@ -2156,6 +2233,15 @@ function AppShell({
               onSaveName={saveLibraryName}
               onCancelEdit={cancelEditLibrary}
               onDelete={deleteLibrary}
+              collapsed={!!collapsedByLibraryId[lib.id]}
+              onToggleCollapsed={(id) => {
+                setCollapsedByLibraryId((prev) => {
+                  const next = { ...prev };
+                  if (next[id]) delete next[id];
+                  else next[id] = true;
+                  return next;
+                });
+              }}
               onMoveUp={(id) => moveLibrary(id, -1)}
               onMoveDown={(id) => moveLibrary(id, 1)}
             >

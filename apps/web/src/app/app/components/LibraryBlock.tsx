@@ -8,6 +8,7 @@ export default function LibraryBlock({
   bookCount,
   index,
   total,
+  collapsed,
   busy,
   isEditing,
   nameDraft,
@@ -16,6 +17,7 @@ export default function LibraryBlock({
   onSaveName,
   onCancelEdit,
   onDelete,
+  onToggleCollapsed,
   onMoveUp,
   onMoveDown,
   children
@@ -25,6 +27,7 @@ export default function LibraryBlock({
   bookCount: number;
   index: number;
   total: number;
+  collapsed: boolean;
   busy: boolean;
   isEditing: boolean;
   nameDraft: string;
@@ -33,6 +36,7 @@ export default function LibraryBlock({
   onSaveName: (libraryId: number, nameDraft: string) => void;
   onCancelEdit: () => void;
   onDelete: (libraryId: number) => void;
+  onToggleCollapsed: (libraryId: number) => void;
   onMoveUp: (libraryId: number) => void;
   onMoveDown: (libraryId: number) => void;
   children: ReactNode;
@@ -83,6 +87,14 @@ export default function LibraryBlock({
           </span>
         </div>
         <div className="row" style={{ gap: 8 }}>
+          <button
+            onClick={() => onToggleCollapsed(libraryId)}
+            disabled={busy}
+            aria-label={collapsed ? "Expand catalog" : "Collapse catalog"}
+            title={collapsed ? "Expand" : "Collapse"}
+          >
+            {collapsed ? "▼" : "▲"}
+          </button>
           {index > 0 ? (
             <button onClick={() => onMoveUp(libraryId)} disabled={busy} aria-label="Move catalog up">
               ↑
@@ -95,7 +107,7 @@ export default function LibraryBlock({
           ) : null}
         </div>
       </div>
-      {children}
+      {collapsed ? null : children}
     </div>
   );
 }

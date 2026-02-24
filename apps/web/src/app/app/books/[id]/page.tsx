@@ -284,6 +284,7 @@ export default function BookDetailPage() {
   const params = useParams();
   const idParam = (params as any)?.id;
   const bookId = Number(Array.isArray(idParam) ? idParam[0] : idParam);
+  const [isNarrow, setIsNarrow] = useState(false);
 
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
@@ -436,6 +437,15 @@ export default function BookDetailPage() {
     message: null
   });
   const [mergeDismissed, setMergeDismissed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 720px)");
+    const update = () => setIsNarrow(!!mq.matches);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, []);
 
   useEffect(() => {
     try {
@@ -1688,17 +1698,17 @@ export default function BookDetailPage() {
             </div>
           </div>
 
-          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "220px 1fr", gap: 14 }}>
+          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "220px 1fr", gap: 14 }}>
             <div>
               {coverUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   alt={effectiveTitle}
                   src={coverUrl}
-                  style={{ width: "100%", height: 280, objectFit: "contain", border: "1px solid var(--border)" }}
+                  style={{ width: "100%", height: isNarrow ? 360 : 280, objectFit: "contain", border: "1px solid var(--border)" }}
                 />
               ) : (
-                <div style={{ width: "100%", height: 280, border: "1px solid var(--border)" }} />
+                <div style={{ width: "100%", height: isNarrow ? 360 : 280, border: "1px solid var(--border)" }} />
               )}
 
               {isOwner && editMode ? (
