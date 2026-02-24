@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 import SignInCard from "../components/SignInCard";
@@ -54,6 +54,7 @@ function AppShell({
   filterPublisher: string | null;
   filterCategory: string | null;
 }) {
+  const router = useRouter();
   const userId = session.user.id;
   const [profile, setProfile] = useState<{ username: string; visibility: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -152,6 +153,8 @@ function AppShell({
   const [sortMode, setSortMode] = useState<"latest" | "earliest" | "title_asc" | "title_desc">("latest");
   const [categoryMode, setCategoryMode] = useState<string>("all");
   const [visibilityMode, setVisibilityMode] = useState<"all" | "public" | "private">("all");
+  const [tagMode, setTagMode] = useState<string>("all");
+  const [tagSearch, setTagSearch] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [deleteStateByBookId, setDeleteStateByBookId] = useState<Record<number, { busy: boolean; error: string | null; message: string | null } | undefined>>(
     {}
@@ -185,10 +188,12 @@ function AppShell({
       const sm = window.localStorage.getItem("om_sortMode");
       const cm = window.localStorage.getItem("om_categoryMode");
       const vis = window.localStorage.getItem("om_visibilityMode");
+      const tm = window.localStorage.getItem("om_tagMode");
       if (vm === "grid" || vm === "list") setViewMode(vm);
       if (gc === "2" || gc === "4" || gc === "8") setGridCols(Number(gc) as any);
       if (sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
       if (cm && typeof cm === "string") setCategoryMode(cm);
+      if (tm && typeof tm === "string") setTagMode(tm);
       if (vis === "all" || vis === "public" || vis === "private") setVisibilityMode(vis);
     } catch {
       // ignore
@@ -201,17 +206,24 @@ function AppShell({
       window.localStorage.setItem("om_gridCols", String(gridCols));
       window.localStorage.setItem("om_sortMode", sortMode);
       if (!filterCategory) window.localStorage.setItem("om_categoryMode", categoryMode);
+      if (!filterTag) window.localStorage.setItem("om_tagMode", tagMode);
       window.localStorage.setItem("om_visibilityMode", visibilityMode);
     } catch {
       // ignore
     }
-  }, [viewMode, gridCols, sortMode, categoryMode, filterCategory, visibilityMode]);
+  }, [viewMode, gridCols, sortMode, categoryMode, filterCategory, tagMode, filterTag, visibilityMode]);
 
   useEffect(() => {
     const normalized = (filterCategory ?? "").trim();
     if (!normalized) return;
     setCategoryMode(normalized);
   }, [filterCategory]);
+
+  useEffect(() => {
+    const normalized = (filterTag ?? "").trim();
+    if (!normalized) return;
+    setTagMode(normalized);
+  }, [filterTag]);
 
   async function refreshAllBooks() {
     if (!supabase) return;
@@ -923,9 +935,27 @@ function AppShell({
     return `m:${title}|${authors}`;
   }
 
+  function setUrlFilters(next: { tag?: string | null; category?: string | null }) {
+    const params = new URLSearchParams();
+    const nextTag = typeof next.tag === "string" ? next.tag : next.tag === null ? "" : (filterTag ?? "");
+    const nextCategory = typeof next.category === "string" ? next.category : next.category === null ? "" : (filterCategory ?? "");
+
+    const tagVal = nextTag.trim();
+    const catVal = nextCategory.trim();
+    if (tagVal && tagVal !== "all") params.set("tag", tagVal);
+    if (catVal && catVal !== "all") params.set("category", catVal);
+    if (filterAuthor) params.set("author", filterAuthor);
+    if (filterSubject) params.set("subject", filterSubject);
+    if (filterPublisher) params.set("publisher", filterPublisher);
+
+    const url = params.toString() ? `/app?${params.toString()}` : "/app";
+    router.push(url);
+  }
+
   const displayGroups = useMemo(() => {
     const profileVis = profile?.visibility === "public" ? "public" : "followers_only";
-    const tag = (filterTag ?? "").trim().toLowerCase();
+    const activeTag = (filterTag ?? tagMode ?? "all").trim();
+    const tag = activeTag === "all" ? "" : activeTag.toLowerCase();
     const author = (filterAuthor ?? "").trim().toLowerCase();
     const subject = (filterSubject ?? "").trim().toLowerCase();
     const publisher = (filterPublisher ?? "").trim().toLowerCase();
@@ -1077,7 +1107,7 @@ function AppShell({
     });
 
     return groups;
-  }, [filteredItems, filterTag, filterAuthor, filterSubject, filterPublisher, filterCategory, categoryMode, visibilityMode, sortMode, searchQuery, profile?.visibility]);
+  }, [filteredItems, filterTag, tagMode, filterAuthor, filterSubject, filterPublisher, filterCategory, categoryMode, visibilityMode, sortMode, searchQuery, profile?.visibility]);
 
   const displayGroupsByLibraryId = useMemo(() => {
     const by: Record<number, CatalogGroup[]> = {};
@@ -1107,11 +1137,27 @@ function AppShell({
     return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
   }, [items]);
 
+  const availableTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of items) {
+      for (const t of tagsFor(it)) {
+        if (t.kind === "tag") set.add(t.name);
+      }
+    }
+    return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
+  }, [items]);
+
   useEffect(() => {
     if ((filterCategory ?? "").trim()) return;
     if (categoryMode === "all") return;
     if (!availableCategories.some((c) => c === categoryMode)) setCategoryMode("all");
   }, [availableCategories, categoryMode, filterCategory]);
+
+  useEffect(() => {
+    if ((filterTag ?? "").trim()) return;
+    if (tagMode === "all") return;
+    if (!availableTags.some((t) => t === tagMode)) setTagMode("all");
+  }, [availableTags, tagMode, filterTag]);
 
   const bulkSelectedCount = useMemo(() => Object.keys(bulkSelectedKeys).length, [bulkSelectedKeys]);
   const bulkSelectedGroups = useMemo(() => displayGroups.filter((g) => bulkSelectedKeys[g.key]), [displayGroups, bulkSelectedKeys]);
@@ -1432,7 +1478,7 @@ function AppShell({
     const e = it.edition;
     const title = g.title;
     const effectiveAuthors = effectiveAuthorsFor(it);
-    const tags = g.tagNames;
+    const tags: string[] = [];
     const selected = !!bulkSelectedKeys[g.key];
     const coverUrl =
       g.copies
@@ -1735,15 +1781,23 @@ function AppShell({
             ) : null}
           </div>
         </div>
-        <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-          <span className="muted">View</span>
+        <div
+          className="row"
+          style={{
+            marginTop: 10,
+            flexWrap: "nowrap",
+            gap: 10,
+            alignItems: "center",
+            overflowX: "auto",
+            paddingBottom: 4
+          }}
+        >
           <select value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
             <option value="grid">grid</option>
             <option value="list">list</option>
           </select>
           {viewMode === "grid" ? (
             <>
-              <span className="muted">Columns</span>
               <select value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
                 <option value={2}>2</option>
                 <option value={4}>4</option>
@@ -1751,23 +1805,97 @@ function AppShell({
               </select>
             </>
           ) : null}
-          <span className="muted">Sort</span>
           <select value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
             <option value="latest">latest</option>
             <option value="earliest">earliest</option>
             <option value="title_asc">title A→Z</option>
             <option value="title_desc">title Z→A</option>
           </select>
-          <span className="muted">Category</span>
-          <select value={categoryMode} onChange={(e) => setCategoryMode(e.target.value)}>
-            <option value="all">all</option>
+          <details
+            onToggle={(e) => {
+              if ((e.currentTarget as HTMLDetailsElement).open) setTagSearch("");
+            }}
+            style={{ position: "relative" }}
+          >
+            <summary
+              style={{
+                listStyle: "none",
+                border: "1px solid var(--border)",
+                padding: "4px 8px",
+                cursor: "pointer",
+                userSelect: "none"
+              }}
+            >
+              {(() => {
+                const active = (filterTag ?? tagMode ?? "all").trim();
+                return `${active && active !== "all" ? active : "tag"} ▾`;
+              })()}
+            </summary>
+            <div
+              className="card"
+              style={{
+                position: "absolute",
+                zIndex: 50,
+                marginTop: 6,
+                minWidth: 260,
+                maxHeight: 320,
+                overflow: "auto"
+              }}
+            >
+              <input
+                placeholder="Search…"
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                style={{ width: "100%", marginBottom: 8 }}
+              />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <button
+                  onClick={(e) => {
+                    setTagMode("all");
+                    setUrlFilters({ tag: null });
+                    const d = (e.currentTarget as HTMLElement).closest("details") as HTMLDetailsElement | null;
+                    if (d) d.open = false;
+                  }}
+                  style={{ textAlign: "left" }}
+                >
+                  all
+                </button>
+                {availableTags
+                  .filter((t) => t.toLowerCase().includes(tagSearch.trim().toLowerCase()))
+                  .slice(0, 400)
+                  .map((t) => (
+                    <button
+                      key={t}
+                      onClick={(e) => {
+                        setTagMode(t);
+                        setUrlFilters({ tag: t });
+                        const d = (e.currentTarget as HTMLElement).closest("details") as HTMLDetailsElement | null;
+                        if (d) d.open = false;
+                      }}
+                      style={{ textAlign: "left" }}
+                    >
+                      {t}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </details>
+
+          <select
+            value={categoryMode}
+            onChange={(e) => {
+              const v = e.target.value;
+              setCategoryMode(v);
+              setUrlFilters({ category: v === "all" ? null : v });
+            }}
+          >
+            <option value="all">category</option>
             {availableCategories.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
             ))}
           </select>
-          <span className="muted">Visibility</span>
           <select value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
             <option value="all">all</option>
             <option value="public">public</option>
