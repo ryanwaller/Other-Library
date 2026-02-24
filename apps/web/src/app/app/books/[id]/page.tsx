@@ -18,6 +18,10 @@ type UserBookDetail = {
   status: "owned" | "loaned" | "selling" | "trading";
   borrowable_override: boolean | null;
   borrow_request_scope_override: string | null;
+  group_label: string | null;
+  object_type: string | null;
+  decade: string | null;
+  pages: number | null;
   title_override: string | null;
   authors_override: string[] | null;
   editors_override: string[] | null;
@@ -312,6 +316,10 @@ export default function BookDetailPage() {
   const [formEditionOverride, setFormEditionOverride] = useState("");
   const [formPublishDate, setFormPublishDate] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const [formGroupLabel, setFormGroupLabel] = useState("");
+  const [formObjectType, setFormObjectType] = useState<string>("");
+  const [formDecade, setFormDecade] = useState<string>("");
+  const [formPages, setFormPages] = useState<string>("");
   const [formLocation, setFormLocation] = useState("");
   const [formShelf, setFormShelf] = useState("");
   const [formNotes, setFormNotes] = useState("");
@@ -506,13 +514,18 @@ export default function BookDetailPage() {
     setCopiesCount(null);
     setCopiesCountState({ busy: false, error: null });
     try {
-      const res = await supabase
-        .from("user_books")
-        .select(
-          "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
-        )
-        .eq("id", bookId)
-        .maybeSingle();
+      const selectNew =
+        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,decade,pages,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+      const selectOld =
+        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+
+      let res = await supabase.from("user_books").select(selectNew).eq("id", bookId).maybeSingle();
+      if (res.error) {
+        const msg = (res.error.message ?? "").toLowerCase();
+        if (msg.includes("group_label") && msg.includes("does not exist")) {
+          res = await supabase.from("user_books").select(selectOld).eq("id", bookId).maybeSingle();
+        }
+      }
       if (res.error) throw new Error(res.error.message);
       const row = (res.data ?? null) as any as UserBookDetail | null;
       if (!row) {
@@ -532,6 +545,10 @@ export default function BookDetailPage() {
       setFormEditionOverride(row.edition_override ?? "");
       setFormPublishDate(row.publish_date_override ?? row.edition?.publish_date ?? "");
       setFormDescription(row.description_override ?? row.edition?.description ?? "");
+      setFormGroupLabel(((row as any).group_label ?? "") as any);
+      setFormObjectType(String((row as any).object_type ?? "").trim());
+      setFormDecade(String((row as any).decade ?? "").trim());
+      setFormPages((row as any).pages ? String((row as any).pages) : "");
       setFormLocation(row.location ?? "");
       setFormShelf(row.shelf ?? "");
       setFormNotes(row.notes ?? "");
@@ -844,7 +861,20 @@ export default function BookDetailPage() {
     const authors_override = parseAuthorsInput(formAuthors);
     const editors_override = parseAuthorsInput(formEditors);
     const designers_override = parseAuthorsInput(formDesigners);
-    const payload = {
+    const group_label = formGroupLabel.trim() ? formGroupLabel.trim() : null;
+    const object_type = formObjectType.trim() ? formObjectType.trim() : null;
+    const decade = formDecade.trim() ? formDecade.trim() : null;
+    const pagesRaw = formPages.trim();
+    const pages = pagesRaw ? Number(pagesRaw) : null;
+    if (pages !== null && !Number.isFinite(pages)) {
+      setSaveState({ busy: false, error: "Pages must be a number.", message: "Save failed" });
+      return;
+    }
+    const payload: any = {
+      group_label,
+      object_type,
+      decade,
+      pages: pages === null ? null : Math.max(1, Math.floor(pages)),
       title_override,
       authors_override: authors_override.length > 0 ? authors_override : null,
       editors_override: editors_override.length > 0 ? editors_override : null,
@@ -862,7 +892,17 @@ export default function BookDetailPage() {
       status: formStatus,
       borrowable_override: formBorrowable === "inherit" ? null : formBorrowable === "yes"
     };
-    const res = await supabase.from("user_books").update(payload).eq("id", book.id);
+    let res = await supabase.from("user_books").update(payload).eq("id", book.id);
+    if (res.error) {
+      const msg = (res.error.message ?? "").toLowerCase();
+      if (msg.includes("group_label") && msg.includes("does not exist")) {
+        delete payload.group_label;
+        delete payload.object_type;
+        delete payload.decade;
+        delete payload.pages;
+        res = await supabase.from("user_books").update(payload).eq("id", book.id);
+      }
+    }
     if (res.error) {
       setSaveState({ busy: false, error: res.error.message, message: "Save failed" });
       return;
@@ -1902,6 +1942,30 @@ export default function BookDetailPage() {
                       </div>
                       <div>{effectivePublishDate || "—"}</div>
                     </div>
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Pages
+                      </div>
+                      <div>{book?.pages ? String(book.pages) : "—"}</div>
+                    </div>
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Group
+                      </div>
+                      <div>{(book?.group_label ?? "").trim() ? (book?.group_label ?? "").trim() : "—"}</div>
+                    </div>
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Object type
+                      </div>
+                      <div>{(book?.object_type ?? "").trim() ? (book?.object_type ?? "").trim() : "—"}</div>
+                    </div>
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Decade
+                      </div>
+                      <div>{(book?.decade ?? "").trim() ? (book?.decade ?? "").trim() : "—"}</div>
+                    </div>
                     <div style={{ marginTop: 8 }}>
                       <div className="muted">Subjects</div>
                       <div style={{ marginTop: 6 }}>
@@ -2350,6 +2414,64 @@ export default function BookDetailPage() {
                     Publish date
                   </div>
                   <input type="date" value={formPublishDate || ""} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} />
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Pages
+                  </div>
+                  <input
+                    type="number"
+                    value={formPages}
+                    onChange={(e) => setFormPages(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, saveEdits)}
+                    style={{ width: 120 }}
+                    min={1}
+                  />
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Group
+                  </div>
+                  <input
+                    value={formGroupLabel}
+                    onChange={(e) => setFormGroupLabel(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, saveEdits)}
+                    style={{ width: 360 }}
+                  />
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Object type
+                  </div>
+                  <select value={formObjectType} onChange={(e) => setFormObjectType(e.target.value)} style={{ width: 220 }}>
+                    <option value="">—</option>
+                    <option value="book">book</option>
+                    <option value="magazine">magazine</option>
+                    <option value="ephemera">ephemera</option>
+                    <option value="video">video</option>
+                    <option value="music">music</option>
+                  </select>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Decade
+                  </div>
+                  <select value={formDecade} onChange={(e) => setFormDecade(e.target.value)} style={{ width: 220 }}>
+                    <option value="">—</option>
+                    <option value="prewar">Prewar</option>
+                    <option value="1950s">1950s</option>
+                    <option value="1960s">1960s</option>
+                    <option value="1970s">1970s</option>
+                    <option value="1980s">1980s</option>
+                    <option value="1990s">1990s</option>
+                    <option value="2000s">2000s</option>
+                    <option value="2010s">2010s</option>
+                    <option value="2020s">2020s</option>
+                  </select>
                 </div>
 
                 <div style={{ marginTop: 8 }}>

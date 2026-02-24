@@ -988,11 +988,13 @@ function AppShell({
     };
     const onScroll = () => closeTagMenu();
     window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onScroll, true);
+    // Don't close on internal element scroll (e.g. horizontal controls strip),
+    // otherwise the menu can appear to "not open".
+    window.addEventListener("scroll", onScroll);
     window.addEventListener("resize", onScroll);
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
   }, [tagMenu.open]);
@@ -1826,6 +1828,36 @@ function AppShell({
             ) : null}
           </div>
         </div>
+        <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+          <span className="muted">Search</span>
+          <input
+            placeholder="Search your catalog…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ minWidth: 260 }}
+          />
+          {searchQuery.trim() ? (
+            <button onClick={() => setSearchQuery("")} aria-label="Clear search">
+              Clear
+            </button>
+          ) : null}
+          <span className="muted">
+            <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}>Search friends / public</Link>
+          </span>
+          <span style={{ flex: "1 1 auto" }} />
+          <button
+            onClick={() => {
+              setBulkMode((prev) => {
+                const next = !prev;
+                if (!next) setBulkSelectedKeys({});
+                setBulkState({ busy: false, error: null, message: null });
+                return next;
+              });
+            }}
+          >
+            {bulkMode ? "Done" : "Edit"}
+          </button>
+        </div>
         <div
           className="row"
           style={{
@@ -1859,12 +1891,28 @@ function AppShell({
           <button
             ref={tagButtonRef}
             onClick={() => (tagMenu.open ? closeTagMenu() : openTagMenu())}
-            style={{ border: "1px solid var(--border)", padding: "4px 8px", background: "transparent" }}
+            style={{
+              border: "1px solid var(--border)",
+              padding: "4px 8px",
+              background: "transparent",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              minWidth: 120
+            }}
+            aria-haspopup="menu"
+            aria-expanded={tagMenu.open}
           >
-            {(() => {
-              const active = (filterTag ?? tagMode ?? "all").trim();
-              return `${active && active !== "all" ? active : "tag"} ▾`;
-            })()}
+            <span>
+              {(() => {
+                const active = (filterTag ?? tagMode ?? "all").trim();
+                return `${active && active !== "all" ? active : "tag"}`;
+              })()}
+            </span>
+            <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1 }}>
+              ▼
+            </span>
           </button>
 
           <select
@@ -1887,38 +1935,9 @@ function AppShell({
             <option value="public">public</option>
             <option value="private">private</option>
           </select>
-          <span className="muted">Search</span>
-          <input
-            placeholder="Search your catalog…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ width: 240, flex: "0 0 auto" }}
-          />
-          {searchQuery.trim() ? (
-            <button onClick={() => setSearchQuery("")} aria-label="Clear search">
-              Clear
-            </button>
-          ) : null}
-          <span className="muted" style={{ whiteSpace: "nowrap" }}>
-            <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}>Search friends / public</Link>
-          </span>
           <span className="muted">
             Showing {displayGroups.length} books{bulkMode ? ` · Selected: ${bulkSelectedCount}` : ""}
           </span>
-          <span style={{ flex: "1 1 auto" }} />
-          <button
-            onClick={() => {
-              setBulkMode((prev) => {
-                const next = !prev;
-                if (!next) setBulkSelectedKeys({});
-                setBulkState({ busy: false, error: null, message: null });
-                return next;
-              });
-            }}
-            style={{ flex: "0 0 auto" }}
-          >
-            {bulkMode ? "Done" : "Edit"}
-          </button>
         </div>
         {tagMenu.open ? (
           <div
