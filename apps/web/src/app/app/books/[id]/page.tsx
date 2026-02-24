@@ -496,7 +496,7 @@ export default function BookDetailPage() {
           const missingSubjects = (!row.subjects_override || row.subjects_override.length === 0) && (!row.edition.subjects || row.edition.subjects.length === 0);
 
           const needsAny =
-            (!hasCoverMedia && !hasEditionCover) ||
+            !hasCoverMedia ||
             !hasAnyImages ||
             missingTitle ||
             missingAuthors ||
@@ -525,7 +525,7 @@ export default function BookDetailPage() {
 
                 let score = 0;
                 // Only count improvements relative to what you're missing.
-                if (!hasCoverMedia && !hasEditionCover && candHasCover) score += 100;
+                if (!hasCoverMedia && candHasCover) score += 100;
                 if (!hasAnyImages && candHasImgs) score += 10;
                 if (missingPublisher && r.publisher_override) score += 2;
                 if (missingPublishDate && r.publish_date_override) score += 1;
@@ -1373,7 +1373,7 @@ export default function BookDetailPage() {
       const existingCover = (book.media ?? []).some((m) => m.kind === "cover");
       const existingImages = (book.media ?? []).some((m) => m.kind === "image");
       const toCopy = mergeSource.media.filter((m) => {
-        if (m.kind === "cover") return !existingCover && !book.edition?.cover_url;
+        if (m.kind === "cover") return !existingCover;
         return !existingImages;
       });
 
@@ -1526,6 +1526,24 @@ export default function BookDetailPage() {
             </div>
 
             <div>
+              {mergeSource && book?.owner_id === userId ? (
+                <div style={{ marginBottom: 12 }} className="card">
+                  <div className="row" style={{ justifyContent: "space-between" }}>
+                    <div>Merge from community</div>
+                    <div className="muted">{mergeSource.owner_username ? `@${mergeSource.owner_username}` : "available"}</div>
+                  </div>
+                  <div className="muted" style={{ marginTop: 8 }}>
+                    Copy missing metadata + images from another visible copy of this same edition.
+                  </div>
+                  <div className="row" style={{ marginTop: 10 }}>
+                    <button onClick={mergeFromSource} disabled={mergeState.busy || busy}>
+                      {mergeState.busy ? "Merging…" : "Merge"}
+                    </button>
+                    <div className="muted">{mergeState.message ? (mergeState.error ? `${mergeState.message} (${mergeState.error})` : mergeState.message) : ""}</div>
+                  </div>
+                </div>
+              ) : null}
+
               {!isOwner || (isOwner && !editMode) ? (
                 <>
                   <div className="muted">Authors</div>
@@ -2053,24 +2071,6 @@ export default function BookDetailPage() {
                   <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} rows={4} style={{ width: "100%", marginTop: 6 }} />
                 </div>
               </div>
-
-              {mergeSource && book?.owner_id === userId ? (
-                <div style={{ marginTop: 16 }} className="card">
-                  <div className="row" style={{ justifyContent: "space-between" }}>
-                    <div>Merge from community</div>
-                    <div className="muted">{mergeSource.owner_username ? `@${mergeSource.owner_username}` : "available"}</div>
-                  </div>
-                  <div className="muted" style={{ marginTop: 8 }}>
-                    Copy missing metadata + images from another visible copy of this same edition.
-                  </div>
-                  <div className="row" style={{ marginTop: 10 }}>
-                    <button onClick={mergeFromSource} disabled={mergeState.busy}>
-                      {mergeState.busy ? "Merging…" : "Merge"}
-                    </button>
-                    <div className="muted">{mergeState.message ? (mergeState.error ? `${mergeState.message} (${mergeState.error})` : mergeState.message) : ""}</div>
-                  </div>
-                </div>
-              ) : null}
 
               <div style={{ marginTop: 16 }} className="muted">
                 Book info
