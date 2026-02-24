@@ -1,0 +1,71 @@
+import { NextResponse } from "next/server";
+import crypto from "crypto";
+import { getSupabaseAdmin, requireAdmin } from "../../../../lib/supabaseAdmin";
+
+export const runtime = "nodejs";
+
+function getOrigin(req: Request): string {
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
+  const proto = req.headers.get("x-forwarded-proto") ?? "https";
+  if (!host) return new URL(req.url).origin;
+  return `${proto}://${host}`;
+}
+
+function newToken(): string {
+  return crypto.randomBytes(24).toString("base64url");
+}
+
+export async function POST(req: Request) {
+  try {
+    const current = await requireAdmin(req);
+    const admin = getSupabaseAdmin();
+    if (!admin) return NextResponse.json({ error: "admin_not_configured" }, { status: 500 });
+
+    const body = await req.json().catch(() => ({}));
+    const email = typeof body.email === "string" ? body.email.trim() : "";
+    const expiresInDays = Number.isFinite(Number(body.expiresInDays)) ? Number(body.expiresInDays) : 14;
+    const expiresAt = new Date(Date.now() + Math.max(1, expiresInDays) * 24 * 60 * 60 * 1000).toISOString();
+
+    const token = newToken();
+    const ins = await admin
+      .from("invites")
+      .insert({
+        token,
+        email: email || null,
+        created_by: current.id,
+        expires_at: expiresAt
+      })
+      .select("id,token,email,expires_at,used_at,created_at")
+      .maybeSingle();
+    if (ins.error) return NextResponse.json({ error: ins.error.message }, { status: 500 });
+
+    const origin = getOrigin(req);
+    const link = `${origin}/accept-invite?token=${encodeURIComponent(token)}`;
+    return NextResponse.json({ invite: ins.data, link });
+  } catch (e: any) {
+    const msg = e?.message ?? "forbidden";
+    const status = msg === "not_authenticated" ? 401 : msg === "forbidden" ? 403 : 400;
+    return NextResponse.json({ error: msg }, { status });
+  }
+}
+
+export async function GET(req: Request) {
+  try {
+    await requireAdmin(req);
+    const admin = getSupabaseAdmin();
+    if (!admin) return NextResponse.json({ error: "admin_not_configured" }, { status: 500 });
+
+    const res = await admin
+      .from("invites")
+      .select("id,token,email,created_by,expires_at,used_by,used_at,created_at")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (res.error) return NextResponse.json({ error: res.error.message }, { status: 500 });
+
+    return NextResponse.json({ invites: res.data ?? [] });
+  } catch (e: any) {
+    const msg = e?.message ?? "forbidden";
+    const status = msg === "not_authenticated" ? 401 : msg === "forbidden" ? 403 : 400;
+    return NextResponse.json({ error: msg }, { status });
+  }
+}

@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
-export default function SignInCard({ note }: { note?: string }) {
+export default function SignInCard({ note, showSignUp }: { note?: string; showSignUp?: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -47,9 +47,11 @@ export default function SignInCard({ note }: { note?: string }) {
           <button type="submit" disabled={busy || !email || !password}>
             Sign in
           </button>
-          <button type="button" onClick={signUp} disabled={busy || !email || !password}>
-            Sign up
-          </button>
+          {showSignUp ? (
+            <button type="button" onClick={signUp} disabled={busy || !email || !password}>
+              Sign up
+            </button>
+          ) : null}
           {error ? <span className="muted">{error}</span> : null}
         </div>
         {note ? (
@@ -61,4 +63,3 @@ export default function SignInCard({ note }: { note?: string }) {
     </div>
   );
 }
-
