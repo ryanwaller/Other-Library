@@ -33,12 +33,13 @@ export default function GlobalNav() {
   const viewingUsername = useMemo(() => parseViewingUsername(pathname), [pathname]);
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
-  const [me, setMe] = useState<{ username: string; avatar_path: string | null } | null>(null);
+  const [me, setMe] = useState<{ username: string; avatar_path: string | null; role?: string | null; status?: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<number>(0);
   const [unreadThreads, setUnreadThreads] = useState<number>(0);
   const [followersCount, setFollowersCount] = useState<number>(0);
   const [followingCount, setFollowingCount] = useState<number>(0);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -154,17 +155,25 @@ export default function GlobalNav() {
       if (!supabase || !sessionUserId) {
         setMe(null);
         setAvatarUrl(null);
+        setIsAdmin(false);
         return;
       }
-      const res = await supabase.from("profiles").select("username,avatar_path").eq("id", sessionUserId).maybeSingle();
+      const res = await supabase.from("profiles").select("username,avatar_path,role,status").eq("id", sessionUserId).maybeSingle();
       if (!alive) return;
       if (res.error || !res.data?.username) {
         setMe(null);
         setAvatarUrl(null);
+        setIsAdmin(false);
         return;
       }
-      const next = { username: res.data.username as string, avatar_path: (res.data as any).avatar_path as string | null };
+      const next = {
+        username: res.data.username as string,
+        avatar_path: (res.data as any).avatar_path as string | null,
+        role: ((res.data as any).role as string | null) ?? null,
+        status: ((res.data as any).status as string | null) ?? null
+      };
       setMe(next);
+      setIsAdmin(String(next.role ?? "") === "admin" && String(next.status ?? "") !== "disabled");
 
       if (next.avatar_path) {
         const signed = await supabase.storage.from("avatars").createSignedUrl(next.avatar_path, 60 * 30);
@@ -270,6 +279,7 @@ export default function GlobalNav() {
               </Link>
             ) : null}
 
+            {isAdmin ? <Link href="/admin">Admin</Link> : null}
             <Link href="/app/settings">Settings</Link>
             <button onClick={() => supabase?.auth.signOut()}>Sign out</button>
           </div>

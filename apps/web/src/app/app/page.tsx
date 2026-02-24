@@ -1087,34 +1087,48 @@ function AppShell({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeTagMenu();
     };
-    const onScroll = () => closeTagMenu();
     window.addEventListener("keydown", onKey);
-    // Don't close on internal element scroll (e.g. horizontal controls strip),
-    // otherwise the menu can appear to "not open".
-    window.addEventListener("scroll", onScroll);
-    window.addEventListener("resize", onScroll);
+
+    // On mobile, focusing the search field can trigger viewport resize/scroll,
+    // which would immediately close the menu if we listened to those events.
+    if (!isMobile) {
+      const onScrollOrResize = () => closeTagMenu();
+      window.addEventListener("scroll", onScrollOrResize);
+      window.addEventListener("resize", onScrollOrResize);
+      return () => {
+        window.removeEventListener("keydown", onKey);
+        window.removeEventListener("scroll", onScrollOrResize);
+        window.removeEventListener("resize", onScrollOrResize);
+      };
+    }
+
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
     };
-  }, [tagMenu.open]);
+  }, [tagMenu.open, isMobile]);
 
   useEffect(() => {
     if (!categoryMenu.open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeCategoryMenu();
     };
-    const onScroll = () => closeCategoryMenu();
     window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onScroll);
-    window.addEventListener("resize", onScroll);
+
+    if (!isMobile) {
+      const onScrollOrResize = () => closeCategoryMenu();
+      window.addEventListener("scroll", onScrollOrResize);
+      window.addEventListener("resize", onScrollOrResize);
+      return () => {
+        window.removeEventListener("keydown", onKey);
+        window.removeEventListener("scroll", onScrollOrResize);
+        window.removeEventListener("resize", onScrollOrResize);
+      };
+    }
+
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
     };
-  }, [categoryMenu.open]);
+  }, [categoryMenu.open, isMobile]);
 
   const displayGroups = useMemo(() => {
     const profileVis = profile?.visibility === "public" ? "public" : "followers_only";
@@ -1286,11 +1300,15 @@ function AppShell({
 
   const coverHeight = useMemo(() => {
     if (viewMode === "list") return 56;
+    if (isMobile) {
+      if (gridCols === 1) return 260;
+      if (gridCols === 2) return 200;
+    }
     if (gridCols === 1) return 420;
     if (gridCols === 2) return 320;
     if (gridCols === 8) return 140;
     return 220;
-  }, [viewMode, gridCols]);
+  }, [viewMode, gridCols, isMobile]);
 
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
@@ -2093,7 +2111,7 @@ function AppShell({
         {tagMenu.open ? (
           <div
             style={{ position: "fixed", inset: 0, zIndex: 1000 }}
-            onMouseDown={() => closeTagMenu()}
+            onPointerDown={() => closeTagMenu()}
           >
             <div
               className="card"
@@ -2105,7 +2123,7 @@ function AppShell({
                 maxHeight: 320,
                 overflow: "auto"
               }}
-              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
             >
               <input
                 placeholder="Search…"
@@ -2146,7 +2164,7 @@ function AppShell({
           </div>
         ) : null}
         {categoryMenu.open ? (
-          <div style={{ position: "fixed", inset: 0, zIndex: 1000 }} onMouseDown={() => closeCategoryMenu()}>
+          <div style={{ position: "fixed", inset: 0, zIndex: 1000 }} onPointerDown={() => closeCategoryMenu()}>
             <div
               className="card"
               style={{
@@ -2157,7 +2175,7 @@ function AppShell({
                 maxHeight: 320,
                 overflow: "auto"
               }}
-              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
             >
               <input
                 placeholder="Search…"
@@ -2270,7 +2288,7 @@ function AppShell({
                 e.preventDefault();
                 createLibrary(newLibraryName);
               }}
-              style={{ minWidth: 260 }}
+              style={{ minWidth: isMobile ? 0 : 260, width: isMobile ? "100%" : undefined, maxWidth: "100%" }}
             />
             <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy || !newLibraryName.trim()}>
               Add

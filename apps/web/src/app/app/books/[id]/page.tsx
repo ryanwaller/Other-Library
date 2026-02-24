@@ -500,6 +500,25 @@ export default function BookDetailPage() {
   }, [bookId]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Ensure navigation to a new detail page always starts at the top on mobile.
+    window.scrollTo(0, 0);
+  }, [bookId]);
+
+  useEffect(() => {
+    // Avoid briefly showing stale data when navigating between book detail pages.
+    setError(null);
+    setBook(null);
+    setMediaUrlsByPath({});
+    setOwnerProfile(null);
+    setOwnerBorrowDefaults(null);
+    setMergeSource(null);
+    setShareState({ error: null, message: null });
+    setCopiesCount(null);
+    setCopiesCountState({ busy: false, error: null });
+  }, [bookId]);
+
+  useEffect(() => {
     let alive = true;
     (async () => {
       if (!supabase) return;
@@ -2730,7 +2749,7 @@ export default function BookDetailPage() {
                     onChange={(e) => setNewCategory(e.target.value)}
                     onKeyDown={(e) => onEnter(e, addCategory)}
                     placeholder="Add a category"
-                    style={{ width: 220 }}
+                    style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
                   />
                   <button onClick={addCategory} disabled={categoryState.busy || !newCategory.trim()}>
                     Add
@@ -2822,7 +2841,7 @@ export default function BookDetailPage() {
                   </div>
                   {formVisibility === "inherit" ? (
                     <>
-                      <div className="muted" style={{ width: 220 }}>
+                      <div className="muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
                         {ownerProfile ? `From settings: ${ownerProfile.visibility === "public" ? "public" : "private"}` : "From settings: …"}
                       </div>
                       <button
@@ -2834,7 +2853,11 @@ export default function BookDetailPage() {
                     </>
                   ) : (
                     <>
-                      <select value={formVisibility} onChange={(e) => setFormVisibility(e.target.value as any)} style={{ width: 220 }}>
+                      <select
+                        value={formVisibility}
+                        onChange={(e) => setFormVisibility(e.target.value as any)}
+                        style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
+                      >
                         <option value="followers_only">private</option>
                         <option value="public">public</option>
                       </select>
@@ -2847,7 +2870,7 @@ export default function BookDetailPage() {
                   <div style={{ minWidth: 110 }} className="muted">
                     Status
                   </div>
-                  <select value={formStatus} onChange={(e) => setFormStatus(e.target.value as any)} style={{ width: 220 }}>
+                  <select value={formStatus} onChange={(e) => setFormStatus(e.target.value as any)} style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
                     <option value="owned">owned</option>
                     <option value="loaned">loaned</option>
                     <option value="selling">selling</option>
@@ -2861,7 +2884,7 @@ export default function BookDetailPage() {
                   </div>
                   {formBorrowable === "inherit" ? (
                     <>
-                      <div className="muted" style={{ width: 220 }}>
+                      <div className="muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
                         {ownerBorrowDefaults ? `From settings: ${ownerBorrowDefaults.borrowable_default ? "yes" : "no"}` : "From settings: …"}
                       </div>
                       <button onClick={() => setFormBorrowable(ownerBorrowDefaults?.borrowable_default ? "yes" : "no")} disabled={!ownerBorrowDefaults}>
@@ -2870,7 +2893,11 @@ export default function BookDetailPage() {
                     </>
                   ) : (
                     <>
-                      <select value={formBorrowable} onChange={(e) => setFormBorrowable(e.target.value as any)} style={{ width: 220 }}>
+                      <select
+                        value={formBorrowable}
+                        onChange={(e) => setFormBorrowable(e.target.value as any)}
+                        style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
+                      >
                         <option value="yes">yes</option>
                         <option value="no">no</option>
                       </select>
@@ -2895,7 +2922,7 @@ export default function BookDetailPage() {
                     onChange={(e) => setFormLocation(e.target.value)}
                     onKeyDown={(e) => onEnter(e, saveEdits)}
                     placeholder="Home, Studio…"
-                    style={{ width: 360 }}
+                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
                   />
                 </div>
 
@@ -2908,7 +2935,7 @@ export default function BookDetailPage() {
                     onChange={(e) => setFormShelf(e.target.value)}
                     onKeyDown={(e) => onEnter(e, saveEdits)}
                     placeholder="Shelf #"
-                    style={{ width: 360 }}
+                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
                   />
                 </div>
 

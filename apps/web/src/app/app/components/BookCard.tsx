@@ -41,7 +41,11 @@ export default function BookCard({
 }) {
   const coverEl = coverUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img alt={title} src={coverUrl} style={{ width: "100%", height: coverHeight, objectFit: "contain", border: "1px solid var(--border)" }} />
+    <img
+      alt={title}
+      src={coverUrl}
+      style={{ display: "block", width: "100%", height: coverHeight, objectFit: "contain", border: "1px solid var(--border)" }}
+    />
   ) : (
     <div style={{ width: "100%", height: coverHeight, border: "1px solid var(--border)" }} />
   );
