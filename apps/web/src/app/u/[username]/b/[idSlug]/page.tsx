@@ -5,6 +5,7 @@ import { bookIdSlug } from "../../../../../lib/slug";
 import AddToLibraryButton from "../../AddToLibraryButton";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
 import BorrowRequestWidget from "../../BorrowRequestWidget";
+import ScrollToTopOnMount from "../../../../components/ScrollToTopOnMount";
 
 export const dynamic = "force-dynamic";
 
@@ -185,6 +186,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
   return (
     <main className="container">
+      <ScrollToTopOnMount />
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div>
@@ -222,7 +224,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           <div className="muted">{book.edition?.isbn13 ?? book.edition?.isbn10 ?? ""}</div>
         </div>
 
-        <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "220px 1fr", gap: 14 }}>
+        <div style={{ marginTop: 10 }} className="om-book-detail-grid">
           <div>
             {coverUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
