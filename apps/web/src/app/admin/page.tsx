@@ -98,6 +98,13 @@ export default function AdminPage() {
   }, [token]);
 
   const activeAdmins = useMemo(() => users.filter((u) => u.role === "admin" && u.status === "active").length, [users]);
+  const friendlyError = useMemo(() => {
+    if (!error) return null;
+    if (error === "admin_not_configured") {
+      return "Admin API is not configured on the server (missing SUPABASE_SERVICE_ROLE_KEY).";
+    }
+    return error;
+  }, [error]);
 
   if (!supabase) {
     return (
@@ -125,7 +132,7 @@ export default function AdminPage() {
             </div>
           </div>
           <div className="muted" style={{ marginTop: 8 }}>
-            Active admins: {activeAdmins}. {error ? `Error: ${error}` : busy ? "Loading…" : ""}
+            Active admins: {activeAdmins}. {friendlyError ? `Error: ${friendlyError}` : busy ? "Loading…" : ""}
           </div>
 
           <div style={{ marginTop: 14 }} className="card">
