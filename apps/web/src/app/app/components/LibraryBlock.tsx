@@ -9,6 +9,7 @@ export default function LibraryBlock({
   index,
   total,
   collapsed,
+  reorderMode,
   busy,
   isEditing,
   nameDraft,
@@ -28,6 +29,7 @@ export default function LibraryBlock({
   index: number;
   total: number;
   collapsed: boolean;
+  reorderMode: boolean;
   busy: boolean;
   isEditing: boolean;
   nameDraft: string;
@@ -41,10 +43,29 @@ export default function LibraryBlock({
   onMoveDown: (libraryId: number) => void;
   children: ReactNode;
 }) {
+  const caret = collapsed ? "▸" : "▾";
   return (
     <div className="card" style={{ marginTop: 14 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
         <div className="row" style={{ gap: 10 }}>
+          <button
+            onClick={() => {
+              if (reorderMode) return;
+              onToggleCollapsed(libraryId);
+            }}
+            disabled={busy || reorderMode}
+            aria-label={collapsed ? "Expand catalog" : "Collapse catalog"}
+            title={reorderMode ? undefined : collapsed ? "Expand" : "Collapse"}
+            style={{
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              textDecoration: "none",
+              cursor: busy || reorderMode ? "default" : "pointer"
+            }}
+          >
+            {caret}
+          </button>
           {isEditing ? (
             <span className="row" style={{ gap: 8 }}>
               <input
@@ -86,26 +107,28 @@ export default function LibraryBlock({
             {bookCount} book{bookCount === 1 ? "" : "s"}
           </span>
         </div>
-        <div className="row" style={{ gap: 8 }}>
-          <button
-            onClick={() => onToggleCollapsed(libraryId)}
-            disabled={busy}
-            aria-label={collapsed ? "Expand catalog" : "Collapse catalog"}
-            title={collapsed ? "Expand" : "Collapse"}
-          >
-            {collapsed ? "▼" : "▲"}
-          </button>
-          {index > 0 ? (
-            <button onClick={() => onMoveUp(libraryId)} disabled={busy} aria-label="Move catalog up">
-              ↑
-            </button>
-          ) : null}
-          {index < total - 1 ? (
-            <button onClick={() => onMoveDown(libraryId)} disabled={busy} aria-label="Move catalog down">
-              ↓
-            </button>
-          ) : null}
-        </div>
+        {reorderMode ? (
+          <div className="row" style={{ gap: 10 }}>
+            {index > 0 ? (
+              <button
+                onClick={() => onMoveUp(libraryId)}
+                disabled={busy}
+                style={{ padding: 0, border: "none", background: "transparent", textDecoration: "underline" }}
+              >
+                Move up
+              </button>
+            ) : null}
+            {index < total - 1 ? (
+              <button
+                onClick={() => onMoveDown(libraryId)}
+                disabled={busy}
+                style={{ padding: 0, border: "none", background: "transparent", textDecoration: "underline" }}
+              >
+                Move down
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       {collapsed ? null : children}
     </div>

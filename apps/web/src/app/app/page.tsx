@@ -196,6 +196,8 @@ function AppShell({
     message: null
   });
 
+  const [reorderMode, setReorderMode] = useState(false);
+
   const [isMobile, setIsMobile] = useState(false);
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, true | undefined>>({});
 
@@ -2009,10 +2011,26 @@ function AppShell({
           <span style={{ flex: "1 1 auto" }} />
           <button
             onClick={() => {
+              setReorderMode((prev) => {
+                const next = !prev;
+                if (next) {
+                  setBulkMode(false);
+                  setBulkSelectedKeys({});
+                  setBulkState({ busy: false, error: null, message: null });
+                }
+                return next;
+              });
+            }}
+          >
+            {reorderMode ? "Done reordering" : "Reorder modules"}
+          </button>
+          <button
+            onClick={() => {
               setBulkMode((prev) => {
                 const next = !prev;
                 if (!next) setBulkSelectedKeys({});
                 setBulkState({ busy: false, error: null, message: null });
+                if (next) setReorderMode(false);
                 return next;
               });
             }}
@@ -2232,6 +2250,12 @@ function AppShell({
           onBulkCopySelected={bulkCopySelected}
         />
 
+        {reorderMode ? (
+          <div className="muted" style={{ marginTop: 10 }}>
+            Reordering modules
+          </div>
+        ) : null}
+
         {libraries.map((lib, idx) => {
           const groups = displayGroupsByLibraryId[lib.id] ?? [];
           const isEditing = editingLibraryId === lib.id;
@@ -2246,6 +2270,7 @@ function AppShell({
               busy={libraryState.busy}
               isEditing={isEditing}
               nameDraft={libraryNameDraft}
+              reorderMode={reorderMode}
               onStartEdit={beginEditLibrary}
               onNameDraftChange={setLibraryNameDraft}
               onSaveName={saveLibraryName}
