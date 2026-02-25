@@ -210,35 +210,35 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       </div>
 
       <div style={{ marginTop: 14 }} className="card">
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <div className="row" style={{ gap: 10 }}>
-            <div>{effectiveTitle}</div>
-            <AddToLibraryButton
-              editionId={editionId}
-              titleFallback={effectiveTitle}
-              authorsFallback={effectiveAuthors}
-              sourceOwnerId={book.owner_id}
-              compact
-            />
-          </div>
-          <div className="muted">{book.edition?.isbn13 ?? book.edition?.isbn10 ?? ""}</div>
-        </div>
-
-        <div style={{ marginTop: 10 }} className="om-book-detail-grid">
+        <div className="om-book-detail-grid">
           <div>
             {coverUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                alt={effectiveTitle}
-                src={coverUrl}
-                style={{ width: "100%", height: 280, objectFit: "contain", border: "1px solid var(--border)" }}
-              />
+              <div className="om-cover-slot" style={{ width: "100%", height: 280 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img alt={effectiveTitle} src={coverUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              </div>
             ) : (
-              <div style={{ width: "100%", height: 280, border: "1px solid var(--border)" }} />
+              <div className="om-cover-slot" style={{ width: "100%", height: 280 }} />
             )}
           </div>
 
           <div>
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+              <div style={{ fontWeight: 600 }}>{effectiveTitle}</div>
+              <AddToLibraryButton
+                editionId={editionId}
+                titleFallback={effectiveTitle}
+                authorsFallback={effectiveAuthors}
+                sourceOwnerId={book.owner_id}
+                compact
+              />
+            </div>
+            {book.edition?.isbn13 || book.edition?.isbn10 ? (
+              <div className="muted" style={{ marginTop: 6 }}>
+                {book.edition?.isbn13 ?? book.edition?.isbn10}
+              </div>
+            ) : null}
+
             {effectiveAuthors.length > 0 ? (
               <>
                 <div className="muted">Authors</div>

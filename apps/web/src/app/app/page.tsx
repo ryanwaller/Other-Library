@@ -57,6 +57,8 @@ function AppShell({
   const router = useRouter();
   const tagButtonRef = useRef<HTMLButtonElement | null>(null);
   const categoryButtonRef = useRef<HTMLButtonElement | null>(null);
+  const tagMenuRef = useRef<HTMLDivElement | null>(null);
+  const categoryMenuRef = useRef<HTMLDivElement | null>(null);
   const userId = session.user.id;
   const [profile, setProfile] = useState<{ username: string; visibility: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -1043,6 +1045,7 @@ function AppShell({
   }
 
   function openTagMenu() {
+    closeCategoryMenu();
     const el = tagButtonRef.current;
     if (!el) {
       setTagMenu({ open: true, top: 0, left: 0, minWidth: 260 });
@@ -1061,6 +1064,7 @@ function AppShell({
   }
 
   function openCategoryMenu() {
+    closeTagMenu();
     const el = categoryButtonRef.current;
     if (!el) {
       setCategoryMenu({ open: true, top: 0, left: 0, minWidth: 260 });
@@ -1089,6 +1093,15 @@ function AppShell({
     };
     window.addEventListener("keydown", onKey);
 
+    const onPointerDownCapture = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (tagMenuRef.current?.contains(t)) return;
+      if (tagButtonRef.current?.contains(t)) return;
+      closeTagMenu();
+    };
+    window.addEventListener("pointerdown", onPointerDownCapture, true);
+
     // On mobile, focusing the search field can trigger viewport resize/scroll,
     // which would immediately close the menu if we listened to those events.
     if (!isMobile) {
@@ -1097,6 +1110,7 @@ function AppShell({
       window.addEventListener("resize", onScrollOrResize);
       return () => {
         window.removeEventListener("keydown", onKey);
+        window.removeEventListener("pointerdown", onPointerDownCapture, true);
         window.removeEventListener("scroll", onScrollOrResize);
         window.removeEventListener("resize", onScrollOrResize);
       };
@@ -1104,6 +1118,7 @@ function AppShell({
 
     return () => {
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onPointerDownCapture, true);
     };
   }, [tagMenu.open, isMobile]);
 
@@ -1114,12 +1129,22 @@ function AppShell({
     };
     window.addEventListener("keydown", onKey);
 
+    const onPointerDownCapture = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (categoryMenuRef.current?.contains(t)) return;
+      if (categoryButtonRef.current?.contains(t)) return;
+      closeCategoryMenu();
+    };
+    window.addEventListener("pointerdown", onPointerDownCapture, true);
+
     if (!isMobile) {
       const onScrollOrResize = () => closeCategoryMenu();
       window.addEventListener("scroll", onScrollOrResize);
       window.addEventListener("resize", onScrollOrResize);
       return () => {
         window.removeEventListener("keydown", onKey);
+        window.removeEventListener("pointerdown", onPointerDownCapture, true);
         window.removeEventListener("scroll", onScrollOrResize);
         window.removeEventListener("resize", onScrollOrResize);
       };
@@ -1127,6 +1152,7 @@ function AppShell({
 
     return () => {
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onPointerDownCapture, true);
     };
   }, [categoryMenu.open, isMobile]);
 
@@ -1684,7 +1710,7 @@ function AppShell({
         coverHeight={coverHeight}
         onDeleteCopy={() => deleteEntry(it.id)}
         deleteState={delState as any}
-        showDeleteCopy={bulkMode}
+        showDeleteCopy={false}
       />
     );
   }
@@ -1692,31 +1718,30 @@ function AppShell({
   return (
     <div className="card">
       <div style={{ marginTop: 16 }} className="card">
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-          <div>Add</div>
+        <div className="row" style={{ justifyContent: "flex-start", alignItems: "baseline", flexWrap: "wrap", gap: 10 }}>
+          <span>Add to catalog</span>
           {libraries.length > 1 ? (
-            <span className="row" style={{ gap: 8 }}>
-              <span className="muted">Catalog</span>
-              <select
-                value={addLibraryId ?? ""}
-                onChange={(e) => {
-                  const id = Number(e.target.value);
-                  setAddLibraryId(id);
-                  try {
-                    window.localStorage.setItem("om_addLibraryId", String(id));
-                  } catch {
-                    // ignore
-                  }
-                }}
-                disabled={libraryState.busy || !addLibraryId}
-              >
-                {libraries.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </span>
+            <select
+              value={addLibraryId ?? ""}
+              onChange={(e) => {
+                const id = Number(e.target.value);
+                setAddLibraryId(id);
+                try {
+                  window.localStorage.setItem("om_addLibraryId", String(id));
+                } catch {
+                  // ignore
+                }
+              }}
+              disabled={libraryState.busy || !addLibraryId}
+            >
+              {libraries.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          ) : libraries.length === 1 ? (
+            <span className="muted">{libraries[0]?.name}</span>
           ) : null}
         </div>
         <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 8 }}>
@@ -1747,17 +1772,19 @@ function AppShell({
             <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
               <div style={{ width: 62, flex: "0 0 auto" }}>
                 {addUrlPreview.cover_url && !addPreviewCoverFailed ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={`/api/image-proxy?url=${encodeURIComponent(addUrlPreview.cover_url)}`}
-                    alt=""
-                    width={60}
-                    height={90}
-                    style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
-                    onError={() => setAddPreviewCoverFailed(true)}
-                  />
+                  <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/api/image-proxy?url=${encodeURIComponent(addUrlPreview.cover_url)}`}
+                      alt=""
+                      width={60}
+                      height={90}
+                      style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                      onError={() => setAddPreviewCoverFailed(true)}
+                    />
+                  </div>
                 ) : (
-                  <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
+                  <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
                 )}
               </div>
               <div style={{ flex: "1 1 auto" }}>
@@ -1843,19 +1870,21 @@ function AppShell({
                   <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                     <div style={{ width: 62, flex: "0 0 auto" }}>
                       {r.cover_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={`/api/image-proxy?url=${encodeURIComponent(String(r.cover_url))}`}
-                          alt=""
-                          width={60}
-                          height={90}
-                          style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
-                        />
+                        <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={`/api/image-proxy?url=${encodeURIComponent(String(r.cover_url))}`}
+                            alt=""
+                            width={60}
+                            height={90}
+                            style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        </div>
                       ) : (
-                        <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
+                        <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
                       )}
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -2112,22 +2141,18 @@ function AppShell({
         </div>
         {tagMenu.open ? (
           <div
-            style={{ position: "fixed", inset: 0, zIndex: 1000 }}
-            onPointerDown={() => closeTagMenu()}
+            ref={tagMenuRef}
+            className="om-popover"
+            style={{
+              position: "fixed",
+              top: tagMenu.top,
+              left: tagMenu.left,
+              minWidth: tagMenu.minWidth,
+              maxHeight: 320,
+              overflow: "auto",
+              zIndex: 1001
+            }}
           >
-            <div
-              className="om-popover"
-              style={{
-                position: "fixed",
-                top: tagMenu.top,
-                left: tagMenu.left,
-                minWidth: tagMenu.minWidth,
-                maxHeight: 320,
-                overflow: "auto",
-                zIndex: 1001
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
               <input
                 placeholder="Search…"
                 value={tagSearch}
@@ -2163,24 +2188,22 @@ function AppShell({
                     </button>
                   ))}
               </div>
-            </div>
           </div>
         ) : null}
         {categoryMenu.open ? (
-          <div style={{ position: "fixed", inset: 0, zIndex: 1000 }} onPointerDown={() => closeCategoryMenu()}>
-            <div
-              className="om-popover"
-              style={{
-                position: "fixed",
-                top: categoryMenu.top,
-                left: categoryMenu.left,
-                minWidth: categoryMenu.minWidth,
-                maxHeight: 320,
-                overflow: "auto",
-                zIndex: 1001
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
+          <div
+            ref={categoryMenuRef}
+            className="om-popover"
+            style={{
+              position: "fixed",
+              top: categoryMenu.top,
+              left: categoryMenu.left,
+              minWidth: categoryMenu.minWidth,
+              maxHeight: 320,
+              overflow: "auto",
+              zIndex: 1001
+            }}
+          >
               <input
                 placeholder="Search…"
                 value={categorySearch}
@@ -2216,7 +2239,6 @@ function AppShell({
                     </button>
                   ))}
               </div>
-            </div>
           </div>
         ) : null}
         <BulkBar
@@ -2233,6 +2255,10 @@ function AppShell({
           onBulkAssignCategory={bulkAssignCategory}
           onBulkMoveSelected={bulkMoveSelected}
           onBulkCopySelected={bulkCopySelected}
+          onAnyMenuOpen={() => {
+            closeTagMenu();
+            closeCategoryMenu();
+          }}
         />
 
         <hr className="om-hr" />
@@ -2247,43 +2273,45 @@ function AppShell({
           const groups = displayGroupsByLibraryId[lib.id] ?? [];
           const isEditing = editingLibraryId === lib.id;
           return (
-            <LibraryBlock
-              key={lib.id}
-              libraryId={lib.id}
-              libraryName={lib.name}
-              bookCount={groups.length}
-              index={idx}
-              total={libraries.length}
-              busy={libraryState.busy}
-              isEditing={isEditing}
-              nameDraft={libraryNameDraft}
-              reorderMode={reorderMode}
-              manageMode={bulkMode}
-              onStartEdit={beginEditLibrary}
-              onNameDraftChange={setLibraryNameDraft}
-              onSaveName={saveLibraryName}
-              onCancelEdit={cancelEditLibrary}
-              onDelete={deleteLibrary}
-              collapsed={!!collapsedByLibraryId[lib.id]}
-              onToggleCollapsed={(id) => {
-                setCollapsedByLibraryId((prev) => {
-                  const next = { ...prev };
-                  if (next[id]) delete next[id];
-                  else next[id] = true;
-                  return next;
-                });
-              }}
-              onMoveUp={(id) => moveLibrary(id, -1)}
-              onMoveDown={(id) => moveLibrary(id, 1)}
-            >
-              {groups.length === 0 ? (
-                <div className="muted" style={{ marginTop: 10 }}>
-                  No books yet.
-                </div>
-              ) : (
-                <div style={{ marginTop: 10, ...booksContainerStyle }}>{groups.map(renderGroup)}</div>
-              )}
-            </LibraryBlock>
+            <div key={lib.id}>
+              <LibraryBlock
+                libraryId={lib.id}
+                libraryName={lib.name}
+                bookCount={groups.length}
+                index={idx}
+                total={libraries.length}
+                busy={libraryState.busy}
+                isEditing={isEditing}
+                nameDraft={libraryNameDraft}
+                reorderMode={reorderMode}
+                manageMode={bulkMode}
+                onStartEdit={beginEditLibrary}
+                onNameDraftChange={setLibraryNameDraft}
+                onSaveName={saveLibraryName}
+                onCancelEdit={cancelEditLibrary}
+                onDelete={deleteLibrary}
+                collapsed={!!collapsedByLibraryId[lib.id]}
+                onToggleCollapsed={(id) => {
+                  setCollapsedByLibraryId((prev) => {
+                    const next = { ...prev };
+                    if (next[id]) delete next[id];
+                    else next[id] = true;
+                    return next;
+                  });
+                }}
+                onMoveUp={(id) => moveLibrary(id, -1)}
+                onMoveDown={(id) => moveLibrary(id, 1)}
+              >
+                {groups.length === 0 ? (
+                  <div className="muted" style={{ marginTop: 10 }}>
+                    No books yet.
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 10, ...booksContainerStyle }}>{groups.map(renderGroup)}</div>
+                )}
+              </LibraryBlock>
+              {idx < libraries.length - 1 ? <hr className="om-hr" /> : null}
+            </div>
           );
         })}
 

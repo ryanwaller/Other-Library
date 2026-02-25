@@ -72,7 +72,6 @@ select:focus-visible {
 
 .om-cover-slot {
   background: color-mix(in srgb, var(--bg) 90%, var(--border));
-  border: 1px solid var(--border);
   padding: 6px;
   display: flex;
   align-items: center;
@@ -189,6 +188,9 @@ select.om-filter-control {
 }
 
 .om-menu-panel button {
+  display: block;
+  width: 100%;
+  text-align: left;
   padding: 2px 0;
   border: 1px solid transparent;
 }

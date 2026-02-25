@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export type BulkState = { busy: boolean; error: string | null; message: string | null };
 export type LibraryOption = { id: number; name: string };
@@ -18,7 +18,8 @@ export default function BulkBar({
   onBulkMakePrivate,
   onBulkAssignCategory,
   onBulkMoveSelected,
-  onBulkCopySelected
+  onBulkCopySelected,
+  onAnyMenuOpen
 }: {
   bulkMode: boolean;
   bulkState: BulkState;
@@ -33,10 +34,10 @@ export default function BulkBar({
   onBulkAssignCategory: () => void;
   onBulkMoveSelected: (libraryId: number) => void;
   onBulkCopySelected: (libraryId: number) => void;
+  onAnyMenuOpen?: () => void;
 }) {
   const canAct = useMemo(() => selectedGroupsCount > 0 && !bulkState.busy, [selectedGroupsCount, bulkState.busy]);
   const [moveQuery, setMoveQuery] = useState("");
-  const [copyQuery, setCopyQuery] = useState("");
 
   const visibilityRef = useRef<HTMLDetailsElement | null>(null);
   const moveRef = useRef<HTMLDetailsElement | null>(null);
@@ -46,11 +47,33 @@ export default function BulkBar({
     if (ref.current) ref.current.open = false;
   }
 
+  function closeAllMenus() {
+    close(visibilityRef);
+    close(moveRef);
+    close(moreRef);
+  }
+
+  useEffect(() => {
+    const onPointerDownCapture = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      const v = visibilityRef.current;
+      const m = moveRef.current;
+      const more = moreRef.current;
+      if (v?.open && v.contains(target)) return;
+      if (m?.open && m.contains(target)) return;
+      if (more?.open && more.contains(target)) return;
+      if (v?.open || m?.open || more?.open) closeAllMenus();
+    };
+    window.addEventListener("pointerdown", onPointerDownCapture, true);
+    return () => window.removeEventListener("pointerdown", onPointerDownCapture, true);
+  }, []);
+
   if (!bulkMode) return null;
   if (selectedGroupsCount === 0) return null;
 
   const filteredMoveTargets = libraries.filter((l) => l.name.toLowerCase().includes(moveQuery.trim().toLowerCase()));
-  const filteredCopyTargets = libraries.filter((l) => l.name.toLowerCase().includes(copyQuery.trim().toLowerCase()));
+  const copyTargets = libraries;
 
   return (
     <div className="om-bulkbar" style={{ marginTop: 10 }}>
@@ -66,7 +89,17 @@ export default function BulkBar({
         </div>
 
         <div className="row" style={{ gap: 14, alignItems: "baseline" }}>
-          <details ref={visibilityRef} className="om-menu">
+          <details
+            ref={visibilityRef}
+            className="om-menu"
+            onToggle={(e) => {
+              const open = (e.currentTarget as HTMLDetailsElement).open;
+              if (!open) return;
+              close(moveRef);
+              close(moreRef);
+              onAnyMenuOpen?.();
+            }}
+          >
             <summary className="om-menu-summary" tabIndex={0}>
               Visibility <span aria-hidden="true">▾</span>
             </summary>
@@ -102,7 +135,17 @@ export default function BulkBar({
             </div>
           </details>
 
-          <details ref={moveRef} className="om-menu">
+          <details
+            ref={moveRef}
+            className="om-menu"
+            onToggle={(e) => {
+              const open = (e.currentTarget as HTMLDetailsElement).open;
+              if (!open) return;
+              close(visibilityRef);
+              close(moreRef);
+              onAnyMenuOpen?.();
+            }}
+          >
             <summary className="om-menu-summary" tabIndex={0}>
               Move <span aria-hidden="true">▾</span>
             </summary>
@@ -139,7 +182,17 @@ export default function BulkBar({
             </div>
           </details>
 
-          <details ref={moreRef} className="om-menu">
+          <details
+            ref={moreRef}
+            className="om-menu"
+            onToggle={(e) => {
+              const open = (e.currentTarget as HTMLDetailsElement).open;
+              if (!open) return;
+              close(visibilityRef);
+              close(moveRef);
+              onAnyMenuOpen?.();
+            }}
+          >
             <summary className="om-menu-summary" tabIndex={0}>
               More <span aria-hidden="true">▾</span>
             </summary>
@@ -172,9 +225,8 @@ export default function BulkBar({
               <div className="muted" style={{ marginTop: 12, marginBottom: 6 }}>
                 Copy to
               </div>
-              <input value={copyQuery} onChange={(e) => setCopyQuery(e.target.value)} placeholder="Copy to…" />
               <div className="om-menu-list" style={{ marginTop: 8 }}>
-                {filteredCopyTargets.map((l) => (
+                {copyTargets.map((l) => (
                   <button
                     key={l.id}
                     type="button"
@@ -189,24 +241,14 @@ export default function BulkBar({
                     {l.name}
                   </button>
                 ))}
-                {filteredCopyTargets.length === 0 ? <div className="muted">No matches.</div> : null}
+                {copyTargets.length === 0 ? <div className="muted">No catalogs.</div> : null}
               </div>
-
-              <hr className="om-hr" />
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  close(moreRef);
-                  onBulkDeleteSelected();
-                }}
-                disabled={!canAct}
-                style={{ textAlign: "left" }}
-              >
-                Delete…
-              </button>
             </div>
           </details>
+
+          <button type="button" onClick={() => onBulkDeleteSelected()} disabled={!canAct}>
+            Delete…
+          </button>
         </div>
       </div>
     </div>

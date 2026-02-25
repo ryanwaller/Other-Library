@@ -21,6 +21,38 @@ function newToken(): string {
   return crypto.randomBytes(24).toString("base64url");
 }
 
+export async function GET(req: Request) {
+  try {
+    await requireAdmin(req);
+    const admin = getSupabaseAdmin();
+    if (!admin) return NextResponse.json({ error: "admin_not_configured" }, { status: 500 });
+
+    const url = new URL(req.url);
+    const q = (url.searchParams.get("q") ?? "").trim();
+    const pageSize = clampInt(url.searchParams.get("pageSize"), 20, 1, 200);
+    const page = clampInt(url.searchParams.get("page"), 1, 1, 10_000);
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = admin
+      .from("invites")
+      .select("id,token,email,created_by,expires_at,used_by,used_at,created_at", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (q) query = query.ilike("email", `%${q}%`);
+
+    const res = await query;
+    if (res.error) return NextResponse.json({ error: res.error.message }, { status: 500 });
+
+    return NextResponse.json({ invites: res.data ?? [], page, pageSize, total: res.count ?? 0 });
+  } catch (e: any) {
+    const msg = e?.message ?? "forbidden";
+    const status = msg === "not_authenticated" ? 401 : msg === "forbidden" ? 403 : 400;
+    return NextResponse.json({ error: msg }, { status });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const current = await requireAdmin(req);
@@ -55,30 +87,3 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET(req: Request) {
-  try {
-    await requireAdmin(req);
-    const admin = getSupabaseAdmin();
-    if (!admin) return NextResponse.json({ error: "admin_not_configured" }, { status: 500 });
-
-    const url = new URL(req.url);
-    const pageSize = clampInt(url.searchParams.get("pageSize"), 20, 1, 200);
-    const page = clampInt(url.searchParams.get("page"), 1, 1, 10_000);
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-
-    const res = await admin
-      .from("invites")
-      .select("id,token,email,created_by,expires_at,used_by,used_at,created_at", { count: "exact" })
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: true })
-      .range(from, to);
-    if (res.error) return NextResponse.json({ error: res.error.message }, { status: 500 });
-
-    return NextResponse.json({ invites: res.data ?? [], page, pageSize, total: res.count ?? 0 });
-  } catch (e: any) {
-    const msg = e?.message ?? "forbidden";
-    const status = msg === "not_authenticated" ? 401 : msg === "forbidden" ? 403 : 400;
-    return NextResponse.json({ error: msg }, { status });
-  }
-}

@@ -247,7 +247,7 @@ export default function GlobalNav() {
 
   return (
     <div className="container">
-      <div className="card" style={{ marginBottom: 12 }}>
+      <div className="card" style={{ marginBottom: 6 }}>
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div>
             <Link href="/app" style={{ textDecoration: "none" }}>
@@ -329,6 +329,7 @@ export default function GlobalNav() {
           </div>
         </div>
       </div>
+      <hr className="om-hr" style={{ marginTop: 0, marginBottom: 12 }} />
     </div>
   );
 }
