@@ -58,17 +58,17 @@ export default function BookCard({
     return (
       <div className="card" style={{ display: "grid", gridTemplateColumns: bulkMode ? "26px 70px 1fr" : "70px 1fr", gap: 12, alignItems: "start" }}>
         {bulkMode ? <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" /> : null}
-        <Link href={href} style={{ display: "block" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {coverUrl ? (
-            <img alt={title} src={coverUrl} style={{ width: 70, height: 70, objectFit: "cover", border: "1px solid var(--border)" }} />
-          ) : (
-            <div style={{ width: 70, height: 70, border: "1px solid var(--border)" }} />
-          )}
+        <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link">
+          <div className="om-cover-slot" style={{ width: 70, height: 70 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {coverUrl ? <img alt={title} src={coverUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <div style={{ width: "100%", height: "100%" }} />}
+          </div>
         </Link>
         <div>
           <div>
-            <Link href={href}>{title}</Link>{" "}
+            <Link href={href} className="om-book-card-link">
+              <span className="om-book-title">{title}</span>
+            </Link>{" "}
             {!hideCopyCount ? <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span> : null}
           </div>
           <div className="muted" style={{ marginTop: 4 }}>
@@ -86,12 +86,11 @@ export default function BookCard({
             )}
           </div>
           {tags.length > 0 ? (
-            <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {tags.slice(0, 6).map((t) => (
-                <span key={t} style={{ border: "1px solid var(--border)", padding: "2px 6px" }}>
-                  <Link href={`/app?tag=${encodeURIComponent(t)}`} style={{ textDecoration: "none" }}>
-                    {t}
-                  </Link>
+            <div className="muted" style={{ marginTop: 6 }}>
+              {tags.slice(0, 6).map((t, idx) => (
+                <span key={t}>
+                  <Link href={`/app?tag=${encodeURIComponent(t)}`}>{t}</Link>
+                  {idx < Math.min(tags.length, 6) - 1 ? <span>, </span> : null}
                 </span>
               ))}
             </div>
@@ -126,12 +125,12 @@ export default function BookCard({
 
       {bulkMode ? (
         <>
-          <Link href={href} style={{ display: "block", textDecoration: "none" }}>
+          <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link">
             {coverEl}
           </Link>
           <div style={{ marginTop: 12 }}>
             <div className="row" style={{ justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-              <Link href={href} style={{ textDecoration: "none" }}>
+              <Link href={href} style={{ textDecoration: "none" }} className="om-book-card-link">
                 <span className="om-book-title">{title}</span>
               </Link>
               {!hideCopyCount ? <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span> : null}

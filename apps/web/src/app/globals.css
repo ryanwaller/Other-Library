@@ -41,7 +41,20 @@ body {
 
 a {
   color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
   text-decoration: underline;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 1px solid var(--border);
+  outline-offset: 2px;
 }
 
 .om-book-card-link {
@@ -58,7 +71,7 @@ a {
 }
 
 .om-cover-slot {
-  background: color-mix(in srgb, var(--card-bg) 86%, var(--border));
+  background: color-mix(in srgb, var(--bg) 90%, var(--border));
   border: 1px solid var(--border);
   padding: 6px;
   display: flex;
@@ -81,19 +94,24 @@ input,
 textarea,
 select {
   color: var(--fg);
-  background: var(--input-bg);
-  border: 1px solid var(--border);
-  padding: 4px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom-color: var(--border);
+  padding: 2px 0;
   max-width: 100%;
   min-width: 0;
 }
 
 button {
   color: var(--fg);
-  background: var(--button-bg);
-  border: 1px solid var(--border);
-  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 2px 4px;
   cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--border);
 }
 
 button:disabled {
@@ -115,9 +133,9 @@ button:disabled {
 }
 
 .card {
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  padding: 12px;
+  border: none;
+  background: transparent;
+  padding: 12px 0;
 }
 
 .muted {
