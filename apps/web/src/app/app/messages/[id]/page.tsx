@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
 import SignInCard from "../../../components/SignInCard";
+import Link from "next/link";
 
 function notifyBorrowRequestsChanged() {
   window.dispatchEvent(new Event("om:borrow-requests-changed"));
@@ -34,19 +34,22 @@ type BookLite = {
 
 type Msg = { id: number; sender_id: string; message: string; created_at: string };
 
-function parseSystemMessage(raw: string): { status: "approved" | "rejected"; text: string } | null {
+function parseEventMessage(raw: string): { status: "approved" | "rejected" | "cancelled" } | null {
   const msg = (raw ?? "").trim();
+  if (msg.startsWith("__event__:")) {
+    const status = msg.slice("__event__:".length).trim().toLowerCase();
+    if (status === "approved" || status === "rejected" || status === "cancelled") return { status: status as any };
+    return null;
+  }
   if (!msg.startsWith("__system__:")) return null;
   const rest = msg.slice("__system__:".length);
-  const [statusRaw, ...textParts] = rest.split("|");
+  const [statusRaw] = rest.split("|");
   const status = (statusRaw ?? "").trim().toLowerCase();
-  const text = textParts.join("|").trim();
-  if ((status !== "approved" && status !== "rejected") || !text) return null;
-  return { status: status as any, text };
+  if (status === "approved" || status === "rejected") return { status: status as any };
+  return null;
 }
 
 export default function MessageThreadPage() {
-  const router = useRouter();
   const params = useParams<{ id: string }>();
   const requestId = Number(params?.id);
 
@@ -217,13 +220,8 @@ export default function MessageThreadPage() {
       return;
     }
 
-    if (nextStatus === "approved" || nextStatus === "rejected") {
-      const ownerName = profilesById[req.owner_id]?.username ?? "user";
-      const requesterName = profilesById[req.requester_id]?.username ?? "user";
-      const thing = String(book?.object_type ?? "book").trim() || "book";
-      const verb = nextStatus === "approved" ? "approved" : "rejected";
-      const text = `${ownerName} has ${verb} ${requesterName}'s request to borrow this ${thing}.`;
-      const systemMsg = `__system__:${verb}|${text}`;
+    if (nextStatus === "approved" || nextStatus === "rejected" || nextStatus === "cancelled") {
+      const systemMsg = `__event__:${nextStatus}`;
       try {
         await supabase.from("borrow_request_messages").insert({ borrow_request_id: req.id, sender_id: userId, message: systemMsg });
       } catch {
@@ -266,139 +264,107 @@ export default function MessageThreadPage() {
   const other = otherUserId ? profilesById[otherUserId] : null;
   const otherAvatarUrl = otherUserId ? avatarUrlByUserId[otherUserId] ?? null : null;
   const title = ((book?.title_override ?? "").trim() || book?.edition?.title || "(untitled)") as string;
+  const ownerName = profilesById[req?.owner_id ?? ""]?.username ?? "someone";
+  const requesterName = profilesById[req?.requester_id ?? ""]?.username ?? "someone";
+
+  function statusLabel(status: BorrowRequestRow["status"]): string {
+    if (status === "approved") return "Approved";
+    if (status === "rejected") return "Declined";
+    if (status === "cancelled") return "Cancelled";
+    return "Pending";
+  }
+
+  function formatEventLine(status: "approved" | "rejected" | "cancelled"): string {
+    const qTitle = `‘${title}’`;
+    if (status === "approved") return `${ownerName} approved ${qTitle} for ${requesterName}.`;
+    if (status === "rejected") return `${ownerName} declined ${qTitle} for ${requesterName}.`;
+    return `${requesterName} cancelled their request for ${qTitle}.`;
+  }
 
   return (
     <main className="container">
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-        <div className="muted">
-          <Link href="/app/messages">Back</Link>
-        </div>
-        <div className="row" style={{ gap: 10 }}>
-          <button onClick={refresh} disabled={busy}>
-            Refresh
-          </button>
-          <button
-            onClick={async () => {
-              try {
-                await supabase?.auth.signOut();
-              } finally {
-                router.push("/");
-                router.refresh();
-              }
-            }}
-          >
-            Sign out
-          </button>
-        </div>
+      <div className="muted" style={{ marginBottom: 12 }}>
+        <Link href="/app/messages">Back</Link>
       </div>
 
-      <div className="card">
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-          <div className="row" style={{ gap: 8 }}>
-            {otherAvatarUrl ? (
-              <a href={otherAvatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img alt="" src={otherAvatarUrl} style={{ width: 18, height: 18, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }} />
-              </a>
-            ) : (
-              <div style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
-            )}
-            <div>
-              <div>
-                <span className="muted">with </span>
-                {other?.username ? <Link href={`/u/${other.username}`}>{other.username}</Link> : <span className="muted">{otherUserId ?? ""}</span>}
-              </div>
-              <div className="muted">Book: {title}</div>
-            </div>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div>{title}</div>
+          <div className="muted">
+            with {other?.username ? <Link href={`/u/${other.username}`}>{other.username}</Link> : <span className="muted">{otherUserId ?? ""}</span>}
           </div>
-          <div className="muted">{busy ? "Loading…" : error ? error : req ? req.status : ""}</div>
         </div>
+        <div className="muted">{busy ? "Loading…" : error ? error : req ? statusLabel(req.status) : ""}</div>
+      </div>
 
+      <div className="om-thread" style={{ marginTop: 14 }}>
         {req?.message ? (
-          <div className="card" style={{ marginTop: 10 }}>
-            <div className="muted">Initial request</div>
-            <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-              {req.message}
-            </div>
+          <div className="om-thread-msg">
+            <div className="muted">{requesterName}</div>
+            <div style={{ whiteSpace: "pre-wrap" }}>{req.message}</div>
           </div>
         ) : null}
 
-        <div className="card" style={{ marginTop: 10 }}>
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <div>Thread</div>
-            <div className="muted">{threadLoading ? "Loading…" : ""}</div>
-          </div>
-          {thread.length === 0 ? (
-            <div className="muted" style={{ marginTop: 8 }}>
-              No replies yet.
-            </div>
-          ) : (
-            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-              {thread.map((m) => {
-                const sys = parseSystemMessage(m.message);
-                if (sys) {
-                  const color = sys.status === "approved" ? "#0b6b2e" : "#b00020";
-                  return (
-                    <div key={m.id} style={{ whiteSpace: "pre-wrap", color }}>
-                      {sys.text}
-                    </div>
-                  );
-                }
+        {thread.length === 0 ? null : (
+          <div style={{ marginTop: req?.message ? 10 : 0, display: "flex", flexDirection: "column", gap: 10 }}>
+            {thread.map((m) => {
+              const ev = parseEventMessage(m.message);
+              if (ev) {
                 return (
-                  <div key={m.id} className="muted" style={{ whiteSpace: "pre-wrap" }}>
-                    {(m.sender_id === userId ? "you" : "them")}: {m.message}
+                  <div key={m.id} className="om-event-line">
+                    {formatEventLine(ev.status)}
                   </div>
                 );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="card" style={{ marginTop: 10 }}>
-          <div className="muted">Reply</div>
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Message"
-            rows={4}
-            style={{ width: "100%", marginTop: 8 }}
-            onKeyDown={(e) => {
-              if (!(e.metaKey || e.ctrlKey) || e.key !== "Enter") return;
-              e.preventDefault();
-              send();
-            }}
-          />
-          <div className="row" style={{ marginTop: 8, justifyContent: "space-between", gap: 10 }}>
-            <div className="row" style={{ gap: 10 }}>
-              <button
-                onClick={send}
-                disabled={sendState.busy || !draft.trim() || !req || (req.status !== "pending" && req.status !== "approved" && req.status !== "rejected")}
-              >
-                {sendState.busy ? "Sending…" : "Send"}
-              </button>
-              <span className="muted">{sendState.message ? (sendState.error ? `${sendState.message} (${sendState.error})` : sendState.message) : ""}</span>
-            </div>
-            <div className="row" style={{ gap: 10 }}>
-              {req?.status === "pending" && isOwner ? (
-                <>
-                  <button onClick={() => setStatus("approved")} disabled={statusState.busy}>
-                    Approve
-                  </button>
-                  <button onClick={() => setStatus("rejected")} disabled={statusState.busy}>
-                    Reject
-                  </button>
-                </>
-              ) : null}
-              {req?.status === "pending" && !isOwner ? (
-                <button onClick={() => setStatus("cancelled")} disabled={statusState.busy}>
-                  Cancel request
-                </button>
-              ) : null}
-              <span className="muted">{statusState.message ? (statusState.error ? `${statusState.message} (${statusState.error})` : statusState.message) : ""}</span>
-            </div>
+              }
+              const senderName = profilesById[m.sender_id]?.username ?? "someone";
+              return (
+                <div key={m.id} className="om-thread-msg">
+                  <div className="muted">{senderName}</div>
+                  <div style={{ whiteSpace: "pre-wrap" }}>{m.message}</div>
+                </div>
+              );
+            })}
           </div>
-          <div className="muted" style={{ marginTop: 6 }}>
-            Tip: press Ctrl+Enter (or ⌘+Enter) to send.
+        )}
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Message"
+          rows={4}
+          style={{ width: "100%" }}
+        />
+
+        <div className="row" style={{ marginTop: 10, justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+          <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={send}
+              disabled={sendState.busy || !draft.trim() || !req || (req.status !== "pending" && req.status !== "approved" && req.status !== "rejected")}
+            >
+              {sendState.busy ? "Sending…" : "Send"}
+            </button>
+            <span className="muted">{sendState.message ? (sendState.error ? `${sendState.message} (${sendState.error})` : sendState.message) : ""}</span>
+          </div>
+
+          <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+            {req?.status === "pending" && isOwner ? (
+              <>
+                <button onClick={() => setStatus("approved")} disabled={statusState.busy}>
+                  Approve
+                </button>
+                <button onClick={() => setStatus("rejected")} disabled={statusState.busy}>
+                  Decline
+                </button>
+              </>
+            ) : null}
+            {req?.status === "pending" && !isOwner ? (
+              <button onClick={() => setStatus("cancelled")} disabled={statusState.busy}>
+                Cancel request
+              </button>
+            ) : null}
+            <span className="muted">{statusState.message ? (statusState.error ? `${statusState.message} (${statusState.error})` : statusState.message) : ""}</span>
           </div>
         </div>
       </div>

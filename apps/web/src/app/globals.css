@@ -98,6 +98,34 @@ button:disabled {
   color: var(--muted);
 }
 
+.om-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.om-list-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.om-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.om-thread-msg {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.om-event-line {
+  text-align: center;
+  color: var(--muted);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
 /* Book detail helpers (public + app) */
 .om-book-detail-grid {
   display: grid;

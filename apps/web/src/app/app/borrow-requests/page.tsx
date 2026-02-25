@@ -6,10 +6,6 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
 
-function notifyBorrowRequestsChanged() {
-  window.dispatchEvent(new Event("om:borrow-requests-changed"));
-}
-
 type BorrowRequest = {
   id: number;
   user_book_id: number;
@@ -29,6 +25,22 @@ type BookLite = {
   edition: { title: string | null; isbn13: string | null; isbn10: string | null } | null;
 };
 
+function statusLabel(status: BorrowRequest["status"]): string {
+  if (status === "approved") return "Approved";
+  if (status === "rejected") return "Declined";
+  if (status === "cancelled") return "Cancelled";
+  return "Pending";
+}
+
+function oneLinePreview(input: string | null, maxLen = 140): string {
+  const s = String(input ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!s) return "";
+  if (s.length <= maxLen) return s;
+  return `${s.slice(0, maxLen - 1)}…`;
+}
+
 export default function BorrowRequestsPage() {
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
@@ -40,10 +52,6 @@ export default function BorrowRequestsPage() {
   const [profilesById, setProfilesById] = useState<Record<string, ProfileLite>>({});
   const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<string, string>>({});
   const [booksById, setBooksById] = useState<Record<number, BookLite>>({});
-
-  const [actionStateByRequestId, setActionStateByRequestId] = useState<Record<number, { busy: boolean; error: string | null; message: string | null } | undefined>>(
-    {}
-  );
 
   useEffect(() => {
     if (!supabase) return;
@@ -123,20 +131,6 @@ export default function BorrowRequestsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  async function setStatus(requestId: number, status: "approved" | "rejected") {
-    if (!supabase || !userId) return;
-    setActionStateByRequestId((prev) => ({ ...prev, [requestId]: { busy: true, error: null, message: "Saving…" } }));
-    const res = await supabase.from("borrow_requests").update({ status }).eq("id", requestId);
-    if (res.error) {
-      setActionStateByRequestId((prev) => ({ ...prev, [requestId]: { busy: false, error: res.error?.message ?? "Failed", message: "Failed" } }));
-      return;
-    }
-    notifyBorrowRequestsChanged();
-    await refresh();
-    setActionStateByRequestId((prev) => ({ ...prev, [requestId]: { busy: false, error: null, message: "Saved" } }));
-    window.setTimeout(() => setActionStateByRequestId((prev) => ({ ...prev, [requestId]: undefined })), 1200);
-  }
-
   if (!supabase) {
     return (
       <main className="container">
@@ -155,17 +149,13 @@ export default function BorrowRequestsPage() {
       {!session ? (
         <SignInCard note="Sign in to manage borrow requests." />
       ) : (
-        <div className="card">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <div>Borrow requests</div>
+        <>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+            <div>Requests from other readers</div>
             <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
           </div>
 
-          <div className="muted" style={{ marginTop: 8 }}>
-            Incoming borrow requests. Open a request to view and reply in chat.
-          </div>
-
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 12 }} className="om-list">
             {rows.length === 0 ? (
               <div className="muted">No requests yet.</div>
             ) : (
@@ -174,66 +164,52 @@ export default function BorrowRequestsPage() {
                 const avatarUrl = avatarUrlByUserId[r.requester_id] ?? null;
                 const book = booksById[r.user_book_id];
                 const title = (book?.title_override ?? "").trim() || book?.edition?.title || "(untitled)";
-                const reqState = actionStateByRequestId[r.id] ?? { busy: false, error: null, message: null };
+                const preview = oneLinePreview(r.message);
                 return (
-                  <div key={r.id} className="card" style={{ marginTop: 10 }}>
-                    <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                      <div className="row" style={{ gap: 8 }}>
+                  <div key={r.id} className="om-list-row">
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+                      <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                         {avatarUrl ? (
-                          <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar">
+                          <Link href={requester?.username ? `/u/${requester.username}` : "/app"} aria-label="Open requester profile" style={{ display: "inline-flex" }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               alt=""
                               src={avatarUrl}
                               style={{ width: 18, height: 18, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
                             />
-                          </a>
+                          </Link>
                         ) : (
                           <div style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
                         )}
                         <div>
-                          <span className="muted">from </span>
                           {requester?.username ? <Link href={`/u/${requester.username}`}>{requester.username}</Link> : <span className="muted">{r.requester_id}</span>}
                         </div>
                       </div>
-                    <div className="muted">borrow request • {r.status}</div>
-                  </div>
+
+                      <div className="muted" style={{ whiteSpace: "nowrap" }}>
+                        {statusLabel(r.status)}
+                      </div>
+                    </div>
 
                     <div style={{ marginTop: 8 }}>
-                      <span className="muted">Book: </span>
                       {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
                     </div>
 
-                    {r.message ? (
-                      <div className="muted" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
-                        {r.message}
+                    {preview ? (
+                      <div className="muted" style={{ marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {preview}
                       </div>
                     ) : null}
 
-                    <div className="row" style={{ marginTop: 10 }}>
-                      <Link href={`/app/messages/${r.id}`} className="muted">
-                        Open chat
-                      </Link>
-                      {r.status === "pending" ? (
-                        <>
-                          <button onClick={() => setStatus(r.id, "approved")} disabled={reqState.busy}>
-                            Approve
-                          </button>
-                          <button onClick={() => setStatus(r.id, "rejected")} disabled={reqState.busy}>
-                            Reject
-                          </button>
-                        </>
-                      ) : null}
-                      <span className="muted">
-                        {reqState.message ? (reqState.error ? `${reqState.message} (${reqState.error})` : reqState.message) : ""}
-                      </span>
+                    <div style={{ marginTop: 8 }}>
+                      <Link href={`/app/messages/${r.id}`}>View conversation</Link>
                     </div>
                   </div>
                 );
               })
             )}
           </div>
-        </div>
+        </>
       )}
     </main>
   );
