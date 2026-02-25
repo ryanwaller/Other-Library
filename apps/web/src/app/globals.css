@@ -44,6 +44,32 @@ a {
   text-decoration: underline;
 }
 
+.om-book-card-link {
+  text-decoration: none;
+}
+
+.om-book-card-link:hover .om-book-title {
+  text-decoration: underline;
+}
+
+.om-book-secondary {
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.om-cover-slot {
+  background: color-mix(in srgb, var(--card-bg) 86%, var(--border));
+  border: 1px solid var(--border);
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.om-book-card:hover .om-cover-slot {
+  filter: brightness(1.03);
+}
+
 input,
 button,
 textarea {

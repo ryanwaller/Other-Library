@@ -126,6 +126,7 @@ function AppShell({
       subjects: string[] | null;
       publisher: string | null;
       cover_url: string | null;
+      publish_date: string | null;
     } | null;
     media: Array<{ id: number; kind: "cover" | "image"; storage_path: string; caption: string | null; created_at: string }>;
     book_tags: Array<{ tag: { id: number; name: string; kind: "tag" | "category" } | null }>;
@@ -322,7 +323,7 @@ function AppShell({
     const { data, error } = await supabase
       .from("user_books")
       .select(
-        "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
+        "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
       )
       .eq("owner_id", userId)
       .order("created_at", { ascending: false })
@@ -1653,7 +1654,7 @@ function AppShell({
       display: viewMode === "grid" ? "grid" : "flex",
       flexDirection: viewMode === "list" ? ("column" as const) : undefined,
       gridTemplateColumns: viewMode === "grid" ? `repeat(${gridCols}, minmax(0, 1fr))` : undefined,
-      gap: 12
+      gap: viewMode === "grid" ? 18 : 12
     }),
     [viewMode, gridCols]
   );
@@ -1665,6 +1666,12 @@ function AppShell({
     const effectiveAuthors = effectiveAuthorsFor(it);
     const tags: string[] = [];
     const selected = !!bulkSelectedKeys[g.key];
+    const publisher = (it.publisher_override ?? "").trim() || (e?.publisher ?? "").trim() || null;
+    const year = (() => {
+      const raw = (e?.publish_date ?? "").trim();
+      const m = raw.match(/^(\d{4})/);
+      return m ? m[1] : null;
+    })();
     const coverUrl =
       g.copies
         .map((c) => {
@@ -1684,6 +1691,8 @@ function AppShell({
         authors={effectiveAuthors}
         isbn13={e?.isbn13 ?? null}
         tags={tags}
+        publisher={publisher}
+        publishYear={year}
         copiesCount={g.copiesCount}
         href={`/app/books/${it.id}`}
         coverUrl={coverUrl}
