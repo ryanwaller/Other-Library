@@ -189,7 +189,6 @@ function AppShell({
 
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkSelectedKeys, setBulkSelectedKeys] = useState<Record<string, true | undefined>>({});
-  const [bulkMoveLibraryId, setBulkMoveLibraryId] = useState<number | null>(null);
   const [bulkCategoryName, setBulkCategoryName] = useState("");
   const [bulkState, setBulkState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
@@ -413,7 +412,6 @@ function AppShell({
         setAddLibraryId(list[0]?.id ?? null);
       }
 
-      setBulkMoveLibraryId((prev) => (prev && list.some((l) => l.id === prev) ? prev : list[0]?.id ?? null));
       setLibraryState({ busy: false, error: null, message: null });
     } catch (e: any) {
       setLibraries([]);
@@ -434,7 +432,6 @@ function AppShell({
       const id = (created.data as any)?.id as number | undefined;
       if (id) {
         setAddLibraryId(id);
-        setBulkMoveLibraryId(id);
         try {
           window.localStorage.setItem("om_addLibraryId", String(id));
         } catch {
@@ -1402,20 +1399,14 @@ function AppShell({
     }
   }
 
-  async function bulkMoveSelected() {
+  async function bulkMoveSelected(targetLibraryId: number) {
     if (!supabase) return;
     if (bulkSelectedGroups.length === 0) return;
-    if (!bulkMoveLibraryId) return;
-    if (
-      !window.confirm(
-        `Move ${bulkSelectedGroups.length} book(s) to "${libraries.find((l) => l.id === bulkMoveLibraryId)?.name ?? "selected catalog"}"?`
-      )
-    )
-      return;
+    if (!Number.isFinite(targetLibraryId) || targetLibraryId <= 0) return;
     setBulkState({ busy: true, error: null, message: "Moving…" });
     try {
       const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
-      const upd = await supabase.from("user_books").update({ library_id: bulkMoveLibraryId }).in("id", ids);
+      const upd = await supabase.from("user_books").update({ library_id: targetLibraryId }).in("id", ids);
       if (upd.error) throw new Error(upd.error.message);
       setBulkSelectedKeys({});
       await refreshAllBooks();
@@ -1426,16 +1417,10 @@ function AppShell({
     }
   }
 
-  async function bulkCopySelected() {
+  async function bulkCopySelected(targetLibraryId: number) {
     if (!supabase) return;
     if (bulkSelectedGroups.length === 0) return;
-    if (!bulkMoveLibraryId) return;
-    if (
-      !window.confirm(
-        `Copy ${bulkSelectedGroups.length} book(s) to "${libraries.find((l) => l.id === bulkMoveLibraryId)?.name ?? "selected catalog"}"?`
-      )
-    )
-      return;
+    if (!Number.isFinite(targetLibraryId) || targetLibraryId <= 0) return;
     setBulkState({ busy: true, error: null, message: "Copying…" });
     try {
       const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
@@ -1480,7 +1465,7 @@ function AppShell({
           .from("user_books")
           .insert({
             owner_id: userId,
-            library_id: bulkMoveLibraryId,
+            library_id: targetLibraryId,
             edition_id: (r as any).edition_id ?? null,
             visibility: (r as any).visibility ?? "inherit",
             status: (r as any).status ?? "owned",
@@ -1706,8 +1691,6 @@ function AppShell({
 
   return (
     <div className="card">
-      <div className="muted">Catalog items: {userBooksCount ?? "…"}</div>
-
       <div style={{ marginTop: 16 }} className="card">
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
           <div>Add</div>
@@ -1935,6 +1918,14 @@ function AppShell({
           <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <span className="muted">Catalogs</span>
             <span>{libraries.length}</span>
+            <span className="muted">Books</span>
+            <span>{displayGroups.length}</span>
+            {bulkMode ? (
+              <>
+                <span className="muted">Selected</span>
+                <span>{bulkSelectedCount}</span>
+              </>
+            ) : null}
             {libraryState.message ? <span className="muted">{libraryState.message}</span> : libraryState.error ? <span className="muted">{libraryState.error}</span> : null}
           </div>
           <div className="muted">
@@ -2020,26 +2011,11 @@ function AppShell({
           <span style={{ flex: "1 1 auto" }} />
           <button
             onClick={() => {
-              setReorderMode((prev) => {
-                const next = !prev;
-                if (next) {
-                  setBulkMode(false);
-                  setBulkSelectedKeys({});
-                  setBulkState({ busy: false, error: null, message: null });
-                }
-                return next;
-              });
-            }}
-          >
-            {reorderMode ? "Done reordering" : "Reorder modules"}
-          </button>
-          <button
-            onClick={() => {
               setBulkMode((prev) => {
                 const next = !prev;
                 if (!next) setBulkSelectedKeys({});
                 setBulkState({ busy: false, error: null, message: null });
-                if (next) setReorderMode(false);
+                setReorderMode(false);
                 return next;
               });
             }}
@@ -2048,7 +2024,7 @@ function AppShell({
           </button>
         </div>
         <div
-          className="row"
+          className="om-filter-row"
           style={{
             marginTop: 10,
             flexWrap: isMobile ? "wrap" : "nowrap",
@@ -2058,13 +2034,13 @@ function AppShell({
             paddingBottom: 4
           }}
         >
-          <select value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
+          <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
             <option value="grid">grid</option>
             <option value="list">list</option>
           </select>
           {viewMode === "grid" ? (
             <>
-              <select value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
+              <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
                 {isMobile ? <option value={1}>1</option> : null}
                 <option value={2}>2</option>
                 {!isMobile ? <option value={4}>4</option> : null}
@@ -2072,7 +2048,7 @@ function AppShell({
               </select>
             </>
           ) : null}
-          <select value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
+          <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
             <option value="latest">latest</option>
             <option value="earliest">earliest</option>
             <option value="title_asc">title A→Z</option>
@@ -2081,16 +2057,8 @@ function AppShell({
           <button
             ref={tagButtonRef}
             onClick={() => (tagMenu.open ? closeTagMenu() : openTagMenu())}
-            style={{
-              border: "1px solid var(--border)",
-              padding: "4px 8px",
-              background: "transparent",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 10,
-              minWidth: 120
-            }}
+            className="om-filter-control"
+            style={{ minWidth: 120 }}
             aria-haspopup="menu"
             aria-expanded={tagMenu.open}
           >
@@ -2108,16 +2076,8 @@ function AppShell({
           <button
             ref={categoryButtonRef}
             onClick={() => (categoryMenu.open ? closeCategoryMenu() : openCategoryMenu())}
-            style={{
-              border: "1px solid var(--border)",
-              padding: "4px 8px",
-              background: "transparent",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 10,
-              minWidth: 160
-            }}
+            className="om-filter-control"
+            style={{ minWidth: 160 }}
             aria-haspopup="menu"
             aria-expanded={categoryMenu.open}
           >
@@ -2126,14 +2086,29 @@ function AppShell({
               ▼
             </span>
           </button>
-          <select value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
+          <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
             <option value="all">all</option>
             <option value="public">public</option>
             <option value="private">private</option>
           </select>
-          <span className="muted">
-            Showing {displayGroups.length} books{bulkMode ? ` · Selected: ${bulkSelectedCount}` : ""}
-          </span>
+          {bulkMode ? (
+            <button
+              type="button"
+              onClick={() => {
+                setReorderMode((prev) => {
+                  const next = !prev;
+                  if (next) {
+                    setBulkSelectedKeys({});
+                    setBulkState({ busy: false, error: null, message: null });
+                  }
+                  return next;
+                });
+              }}
+              style={{ marginLeft: "auto" }}
+            >
+              {reorderMode ? "Done reordering" : "Reorder modules"}
+            </button>
+          ) : null}
         </div>
         {tagMenu.open ? (
           <div
@@ -2249,8 +2224,7 @@ function AppShell({
           libraries={libraries.map((l) => ({ id: l.id, name: l.name }))}
           bulkCategoryName={bulkCategoryName}
           setBulkCategoryName={setBulkCategoryName}
-          bulkMoveLibraryId={bulkMoveLibraryId}
-          setBulkMoveLibraryId={(next) => setBulkMoveLibraryId(next)}
+          onClearSelected={() => setBulkSelectedKeys({})}
           onBulkDeleteSelected={bulkDeleteSelected}
           onBulkMakePublic={bulkMakePublic}
           onBulkMakePrivate={bulkMakePrivate}
@@ -2282,6 +2256,7 @@ function AppShell({
               isEditing={isEditing}
               nameDraft={libraryNameDraft}
               reorderMode={reorderMode}
+              manageMode={bulkMode}
               onStartEdit={beginEditLibrary}
               onNameDraftChange={setLibraryNameDraft}
               onSaveName={saveLibraryName}

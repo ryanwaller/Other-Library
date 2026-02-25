@@ -10,6 +10,7 @@ export default function LibraryBlock({
   total,
   collapsed,
   reorderMode,
+  manageMode,
   busy,
   isEditing,
   nameDraft,
@@ -30,6 +31,7 @@ export default function LibraryBlock({
   total: number;
   collapsed: boolean;
   reorderMode: boolean;
+  manageMode: boolean;
   busy: boolean;
   isEditing: boolean;
   nameDraft: string;
@@ -66,7 +68,7 @@ export default function LibraryBlock({
           >
             {caret}
           </button>
-          {isEditing ? (
+          {manageMode && isEditing ? (
             <span className="row" style={{ gap: 8 }}>
               <input
                 value={nameDraft}
@@ -94,7 +96,7 @@ export default function LibraryBlock({
                 Delete…
               </button>
             </span>
-          ) : (
+          ) : manageMode && !reorderMode ? (
             <button
               onClick={() => onStartEdit(libraryId, libraryName)}
               style={{ padding: 0, border: "none", background: "transparent", textDecoration: "underline" }}
@@ -102,6 +104,8 @@ export default function LibraryBlock({
             >
               {libraryName}
             </button>
+          ) : (
+            <span>{libraryName}</span>
           )}
           <span className="muted">
             {bookCount} book{bookCount === 1 ? "" : "s"}
