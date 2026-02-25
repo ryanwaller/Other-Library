@@ -2116,14 +2116,15 @@ function AppShell({
             onPointerDown={() => closeTagMenu()}
           >
             <div
-              className="card"
+              className="om-popover"
               style={{
                 position: "fixed",
                 top: tagMenu.top,
                 left: tagMenu.left,
                 minWidth: tagMenu.minWidth,
                 maxHeight: 320,
-                overflow: "auto"
+                overflow: "auto",
+                zIndex: 1001
               }}
               onPointerDown={(e) => e.stopPropagation()}
             >
@@ -2168,14 +2169,15 @@ function AppShell({
         {categoryMenu.open ? (
           <div style={{ position: "fixed", inset: 0, zIndex: 1000 }} onPointerDown={() => closeCategoryMenu()}>
             <div
-              className="card"
+              className="om-popover"
               style={{
                 position: "fixed",
                 top: categoryMenu.top,
                 left: categoryMenu.left,
                 minWidth: categoryMenu.minWidth,
                 maxHeight: 320,
-                overflow: "auto"
+                overflow: "auto",
+                zIndex: 1001
               }}
               onPointerDown={(e) => e.stopPropagation()}
             >

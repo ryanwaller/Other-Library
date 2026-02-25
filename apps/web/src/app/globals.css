@@ -197,6 +197,12 @@ select.om-filter-control {
   border-color: var(--border);
 }
 
+.om-popover {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  padding: 10px;
+}
+
 .container {
   max-width: 880px;
   margin: 0 auto;
