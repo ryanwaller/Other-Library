@@ -16,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <GlobalNav />
+        <hr className="om-hr" />
         {children}
       </body>
     </html>

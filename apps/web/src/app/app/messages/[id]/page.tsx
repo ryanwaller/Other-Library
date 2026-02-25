@@ -310,8 +310,14 @@ export default function MessageThreadPage() {
             {thread.map((m) => {
               const ev = parseEventMessage(m.message);
               if (ev) {
+                const evClass =
+                  ev.status === "approved"
+                    ? "om-event-line om-event-line--approved"
+                    : ev.status === "rejected"
+                      ? "om-event-line om-event-line--rejected"
+                      : "om-event-line";
                 return (
-                  <div key={m.id} className="om-event-line">
+                  <div key={m.id} className={evClass}>
                     {formatEventLine(ev.status)}
                   </div>
                 );

@@ -170,6 +170,20 @@ button:disabled {
   border-bottom: 1px solid var(--border);
 }
 
+.om-event-line--approved {
+  color: #0b6b2e;
+}
+
+.om-event-line--rejected {
+  color: #b00020;
+}
+
+.om-hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
+}
+
 /* Book detail helpers (public + app) */
 .om-book-detail-grid {
   display: grid;

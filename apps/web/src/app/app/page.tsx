@@ -2259,6 +2259,8 @@ function AppShell({
           onBulkCopySelected={bulkCopySelected}
         />
 
+        <hr className="om-hr" />
+
         {reorderMode ? (
           <div className="muted" style={{ marginTop: 10 }}>
             Reordering modules
@@ -2307,6 +2309,8 @@ function AppShell({
             </LibraryBlock>
           );
         })}
+
+        <hr className="om-hr" />
 
         <div style={{ marginTop: 14 }} className="card">
           <div className="row" style={{ justifyContent: "space-between" }}>

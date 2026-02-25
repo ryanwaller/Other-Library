@@ -1705,18 +1705,6 @@ export default function BookDetailPage() {
         </div>
       ) : (
         <div className="card">
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-            <div>{effectiveTitle}</div>
-            <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              {isOwner ? (
-                <button onClick={() => setEditMode((v) => !v)} disabled={busy}>
-                  {editMode ? "Done" : "Edit"}
-                </button>
-              ) : null}
-              <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
-            </div>
-          </div>
-
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "220px 1fr", gap: 14 }}>
             <div>
               {coverUrl ? (
@@ -1995,33 +1983,45 @@ export default function BookDetailPage() {
                 </div>
               ) : null}
 
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 10 }}>
+                <div>{effectiveTitle}</div>
+                <div className="row" style={{ gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+                  {isOwner ? (
+                    <button onClick={() => setEditMode((v) => !v)} disabled={busy}>
+                      {editMode ? "Done" : "Edit"}
+                    </button>
+                  ) : null}
+                  <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
+                </div>
+              </div>
+
               {!isOwner || (isOwner && !editMode) ? (
                 <>
-                  <div className="muted">Authors</div>
-                  <div style={{ marginTop: 4 }}>
-                    {effectiveAuthors.length > 0 ? (
-                      <>
-                        {effectiveAuthors.map((a, idx) => (
-                          <span key={a}>
-                            <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
-                            {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                          </span>
-                        ))}
-                      </>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </div>
-
-                  <div style={{ marginTop: 14 }} className="muted">
-                    Metadata
-                  </div>
-                  <div style={{ marginTop: 6 }}>
+                  <div style={{ marginTop: 14 }}>
                     <div className="row">
                       <div style={{ minWidth: 110 }} className="muted">
                         ISBN
                       </div>
                       <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10 ?? "—"}</div>
+                    </div>
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Authors
+                      </div>
+                      <div>
+                        {effectiveAuthors.length > 0 ? (
+                          <>
+                            {effectiveAuthors.map((a, idx) => (
+                              <span key={a}>
+                                <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
+                                {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                              </span>
+                            ))}
+                          </>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </div>
                     </div>
                     <div className="row" style={{ marginTop: 6 }}>
                       <div style={{ minWidth: 110 }} className="muted">
@@ -3025,6 +3025,7 @@ export default function BookDetailPage() {
           </div>
 
           <div style={{ marginTop: 16 }}>
+            <hr className="om-hr" />
             {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} /> : null}
           </div>
         </div>

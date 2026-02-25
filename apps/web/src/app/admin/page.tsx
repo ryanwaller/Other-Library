@@ -286,6 +286,7 @@ export default function AdminPage() {
 
           {view === "users" ? (
             <>
+              <hr className="om-hr" />
               <div className="card" style={{ marginTop: 14 }}>
                 <div style={{ marginBottom: 8 }}>Summary</div>
                 <div className="muted">
@@ -293,6 +294,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
+              <hr className="om-hr" />
               <div style={{ marginTop: 14 }} className="card">
                 <div style={{ marginBottom: 8 }}>Create invite</div>
                 <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
@@ -337,6 +339,7 @@ export default function AdminPage() {
                 ) : null}
               </div>
 
+              <hr className="om-hr" />
               <div className="card" style={{ marginTop: 14 }}>
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                   <div>Users</div>
@@ -508,6 +511,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
+              <hr className="om-hr" />
               <div className="card" style={{ marginTop: 14 }}>
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                   <div>Invites</div>

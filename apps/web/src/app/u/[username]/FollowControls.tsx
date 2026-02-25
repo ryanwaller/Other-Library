@@ -84,6 +84,7 @@ export default function FollowControls({
   if (isSelf) return null;
 
   if (!sessionUserId) {
+    if (compact) return null;
     return (
       <div style={{ marginTop: compact ? 0 : 10 }} className="muted">
         <Link href="/app">Sign in</Link> to follow.

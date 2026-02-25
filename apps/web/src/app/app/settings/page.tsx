@@ -684,6 +684,8 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          <hr className="om-hr" />
+
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Follows</div>
@@ -696,6 +698,8 @@ export default function SettingsPage() {
               <Link href="/app/follows">Open follow settings</Link>
             </div>
           </div>
+
+          <hr className="om-hr" />
 
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
@@ -747,6 +751,8 @@ export default function SettingsPage() {
               <Link href="/app/borrow-requests">View borrow requests</Link>
             </div>
           </div>
+
+          <hr className="om-hr" />
 
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
