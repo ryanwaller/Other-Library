@@ -23,6 +23,83 @@ type EditionMetadata = {
   raw?: Record<string, unknown>;
 };
 
+function parseCsvToObjects(text: string): Array<Record<string, string>> {
+  const src = (text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < src.length; i += 1) {
+    const ch = src[i] ?? "";
+    const next = src[i + 1] ?? "";
+    if (inQuotes) {
+      if (ch === '"' && next === '"') {
+        field += '"';
+        i += 1;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        field += ch;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inQuotes = true;
+      continue;
+    }
+    if (ch === ",") {
+      row.push(field);
+      field = "";
+      continue;
+    }
+    if (ch === "\n") {
+      row.push(field);
+      field = "";
+      // Skip completely empty trailing row
+      if (row.some((v) => (v ?? "").trim() !== "")) rows.push(row);
+      row = [];
+      continue;
+    }
+    field += ch;
+  }
+  row.push(field);
+  if (row.some((v) => (v ?? "").trim() !== "")) rows.push(row);
+
+  if (rows.length === 0) return [];
+  const headers = rows[0].map((h) => (h ?? "").trim());
+  const out: Array<Record<string, string>> = [];
+  for (const r of rows.slice(1)) {
+    const obj: Record<string, string> = {};
+    for (let i = 0; i < headers.length; i += 1) {
+      const key = headers[i] ?? "";
+      if (!key) continue;
+      obj[key] = (r[i] ?? "").trim();
+    }
+    out.push(obj);
+  }
+  return out;
+}
+
+function splitListField(input: string): string[] {
+  const raw = (input ?? "").trim();
+  if (!raw) return [];
+  const parts = raw
+    .split(/[;,]/g)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of parts) {
+    const k = p.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(p);
+  }
+  return out;
+}
+
 function parseAuthorsInput(input: string): string[] {
   const parts = input
     .split(",")
@@ -105,6 +182,30 @@ function AppShell({
     busy: false,
     error: null,
     message: null
+  });
+  type CsvImportRow = {
+    title: string;
+    isbn: string | null;
+    authors: string[];
+    publisher: string | null;
+    publish_date: string | null;
+    description: string | null;
+    category: string | null;
+    tags: string[];
+    notes: string | null;
+    group_label: string | null;
+    object_type: string | null;
+    copies: number;
+  };
+  const [csvFileName, setCsvFileName] = useState<string | null>(null);
+  const [csvRows, setCsvRows] = useState<CsvImportRow[]>([]);
+  const [csvApplyOverrides, setCsvApplyOverrides] = useState(false);
+  const [csvImportState, setCsvImportState] = useState<{ busy: boolean; error: string | null; message: string | null; done: number; total: number }>({
+    busy: false,
+    error: null,
+    message: null,
+    done: 0,
+    total: 0
   });
   const [pendingCoverByBookId, setPendingCoverByBookId] = useState<Record<number, File | undefined>>({});
   const [coverUploadStateByBookId, setCoverUploadStateByBookId] = useState<
@@ -711,6 +812,199 @@ function AppShell({
       return created.data.id as number;
     } catch (e: any) {
       throw new Error(e?.message ?? "Failed to add book");
+    }
+  }
+
+  async function createUserBookByIsbnNoRefresh(isbnValue: string): Promise<number> {
+    if (!supabase) throw new Error("Supabase is not configured");
+    if (!addLibraryId) throw new Error("Choose a catalog first");
+    const isbn = isbnValue.trim();
+    if (!isbn) throw new Error("Provide an ISBN");
+    const res = await fetch(`/api/isbn?isbn=${encodeURIComponent(isbn)}`);
+    const json = await res.json();
+    if (!res.ok || !json?.ok) throw new Error(json?.error ?? "ISBN lookup failed");
+    const edition = (json.edition ?? {}) as EditionMetadata;
+    const isbn13 = (edition.isbn13 ?? "").trim();
+    if (!isbn13) throw new Error("No ISBN-13 returned by resolver");
+
+    const existing = await supabase.from("editions").select("id").eq("isbn13", isbn13).maybeSingle();
+    if (existing.error) throw new Error(existing.error.message);
+
+    let editionId = existing.data?.id as number | undefined;
+    if (!editionId) {
+      const inserted = await supabase
+        .from("editions")
+        .insert({
+          isbn10: edition.isbn10 ?? null,
+          isbn13,
+          title: edition.title ?? null,
+          authors: edition.authors ?? [],
+          publisher: edition.publisher ?? null,
+          publish_date: edition.publish_date ?? null,
+          description: edition.description ?? null,
+          subjects: edition.subjects ?? [],
+          cover_url: edition.cover_url ?? null,
+          raw: edition.raw ?? null
+        })
+        .select("id")
+        .single();
+      if (inserted.error) throw new Error(inserted.error.message);
+      editionId = inserted.data.id;
+    }
+
+    const created = await supabase.from("user_books").insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId }).select("id").single();
+    if (created.error) throw new Error(created.error.message);
+    return created.data.id as number;
+  }
+
+  async function createManualUserBookNoRefresh(row: {
+    title: string;
+    authors: string[];
+    publisher?: string | null;
+    publish_date?: string | null;
+    description?: string | null;
+  }): Promise<number> {
+    if (!supabase) throw new Error("Supabase is not configured");
+    if (!addLibraryId) throw new Error("Choose a catalog first");
+    const title = (row.title ?? "").trim();
+    if (!title) throw new Error("Provide a title");
+    const created = await supabase
+      .from("user_books")
+      .insert({
+        owner_id: userId,
+        library_id: addLibraryId,
+        edition_id: null,
+        title_override: title,
+        authors_override: row.authors.length > 0 ? row.authors : null,
+        publisher_override: row.publisher ?? null,
+        publish_date_override: row.publish_date ?? null,
+        description_override: row.description ?? null
+      })
+      .select("id")
+      .single();
+    if (created.error) throw new Error(created.error.message);
+    return created.data.id as number;
+  }
+
+  async function loadCsvFile(file: File) {
+    const text = await file.text();
+    const objects = parseCsvToObjects(text);
+    const normalized: CsvImportRow[] = objects
+      .map((o) => {
+        const title = (o.title ?? o.Title ?? "").trim();
+        const isbn13 = (o.ean_isbn13 ?? o.isbn13 ?? o.ISBN13 ?? "").trim();
+        const isbn10 = (o.upc_isbn10 ?? o.isbn10 ?? o.ISBN10 ?? "").trim();
+        const isbn = isbn13 || isbn10 || "";
+        const creators = (o.creators ?? o.creators_name ?? o.author ?? o.authors ?? "").trim();
+        const authors = creators ? splitListField(creators) : [];
+        const publisher = (o.publisher ?? "").trim() || null;
+        const publish_date = (o.publish_date ?? "").trim() || null;
+        const description = (o.description ?? "").trim() || null;
+        const category = (o.collection ?? o.category ?? "").trim() || null;
+        const tags = splitListField((o.tags ?? "").trim());
+        const notes = (o.notes ?? "").trim() || null;
+        const group_label = (o.group ?? "").trim() || null;
+        const object_type = (o.item_type ?? o.object_type ?? "").trim() || null;
+        const copiesRaw = (o.copies ?? "").trim();
+        const copiesNum = copiesRaw ? Number(copiesRaw) : 1;
+        const copies = Number.isFinite(copiesNum) && copiesNum > 1 ? Math.floor(copiesNum) : 1;
+        return {
+          title,
+          isbn: isbn ? isbn : null,
+          authors,
+          publisher,
+          publish_date,
+          description,
+          category,
+          tags,
+          notes,
+          group_label,
+          object_type,
+          copies
+        } as CsvImportRow;
+      })
+      .filter((r) => Boolean(r.title || r.isbn));
+
+    setCsvFileName(file.name);
+    setCsvRows(normalized);
+    setCsvImportState({ busy: false, error: null, message: `Loaded ${normalized.length} row(s)`, done: 0, total: normalized.length });
+    window.setTimeout(() => setCsvImportState((s) => ({ ...s, message: null })), 1500);
+  }
+
+  function clearCsvImport() {
+    setCsvFileName(null);
+    setCsvRows([]);
+    setCsvImportState({ busy: false, error: null, message: null, done: 0, total: 0 });
+  }
+
+  async function importCsvRows() {
+    if (!supabase) return;
+    if (csvRows.length === 0) return;
+    if (!addLibraryId) {
+      setCsvImportState({ busy: false, error: "Choose a catalog first", message: "Choose a catalog first", done: 0, total: csvRows.length });
+      return;
+    }
+
+    setCsvImportState({ busy: true, error: null, message: `Importing…`, done: 0, total: csvRows.length });
+    const tagIdCache = new Map<string, number>();
+    const getTagIdCached = async (name: string, kind: "tag" | "category") => {
+      const normalized = name.trim().replace(/\s+/g, " ");
+      const key = `${kind}:${normalized.toLowerCase()}`;
+      const cached = tagIdCache.get(key);
+      if (cached) return cached;
+      const id = await getOrCreateTagId(normalized, kind);
+      tagIdCache.set(key, id);
+      return id;
+    };
+
+    let done = 0;
+    try {
+      for (const r of csvRows) {
+        const copies = Math.max(1, Math.floor(Number(r.copies) || 1));
+        for (let c = 0; c < copies; c += 1) {
+          const id = r.isbn ? await createUserBookByIsbnNoRefresh(r.isbn) : await createManualUserBookNoRefresh(r);
+
+          const updatePayload: any = {};
+          if (r.notes) updatePayload.notes = r.notes;
+          if (r.group_label) updatePayload.group_label = r.group_label;
+          if (r.object_type) updatePayload.object_type = r.object_type;
+          if (csvApplyOverrides && r.isbn) {
+            if (r.title) updatePayload.title_override = r.title;
+            if (r.authors.length > 0) updatePayload.authors_override = r.authors;
+            if (r.publisher) updatePayload.publisher_override = r.publisher;
+            if (r.publish_date) updatePayload.publish_date_override = r.publish_date;
+            if (r.description) updatePayload.description_override = r.description;
+          }
+          if (Object.keys(updatePayload).length > 0) {
+            const up = await supabase.from("user_books").update(updatePayload).eq("id", id);
+            if (up.error) {
+              // ignore per-row; import should continue
+            }
+          }
+
+          const rows: Array<{ user_book_id: number; tag_id: number }> = [];
+          if (r.category) rows.push({ user_book_id: id, tag_id: await getTagIdCached(r.category, "category") });
+          for (const t of r.tags) rows.push({ user_book_id: id, tag_id: await getTagIdCached(t, "tag") });
+          if (rows.length > 0) {
+            const upTags = await supabase.from("user_book_tags").upsert(rows as any, { onConflict: "user_book_id,tag_id" });
+            if (upTags.error) {
+              // ignore; tags optional
+            }
+          }
+        }
+        done += 1;
+        setCsvImportState((s) => ({ ...s, done, message: `Importing… ${done}/${csvRows.length}` }));
+      }
+
+      await refreshAllBooks();
+      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
+      setUserBooksCount(count ?? 0);
+      setCsvImportState({ busy: false, error: null, message: `Imported ${csvRows.length} row(s)`, done: csvRows.length, total: csvRows.length });
+      window.setTimeout(() => setCsvImportState((s) => ({ ...s, message: null })), 1500);
+      setCsvFileName(null);
+      setCsvRows([]);
+    } catch (e: any) {
+      setCsvImportState({ busy: false, error: e?.message ?? "Import failed", message: "Import failed", done, total: csvRows.length });
     }
   }
 
@@ -1741,7 +2035,7 @@ function AppShell({
           <span className="muted">{addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}</span>
         </div>
 
-        {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message) && libraries.length > 0 ? (
+        {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || csvRows.length > 0) && libraries.length > 0 ? (
           <div className="row" style={{ marginTop: 8, alignItems: "baseline", gap: 10 }}>
             <span className="muted">Add to catalog</span>
             {libraries.length > 1 ? (
@@ -1769,6 +2063,38 @@ function AppShell({
             )}
           </div>
         ) : null}
+
+        <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => {
+              const f = (e.target.files ?? [])[0];
+              if (!f) return;
+              setCsvImportState({ busy: true, error: null, message: "Loading CSV…", done: 0, total: 0 });
+              loadCsvFile(f).catch((err: any) => {
+                setCsvImportState({ busy: false, error: err?.message ?? "CSV load failed", message: "CSV load failed", done: 0, total: 0 });
+              });
+            }}
+            disabled={csvImportState.busy || addState.busy || addSearchState.busy}
+          />
+          {csvFileName ? <span className="muted">{csvFileName}</span> : <span className="muted">Upload CSV to bulk add</span>}
+          {csvRows.length > 0 ? (
+            <>
+              <label className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <input type="checkbox" checked={csvApplyOverrides} onChange={(e) => setCsvApplyOverrides(e.target.checked)} />
+                use CSV metadata as overrides
+              </label>
+              <button onClick={importCsvRows} disabled={csvImportState.busy || !addLibraryId}>
+                {csvImportState.busy ? "Importing…" : `Import ${csvRows.length}`}
+              </button>
+              <button onClick={clearCsvImport} disabled={csvImportState.busy}>
+                Clear
+              </button>
+            </>
+          ) : null}
+          {csvImportState.message ? <span className="muted">{csvImportState.message}</span> : csvImportState.error ? <span className="muted">{csvImportState.error}</span> : null}
+        </div>
 
         {addUrlPreview ? (
           <div style={{ marginTop: 10 }} className="card">

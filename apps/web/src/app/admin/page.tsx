@@ -402,12 +402,12 @@ export default function AdminPage() {
                   >
                     <option value="created_at:desc">created (newest)</option>
                     <option value="created_at:asc">created (oldest)</option>
-                    <option value="email:asc">email A→Z</option>
-                    <option value="email:desc">email Z→A</option>
-                    <option value="status:asc">status A→Z</option>
-                    <option value="status:desc">status Z→A</option>
-                    <option value="role:asc">role A→Z</option>
-                    <option value="role:desc">role Z→A</option>
+                    <option value="email:asc">email A-Z</option>
+                    <option value="email:desc">email Z-A</option>
+                    <option value="status:asc">status A-Z</option>
+                    <option value="status:desc">status Z-A</option>
+                    <option value="role:asc">role A-Z</option>
+                    <option value="role:desc">role Z-A</option>
                   </select>
                   <div className="muted">
                     page {usersData?.page ?? userPage} / {userTotalPages} · {usersData?.total ?? 0} results
@@ -625,10 +625,10 @@ export default function AdminPage() {
                     >
                       <option value="created_at:desc">created (newest)</option>
                       <option value="created_at:asc">created (oldest)</option>
-                      <option value="email:asc">email A→Z</option>
-                      <option value="email:desc">email Z→A</option>
-                      <option value="status:asc">status A→Z</option>
-                      <option value="status:desc">status Z→A</option>
+                      <option value="email:asc">email A-Z</option>
+                      <option value="email:desc">email Z-A</option>
+                      <option value="status:asc">status A-Z</option>
+                      <option value="status:desc">status Z-A</option>
                     </select>
                   </div>
 
