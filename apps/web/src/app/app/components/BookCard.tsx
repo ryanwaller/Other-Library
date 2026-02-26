@@ -13,8 +13,6 @@ export default function BookCard({
   authors,
   isbn13,
   tags,
-  publisher,
-  publishYear,
   copiesCount,
   href,
   coverUrl,
@@ -32,8 +30,6 @@ export default function BookCard({
   authors: string[];
   isbn13: string | null;
   tags: string[];
-  publisher: string | null;
-  publishYear: string | null;
   copiesCount: number;
   href: string;
   coverUrl: string | null;
@@ -111,8 +107,6 @@ export default function BookCard({
   }
 
   const authorLine = authors.length > 0 ? authors.join(", ") : "";
-  const pubBits = [publisher?.trim() || "", publishYear?.trim() || ""].filter(Boolean);
-  const pubLine = pubBits.length > 0 ? pubBits.join(" · ") : "";
 
   return (
     <div className="card om-book-card">
@@ -140,11 +134,6 @@ export default function BookCard({
                 {authorLine}
               </div>
             ) : null}
-            {pubLine ? (
-              <div className="muted" style={{ marginTop: 6 }}>
-                {pubLine}
-              </div>
-            ) : null}
 
             {showDeleteCopy ? (
               <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
@@ -166,11 +155,6 @@ export default function BookCard({
             </div>
             {authorLine ? (
               <div className="om-book-secondary">{authorLine}</div>
-            ) : null}
-            {pubLine ? (
-              <div className="muted" style={{ marginTop: 6 }}>
-                {pubLine}
-              </div>
             ) : null}
           </div>
         </Link>

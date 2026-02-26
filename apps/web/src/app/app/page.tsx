@@ -1972,12 +1972,6 @@ function AppShell({
     const effectiveAuthors = effectiveAuthorsFor(it);
     const tags: string[] = [];
     const selected = !!bulkSelectedKeys[g.key];
-    const publisher = (it.publisher_override ?? "").trim() || (e?.publisher ?? "").trim() || null;
-    const year = (() => {
-      const raw = (e?.publish_date ?? "").trim();
-      const m = raw.match(/^(\d{4})/);
-      return m ? m[1] : null;
-    })();
     const coverUrl =
       g.copies
         .map((c) => {
@@ -1997,8 +1991,6 @@ function AppShell({
         authors={effectiveAuthors}
         isbn13={e?.isbn13 ?? null}
         tags={tags}
-        publisher={publisher}
-        publishYear={year}
         copiesCount={g.copiesCount}
         href={`/app/books/${it.id}`}
         coverUrl={coverUrl}

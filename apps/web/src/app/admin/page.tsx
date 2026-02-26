@@ -218,6 +218,11 @@ export default function AdminPage() {
   const waitTotalPages = waitlistData ? Math.max(1, Math.ceil(waitlistData.total / waitlistData.pageSize)) : 1;
   const invitesTotalPages = invitesData ? Math.max(1, Math.ceil(invitesData.total / invitesData.pageSize)) : 1;
 
+  function pageLabel(page: number, totalPages: number, total: number): string {
+    if (totalPages > 1) return `page ${page} / ${totalPages} · ${total} results`;
+    return `${total} results`;
+  }
+
   function setSort(next: "email" | "role" | "status" | "created_at") {
     if (userSort === next) setUserDir(userDir === "asc" ? "desc" : "asc");
     else {
@@ -258,13 +263,44 @@ export default function AdminPage() {
               >
                 Refresh
               </button>
-              <Link href="/app" className="muted">
-                App
-              </Link>
             </div>
           </div>
 
-          <div className="row" style={{ gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+          <div className="row" style={{ gap: 10, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="Add via email" />
+            <button
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                setInviteLink(null);
+                try {
+                  const res = await api<{ link: string }>("/api/admin/invites", {
+                    method: "POST",
+                    token,
+                    body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
+                  });
+                  setInviteLink(res.link);
+                  await refreshInvites();
+                } catch (e: any) {
+                  setError(e?.message ?? "Failed to create invite");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              disabled={busy}
+            >
+              Invite
+            </button>
+            {inviteLink ? (
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(inviteLink);
+                }}
+              >
+                Copy link
+              </button>
+            ) : null}
+            <span style={{ flex: "1 1 auto" }} />
             <button
               onClick={() => {
                 setView("users");
@@ -295,55 +331,37 @@ export default function AdminPage() {
               </div>
 
               <hr className="om-hr" />
-              <div style={{ marginTop: 14 }} className="card">
-                <div style={{ marginBottom: 8 }}>Create invite</div>
-                <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
-                  <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="Email (optional)" />
-                  <button
-                    onClick={async () => {
-                      setBusy(true);
-                      setError(null);
-                      setInviteLink(null);
-                      try {
-                        const res = await api<{ link: string }>("/api/admin/invites", {
-                          method: "POST",
-                          token,
-                          body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
-                        });
-                        setInviteLink(res.link);
-                        await refreshInvites();
-                      } catch (e: any) {
-                        setError(e?.message ?? "Failed to create invite");
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
-                    disabled={busy}
-                  >
-                    Create
-                  </button>
-                </div>
-                {inviteLink ? (
-                  <div className="row" style={{ marginTop: 10, gap: 10, alignItems: "center" }}>
-                    <div className="muted" style={{ wordBreak: "break-all" }}>
-                      {inviteLink}
-                    </div>
-                    <button
-                      onClick={async () => {
-                        await navigator.clipboard.writeText(inviteLink);
-                      }}
-                    >
-                      Copy
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-
-              <hr className="om-hr" />
               <div className="card" style={{ marginTop: 14 }}>
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                   <div>Users</div>
                   <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+                    <select
+                      value={userTab}
+                      onChange={(e) => {
+                        setUserPage(1);
+                        setUserTab(e.target.value as any);
+                      }}
+                    >
+                      <option value="all">All</option>
+                      <option value="active">Active</option>
+                      <option value="disabled">Disabled</option>
+                      <option value="admins">Admins</option>
+                    </select>
+                    <select
+                      value={`${userSort}:${userDir}`}
+                      onChange={(e) => {
+                        const [sort, dir] = String(e.target.value).split(":");
+                        setUserPage(1);
+                        setUserSort(sort as any);
+                        setUserDir(dir as any);
+                      }}
+                    >
+                      <option value="created_at:desc">created (newest)</option>
+                      <option value="created_at:asc">created (oldest)</option>
+                      <option value="email:asc">email</option>
+                      <option value="status:asc">status</option>
+                      <option value="role:asc">role</option>
+                    </select>
                     <input
                       value={userSearchDraft}
                       onChange={(e) => setUserSearchDraft(e.target.value)}
@@ -378,98 +396,7 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="row om-only-mobile" style={{ gap: 10, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
-                  <select
-                    value={userTab}
-                    onChange={(e) => {
-                      setUserPage(1);
-                      setUserTab(e.target.value as any);
-                    }}
-                  >
-                    <option value="all">All</option>
-                    <option value="active">Active</option>
-                    <option value="disabled">Disabled</option>
-                    <option value="admins">Admins</option>
-                  </select>
-                  <select
-                    value={`${userSort}:${userDir}`}
-                    onChange={(e) => {
-                      const [sort, dir] = String(e.target.value).split(":");
-                      setUserPage(1);
-                      setUserSort(sort as any);
-                      setUserDir(dir as any);
-                    }}
-                  >
-                    <option value="created_at:desc">created (newest)</option>
-                    <option value="created_at:asc">created (oldest)</option>
-                    <option value="email:asc">email</option>
-                    <option value="status:asc">status</option>
-                    <option value="role:asc">role</option>
-                  </select>
-                  <div className="muted">
-                    page {usersData?.page ?? userPage} / {userTotalPages} · {usersData?.total ?? 0} results
-                  </div>
-                </div>
-
-                <div className="row om-hide-mobile" style={{ gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-                  <button
-                    onClick={() => {
-                      setUserPage(1);
-                      setUserTab("all");
-                    }}
-                    disabled={userTab === "all"}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => {
-                      setUserPage(1);
-                      setUserTab("active");
-                    }}
-                    disabled={userTab === "active"}
-                  >
-                    Active
-                  </button>
-                  <button
-                    onClick={() => {
-                      setUserPage(1);
-                      setUserTab("disabled");
-                    }}
-                    disabled={userTab === "disabled"}
-                  >
-                    Disabled
-                  </button>
-                  <button
-                    onClick={() => {
-                      setUserPage(1);
-                      setUserTab("admins");
-                    }}
-                    disabled={userTab === "admins"}
-                  >
-                    Admins
-                  </button>
-                  <div className="muted">page {usersData?.page ?? userPage} / {userTotalPages} · {usersData?.total ?? 0} results</div>
-                </div>
-
                 <div className="card" style={{ marginTop: 12, overflowX: "auto" }}>
-                  <div className="row om-hide-mobile" style={{ gap: 10, alignItems: "center" }}>
-                    <button onClick={() => setSort("email")} disabled={busy}>
-                      Email
-                    </button>
-                    <button onClick={() => setSort("role")} disabled={busy}>
-                      Role
-                    </button>
-                    <button onClick={() => setSort("status")} disabled={busy}>
-                      Status
-                    </button>
-                    <button onClick={() => setSort("created_at")} disabled={busy}>
-                      Created
-                    </button>
-                    <div className="muted">
-                      sort: {userSort} {userDir}
-                    </div>
-                  </div>
-
                   <div style={{ marginTop: 10 }}>
                     {(usersData?.users ?? []).map((u) => (
                       <div key={u.id} className="row" style={{ justifyContent: "space-between", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)" }}>
@@ -480,7 +407,9 @@ export default function AdminPage() {
                               · {u.role}/{u.status} · {fmtDate(u.created_at)}
                             </span>
                           </div>
-                          <div className="muted">{u.username}</div>
+                          <div className="muted">
+                            <Link href={`/u/${encodeURIComponent(u.username)}`}>{u.username}</Link>
+                          </div>
                         </div>
                         <div className="row" style={{ gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
                           <button
@@ -522,9 +451,12 @@ export default function AdminPage() {
                         </div>
                       </div>
                     ))}
-                    {(usersData?.users ?? []).length === 0 ? <div className="muted" style={{ paddingTop: 8 }}>No users.</div> : null}
+                  {(usersData?.users ?? []).length === 0 ? <div className="muted" style={{ paddingTop: 8 }}>No users.</div> : null}
                   </div>
 
+                  <div className="muted" style={{ marginTop: 12 }}>
+                    {pageLabel(usersData?.page ?? userPage, userTotalPages, usersData?.total ?? 0)}
+                  </div>
                   {userTotalPages > 1 ? (
                     <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
                       <button
@@ -548,9 +480,7 @@ export default function AdminPage() {
               <div className="card" style={{ marginTop: 14 }}>
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                   <div>Invites</div>
-                  <div className="muted">
-                    page {invitesData?.page ?? invitesPage} / {invitesTotalPages} · {invitesData?.total ?? 0} total
-                  </div>
+                  <div className="muted">{invitesTotalPages > 1 ? `page ${invitesData?.page ?? invitesPage} / ${invitesTotalPages}` : ""}</div>
                 </div>
                 <div style={{ marginTop: 10 }}>
                   {(invitesData?.invites ?? []).map((i) => (
@@ -598,7 +528,7 @@ export default function AdminPage() {
                 <div style={{ marginBottom: 8 }}>Waitlist</div>
 
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                  <div className="row om-only-mobile" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                  <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                     <select
                       value={waitTab}
                       onChange={(e) => {
@@ -620,50 +550,11 @@ export default function AdminPage() {
                         setWaitDir(dir as any);
                       }}
                     >
-                    <option value="created_at:desc">created (newest)</option>
-                    <option value="created_at:asc">created (oldest)</option>
-                    <option value="email:asc">email</option>
-                    <option value="status:asc">status</option>
-                  </select>
-                  </div>
-
-                  <div className="row om-hide-mobile" style={{ gap: 10, flexWrap: "wrap" }}>
-                    <button
-                      onClick={() => {
-                        setWaitPage(1);
-                        setWaitTab("all");
-                      }}
-                      disabled={waitTab === "all"}
-                    >
-                      All
-                    </button>
-                    <button
-                      onClick={() => {
-                        setWaitPage(1);
-                        setWaitTab("pending");
-                      }}
-                      disabled={waitTab === "pending"}
-                    >
-                      Pending
-                    </button>
-                    <button
-                      onClick={() => {
-                        setWaitPage(1);
-                        setWaitTab("approved");
-                      }}
-                      disabled={waitTab === "approved"}
-                    >
-                      Approved
-                    </button>
-                    <button
-                      onClick={() => {
-                        setWaitPage(1);
-                        setWaitTab("rejected");
-                      }}
-                      disabled={waitTab === "rejected"}
-                    >
-                      Rejected
-                    </button>
+                      <option value="created_at:desc">created (newest)</option>
+                      <option value="created_at:asc">created (oldest)</option>
+                      <option value="email:asc">email</option>
+                      <option value="status:asc">status</option>
+                    </select>
                   </div>
 
                   <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
@@ -770,7 +661,7 @@ export default function AdminPage() {
                 </div>
 
                 <div className="muted" style={{ marginTop: 12 }}>
-                  page {waitlistData?.page ?? waitPage} / {waitTotalPages} · {waitlistData?.total ?? 0} results
+                  {pageLabel(waitlistData?.page ?? waitPage, waitTotalPages, waitlistData?.total ?? 0)}
                 </div>
                 {waitTotalPages > 1 ? (
                   <div className="row" style={{ gap: 10, marginTop: 6, flexWrap: "wrap" }}>
