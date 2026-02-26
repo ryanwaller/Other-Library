@@ -289,6 +289,37 @@ export default function BookDetailPage() {
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
   const [editMode, setEditMode] = useState(false);
+  const [findMoreOpen, setFindMoreOpen] = useState(false);
+  const [coverToolsOpen, setCoverToolsOpen] = useState(false);
+  const editSnapshotRef = useRef<{
+    formTitle: string;
+    formAuthors: string;
+    formEditors: string;
+    formDesigners: string;
+    formPublisher: string;
+    formPrinter: string;
+    formMaterials: string;
+    formEditionOverride: string;
+    formPublishDate: string;
+    formDescription: string;
+    formGroupLabel: string;
+    formObjectType: string;
+    formDecade: string;
+    formPages: string;
+    formLocation: string;
+    formShelf: string;
+    formNotes: string;
+    formVisibility: "inherit" | "followers_only" | "public";
+    formStatus: "owned" | "loaned" | "selling" | "trading";
+    formBorrowable: "inherit" | "yes" | "no";
+    formLibraryId: number | null;
+  } | null>(null);
+
+  const [addPersonModal, setAddPersonModal] = useState<{
+    open: boolean;
+    kind: "author" | "editor" | "designer" | "subject" | "category" | "tag";
+    value: string;
+  }>({ open: false, kind: "author", value: "" });
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -318,11 +349,8 @@ export default function BookDetailPage() {
 
   const [formTitle, setFormTitle] = useState("");
   const [formAuthors, setFormAuthors] = useState("");
-  const [newAuthor, setNewAuthor] = useState("");
   const [formEditors, setFormEditors] = useState("");
-  const [newEditor, setNewEditor] = useState("");
   const [formDesigners, setFormDesigners] = useState("");
-  const [newDesigner, setNewDesigner] = useState("");
   const [formPublisher, setFormPublisher] = useState("");
   const [formPrinter, setFormPrinter] = useState("");
   const [formMaterials, setFormMaterials] = useState("");
@@ -345,21 +373,18 @@ export default function BookDetailPage() {
     message: null
   });
 
-  const [newTag, setNewTag] = useState("");
   const [tagState, setTagState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
     message: null
   });
 
-  const [newCategory, setNewCategory] = useState("");
   const [categoryState, setCategoryState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
     message: null
   });
 
-  const [newSubject, setNewSubject] = useState("");
   const [subjectState, setSubjectState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -895,9 +920,87 @@ export default function BookDetailPage() {
     }
   }
 
-  async function saveEdits() {
-    if (!supabase || !book || !userId) return;
-    if (book.owner_id !== userId) return;
+  function enterEditMode() {
+    if (!isOwner) return;
+    if (editMode) return;
+    editSnapshotRef.current = {
+      formTitle,
+      formAuthors,
+      formEditors,
+      formDesigners,
+      formPublisher,
+      formPrinter,
+      formMaterials,
+      formEditionOverride,
+      formPublishDate,
+      formDescription,
+      formGroupLabel,
+      formObjectType,
+      formDecade,
+      formPages,
+      formLocation,
+      formShelf,
+      formNotes,
+      formVisibility,
+      formStatus,
+      formBorrowable,
+      formLibraryId
+    };
+    setFindMoreOpen(false);
+    setEditMode(true);
+  }
+
+  function cancelEditMode() {
+    if (!isOwner) return;
+    setAddPersonModal((m) => ({ ...m, open: false, value: "" }));
+    const snap = editSnapshotRef.current;
+    if (snap) {
+      setFormTitle(snap.formTitle);
+      setFormAuthors(snap.formAuthors);
+      setFormEditors(snap.formEditors);
+      setFormDesigners(snap.formDesigners);
+      setFormPublisher(snap.formPublisher);
+      setFormPrinter(snap.formPrinter);
+      setFormMaterials(snap.formMaterials);
+      setFormEditionOverride(snap.formEditionOverride);
+      setFormPublishDate(snap.formPublishDate);
+      setFormDescription(snap.formDescription);
+      setFormGroupLabel(snap.formGroupLabel);
+      setFormObjectType(snap.formObjectType);
+      setFormDecade(snap.formDecade);
+      setFormPages(snap.formPages);
+      setFormLocation(snap.formLocation);
+      setFormShelf(snap.formShelf);
+      setFormNotes(snap.formNotes);
+      setFormVisibility(snap.formVisibility);
+      setFormStatus(snap.formStatus);
+      setFormBorrowable(snap.formBorrowable);
+      setFormLibraryId(snap.formLibraryId);
+    }
+    setCoverToolsOpen(false);
+    setPendingCover(null);
+    setCoverEditorSrc(null);
+    setCoverCroppedAreaPixels(null);
+    setSaveState({ busy: false, error: null, message: null });
+    setEditMode(false);
+  }
+
+  async function submitAddPersonModal() {
+    const raw = addPersonModal.value.trim();
+    if (!raw) return;
+    const kind = addPersonModal.kind;
+    if (kind === "author") addAuthorName(raw);
+    if (kind === "editor") addEditorName(raw);
+    if (kind === "designer") addDesignerName(raw);
+    if (kind === "subject") await addSubject(raw);
+    if (kind === "category") await addCategory(raw);
+    if (kind === "tag") await addTag(raw);
+    setAddPersonModal((m) => ({ ...m, open: false, value: "" }));
+  }
+
+  async function saveEdits(): Promise<boolean> {
+    if (!supabase || !book || !userId) return false;
+    if (book.owner_id !== userId) return false;
     setSaveState({ busy: true, error: null, message: "Saving…" });
     const title_override = formTitle.trim() ? formTitle.trim() : null;
     const authors_override = parseAuthorsInput(formAuthors);
@@ -910,7 +1013,7 @@ export default function BookDetailPage() {
     const pages = pagesRaw ? Number(pagesRaw) : null;
     if (pages !== null && !Number.isFinite(pages)) {
       setSaveState({ busy: false, error: "Pages must be a number.", message: "Save failed" });
-      return;
+      return false;
     }
     const payload: any = {
       group_label,
@@ -947,10 +1050,20 @@ export default function BookDetailPage() {
     }
     if (res.error) {
       setSaveState({ busy: false, error: res.error.message, message: "Save failed" });
-      return;
+      return false;
     }
     await refresh();
     setSaveState({ busy: false, error: null, message: "Saved" });
+    return true;
+  }
+
+  async function doneEditMode() {
+    if (!isOwner) return;
+    const ok = await saveEdits();
+    if (!ok) return;
+    editSnapshotRef.current = null;
+    setCoverToolsOpen(false);
+    setEditMode(false);
   }
 
   function setAuthorsFromList(list: string[]) {
@@ -964,14 +1077,13 @@ export default function BookDetailPage() {
     setAuthorsFromList(next);
   }
 
-  function addAuthor() {
-    const name = normalizeAuthorName(newAuthor);
+  function addAuthorName(rawName: string) {
+    const name = normalizeAuthorName(rawName);
     if (!name) return;
     const existing = (effectiveAuthors ?? []).slice();
     const key = name.toLowerCase();
     if (!existing.some((a) => a.trim().toLowerCase() === key)) existing.push(name);
     setAuthorsFromList(existing);
-    setNewAuthor("");
   }
 
   function setEditorsFromList(list: string[]) {
@@ -985,14 +1097,13 @@ export default function BookDetailPage() {
     setEditorsFromList(next);
   }
 
-  function addEditor() {
-    const name = normalizeAuthorName(newEditor);
+  function addEditorName(rawName: string) {
+    const name = normalizeAuthorName(rawName);
     if (!name) return;
     const existing = (effectiveEditors ?? []).slice();
     const key = name.toLowerCase();
     if (!existing.some((a) => a.trim().toLowerCase() === key)) existing.push(name);
     setEditorsFromList(existing);
-    setNewEditor("");
   }
 
   function setDesignersFromList(list: string[]) {
@@ -1006,14 +1117,13 @@ export default function BookDetailPage() {
     setDesignersFromList(next);
   }
 
-  function addDesigner() {
-    const name = normalizeAuthorName(newDesigner);
+  function addDesignerName(rawName: string) {
+    const name = normalizeAuthorName(rawName);
     if (!name) return;
     const existing = (effectiveDesigners ?? []).slice();
     const key = name.toLowerCase();
     if (!existing.some((a) => a.trim().toLowerCase() === key)) existing.push(name);
     setDesignersFromList(existing);
-    setNewDesigner("");
   }
 
   async function moveToLibrary(nextLibraryId: number) {
@@ -1127,17 +1237,16 @@ export default function BookDetailPage() {
     return inserted.data.id as number;
   }
 
-  async function addTag() {
+  async function addTag(nameRaw: string) {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
-    const name = normalizeTagName(newTag);
+    const name = normalizeTagName(nameRaw);
     if (!name) return;
     setTagState({ busy: true, error: null, message: "Adding…" });
     try {
       const tagId = await getOrCreateTagId(name, "tag");
       const ins = await supabase.from("user_book_tags").insert({ user_book_id: book.id, tag_id: tagId });
       if (ins.error && !ins.error.message.toLowerCase().includes("duplicate")) throw new Error(ins.error.message);
-      setNewTag("");
       await refresh();
       setTagState({ busy: false, error: null, message: "Added" });
     } catch (e: any) {
@@ -1158,17 +1267,16 @@ export default function BookDetailPage() {
     setTagState({ busy: false, error: null, message: "Removed" });
   }
 
-  async function addCategory() {
+  async function addCategory(nameRaw: string) {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
-    const name = normalizeTagName(newCategory);
+    const name = normalizeTagName(nameRaw);
     if (!name) return;
     setCategoryState({ busy: true, error: null, message: "Adding…" });
     try {
       const tagId = await getOrCreateTagId(name, "category");
       const ins = await supabase.from("user_book_tags").insert({ user_book_id: book.id, tag_id: tagId });
       if (ins.error && !ins.error.message.toLowerCase().includes("duplicate")) throw new Error(ins.error.message);
-      setNewCategory("");
       await refresh();
       setCategoryState({ busy: false, error: null, message: "Added" });
     } catch (e: any) {
@@ -1189,10 +1297,10 @@ export default function BookDetailPage() {
     setCategoryState({ busy: false, error: null, message: "Removed" });
   }
 
-  async function addSubject() {
+  async function addSubject(nameRaw: string) {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
-    const name = normalizeSubjectName(newSubject);
+    const name = normalizeSubjectName(nameRaw);
     if (!name) return;
     setSubjectState({ busy: true, error: null, message: "Adding…" });
     const current = (effectiveSubjects ?? []).slice();
@@ -1204,7 +1312,6 @@ export default function BookDetailPage() {
       setSubjectState({ busy: false, error: upd.error.message, message: "Add failed" });
       return;
     }
-    setNewSubject("");
     await refresh();
     setSubjectState({ busy: false, error: null, message: "Added" });
   }
@@ -1768,239 +1875,255 @@ export default function BookDetailPage() {
                 ) : null}
               </div>
 
-              {isOwner && editMode ? (
-                <div style={{ marginTop: 10 }}>
-                  <div className="muted">Cover override</div>
-                  <div className="row" style={{ marginTop: 6, gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                    <input
-                      key={coverInputKey}
-                      type="file"
-                      accept="image/*"
-                      onChange={(ev) => setPendingCover((ev.target.files ?? [])[0] ?? null)}
-                      style={{ marginTop: 0 }}
-                    />
-                    {coverUrl ? (
-                      <button
-                        onClick={() => {
-                          if (!coverUrl) return;
-                          setPendingCover(null);
-                          setCoverEditorSrc(toProxyImageUrl(coverUrl));
-                          setCoverCrop({ x: 0, y: 0 });
-                          setCoverZoom(1);
-                          setCoverRotation(0);
-                          setCoverBrightness(1);
-                          setCoverContrast(1);
-                          setCoverAspectW(2);
-                          setCoverAspectH(3);
-                          setCoverCroppedAreaPixels(null);
-                        }}
-                        disabled={coverState.busy}
-                      >
-                        Edit current cover
-                      </button>
-                    ) : null}
-                    {coverEditorSrc ? (
-                      <button
-                        onClick={() => {
-                          if (coverEditorObjectUrlRef.current) {
-                            URL.revokeObjectURL(coverEditorObjectUrlRef.current);
-                            coverEditorObjectUrlRef.current = null;
-                          }
-                          setPendingCover(null);
-                          setCoverEditorSrc(null);
-                          setCoverInputKey((k) => k + 1);
-                        }}
-                        disabled={coverState.busy}
-                      >
-                        Clear
-                      </button>
-                    ) : null}
-                  </div>
-                  {coverEditorSrc ? (
-                    <div style={{ marginTop: 8 }}>
-                      <div
-                        className="om-cover-slot"
-                        style={{
-                          position: "relative",
-                          width: "100%",
-                          height: 260,
-                          padding: 0,
-                          filter: `brightness(${coverBrightness}) contrast(${coverContrast})`
-                        }}
-                      >
-                        <Cropper
-                          image={coverEditorSrc}
-                          crop={coverCrop}
-                          zoom={coverZoom}
-                          rotation={coverRotation}
-                          aspect={coverAspect}
-                          onCropChange={setCoverCrop}
-                          onZoomChange={setCoverZoom}
-                          onRotationChange={setCoverRotation}
-                          onCropComplete={(_area, pixels) => setCoverCroppedAreaPixels(pixels)}
-                          showGrid={false}
+              {isOwner ? (
+                <details
+                  open={coverToolsOpen}
+                  onToggle={(e) => {
+                    const open = (e.currentTarget as HTMLDetailsElement).open;
+                    setCoverToolsOpen(open);
+                    if (open && !editMode) enterEditMode();
+                  }}
+                  style={{ marginTop: 10 }}
+                >
+                  <summary className="muted">{coverUrl ? "Change cover…" : "Add cover…"}</summary>
+                  {editMode ? (
+                    <div style={{ marginTop: 10 }}>
+                      <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                        <input
+                          key={coverInputKey}
+                          type="file"
+                          accept="image/*"
+                          onChange={(ev) => setPendingCover((ev.target.files ?? [])[0] ?? null)}
+                          style={{ marginTop: 0 }}
                         />
-                      </div>
-
-                      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
-                        <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                          <div className="muted" style={{ width: 72 }}>
-                            Aspect
-                          </div>
-                          <input
-                            type="number"
-                            value={coverAspectW}
-                            min={1}
-                            step={1}
-                            onChange={(e) => setCoverAspectW(Math.max(1, Number(e.target.value) || 1))}
-                            style={{ width: 64 }}
-                          />
-                          <span className="muted">:</span>
-                          <input
-                            type="number"
-                            value={coverAspectH}
-                            min={1}
-                            step={1}
-                            onChange={(e) => setCoverAspectH(Math.max(1, Number(e.target.value) || 1))}
-                            style={{ width: 64 }}
-                          />
+                        {coverUrl ? (
                           <button
                             onClick={() => {
+                              if (!coverUrl) return;
+                              setPendingCover(null);
+                              setCoverEditorSrc(toProxyImageUrl(coverUrl));
+                              setCoverCrop({ x: 0, y: 0 });
+                              setCoverZoom(1);
+                              setCoverRotation(0);
+                              setCoverBrightness(1);
+                              setCoverContrast(1);
                               setCoverAspectW(2);
                               setCoverAspectH(3);
+                              setCoverCroppedAreaPixels(null);
                             }}
+                            disabled={coverState.busy}
                           >
-                            2:3
+                            Edit current cover
                           </button>
+                        ) : null}
+                        {coverEditorSrc ? (
                           <button
                             onClick={() => {
-                              setCoverAspectW(1);
-                              setCoverAspectH(1);
+                              if (coverEditorObjectUrlRef.current) {
+                                URL.revokeObjectURL(coverEditorObjectUrlRef.current);
+                                coverEditorObjectUrlRef.current = null;
+                              }
+                              setPendingCover(null);
+                              setCoverEditorSrc(null);
+                              setCoverInputKey((k) => k + 1);
                             }}
+                            disabled={coverState.busy}
                           >
-                            1:1
-                          </button>
-                          <button
-                            onClick={() => {
-                              setCoverAspectW(3);
-                              setCoverAspectH(2);
-                            }}
-                          >
-                            3:2
-                          </button>
-                        </div>
-                        <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                          <div className="muted" style={{ width: 72 }}>
-                            Zoom
-                          </div>
-                          <input
-                            type="range"
-                            min={1}
-                            max={3}
-                            step={0.01}
-                            value={coverZoom}
-                            onChange={(e) => setCoverZoom(Number(e.target.value))}
-                            style={{ flex: "1 1 auto" }}
-                          />
-                        </div>
-                        <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                          <div className="muted" style={{ width: 72 }}>
-                            Rotate
-                          </div>
-                          <input
-                            type="range"
-                            min={-180}
-                            max={180}
-                            step={1}
-                            value={coverRotation}
-                            onChange={(e) => setCoverRotation(Number(e.target.value))}
-                            style={{ flex: "1 1 auto" }}
-                          />
-                        </div>
-                        <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                          <div className="muted" style={{ width: 72 }}>
-                            Bright
-                          </div>
-                          <input
-                            type="range"
-                            min={0.7}
-                            max={1.3}
-                            step={0.01}
-                            value={coverBrightness}
-                            onChange={(e) => setCoverBrightness(Number(e.target.value))}
-                            style={{ flex: "1 1 auto" }}
-                          />
-                        </div>
-                        <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                          <div className="muted" style={{ width: 72 }}>
-                            Contrast
-                          </div>
-                          <input
-                            type="range"
-                            min={0.7}
-                            max={1.3}
-                            step={0.01}
-                            value={coverContrast}
-                            onChange={(e) => setCoverContrast(Number(e.target.value))}
-                            style={{ flex: "1 1 auto" }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                  {coverEditorSrc ? (
-                    <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
-                      <button onClick={uploadCover} disabled={coverState.busy}>
-                        {coverState.busy ? "Uploading…" : "Submit cover"}
-                      </button>
-                    </div>
-                  ) : null}
-                  {coverState.message ? (
-                    <div className="muted" style={{ marginTop: 6 }}>
-                      {coverState.error ? `${coverState.message} (${coverState.error})` : coverState.message}
-                    </div>
-                  ) : null}
-                  {suggestedCoverUrl ? (
-                    <div style={{ marginTop: 10 }}>
-                      <div className="muted">Cover from preview</div>
-                      <div className="row" style={{ marginTop: 6, justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <div className="om-cover-slot" style={{ width: 44, height: 66, padding: 4 }}>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={suggestedCoverUrl}
-                              alt=""
-                              width={44}
-                              height={66}
-                              style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
-                            />
-                          </div>
-                          <div className="muted" style={{ maxWidth: 140, wordBreak: "break-word" }}>
-                            <a href={suggestedCoverUrl} target="_blank" rel="noreferrer">
-                              open
-                            </a>
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                          <button onClick={() => importCoverFromUrl(suggestedCoverUrl)} disabled={suggestedCoverState.busy}>
-                            {suggestedCoverState.busy ? "Importing…" : "Use as cover"}
-                          </button>
-                          <button onClick={() => setSuggestedCoverUrl(null)} disabled={suggestedCoverState.busy}>
                             Clear
                           </button>
-                        </div>
+                        ) : null}
                       </div>
-                      {suggestedCoverState.message ? (
+                      {coverEditorSrc ? (
+                        <div style={{ marginTop: 8 }}>
+                          <div
+                            className="om-cover-slot"
+                            style={{
+                              position: "relative",
+                              width: "100%",
+                              height: 260,
+                              padding: 0,
+                              filter: `brightness(${coverBrightness}) contrast(${coverContrast})`
+                            }}
+                          >
+                            <Cropper
+                              image={coverEditorSrc}
+                              crop={coverCrop}
+                              zoom={coverZoom}
+                              rotation={coverRotation}
+                              aspect={coverAspect}
+                              onCropChange={setCoverCrop}
+                              onZoomChange={setCoverZoom}
+                              onRotationChange={setCoverRotation}
+                              onCropComplete={(_area, pixels) => setCoverCroppedAreaPixels(pixels)}
+                              showGrid={false}
+                            />
+                          </div>
+
+                          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                              <div className="muted" style={{ width: 72 }}>
+                                Aspect
+                              </div>
+                              <input
+                                type="number"
+                                value={coverAspectW}
+                                min={1}
+                                step={1}
+                                onChange={(e) => setCoverAspectW(Math.max(1, Number(e.target.value) || 1))}
+                                style={{ width: 64 }}
+                              />
+                              <span className="muted">:</span>
+                              <input
+                                type="number"
+                                value={coverAspectH}
+                                min={1}
+                                step={1}
+                                onChange={(e) => setCoverAspectH(Math.max(1, Number(e.target.value) || 1))}
+                                style={{ width: 64 }}
+                              />
+                              <button
+                                onClick={() => {
+                                  setCoverAspectW(2);
+                                  setCoverAspectH(3);
+                                }}
+                              >
+                                2:3
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setCoverAspectW(1);
+                                  setCoverAspectH(1);
+                                }}
+                              >
+                                1:1
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setCoverAspectW(3);
+                                  setCoverAspectH(2);
+                                }}
+                              >
+                                3:2
+                              </button>
+                            </div>
+                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                              <div className="muted" style={{ width: 72 }}>
+                                Zoom
+                              </div>
+                              <input
+                                type="range"
+                                min={1}
+                                max={3}
+                                step={0.01}
+                                value={coverZoom}
+                                onChange={(e) => setCoverZoom(Number(e.target.value))}
+                                style={{ flex: "1 1 auto" }}
+                              />
+                            </div>
+                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                              <div className="muted" style={{ width: 72 }}>
+                                Rotate
+                              </div>
+                              <input
+                                type="range"
+                                min={-180}
+                                max={180}
+                                step={1}
+                                value={coverRotation}
+                                onChange={(e) => setCoverRotation(Number(e.target.value))}
+                                style={{ flex: "1 1 auto" }}
+                              />
+                            </div>
+                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                              <div className="muted" style={{ width: 72 }}>
+                                Bright
+                              </div>
+                              <input
+                                type="range"
+                                min={0.7}
+                                max={1.3}
+                                step={0.01}
+                                value={coverBrightness}
+                                onChange={(e) => setCoverBrightness(Number(e.target.value))}
+                                style={{ flex: "1 1 auto" }}
+                              />
+                            </div>
+                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                              <div className="muted" style={{ width: 72 }}>
+                                Contrast
+                              </div>
+                              <input
+                                type="range"
+                                min={0.7}
+                                max={1.3}
+                                step={0.01}
+                                value={coverContrast}
+                                onChange={(e) => setCoverContrast(Number(e.target.value))}
+                                style={{ flex: "1 1 auto" }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                      {coverEditorSrc ? (
+                        <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
+                          <button onClick={uploadCover} disabled={coverState.busy}>
+                            {coverState.busy ? "Uploading…" : "Submit cover"}
+                          </button>
+                        </div>
+                      ) : null}
+                      {coverState.message ? (
                         <div className="muted" style={{ marginTop: 6 }}>
-                          {suggestedCoverState.error
-                            ? `${suggestedCoverState.message} (${suggestedCoverState.error})`
-                            : suggestedCoverState.message}
+                          {coverState.error ? `${coverState.message} (${coverState.error})` : coverState.message}
+                        </div>
+                      ) : null}
+                      {suggestedCoverUrl ? (
+                        <div style={{ marginTop: 10 }}>
+                          <div className="muted">Cover from preview</div>
+                          <div className="row" style={{ marginTop: 6, justifyContent: "space-between", alignItems: "flex-start" }}>
+                            <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <div className="om-cover-slot" style={{ width: 44, height: 66, padding: 4 }}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={suggestedCoverUrl}
+                                  alt=""
+                                  width={44}
+                                  height={66}
+                                  style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                                />
+                              </div>
+                              <div className="muted" style={{ maxWidth: 140, wordBreak: "break-word" }}>
+                                <a href={suggestedCoverUrl} target="_blank" rel="noreferrer">
+                                  open
+                                </a>
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                              <button onClick={() => importCoverFromUrl(suggestedCoverUrl)} disabled={suggestedCoverState.busy}>
+                                {suggestedCoverState.busy ? "Importing…" : "Use as cover"}
+                              </button>
+                              <button onClick={() => setSuggestedCoverUrl(null)} disabled={suggestedCoverState.busy}>
+                                Clear
+                              </button>
+                            </div>
+                          </div>
+                          {suggestedCoverState.message ? (
+                            <div className="muted" style={{ marginTop: 6 }}>
+                              {suggestedCoverState.error
+                                ? `${suggestedCoverState.message} (${suggestedCoverState.error})`
+                                : suggestedCoverState.message}
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
-                  ) : null}
-                </div>
+                  ) : (
+                    <div className="muted" style={{ marginTop: 8 }}>
+                      Click Edit to change the cover.
+                    </div>
+                  )}
+                </details>
               ) : null}
             </div>
 
@@ -2037,166 +2160,377 @@ export default function BookDetailPage() {
               ) : null}
 
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 10 }}>
-                <div>{effectiveTitle}</div>
+                {isOwner ? (
+                  <button
+                    onClick={() => setFindMoreOpen((v) => !v)}
+                    className="muted"
+                    style={{ padding: 0 }}
+                  >
+                    {findMoreOpen ? "▾" : "▸"} Find more info
+                  </button>
+                ) : (
+                  <span />
+                )}
+
                 <div className="row" style={{ gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
                   {isOwner ? (
-                    <button onClick={() => setEditMode((v) => !v)} disabled={busy}>
-                      {editMode ? "Done" : "Edit"}
-                    </button>
+                    editMode ? (
+                      <>
+                        <button onClick={doneEditMode} disabled={busy || saveState.busy}>
+                          Done
+                        </button>
+                        <button onClick={cancelEditMode} disabled={busy || saveState.busy} className="muted">
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={enterEditMode} disabled={busy}>
+                        Edit
+                      </button>
+                    )
                   ) : null}
-                  <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
+                  <div className="muted">
+                    {saveState.message
+                      ? saveState.error
+                        ? `${saveState.message} (${saveState.error})`
+                        : saveState.message
+                      : busy
+                        ? "Loading…"
+                        : error
+                          ? error
+                          : ""}
+                  </div>
                 </div>
               </div>
 
-              {!isOwner || (isOwner && !editMode) ? (
-                <>
-                  <div style={{ marginTop: 14 }}>
-                    <div className="row">
-                      <div style={{ minWidth: 110 }} className="muted">
-                        ISBN
-                      </div>
-                      <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10 ?? "—"}</div>
-                    </div>
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Authors
-                      </div>
-                      <div>
-                        {effectiveAuthors.length > 0 ? (
-                          <>
-                            {effectiveAuthors.map((a, idx) => (
-                              <span key={a}>
-                                <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
-                                {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                              </span>
-                            ))}
-                          </>
-                        ) : (
-                          <span className="muted">—</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Editors
-                      </div>
-                      <div>{effectiveEditors.length > 0 ? effectiveEditors.join(", ") : "—"}</div>
-                    </div>
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Designers
-                      </div>
-                      <div>{effectiveDesigners.length > 0 ? effectiveDesigners.join(", ") : "—"}</div>
-                    </div>
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Printer
-                      </div>
-                      <div>{formPrinter.trim() ? formPrinter.trim() : "—"}</div>
-                    </div>
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Materials
-                      </div>
-                      <div>{formMaterials.trim() ? formMaterials.trim() : "—"}</div>
-                    </div>
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Edition
-                      </div>
-                      <div>{formEditionOverride.trim() ? formEditionOverride.trim() : "—"}</div>
-                    </div>
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Publisher
-                      </div>
-                      <div>
-                        {effectivePublisher ? <Link href={`/app?publisher=${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link> : "—"}
-                      </div>
-                    </div>
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Publish date
-                      </div>
-                      <div>{effectivePublishDate || "—"}</div>
-                    </div>
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Pages
-                      </div>
-                      <div>{book?.pages ? String(book.pages) : "—"}</div>
-                    </div>
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Group
-                      </div>
-                      <div>{(book?.group_label ?? "").trim() ? (book?.group_label ?? "").trim() : "—"}</div>
-                    </div>
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Object type
-                      </div>
-                      <div>{(book?.object_type ?? "").trim() ? (book?.object_type ?? "").trim() : "—"}</div>
-                    </div>
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Decade
-                      </div>
-                      <div>{(book?.decade ?? "").trim() ? (book?.decade ?? "").trim() : "—"}</div>
-                    </div>
-                    <div style={{ marginTop: 8 }}>
-                      <div className="muted">Subjects</div>
-                      <div style={{ marginTop: 6 }}>
-                        {effectiveSubjects.length > 0 ? (
-                          effectiveSubjects.map((s) => (
-                            <span key={s} style={{ marginRight: 10 }}>
-                              <Link href={`/app?subject=${encodeURIComponent(s)}`}>{s}</Link>
-                            </span>
-                          ))
-                        ) : (
-                          <span className="muted">—</span>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 8 }}>
-                      <div className="muted">Description</div>
-                      <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-                        {effectiveDescription || "—"}
-                      </div>
-                    </div>
-                    {book?.edition?.cover_url ? (
-                      <div style={{ marginTop: 8 }} className="muted">
-                        Online cover:{" "}
-                        <a href={book.edition.cover_url} target="_blank" rel="noreferrer">
-                          open
-                        </a>
-                      </div>
-                    ) : null}
-                    {publicBookUrl ? (
-                      <div className="row" style={{ marginTop: 10, justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          URL
-                        </div>
-                        <div style={{ flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          <a href={publicBookUrl} target="_blank" rel="noreferrer">
-                            {publicBookUrl}
-                          </a>
-                        </div>
-                        <button onClick={copyPublicLink} style={{ flex: "0 0 auto" }}>
-                          Copy
-                        </button>
-                        <div className="muted" style={{ flex: "0 0 auto" }}>
-                          {shareState.message ? (shareState.error ? `${shareState.message} (${shareState.error})` : shareState.message) : ""}
-                        </div>
-                      </div>
+              <div style={{ marginTop: 10 }}>
+                {editMode ? (
+                  <input
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    onKeyDown={(e) => onEnter(e, () => void saveEdits())}
+                    placeholder={effectiveTitle}
+                    style={{ width: "100%" }}
+                  />
+                ) : (
+                  <div>{effectiveTitle}</div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 14 }}>
+                <div className="row">
+                  <div style={{ minWidth: 110 }} className="muted">
+                    ISBN
+                  </div>
+                  <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10 ?? "—"}</div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Authors
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
+                    {effectiveAuthors.length > 0 ? (
+                      effectiveAuthors.map((a) => (
+                        <span key={a} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
+                          <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
+                          {editMode ? (
+                            <button onClick={() => removeAuthor(a)} aria-label={`Remove author ${a}`} style={{ padding: 0 }}>
+                              ×
+                            </button>
+                          ) : null}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                    {isOwner && editMode ? (
+                      <button onClick={() => setAddPersonModal({ open: true, kind: "author", value: "" })} className="muted" style={{ padding: 0 }}>
+                        + Add
+                      </button>
                     ) : null}
                   </div>
-                </>
-              ) : null}
+                </div>
 
-              {isOwner && editMode ? (
-                <details style={{ marginTop: 14 }}>
-                  <summary className="muted">Find more metadata</summary>
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Editors
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
+                    {effectiveEditors.length > 0 ? (
+                      effectiveEditors.map((a) => (
+                        <span key={a} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
+                          <span>{a}</span>
+                          {editMode ? (
+                            <button onClick={() => removeEditor(a)} aria-label={`Remove editor ${a}`} style={{ padding: 0 }}>
+                              ×
+                            </button>
+                          ) : null}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                    {isOwner && editMode ? (
+                      <button onClick={() => setAddPersonModal({ open: true, kind: "editor", value: "" })} className="muted" style={{ padding: 0 }}>
+                        + Add
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Designers
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
+                    {effectiveDesigners.length > 0 ? (
+                      effectiveDesigners.map((a) => (
+                        <span key={a} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
+                          <span>{a}</span>
+                          {editMode ? (
+                            <button onClick={() => removeDesigner(a)} aria-label={`Remove designer ${a}`} style={{ padding: 0 }}>
+                              ×
+                            </button>
+                          ) : null}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                    {isOwner && editMode ? (
+                      <button onClick={() => setAddPersonModal({ open: true, kind: "designer", value: "" })} className="muted" style={{ padding: 0 }}>
+                        + Add
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Printer
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input value={formPrinter} onChange={(e) => setFormPrinter(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
+                    ) : (
+                      (formPrinter ?? "").trim() || "—"
+                    )}
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Materials
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input value={formMaterials} onChange={(e) => setFormMaterials(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
+                    ) : (
+                      (formMaterials ?? "").trim() || "—"
+                    )}
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Edition
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input value={formEditionOverride} onChange={(e) => setFormEditionOverride(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
+                    ) : (
+                      (formEditionOverride ?? "").trim() || "—"
+                    )}
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Publisher
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input value={formPublisher} onChange={(e) => setFormPublisher(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
+                    ) : effectivePublisher ? (
+                      <Link href={`/app?publisher=${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link>
+                    ) : (
+                      "—"
+                    )}
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Publish date
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
+                    ) : (
+                      effectivePublishDate || "—"
+                    )}
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Pages
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input value={formPages} onChange={(e) => setFormPages(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
+                    ) : book?.pages ? (
+                      String(book.pages)
+                    ) : (
+                      "—"
+                    )}
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Group
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input value={formGroupLabel} onChange={(e) => setFormGroupLabel(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
+                    ) : (book?.group_label ?? "").trim() ? (
+                      (book?.group_label ?? "").trim()
+                    ) : (
+                      "—"
+                    )}
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Object type
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <select value={formObjectType || "book"} onChange={(e) => setFormObjectType(e.target.value)} style={{ width: "100%" }}>
+                        <option value="book">book</option>
+                        <option value="magazine">magazine</option>
+                        <option value="ephemera">ephemera</option>
+                        <option value="video">video</option>
+                        <option value="music">music</option>
+                      </select>
+                    ) : (book?.object_type ?? "").trim() ? (
+                      (book?.object_type ?? "").trim()
+                    ) : (
+                      "—"
+                    )}
+                  </div>
+                </div>
+
+                <div className="row" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Decade
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <select value={formDecade || ""} onChange={(e) => setFormDecade(e.target.value)} style={{ width: "100%" }}>
+                        <option value="">—</option>
+                        <option value="Prewar">Prewar</option>
+                        <option value="1950s">1950s</option>
+                        <option value="1960s">1960s</option>
+                        <option value="1970s">1970s</option>
+                        <option value="1980s">1980s</option>
+                        <option value="1990s">1990s</option>
+                        <option value="2000s">2000s</option>
+                        <option value="2010s">2010s</option>
+                        <option value="2020s">2020s</option>
+                      </select>
+                    ) : (book?.decade ?? "").trim() ? (
+                      (book?.decade ?? "").trim()
+                    ) : (
+                      "—"
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 8 }}>
+                  <div className="muted">Subjects</div>
+                  <div style={{ marginTop: 6 }}>
+                    {effectiveSubjects.length > 0 ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
+                        {effectiveSubjects.map((s) => (
+                          <span key={s} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
+                            <Link href={`/app?subject=${encodeURIComponent(s)}`}>{s}</Link>
+                            {editMode ? (
+                              <button onClick={() => removeSubject(s)} disabled={subjectState.busy} aria-label={`Remove subject ${s}`} style={{ padding: 0 }}>
+                                ×
+                              </button>
+                            ) : null}
+                          </span>
+                        ))}
+                        {isOwner && editMode ? (
+                          <button onClick={() => setAddPersonModal({ open: true, kind: "subject", value: "" })} className="muted" style={{ padding: 0 }}>
+                            + Add
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : isOwner && editMode ? (
+                      <div className="row">
+                        <span className="muted">—</span>
+                        <button onClick={() => setAddPersonModal({ open: true, kind: "subject", value: "" })} className="muted" style={{ padding: 0 }}>
+                          + Add
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </div>
+                  {subjectState.message ? (
+                    <div className="muted" style={{ marginTop: 6 }}>
+                      {subjectState.error ? `${subjectState.message} (${subjectState.error})` : subjectState.message}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div style={{ marginTop: 8 }}>
+                  <div className="muted">Description</div>
+                  {editMode ? (
+                    <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} rows={4} style={{ width: "100%", marginTop: 6 }} />
+                  ) : (
+                    <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
+                      {effectiveDescription || "—"}
+                    </div>
+                  )}
+                </div>
+
+                {book?.edition?.cover_url ? (
+                  <div style={{ marginTop: 8 }} className="muted">
+                    Online cover:{" "}
+                    <a href={book.edition.cover_url} target="_blank" rel="noreferrer">
+                      open
+                    </a>
+                  </div>
+                ) : null}
+
+                {publicBookUrl ? (
+                  <div className="row" style={{ marginTop: 10, justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      URL
+                    </div>
+                    <div style={{ flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <a href={publicBookUrl} target="_blank" rel="noreferrer">
+                        {publicBookUrl}
+                      </a>
+                    </div>
+                    <button onClick={copyPublicLink} style={{ flex: "0 0 auto" }}>
+                      Copy
+                    </button>
+                    <div className="muted" style={{ flex: "0 0 auto" }}>
+                      {shareState.message ? (shareState.error ? `${shareState.message} (${shareState.error})` : shareState.message) : ""}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              {isOwner && findMoreOpen ? (
+                <div style={{ marginTop: 14 }} className="card">
                   <div style={{ marginTop: 10 }} className="card">
                     <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
                       <div>Lookup</div>
@@ -2226,9 +2560,6 @@ export default function BookDetailPage() {
                               : searchState.message
                             : ""}
                       </span>
-                    </div>
-                    <div className="muted" style={{ marginTop: 8 }}>
-                      Enter an ISBN, paste a link, or search by title/author. Review results, then click <span>Link ISBN</span> or <span>Fill fields</span>.
                     </div>
                   </div>
 
@@ -2269,28 +2600,25 @@ export default function BookDetailPage() {
                                     {pub ? ` · ${pub}` : ""}
                                   </div>
                                   <div className="muted" style={{ marginTop: 4 }}>
-                                    {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"}
-                                    {r.cover_url ? (
-                                      <>
-                                        {" "}
-                                        ·{" "}
-                                        <a href={r.cover_url} target="_blank" rel="noreferrer">
-                                          cover
-                                        </a>
-                                      </>
-                                    ) : null}{" "}
-                                    · {r.source}
+                                    {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"} · {r.source}
                                   </div>
                                 </div>
                                 <div className="om-lookup-actions">
                                   <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
                                     {hasIsbn ? (
-                                      <button onClick={() => linkEditionByIsbn(bestIsbn, r.cover_url ?? null)} disabled={linkState.busy || !bestIsbn}>
+                                      <button
+                                        onClick={() => {
+                                          enterEditMode();
+                                          linkEditionByIsbn(bestIsbn, r.cover_url ?? null);
+                                        }}
+                                        disabled={linkState.busy || !bestIsbn}
+                                      >
                                         Link ISBN
                                       </button>
                                     ) : (
                                       <button
                                         onClick={() => {
+                                          enterEditMode();
                                           if (r.title) setFormTitle(r.title);
                                           setFormAuthors((r.authors ?? []).filter(Boolean).join(", "));
                                           if (r.publisher) setFormPublisher(r.publisher);
@@ -2376,7 +2704,10 @@ export default function BookDetailPage() {
                                   <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
                                     {importPreviewHasIsbn ? (
                                       <button
-                                        onClick={() => linkEditionByIsbn(importPreviewIsbn, preview.cover_url ?? null)}
+                                        onClick={() => {
+                                          enterEditMode();
+                                          linkEditionByIsbn(importPreviewIsbn, preview.cover_url ?? null);
+                                        }}
                                         disabled={linkState.busy || !importPreviewIsbn}
                                       >
                                         Link ISBN
@@ -2384,6 +2715,7 @@ export default function BookDetailPage() {
                                     ) : (
                                       <button
                                         onClick={() => {
+                                          enterEditMode();
                                           if (preview.title) setFormTitle(preview.title);
                                           setFormAuthors((preview.authors ?? []).filter(Boolean).join(", "));
                                           if (preview.publisher) setFormPublisher(preview.publisher);
@@ -2406,681 +2738,372 @@ export default function BookDetailPage() {
                                   </div>
                                 </div>
                               </div>
-                              {preview.subjects && preview.subjects.length > 0 ? (
-                                <div className="muted" style={{ marginTop: 10 }}>
-                                  Subjects found: {preview.subjects.slice(0, 12).join(", ")}
-                                  {preview.subjects.length > 12 ? "…" : ""} (you can add them below)
-                                </div>
-                              ) : null}
                             </div>
                           </div>
                         );
                       })()
                     : null}
-                </details>
+                </div>
               ) : null}
 
-              {isOwner && editMode ? (
+              {isOwner ? (
                 <>
+                  <div style={{ marginTop: 16 }}>
+                    <hr className="om-hr" />
+                  </div>
+
                   <div style={{ marginTop: 16 }} className="muted">
-                    Metadata
+                    Book info
                   </div>
                   <div style={{ marginTop: 8 }}>
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    ISBN
-                  </div>
-                  <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10 ?? "—"}</div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Title
-                  </div>
-                  <input
-                    value={formTitle}
-                    onChange={(e) => setFormTitle(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, saveEdits)}
-                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
-                  />
-                </div>
-
-                <div style={{ marginTop: 8 }}>
-                  <div className="muted">Authors</div>
-                  <div style={{ marginTop: 6 }}>
-                    {effectiveAuthors.length > 0 ? (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {effectiveAuthors.map((a) => (
-                          <span
-                            key={a}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                              border: "1px solid var(--border)",
-                              padding: "2px 6px"
-                            }}
-                          >
-                            <Link href={`/app?author=${encodeURIComponent(a)}`} style={{ textDecoration: "none" }}>
-                              {a}
-                            </Link>
-                            <button onClick={() => removeAuthor(a)} aria-label={`Remove author ${a}`}>
-                              ×
-                            </button>
-                          </span>
-                        ))}
+                    <div className="row">
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Catalog
                       </div>
-                    ) : (
-                      <div className="muted">—</div>
-                    )}
-                  </div>
-                  <div className="row" style={{ marginTop: 8 }}>
-                    <input
-                      value={newAuthor}
-                      onChange={(e) => setNewAuthor(e.target.value)}
-                      onKeyDown={(e) => onEnter(e, addAuthor)}
-                      placeholder="Add an author"
-                      style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
-                    />
-                    <button onClick={addAuthor} disabled={!newAuthor.trim()}>
-                      Add
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 10 }}>
-                  <div className="muted">Editors</div>
-                  <div style={{ marginTop: 6 }}>
-                    {effectiveEditors.length > 0 ? (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {effectiveEditors.map((a) => (
-                          <span
-                            key={a}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                              border: "1px solid var(--border)",
-                              padding: "2px 6px"
-                            }}
+                      {editMode ? (
+                        <>
+                          <select
+                            value={formLibraryId ?? ""}
+                            onChange={(e) => moveToLibrary(Number(e.target.value))}
+                            disabled={libraryMoveState.busy || libraries.length === 0}
+                            style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
                           >
-                            <span>{a}</span>
-                            <button onClick={() => removeEditor(a)} aria-label={`Remove editor ${a}`}>
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="muted">—</div>
-                    )}
-                  </div>
-                  <div className="row" style={{ marginTop: 8 }}>
-                    <input
-                      value={newEditor}
-                      onChange={(e) => setNewEditor(e.target.value)}
-                      onKeyDown={(e) => onEnter(e, addEditor)}
-                      placeholder="Add an editor"
-                      style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
-                    />
-                    <button onClick={addEditor} disabled={!newEditor.trim()}>
-                      Add
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 10 }}>
-                  <div className="muted">Designers</div>
-                  <div style={{ marginTop: 6 }}>
-                    {effectiveDesigners.length > 0 ? (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {effectiveDesigners.map((a) => (
-                          <span
-                            key={a}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                              border: "1px solid var(--border)",
-                              padding: "2px 6px"
-                            }}
-                          >
-                            <span>{a}</span>
-                            <button onClick={() => removeDesigner(a)} aria-label={`Remove designer ${a}`}>
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="muted">—</div>
-                    )}
-                  </div>
-                  <div className="row" style={{ marginTop: 8 }}>
-                    <input
-                      value={newDesigner}
-                      onChange={(e) => setNewDesigner(e.target.value)}
-                      onKeyDown={(e) => onEnter(e, addDesigner)}
-                      placeholder="Add a designer"
-                      style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
-                    />
-                    <button onClick={addDesigner} disabled={!newDesigner.trim()}>
-                      Add
-                    </button>
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 10 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Printer
-                  </div>
-                  <input
-                    value={formPrinter}
-                    onChange={(e) => setFormPrinter(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, saveEdits)}
-                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
-                  />
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Materials
-                  </div>
-                  <input
-                    value={formMaterials}
-                    onChange={(e) => setFormMaterials(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, saveEdits)}
-                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
-                  />
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Edition
-                  </div>
-                  <input
-                    value={formEditionOverride}
-                    onChange={(e) => setFormEditionOverride(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, saveEdits)}
-                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
-                  />
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Publisher
-                  </div>
-                  <input
-                    value={formPublisher}
-                    onChange={(e) => setFormPublisher(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, saveEdits)}
-                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
-                  />
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Publish date
-                  </div>
-                  <input type="date" value={formPublishDate || ""} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, saveEdits)} />
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Pages
-                  </div>
-                  <input
-                    type="number"
-                    value={formPages}
-                    onChange={(e) => setFormPages(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, saveEdits)}
-                    style={{ width: 120 }}
-                    min={1}
-                  />
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Group
-                  </div>
-                  <input
-                    value={formGroupLabel}
-                    onChange={(e) => setFormGroupLabel(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, saveEdits)}
-                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
-                  />
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Object type
-                  </div>
-                  <select value={formObjectType} onChange={(e) => setFormObjectType(e.target.value)} style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
-                    <option value="">—</option>
-                    <option value="book">book</option>
-                    <option value="magazine">magazine</option>
-                    <option value="ephemera">ephemera</option>
-                    <option value="video">video</option>
-                    <option value="music">music</option>
-                  </select>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Decade
-                  </div>
-                  <select value={formDecade} onChange={(e) => setFormDecade(e.target.value)} style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
-                    <option value="">—</option>
-                    <option value="prewar">Prewar</option>
-                    <option value="1950s">1950s</option>
-                    <option value="1960s">1960s</option>
-                    <option value="1970s">1970s</option>
-                    <option value="1980s">1980s</option>
-                    <option value="1990s">1990s</option>
-                    <option value="2000s">2000s</option>
-                    <option value="2010s">2010s</option>
-                    <option value="2020s">2020s</option>
-                  </select>
-                </div>
-
-                <div style={{ marginTop: 8 }}>
-                  <div className="muted">Description</div>
-                  <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} rows={4} style={{ width: "100%", marginTop: 6 }} />
-                </div>
-              </div>
-
-              <div style={{ marginTop: 16 }} className="muted">
-                Book info
-              </div>
-              <div style={{ marginTop: 8 }}>
-                <div className="row">
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Catalog
-                  </div>
-                  <select
-                    value={formLibraryId ?? ""}
-                    onChange={(e) => moveToLibrary(Number(e.target.value))}
-                    disabled={libraryMoveState.busy || libraries.length === 0}
-                    style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
-                  >
-                    <option value="" disabled>
-                      —
-                    </option>
-                    {libraries.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="muted" style={{ marginLeft: 10 }}>
-                    {libraryMoveState.message ? (libraryMoveState.error ? `${libraryMoveState.message} (${libraryMoveState.error})` : libraryMoveState.message) : ""}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    {copiesLabel}
-                  </div>
-                  <input
-                    type="number"
-                    min={1}
-                    value={copiesDraft || ""}
-                    onChange={(e) => setCopiesDraft(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, updateCopies)}
-                    style={{ width: 90 }}
-                  />
-                  <button onClick={updateCopies} disabled={copiesUpdateState.busy || copiesCountState.busy || !copiesDraft.trim()}>
-                    {copiesUpdateState.busy ? "Updating…" : "Update"}
-                  </button>
-                  <div className="muted" style={{ marginLeft: 10 }}>
-                    {copiesUpdateState.message
-                      ? copiesUpdateState.error
-                        ? `${copiesUpdateState.message} (${copiesUpdateState.error})`
-                        : copiesUpdateState.message
-                      : copiesCountState.error
-                        ? copiesCountState.error
-                        : copiesCountState.busy
-                          ? "…"
-                          : copiesCount !== null
-                            ? `${copiesCount}`
-                            : ""}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 16 }} className="muted">
-                Subjects
-              </div>
-                <div style={{ marginTop: 8 }}>
-                  <div className="row">
-                    <input
-                      value={newSubject}
-                      onChange={(e) => setNewSubject(e.target.value)}
-                      onKeyDown={(e) => onEnter(e, addSubject)}
-                      placeholder="Add a subject"
-                      style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
-                    />
-                    <button onClick={addSubject} disabled={subjectState.busy || !newSubject.trim()}>
-                      Add
-                    </button>
-                    <div className="muted">
-                    {subjectState.message ? (subjectState.error ? `${subjectState.message} (${subjectState.error})` : subjectState.message) : ""}
-                  </div>
-                </div>
-                <div style={{ marginTop: 8 }}>
-                  {effectiveSubjects.length > 0 ? (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {effectiveSubjects
-                        .slice()
-                        .sort((a, b) => a.localeCompare(b))
-                        .map((s) => (
-                          <span
-                            key={s}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                              border: "1px solid var(--border)",
-                              padding: "2px 6px"
-                            }}
-                          >
-                            <Link href={`/app?subject=${encodeURIComponent(s)}`} style={{ textDecoration: "none" }}>
-                              {s}
-                            </Link>
-                            <button onClick={() => removeSubject(s)} disabled={subjectState.busy} aria-label={`Remove subject ${s}`}>
-                              ×
-                            </button>
-                          </span>
-                        ))}
+                            <option value="" disabled>
+                              —
+                            </option>
+                            {libraries.map((l) => (
+                              <option key={l.id} value={l.id}>
+                                {l.name}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="muted" style={{ marginLeft: 10 }}>
+                            {libraryMoveState.message ? (libraryMoveState.error ? `${libraryMoveState.message} (${libraryMoveState.error})` : libraryMoveState.message) : ""}
+                          </div>
+                        </>
+                      ) : (
+                        <div>{libraries.find((l) => l.id === formLibraryId)?.name ?? "—"}</div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="muted">No subjects yet.</div>
-                  )}
-                </div>
-              </div>
 
-              <div style={{ marginTop: 16 }} className="muted">
-                Categories
-              </div>
-              <div style={{ marginTop: 8 }}>
-                <div className="row">
-                  <input
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, addCategory)}
-                    placeholder="Add a category"
-                    style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
-                  />
-                  <button onClick={addCategory} disabled={categoryState.busy || !newCategory.trim()}>
-                    Add
-                  </button>
-                  <div className="muted">{categoryState.message ? (categoryState.error ? `${categoryState.message} (${categoryState.error})` : categoryState.message) : ""}</div>
-                </div>
-                <div style={{ marginTop: 8 }}>
-                  {categories.length > 0 ? (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {categories.map((t) => (
-                        <span
-                          key={t.id}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            border: "1px solid var(--border)",
-                            padding: "2px 6px"
-                          }}
-                        >
-                          <Link href={`/app?category=${encodeURIComponent(t.name)}`} style={{ textDecoration: "none" }}>
-                            {t.name}
-                          </Link>
-                          <button onClick={() => removeCategory(t.id)} disabled={categoryState.busy} aria-label={`Remove category ${t.name}`}>
-                            ×
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        {copiesLabel}
+                      </div>
+                      {editMode ? (
+                        <>
+                          <input
+                            type="number"
+                            min={1}
+                            value={copiesDraft || ""}
+                            onChange={(e) => setCopiesDraft(e.target.value)}
+                            onKeyDown={(e) => onEnter(e, updateCopies)}
+                            style={{ width: 90 }}
+                          />
+                          <button onClick={updateCopies} disabled={copiesUpdateState.busy || copiesCountState.busy || !copiesDraft.trim()}>
+                            {copiesUpdateState.busy ? "Updating…" : "Update"}
                           </button>
-                        </span>
-                      ))}
+                          <div className="muted" style={{ marginLeft: 10 }}>
+                            {copiesUpdateState.message
+                              ? copiesUpdateState.error
+                                ? `${copiesUpdateState.message} (${copiesUpdateState.error})`
+                                : copiesUpdateState.message
+                              : copiesCountState.error
+                                ? copiesCountState.error
+                                : copiesCountState.busy
+                                  ? "…"
+                                  : copiesCount !== null
+                                    ? `${copiesCount}`
+                                    : ""}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="muted">{copiesCountState.busy ? "…" : copiesCount !== null ? String(copiesCount) : "—"}</div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="muted">No categories yet.</div>
-                  )}
-                </div>
-              </div>
-
-              <div style={{ marginTop: 16 }} className="muted">
-                Tags
-              </div>
-                <div style={{ marginTop: 8 }}>
-                  <div className="row">
-                    <input
-                      value={newTag}
-                      onChange={(e) => setNewTag(e.target.value)}
-                      onKeyDown={(e) => onEnter(e, addTag)}
-                      placeholder="Add a tag"
-                      style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
-                    />
-                    <button onClick={addTag} disabled={tagState.busy || !newTag.trim()}>
-                      Add
-                    </button>
-                    <div className="muted">{tagState.message ? (tagState.error ? `${tagState.message} (${tagState.error})` : tagState.message) : ""}</div>
                   </div>
-                <div style={{ marginTop: 8 }}>
-                  {tags.length > 0 ? (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {tags.map((t) => (
-                        <span
-                          key={t.id}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            border: "1px solid var(--border)",
-                            padding: "2px 6px"
-                          }}
-                        >
-                          <Link href={`/app?tag=${encodeURIComponent(t.name)}`} style={{ textDecoration: "none" }}>
-                            {t.name}
-                          </Link>
-                          <button onClick={() => removeTag(t.id)} disabled={tagState.busy} aria-label={`Remove tag ${t.name}`}>
-                            ×
+
+                  <div style={{ marginTop: 16 }} className="muted">
+                    Categories
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {categories.length > 0 ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
+                        {categories.map((t) => (
+                          <span key={t.id} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
+                            <Link href={`/app?category=${encodeURIComponent(t.name)}`}>{t.name}</Link>
+                            {editMode ? (
+                              <button onClick={() => removeCategory(t.id)} disabled={categoryState.busy} aria-label={`Remove category ${t.name}`} style={{ padding: 0 }}>
+                                ×
+                              </button>
+                            ) : null}
+                          </span>
+                        ))}
+                        {editMode ? (
+                          <button onClick={() => setAddPersonModal({ open: true, kind: "category", value: "" })} className="muted" style={{ padding: 0 }}>
+                            + Add
                           </button>
-                        </span>
-                      ))}
+                        ) : null}
+                      </div>
+                    ) : editMode ? (
+                      <div className="row">
+                        <span className="muted">—</span>
+                        <button onClick={() => setAddPersonModal({ open: true, kind: "category", value: "" })} className="muted" style={{ padding: 0 }}>
+                          + Add
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="muted">—</div>
+                    )}
+                    <div className="muted" style={{ marginTop: 6 }}>
+                      {categoryState.message ? (categoryState.error ? `${categoryState.message} (${categoryState.error})` : categoryState.message) : ""}
                     </div>
-                  ) : (
-                    <div className="muted">No tags yet.</div>
-                  )}
-                </div>
-              </div>
-
-              <div style={{ marginTop: 16 }} className="muted">
-                Privacy &amp; lending
-              </div>
-              <div style={{ marginTop: 8 }}>
-                <div className="row">
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Visibility
                   </div>
-                  {formVisibility === "inherit" ? (
-                    <>
-                      <div className="muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
-                        {ownerProfile ? `From settings: ${ownerProfile.visibility === "public" ? "public" : "private"}` : "From settings: …"}
+
+                  <div style={{ marginTop: 16 }} className="muted">
+                    Tags
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {tags.length > 0 ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
+                        {tags.map((t) => (
+                          <span key={t.id} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
+                            <Link href={`/app?tag=${encodeURIComponent(t.name)}`}>{t.name}</Link>
+                            {editMode ? (
+                              <button onClick={() => removeTag(t.id)} disabled={tagState.busy} aria-label={`Remove tag ${t.name}`} style={{ padding: 0 }}>
+                                ×
+                              </button>
+                            ) : null}
+                          </span>
+                        ))}
+                        {editMode ? (
+                          <button onClick={() => setAddPersonModal({ open: true, kind: "tag", value: "" })} className="muted" style={{ padding: 0 }}>
+                            + Add
+                          </button>
+                        ) : null}
                       </div>
-                      <button
-                        onClick={() => setFormVisibility(ownerProfile?.visibility === "public" ? "public" : "followers_only")}
-                        disabled={!ownerProfile}
-                      >
-                        Override
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <select
-                        value={formVisibility}
-                        onChange={(e) => setFormVisibility(e.target.value as any)}
-                        style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
-                      >
-                        <option value="followers_only">private</option>
-                        <option value="public">public</option>
-                      </select>
-                      <button onClick={() => setFormVisibility("inherit")}>Revert</button>
-                    </>
-                  )}
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Status
-                  </div>
-                  <select value={formStatus} onChange={(e) => setFormStatus(e.target.value as any)} style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
-                    <option value="owned">owned</option>
-                    <option value="loaned">loaned</option>
-                    <option value="selling">selling</option>
-                    <option value="trading">trading</option>
-                  </select>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Borrowable
-                  </div>
-                  {formBorrowable === "inherit" ? (
-                    <>
-                      <div className="muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
-                        {ownerBorrowDefaults ? `From settings: ${ownerBorrowDefaults.borrowable_default ? "yes" : "no"}` : "From settings: …"}
+                    ) : editMode ? (
+                      <div className="row">
+                        <span className="muted">—</span>
+                        <button onClick={() => setAddPersonModal({ open: true, kind: "tag", value: "" })} className="muted" style={{ padding: 0 }}>
+                          + Add
+                        </button>
                       </div>
-                      <button onClick={() => setFormBorrowable(ownerBorrowDefaults?.borrowable_default ? "yes" : "no")} disabled={!ownerBorrowDefaults}>
-                        Override
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <select
-                        value={formBorrowable}
-                        onChange={(e) => setFormBorrowable(e.target.value as any)}
-                        style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
-                      >
-                        <option value="yes">yes</option>
-                        <option value="no">no</option>
-                      </select>
-                      <button onClick={() => setFormBorrowable("inherit")}>Revert</button>
-                    </>
-                  )}
-                </div>
-              </div>
+                    ) : (
+                      <div className="muted">—</div>
+                    )}
+                    <div className="muted" style={{ marginTop: 6 }}>
+                      {tagState.message ? (tagState.error ? `${tagState.message} (${tagState.error})` : tagState.message) : ""}
+                    </div>
+                  </div>
 
-              {/* Share link is shown in view-mode under metadata */}
+                  <div style={{ marginTop: 16 }} className="muted">
+                    Privacy &amp; lending
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div className="row">
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Visibility
+                      </div>
+                      {editMode ? (
+                        formVisibility === "inherit" ? (
+                          <>
+                            <div className="muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
+                              {ownerProfile ? `From settings: ${ownerProfile.visibility === "public" ? "public" : "private"}` : "From settings: …"}
+                            </div>
+                            <button
+                              onClick={() => setFormVisibility(ownerProfile?.visibility === "public" ? "public" : "followers_only")}
+                              disabled={!ownerProfile}
+                            >
+                              Override
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <select
+                              value={formVisibility}
+                              onChange={(e) => setFormVisibility(e.target.value as any)}
+                              style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
+                            >
+                              <option value="followers_only">private</option>
+                              <option value="public">public</option>
+                            </select>
+                            <button onClick={() => setFormVisibility("inherit")}>Revert</button>
+                          </>
+                        )
+                      ) : (
+                        <div>{formVisibility === "inherit" ? (ownerProfile?.visibility === "public" ? "public" : "private") : formVisibility === "public" ? "public" : "private"}</div>
+                      )}
+                    </div>
 
-              <div style={{ marginTop: 16 }} className="muted">
-                Location
-              </div>
-              <div style={{ marginTop: 8 }}>
-                <div className="row">
-                  <div style={{ minWidth: 110 }} className="muted">
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Status
+                      </div>
+                      {editMode ? (
+                        <select value={formStatus} onChange={(e) => setFormStatus(e.target.value as any)} style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
+                          <option value="owned">owned</option>
+                          <option value="loaned">loaned</option>
+                          <option value="selling">selling</option>
+                          <option value="trading">trading</option>
+                        </select>
+                      ) : (
+                        <div>{formStatus}</div>
+                      )}
+                    </div>
+
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Borrowable
+                      </div>
+                      {editMode ? (
+                        formBorrowable === "inherit" ? (
+                          <>
+                            <div className="muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
+                              {ownerBorrowDefaults ? `From settings: ${ownerBorrowDefaults.borrowable_default ? "yes" : "no"}` : "From settings: …"}
+                            </div>
+                            <button onClick={() => setFormBorrowable(ownerBorrowDefaults?.borrowable_default ? "yes" : "no")} disabled={!ownerBorrowDefaults}>
+                              Override
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <select
+                              value={formBorrowable}
+                              onChange={(e) => setFormBorrowable(e.target.value as any)}
+                              style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
+                            >
+                              <option value="yes">yes</option>
+                              <option value="no">no</option>
+                            </select>
+                            <button onClick={() => setFormBorrowable("inherit")}>Revert</button>
+                          </>
+                        )
+                      ) : (
+                        <div>{formBorrowable === "inherit" ? (ownerBorrowDefaults?.borrowable_default ? "yes" : "no") : formBorrowable}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 16 }} className="muted">
                     Location
                   </div>
-                  <input
-                    value={formLocation}
-                    onChange={(e) => setFormLocation(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, saveEdits)}
-                    placeholder="Home, Studio…"
-                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
-                  />
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Shelf
-                  </div>
-                  <input
-                    value={formShelf}
-                    onChange={(e) => setFormShelf(e.target.value)}
-                    onKeyDown={(e) => onEnter(e, saveEdits)}
-                    placeholder="Shelf #"
-                    style={{ width: isNarrow ? "100%" : 360, maxWidth: "100%" }}
-                  />
-                </div>
-
-                <div style={{ marginTop: 8 }}>
-                  <div className="muted">Notes</div>
-                  <textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} rows={4} style={{ width: "100%", marginTop: 6 }} />
-                </div>
-              </div>
-
-              <div style={{ marginTop: 16 }} className="muted">
-                Images
-              </div>
-              <div style={{ marginTop: 8 }}>
-                <div className="muted">Upload additional images</div>
-                <input key={imagesInputKey} type="file" accept="image/*" multiple onChange={(ev) => selectPendingImages(ev.target.files)} style={{ marginTop: 6 }} />
-
-                {pendingImages.length > 0 ? (
-                  <div className="muted" style={{ marginTop: 8 }}>
-                    <div>Selected (not uploaded yet):</div>
-                    <div style={{ marginTop: 6 }}>
-                      {pendingImages.map((f) => (
-                        <div key={`${f.name}:${f.size}:${f.lastModified}`}>{f.name}</div>
-                      ))}
-                    </div>
-                    <div className="row" style={{ marginTop: 8 }}>
-                      <button onClick={uploadImages} disabled={imagesState.busy}>
-                        {imagesState.busy ? "Uploading…" : "Submit"}
-                      </button>
-                      <button onClick={clearPendingImages} disabled={imagesState.busy} style={{ marginLeft: 8 }}>
-                        Clear
-                      </button>
-                      <div className="muted" style={{ marginLeft: 10 }}>
-                        {imagesState.message ? (imagesState.error ? `${imagesState.message} (${imagesState.error})` : imagesState.message) : ""}
+                  <div style={{ marginTop: 8 }}>
+                    <div className="row">
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Location
+                      </div>
+                      <div style={{ flex: "1 1 auto" }}>
+                        {editMode ? (
+                          <input value={formLocation} onChange={(e) => setFormLocation(e.target.value)} placeholder="Home, Studio…" style={{ width: "100%" }} />
+                        ) : (
+                          (formLocation ?? "").trim() || "—"
+                        )}
                       </div>
                     </div>
-                  </div>
-                ) : imagesState.message ? (
-                  <div className="muted" style={{ marginTop: 6 }}>
-                    {imagesState.error ? `${imagesState.message} (${imagesState.error})` : imagesState.message}
-                  </div>
-                ) : (
-                  <div className="muted" style={{ marginTop: 6 }}>
-                    Select one or more images, then click Submit.
-                  </div>
-                )}
 
-                {imageMedia.length > 0 ? (
-                  <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-                    {imageMedia.map((m) => {
-                      const url = mediaUrlsByPath[m.storage_path];
-                      return (
-                        <div key={m.id} className="card">
-                          {url ? (
-                            <div className="om-cover-slot" style={{ width: "100%", height: 120, padding: 0 }}>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img alt="" src={url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    <div className="row" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Shelf
+                      </div>
+                      <div style={{ flex: "1 1 auto" }}>
+                        {editMode ? (
+                          <input value={formShelf} onChange={(e) => setFormShelf(e.target.value)} placeholder="Shelf #" style={{ width: "100%" }} />
+                        ) : (
+                          (formShelf ?? "").trim() || "—"
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 8 }}>
+                      <div className="muted">Notes</div>
+                      {editMode ? (
+                        <textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} rows={4} style={{ width: "100%", marginTop: 6 }} />
+                      ) : (
+                        <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
+                          {(formNotes ?? "").trim() || "—"}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 16 }} className="muted">
+                    Images
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {editMode ? (
+                      <details>
+                        <summary className="muted">Add images…</summary>
+                        <div style={{ marginTop: 8 }}>
+                          <input key={imagesInputKey} type="file" accept="image/*" multiple onChange={(ev) => selectPendingImages(ev.target.files)} />
+
+                          {pendingImages.length > 0 ? (
+                            <div className="muted" style={{ marginTop: 8 }}>
+                              <div>Selected (not uploaded yet):</div>
+                              <div style={{ marginTop: 6 }}>
+                                {pendingImages.map((f) => (
+                                  <div key={`${f.name}:${f.size}:${f.lastModified}`}>{f.name}</div>
+                                ))}
+                              </div>
+                              <div className="row" style={{ marginTop: 8 }}>
+                                <button onClick={uploadImages} disabled={imagesState.busy}>
+                                  {imagesState.busy ? "Uploading…" : "Submit"}
+                                </button>
+                                <button onClick={clearPendingImages} disabled={imagesState.busy} className="muted">
+                                  Clear
+                                </button>
+                                <div className="muted" style={{ marginLeft: 10 }}>
+                                  {imagesState.message ? (imagesState.error ? `${imagesState.message} (${imagesState.error})` : imagesState.message) : ""}
+                                </div>
+                              </div>
+                            </div>
+                          ) : imagesState.message ? (
+                            <div className="muted" style={{ marginTop: 6 }}>
+                              {imagesState.error ? `${imagesState.message} (${imagesState.error})` : imagesState.message}
                             </div>
                           ) : (
-                            <div className="om-cover-slot" style={{ width: "100%", height: 120, padding: 0 }} />
+                            <div className="muted" style={{ marginTop: 6 }}>
+                              Select one or more images, then click Submit.
+                            </div>
                           )}
-                          <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
-                            <button onClick={() => setAsCover(m.id)} disabled={coverState.busy}>
-                              Use as cover
-                            </button>
-                            <button onClick={() => deleteMedia(m.id, m.storage_path)} disabled={imagesState.busy || coverState.busy}>
-                              Delete
-                            </button>
-                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="muted" style={{ marginTop: 8 }}>
-                    No images yet.
-                  </div>
-                )}
-              </div>
+                      </details>
+                    ) : null}
 
-              <div className="row" style={{ marginTop: 10 }}>
-                <button onClick={saveEdits} disabled={saveState.busy || !book || book.owner_id !== userId}>
-                  {saveState.busy ? "Saving…" : "Save"}
-                </button>
-                <div className="muted">{saveState.message ? (saveState.error ? `${saveState.message} (${saveState.error})` : saveState.message) : ""}</div>
-              </div>
+                    {imageMedia.length > 0 ? (
+                      <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+                        {imageMedia.map((m) => {
+                          const url = mediaUrlsByPath[m.storage_path];
+                          return (
+                            <div key={m.id} className="card">
+                              {url ? (
+                                <a href={url} target="_blank" rel="noreferrer" className="om-cover-slot" style={{ width: "100%", height: 120, padding: 0 }}>
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img alt="" src={url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                                </a>
+                              ) : (
+                                <div className="om-cover-slot" style={{ width: "100%", height: 120, padding: 0 }} />
+                              )}
+                              {editMode ? (
+                                <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
+                                  <button onClick={() => setAsCover(m.id)} disabled={coverState.busy}>
+                                    Use as cover
+                                  </button>
+                                  <button onClick={() => deleteMedia(m.id, m.storage_path)} disabled={imagesState.busy || coverState.busy}>
+                                    Delete
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="muted" style={{ marginTop: 8 }}>
+                        —{/* no images */}
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : null}
             </div>
@@ -3092,6 +3115,98 @@ export default function BookDetailPage() {
           </div>
         </div>
       )}
+
+      {addPersonModal.open ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setAddPersonModal((m) => ({ ...m, open: false, value: "" }))}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(0,0,0,0.35)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16
+          }}
+        >
+          <div
+            className="om-popover"
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "min(520px, 100%)" }}
+          >
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+              <div>
+                {addPersonModal.kind === "author"
+                  ? "Add author"
+                  : addPersonModal.kind === "editor"
+                    ? "Add editor"
+                    : addPersonModal.kind === "designer"
+                      ? "Add designer"
+                      : addPersonModal.kind === "subject"
+                        ? "Add subject"
+                        : addPersonModal.kind === "category"
+                          ? "Add category"
+                          : "Add tag"}
+              </div>
+              <button className="muted" onClick={() => setAddPersonModal((m) => ({ ...m, open: false, value: "" }))}>
+                Close
+              </button>
+            </div>
+            <input
+              autoFocus
+              value={addPersonModal.value}
+              onChange={(e) => setAddPersonModal((m) => ({ ...m, value: e.target.value }))}
+              onKeyDown={(e) => onEnter(e, submitAddPersonModal)}
+              placeholder="Type a name"
+              style={{ width: "100%", marginTop: 10 }}
+            />
+            <div className="row" style={{ marginTop: 10 }}>
+              <button
+                onClick={submitAddPersonModal}
+                disabled={
+                  !addPersonModal.value.trim() ||
+                  (addPersonModal.kind === "subject"
+                    ? subjectState.busy
+                    : addPersonModal.kind === "category"
+                      ? categoryState.busy
+                      : addPersonModal.kind === "tag"
+                        ? tagState.busy
+                        : false)
+                }
+              >
+                Add
+              </button>
+              <button className="muted" onClick={() => setAddPersonModal((m) => ({ ...m, open: false, value: "" }))}>
+                Cancel
+              </button>
+              <div className="muted">
+                {addPersonModal.kind === "subject"
+                  ? subjectState.message
+                    ? subjectState.error
+                      ? `${subjectState.message} (${subjectState.error})`
+                      : subjectState.message
+                    : ""
+                  : addPersonModal.kind === "category"
+                    ? categoryState.message
+                      ? categoryState.error
+                        ? `${categoryState.message} (${categoryState.error})`
+                        : categoryState.message
+                      : ""
+                    : addPersonModal.kind === "tag"
+                      ? tagState.message
+                        ? tagState.error
+                          ? `${tagState.message} (${tagState.error})`
+                          : tagState.message
+                        : ""
+                      : ""}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
