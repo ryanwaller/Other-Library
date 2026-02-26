@@ -9,6 +9,20 @@ import { supabase } from "../../../../lib/supabaseClient";
 import { bookIdSlug } from "../../../../lib/slug";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
 import SignInCard from "../../../components/SignInCard";
+import EntityTokenField from "../../components/EntityTokenField";
+
+type FacetRole =
+  | "author"
+  | "editor"
+  | "designer"
+  | "subject"
+  | "tag"
+  | "category"
+  | "material"
+  | "printer"
+  | "publisher";
+
+type EntityRef = { id: string; name: string; slug: string };
 
 type UserBookDetail = {
   id: number;
@@ -51,6 +65,7 @@ type UserBookDetail = {
   } | null;
   media: Array<{ id: number; kind: "cover" | "image"; storage_path: string; caption: string | null; created_at: string }>;
   book_tags: Array<{ tag: { id: number; name: string; kind: "tag" | "category" } | null }>;
+  book_entities?: Array<{ role: FacetRole; position: number | null; entity: EntityRef | null }> | null;
 };
 
 type MetadataSearchResult = {
@@ -239,6 +254,24 @@ function parseAuthorsInput(input: string): string[] {
   return out;
 }
 
+function facetHref(role: string, slug: string): string {
+  return `/facet/${encodeURIComponent(role)}/${encodeURIComponent(slug)}`;
+}
+
+function FacetLinks(props: { role: FacetRole; items: EntityRef[] }) {
+  const { role, items } = props;
+  return (
+    <span>
+      {items.map((e, idx) => (
+        <span key={e.id}>
+          <Link href={facetHref(role, e.slug)}>{e.name}</Link>
+          {idx < items.length - 1 ? ", " : ""}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function normalizeIsbn(input: string): string {
   return input
     .trim()
@@ -373,6 +406,18 @@ export default function BookDetailPage() {
     message: null
   });
 
+  const [facetDraft, setFacetDraft] = useState<Record<FacetRole, string[]>>({
+    author: [],
+    editor: [],
+    designer: [],
+    subject: [],
+    tag: [],
+    category: [],
+    material: [],
+    printer: [],
+    publisher: []
+  });
+
   const [tagState, setTagState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -430,6 +475,7 @@ export default function BookDetailPage() {
   const [pendingCover, setPendingCover] = useState<File | null>(null);
   const [coverEditorSrc, setCoverEditorSrc] = useState<string | null>(null);
   const coverEditorObjectUrlRef = useRef<string | null>(null);
+  const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [coverCrop, setCoverCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [coverZoom, setCoverZoom] = useState<number>(1);
   const [coverRotation, setCoverRotation] = useState<number>(0);
@@ -525,6 +571,18 @@ export default function BookDetailPage() {
   }, [bookId]);
 
   useEffect(() => {
+    if (!editMode) return;
+    const el = descriptionTextareaRef.current;
+    if (!el) return;
+    try {
+      el.style.height = "0px";
+      el.style.height = `${el.scrollHeight}px`;
+    } catch {
+      // ignore
+    }
+  }, [editMode, formDescription]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     // Ensure navigation to a new detail page always starts at the top on mobile.
     window.scrollTo(0, 0);
@@ -580,16 +638,28 @@ export default function BookDetailPage() {
     setCopiesCount(null);
     setCopiesCountState({ busy: false, error: null });
     try {
-      const selectNew =
+      const baseNew =
         "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,decade,pages,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
-      const selectOld =
+      const baseOld =
         "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+
+      const entitiesSelect = ",book_entities:book_entities(role,position,entity:entities(id,name,slug))";
+      const selectNew = baseNew + entitiesSelect;
+      const selectOld = baseOld + entitiesSelect;
 
       let res = await supabase.from("user_books").select(selectNew).eq("id", bookId).maybeSingle();
       if (res.error) {
         const msg = (res.error.message ?? "").toLowerCase();
-        if (msg.includes("group_label") && msg.includes("does not exist")) {
+        if ((msg.includes("book_entities") || msg.includes("entities")) && (res.error.message ?? "").toLowerCase().includes("does not exist")) {
+          res = await supabase.from("user_books").select(baseNew).eq("id", bookId).maybeSingle();
+        } else if (msg.includes("group_label") && msg.includes("does not exist")) {
           res = await supabase.from("user_books").select(selectOld).eq("id", bookId).maybeSingle();
+          if (res.error) {
+            const msg2 = (res.error.message ?? "").toLowerCase();
+            if ((msg2.includes("book_entities") || msg2.includes("entities")) && msg2.includes("does not exist")) {
+              res = await supabase.from("user_books").select(baseOld).eq("id", bookId).maybeSingle();
+            }
+          }
         }
       }
       if (res.error) throw new Error(res.error.message);
@@ -601,13 +671,63 @@ export default function BookDetailPage() {
       }
 
       setBook(row);
+
+      const nextFacets: Record<FacetRole, string[]> = {
+        author: [],
+        editor: [],
+        designer: [],
+        subject: [],
+        tag: [],
+        category: [],
+        material: [],
+        printer: [],
+        publisher: []
+      };
+
+      const entityRows = ((row as any).book_entities as Array<{ role: FacetRole; position: number | null; entity: EntityRef | null }> | null) ?? [];
+      if (entityRows.length > 0) {
+        const sorted = entityRows
+          .filter((r) => r?.role && r?.entity?.name)
+          .slice()
+          .sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999));
+        for (const r of sorted) {
+          const role = r.role;
+          const name = String(r.entity!.name ?? "").trim();
+          if (!name) continue;
+          const existing = nextFacets[role] ?? [];
+          if (!existing.some((x) => x.toLowerCase() === name.toLowerCase())) existing.push(name);
+          nextFacets[role] = existing;
+        }
+      } else {
+        // Fallback to legacy fields/tables when entities aren't present yet.
+        const authorsFallback =
+          row.authors_override && row.authors_override.length > 0 ? row.authors_override : ((row.edition?.authors ?? []) as string[]);
+        const subjectsFallback = row.subjects_override !== null && row.subjects_override !== undefined ? row.subjects_override : (row.edition?.subjects ?? []);
+        nextFacets.author = (authorsFallback ?? []).filter(Boolean);
+        nextFacets.editor = (row.editors_override ?? []).filter(Boolean);
+        nextFacets.designer = (row.designers_override ?? []).filter(Boolean);
+        nextFacets.subject = (subjectsFallback ?? []).filter(Boolean);
+        const publisherFallback = String(row.publisher_override ?? row.edition?.publisher ?? "").trim();
+        if (publisherFallback) nextFacets.publisher = [publisherFallback];
+        const printerFallback = String(row.printer_override ?? "").trim();
+        if (printerFallback) nextFacets.printer = [printerFallback];
+        const materialFallback = String(row.materials_override ?? "").trim();
+        if (materialFallback) nextFacets.material = [materialFallback];
+        const tagRows = ((row as any).book_tags ?? []) as any[];
+        const tagsFallback = tagRows.map((bt) => bt?.tag).filter(Boolean);
+        nextFacets.tag = tagsFallback.filter((t) => t.kind === "tag").map((t) => String(t.name)).filter(Boolean);
+        nextFacets.category = tagsFallback.filter((t) => t.kind === "category").map((t) => String(t.name)).filter(Boolean);
+      }
+
+      setFacetDraft(nextFacets);
+
       setFormTitle(row.title_override ?? "");
-      setFormAuthors((row.authors_override ?? []).filter(Boolean).join(", "));
-      setFormEditors((row.editors_override ?? []).filter(Boolean).join(", "));
-      setFormDesigners((row.designers_override ?? []).filter(Boolean).join(", "));
-      setFormPublisher(row.publisher_override ?? row.edition?.publisher ?? "");
-      setFormPrinter(row.printer_override ?? "");
-      setFormMaterials(row.materials_override ?? "");
+      setFormAuthors((nextFacets.author ?? []).join(", "));
+      setFormEditors((nextFacets.editor ?? []).join(", "));
+      setFormDesigners((nextFacets.designer ?? []).join(", "));
+      setFormPublisher((nextFacets.publisher?.[0] ?? row.publisher_override ?? row.edition?.publisher ?? "").trim());
+      setFormPrinter((nextFacets.printer?.[0] ?? row.printer_override ?? "").trim());
+      setFormMaterials((nextFacets.material?.[0] ?? row.materials_override ?? "").trim());
       setFormEditionOverride(row.edition_override ?? "");
       setFormPublishDate(row.publish_date_override ?? row.edition?.publish_date ?? "");
       setFormDescription(row.description_override ?? row.edition?.description ?? "");
@@ -866,6 +986,82 @@ export default function BookDetailPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [book]);
 
+  function slugifyFallback(input: string): string {
+    const s = String(input ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-+|-+$)/g, "");
+    return s;
+  }
+
+  const facetView = useMemo(() => {
+    const out: Record<FacetRole, EntityRef[]> = {
+      author: [],
+      editor: [],
+      designer: [],
+      subject: [],
+      tag: [],
+      category: [],
+      material: [],
+      printer: [],
+      publisher: []
+    };
+
+    const rows = ((book?.book_entities ?? []) as Array<{ role: FacetRole; position: number | null; entity: EntityRef | null }> | null) ?? [];
+    if (rows.length > 0) {
+      const sorted = rows
+        .filter((r) => r?.role && r?.entity?.name && r?.entity?.slug)
+        .slice()
+        .sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999));
+      for (const r of sorted) {
+        const role = r.role;
+        const ent = r.entity!;
+        if (!out[role]) continue;
+        out[role].push({ id: ent.id, name: ent.name, slug: ent.slug });
+      }
+      return out;
+    }
+
+    // Fallback (when DB migration isn't applied yet): generate slugs client-side so links still work.
+    for (const a of effectiveAuthors) {
+      const slug = slugifyFallback(a) || slugifyFallback(`author-${a}`);
+      out.author.push({ id: `author:${slug}`, name: a, slug });
+    }
+    for (const a of effectiveEditors) {
+      const slug = slugifyFallback(a) || slugifyFallback(`editor-${a}`);
+      out.editor.push({ id: `editor:${slug}`, name: a, slug });
+    }
+    for (const a of effectiveDesigners) {
+      const slug = slugifyFallback(a) || slugifyFallback(`designer-${a}`);
+      out.designer.push({ id: `designer:${slug}`, name: a, slug });
+    }
+    for (const s of effectiveSubjects) {
+      const slug = slugifyFallback(s) || slugifyFallback(`subject-${s}`);
+      out.subject.push({ id: `subject:${slug}`, name: s, slug });
+    }
+    for (const t of tags) {
+      const slug = slugifyFallback(t.name) || slugifyFallback(`tag-${t.name}`);
+      out.tag.push({ id: `tag:${slug}`, name: t.name, slug });
+    }
+    for (const t of categories) {
+      const slug = slugifyFallback(t.name) || slugifyFallback(`category-${t.name}`);
+      out.category.push({ id: `category:${slug}`, name: t.name, slug });
+    }
+    if (effectivePublisher.trim()) {
+      const slug = slugifyFallback(effectivePublisher) || slugifyFallback(`publisher-${effectivePublisher}`);
+      out.publisher.push({ id: `publisher:${slug}`, name: effectivePublisher, slug });
+    }
+    if (formPrinter.trim()) {
+      const slug = slugifyFallback(formPrinter) || slugifyFallback(`printer-${formPrinter}`);
+      out.printer.push({ id: `printer:${slug}`, name: formPrinter.trim(), slug });
+    }
+    if (formMaterials.trim()) {
+      const slug = slugifyFallback(formMaterials) || slugifyFallback(`material-${formMaterials}`);
+      out.material.push({ id: `material:${slug}`, name: formMaterials.trim(), slug });
+    }
+    return out;
+  }, [book?.book_entities, categories, effectiveAuthors, effectiveDesigners, effectiveEditors, effectivePublisher, effectiveSubjects, formMaterials, formPrinter, tags]);
+
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
   const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : suggestedCoverUrl ?? book?.edition?.cover_url ?? null;
   const coverAspect = useMemo(() => aspectFrom(coverAspectW, coverAspectH), [coverAspectW, coverAspectH]);
@@ -944,9 +1140,9 @@ export default function BookDetailPage() {
       formVisibility,
       formStatus,
       formBorrowable,
-      formLibraryId
+      formLibraryId,
+      facetDraft: JSON.parse(JSON.stringify(facetDraft))
     };
-    setFindMoreOpen(false);
     setEditMode(true);
   }
 
@@ -976,6 +1172,7 @@ export default function BookDetailPage() {
       setFormStatus(snap.formStatus);
       setFormBorrowable(snap.formBorrowable);
       setFormLibraryId(snap.formLibraryId);
+      if (snap.facetDraft) setFacetDraft(snap.facetDraft);
     }
     setCoverToolsOpen(false);
     setPendingCover(null);
@@ -1030,6 +1227,7 @@ export default function BookDetailPage() {
       edition_override: formEditionOverride.trim() ? formEditionOverride.trim() : null,
       publish_date_override: formPublishDate.trim() ? formPublishDate.trim() : null,
       description_override: formDescription.trim() ? formDescription.trim() : null,
+      subjects_override: facetDraft.subject ?? [],
       location: formLocation.trim() ? formLocation.trim() : null,
       shelf: formShelf.trim() ? formShelf.trim() : null,
       notes: formNotes.trim() ? formNotes.trim() : null,
@@ -1052,6 +1250,33 @@ export default function BookDetailPage() {
       setSaveState({ busy: false, error: res.error.message, message: "Save failed" });
       return false;
     }
+
+    // Sync entity facets (best-effort; won't block save if DB migration hasn't been applied yet).
+    try {
+      const roles: Array<[FacetRole, string[]]> = [
+        ["author", facetDraft.author ?? effectiveAuthors],
+        ["editor", facetDraft.editor ?? effectiveEditors],
+        ["designer", facetDraft.designer ?? effectiveDesigners],
+        ["subject", facetDraft.subject ?? effectiveSubjects],
+        ["publisher", facetDraft.publisher ?? (effectivePublisher.trim() ? [effectivePublisher.trim()] : [])],
+        ["printer", facetDraft.printer ?? (formPrinter.trim() ? [formPrinter.trim()] : [])],
+        ["material", facetDraft.material ?? (formMaterials.trim() ? [formMaterials.trim()] : [])],
+        ["tag", facetDraft.tag ?? tags.map((t) => t.name)],
+        ["category", facetDraft.category ?? categories.map((t) => t.name)]
+      ];
+      for (const [role, names] of roles) {
+        const rpc = await supabase.rpc("set_book_entities", { p_user_book_id: book.id, p_role: role, p_names: names ?? [] });
+        if (rpc.error) {
+          const msg = (rpc.error.message ?? "").toLowerCase();
+          if (msg.includes("does not exist") || msg.includes("function") || msg.includes("unknown")) {
+            break;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     await refresh();
     setSaveState({ busy: false, error: null, message: "Saved" });
     return true;
@@ -2203,14 +2428,234 @@ export default function BookDetailPage() {
                 </div>
               </div>
 
+              {isOwner && findMoreOpen ? (
+                <div style={{ marginTop: 14 }}>
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+                    <div>Lookup</div>
+                    <div className="muted">
+                      {importState.busy || searchState.busy ? "Working…" : importState.error || searchState.error ? "Error" : ""}
+                    </div>
+                  </div>
+                  <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                    <input
+                      className="om-inline-control"
+                      placeholder='ISBN, URL, or "Title by Author"'
+                      value={lookupInput}
+                      onChange={(e) => setLookupInput(e.target.value)}
+                      onKeyDown={(e) => onEnter(e, smartLookup)}
+                      style={{ width: isNarrow ? "100%" : 520, maxWidth: "100%", minWidth: 0 }}
+                    />
+                    <button onClick={smartLookup} disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}>
+                      Find
+                    </button>
+                    <span className="muted" style={{ marginLeft: 10 }}>
+                      {importState.message
+                        ? importState.error
+                          ? `${importState.message} (${importState.error})`
+                          : importState.message
+                        : searchState.message
+                          ? searchState.error
+                            ? `${searchState.message} (${searchState.error})`
+                            : searchState.message
+                          : ""}
+                    </span>
+                  </div>
+
+                  {searchResults.length > 0 ? (
+                    <div style={{ marginTop: 10 }}>
+                      <div className="muted">Title/author results</div>
+                      <div style={{ marginTop: 6 }}>
+                        {searchResults.map((r, idx) => {
+                          const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
+                          const hasIsbn = Boolean(bestIsbn);
+                          const title = (r.title ?? "").trim() || "—";
+                          const authors = (r.authors ?? []).filter(Boolean).join(", ");
+                          const pub = [r.publisher ?? "", r.publish_date ?? (r.publish_year ? String(r.publish_year) : "")]
+                            .filter(Boolean)
+                            .join(" · ");
+                          return (
+                            <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="card" style={{ marginTop: 8 }}>
+                              <div className="om-lookup-row">
+                                <div style={{ width: 62, flex: "0 0 auto" }}>
+                                  {r.cover_url ? (
+                                    <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
+                                      <img
+                                        src={r.cover_url}
+                                        alt=""
+                                        width={60}
+                                        height={90}
+                                        style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
+                                  )}
+                                </div>
+                                <div className="om-lookup-main">
+                                  <div>{title}</div>
+                                  <div className="muted" style={{ marginTop: 4 }}>
+                                    {authors || "—"}
+                                    {pub ? ` · ${pub}` : ""}
+                                  </div>
+                                  <div className="muted" style={{ marginTop: 4 }}>
+                                    {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"} · {r.source}
+                                  </div>
+                                </div>
+                                <div className="om-lookup-actions">
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                                    {hasIsbn ? (
+                                      <button
+                                        onClick={() => {
+                                          enterEditMode();
+                                          linkEditionByIsbn(bestIsbn, r.cover_url ?? null);
+                                        }}
+                                        disabled={linkState.busy || !bestIsbn}
+                                      >
+                                        Link ISBN
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          enterEditMode();
+                                          if (r.title) setFormTitle(r.title);
+                                          setFormAuthors((r.authors ?? []).filter(Boolean).join(", "));
+                                          if (r.publisher) setFormPublisher(r.publisher);
+                                          if (r.publish_date) setFormPublishDate(r.publish_date);
+                                          if (r.cover_url) setSuggestedCoverUrl(r.cover_url);
+                                          setSearchState((s) => ({ ...s, message: "Filled fields (not saved)" }));
+                                        }}
+                                        disabled={!r.title && (!r.authors || r.authors.length === 0) && !r.publisher && !r.publish_date}
+                                      >
+                                        Fill fields
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {importPreview
+                    ? (() => {
+                        const preview = importPreview as ImportPreview;
+                        const previewCoverUrl = preview.cover_url ?? undefined;
+                        const previewFinalUrl = importMeta.final_url ?? undefined;
+                        return (
+                          <div style={{ marginTop: 10 }}>
+                            <div className="muted">Preview</div>
+                            <div style={{ marginTop: 6 }} className="card">
+                              <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                                <div style={{ width: 62, flex: "0 0 auto" }}>
+                                  {previewCoverUrl ? (
+                                    <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
+                                      <img
+                                        src={previewCoverUrl}
+                                        alt=""
+                                        width={60}
+                                        height={90}
+                                        style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
+                                  )}
+                                </div>
+                                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                                  <div>{(preview.title ?? "").trim() || "—"}</div>
+                                  <div className="muted" style={{ marginTop: 4 }}>
+                                    {(preview.authors ?? []).filter(Boolean).join(", ") || "—"}
+                                  </div>
+                                  <div className="muted" style={{ marginTop: 4 }}>
+                                    {[preview.publisher ?? "", preview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
+                                  </div>
+                                  <div className="muted" style={{ marginTop: 4 }}>
+                                    {preview.isbn13 || preview.isbn10 ? `ISBN: ${preview.isbn13 ?? preview.isbn10}` : "No ISBN found"} · sources:{" "}
+                                    {(preview.sources ?? []).join(", ") || "—"}
+                                  </div>
+                                  <div className="muted" style={{ marginTop: 4 }}>
+                                    {importMeta.domain ? `${importMeta.domain_kind ?? "generic"} · ${importMeta.domain}` : importMeta.domain_kind ?? ""}
+                                    {previewFinalUrl ? (
+                                      <>
+                                        {" "}
+                                        ·{" "}
+                                        <a href={previewFinalUrl} target="_blank" rel="noreferrer">
+                                          open page
+                                        </a>
+                                      </>
+                                    ) : null}
+                                    {previewCoverUrl ? (
+                                      <>
+                                        {" "}
+                                        ·{" "}
+                                        <a href={previewCoverUrl} target="_blank" rel="noreferrer">
+                                          open cover
+                                        </a>
+                                      </>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                <div style={{ flex: "0 0 auto" }}>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                                    {(() => {
+                                      const importPreviewIsbn = String(preview.isbn13 ?? preview.isbn10 ?? "").trim();
+                                      const importPreviewHasIsbn = Boolean(importPreviewIsbn);
+                                      return importPreviewHasIsbn ? (
+                                        <button
+                                          onClick={() => {
+                                            enterEditMode();
+                                            linkEditionByIsbn(importPreviewIsbn, preview.cover_url ?? null);
+                                          }}
+                                          disabled={linkState.busy || !importPreviewIsbn}
+                                        >
+                                          Link ISBN
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => {
+                                            enterEditMode();
+                                            if (preview.title) setFormTitle(preview.title);
+                                            setFormAuthors((preview.authors ?? []).filter(Boolean).join(", "));
+                                            if (preview.publisher) setFormPublisher(preview.publisher);
+                                            if (preview.publish_date) setFormPublishDate(preview.publish_date);
+                                            if (preview.description) setFormDescription(preview.description);
+                                            if (preview.cover_url) setSuggestedCoverUrl(preview.cover_url);
+                                            setImportState((s) => ({ ...s, message: "Filled fields (not saved)" }));
+                                          }}
+                                          disabled={
+                                            !preview.title &&
+                                            (!preview.authors || preview.authors.length === 0) &&
+                                            !preview.publisher &&
+                                            !preview.publish_date &&
+                                            !preview.description
+                                          }
+                                        >
+                                          Fill fields
+                                        </button>
+                                      );
+                                    })()}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    : null}
+                </div>
+              ) : null}
+
               <div style={{ marginTop: 10 }}>
                 {editMode ? (
                   <input
+                    className="om-inline-control"
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
                     onKeyDown={(e) => onEnter(e, () => void saveEdits())}
                     placeholder={effectiveTitle}
-                    style={{ width: "100%" }}
                   />
                 ) : (
                   <div>{effectiveTitle}</div>
@@ -2218,287 +2663,329 @@ export default function BookDetailPage() {
               </div>
 
               <div style={{ marginTop: 14 }}>
-                <div className="row">
-                  <div style={{ minWidth: 110 }} className="muted">
-                    ISBN
-                  </div>
-                  <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10 ?? "—"}</div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Authors
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
-                    {effectiveAuthors.length > 0 ? (
-                      effectiveAuthors.map((a) => (
-                        <span key={a} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
-                          <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
-                          {editMode ? (
-                            <button onClick={() => removeAuthor(a)} aria-label={`Remove author ${a}`} style={{ padding: 0 }}>
-                              ×
-                            </button>
-                          ) : null}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                    {isOwner && editMode ? (
-                      <button onClick={() => setAddPersonModal({ open: true, kind: "author", value: "" })} className="muted" style={{ padding: 0 }}>
-                        + Add
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Editors
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
-                    {effectiveEditors.length > 0 ? (
-                      effectiveEditors.map((a) => (
-                        <span key={a} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
-                          <span>{a}</span>
-                          {editMode ? (
-                            <button onClick={() => removeEditor(a)} aria-label={`Remove editor ${a}`} style={{ padding: 0 }}>
-                              ×
-                            </button>
-                          ) : null}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                    {isOwner && editMode ? (
-                      <button onClick={() => setAddPersonModal({ open: true, kind: "editor", value: "" })} className="muted" style={{ padding: 0 }}>
-                        + Add
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Designers
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
-                    {effectiveDesigners.length > 0 ? (
-                      effectiveDesigners.map((a) => (
-                        <span key={a} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
-                          <span>{a}</span>
-                          {editMode ? (
-                            <button onClick={() => removeDesigner(a)} aria-label={`Remove designer ${a}`} style={{ padding: 0 }}>
-                              ×
-                            </button>
-                          ) : null}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                    {isOwner && editMode ? (
-                      <button onClick={() => setAddPersonModal({ open: true, kind: "designer", value: "" })} className="muted" style={{ padding: 0 }}>
-                        + Add
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Printer
-                  </div>
-                  <div style={{ flex: "1 1 auto" }}>
-                    {editMode ? (
-                      <input value={formPrinter} onChange={(e) => setFormPrinter(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
-                    ) : (
-                      (formPrinter ?? "").trim() || "—"
-                    )}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Materials
-                  </div>
-                  <div style={{ flex: "1 1 auto" }}>
-                    {editMode ? (
-                      <input value={formMaterials} onChange={(e) => setFormMaterials(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
-                    ) : (
-                      (formMaterials ?? "").trim() || "—"
-                    )}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Edition
-                  </div>
-                  <div style={{ flex: "1 1 auto" }}>
-                    {editMode ? (
-                      <input value={formEditionOverride} onChange={(e) => setFormEditionOverride(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
-                    ) : (
-                      (formEditionOverride ?? "").trim() || "—"
-                    )}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Publisher
-                  </div>
-                  <div style={{ flex: "1 1 auto" }}>
-                    {editMode ? (
-                      <input value={formPublisher} onChange={(e) => setFormPublisher(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
-                    ) : effectivePublisher ? (
-                      <Link href={`/app?publisher=${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link>
-                    ) : (
-                      "—"
-                    )}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Publish date
-                  </div>
-                  <div style={{ flex: "1 1 auto" }}>
-                    {editMode ? (
-                      <input value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
-                    ) : (
-                      effectivePublishDate || "—"
-                    )}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Pages
-                  </div>
-                  <div style={{ flex: "1 1 auto" }}>
-                    {editMode ? (
-                      <input value={formPages} onChange={(e) => setFormPages(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
-                    ) : book?.pages ? (
-                      String(book.pages)
-                    ) : (
-                      "—"
-                    )}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Group
-                  </div>
-                  <div style={{ flex: "1 1 auto" }}>
-                    {editMode ? (
-                      <input value={formGroupLabel} onChange={(e) => setFormGroupLabel(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} style={{ width: "100%" }} />
-                    ) : (book?.group_label ?? "").trim() ? (
-                      (book?.group_label ?? "").trim()
-                    ) : (
-                      "—"
-                    )}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Object type
-                  </div>
-                  <div style={{ flex: "1 1 auto" }}>
-                    {editMode ? (
-                      <select value={formObjectType || "book"} onChange={(e) => setFormObjectType(e.target.value)} style={{ width: "100%" }}>
-                        <option value="book">book</option>
-                        <option value="magazine">magazine</option>
-                        <option value="ephemera">ephemera</option>
-                        <option value="video">video</option>
-                        <option value="music">music</option>
-                      </select>
-                    ) : (book?.object_type ?? "").trim() ? (
-                      (book?.object_type ?? "").trim()
-                    ) : (
-                      "—"
-                    )}
-                  </div>
-                </div>
-
-                <div className="row" style={{ marginTop: 6 }}>
-                  <div style={{ minWidth: 110 }} className="muted">
-                    Decade
-                  </div>
-                  <div style={{ flex: "1 1 auto" }}>
-                    {editMode ? (
-                      <select value={formDecade || ""} onChange={(e) => setFormDecade(e.target.value)} style={{ width: "100%" }}>
-                        <option value="">—</option>
-                        <option value="Prewar">Prewar</option>
-                        <option value="1950s">1950s</option>
-                        <option value="1960s">1960s</option>
-                        <option value="1970s">1970s</option>
-                        <option value="1980s">1980s</option>
-                        <option value="1990s">1990s</option>
-                        <option value="2000s">2000s</option>
-                        <option value="2010s">2010s</option>
-                        <option value="2020s">2020s</option>
-                      </select>
-                    ) : (book?.decade ?? "").trim() ? (
-                      (book?.decade ?? "").trim()
-                    ) : (
-                      "—"
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 8 }}>
-                  <div className="muted">Subjects</div>
-                  <div style={{ marginTop: 6 }}>
-                    {effectiveSubjects.length > 0 ? (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
-                        {effectiveSubjects.map((s) => (
-                          <span key={s} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
-                            <Link href={`/app?subject=${encodeURIComponent(s)}`}>{s}</Link>
-                            {editMode ? (
-                              <button onClick={() => removeSubject(s)} disabled={subjectState.busy} aria-label={`Remove subject ${s}`} style={{ padding: 0 }}>
-                                ×
-                              </button>
-                            ) : null}
-                          </span>
-                        ))}
-                        {isOwner && editMode ? (
-                          <button onClick={() => setAddPersonModal({ open: true, kind: "subject", value: "" })} className="muted" style={{ padding: 0 }}>
-                            + Add
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : isOwner && editMode ? (
-                      <div className="row">
-                        <span className="muted">—</span>
-                        <button onClick={() => setAddPersonModal({ open: true, kind: "subject", value: "" })} className="muted" style={{ padding: 0 }}>
-                          + Add
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </div>
-                  {subjectState.message ? (
-                    <div className="muted" style={{ marginTop: 6 }}>
-                      {subjectState.error ? `${subjectState.message} (${subjectState.error})` : subjectState.message}
+                {editMode || Boolean(book?.edition?.isbn13 ?? book?.edition?.isbn10) ? (
+                  <div className="row om-row-baseline">
+                    <div style={{ minWidth: 110 }} className="muted">
+                      ISBN
                     </div>
-                  ) : null}
-                </div>
+                    <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10}</div>
+                  </div>
+                ) : null}
 
-                <div style={{ marginTop: 8 }}>
-                  <div className="muted">Description</div>
-                  {editMode ? (
-                    <textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} rows={4} style={{ width: "100%", marginTop: 6 }} />
-                  ) : (
-                    <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-                      {effectiveDescription || "—"}
+                {editMode || facetView.author.length > 0 ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Authors
                     </div>
-                  )}
-                </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <EntityTokenField
+                          role="author"
+                          value={facetDraft.author}
+                          onChange={(next) => {
+                            setFacetDraft((s) => ({ ...s, author: next }));
+                            setFormAuthors(next.join(", "));
+                          }}
+                          placeholder="Add an author"
+                          disabled={!isOwner || busy || saveState.busy}
+                        />
+                      ) : (
+                        <FacetLinks role="author" items={facetView.author} />
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || facetView.editor.length > 0 ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Editors
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <EntityTokenField
+                          role="editor"
+                          value={facetDraft.editor}
+                          onChange={(next) => {
+                            setFacetDraft((s) => ({ ...s, editor: next }));
+                            setFormEditors(next.join(", "));
+                          }}
+                          placeholder="Add an editor"
+                          disabled={!isOwner || busy || saveState.busy}
+                        />
+                      ) : (
+                        <FacetLinks role="editor" items={facetView.editor} />
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || facetView.designer.length > 0 ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Designers
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <EntityTokenField
+                          role="designer"
+                          value={facetDraft.designer}
+                          onChange={(next) => {
+                            setFacetDraft((s) => ({ ...s, designer: next }));
+                            setFormDesigners(next.join(", "));
+                          }}
+                          placeholder="Add a designer"
+                          disabled={!isOwner || busy || saveState.busy}
+                        />
+                      ) : (
+                        <FacetLinks role="designer" items={facetView.designer} />
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || facetView.printer.length > 0 ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Printer
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <EntityTokenField
+                          role="printer"
+                          value={facetDraft.printer}
+                          onChange={(next) => {
+                            const only = next.slice(0, 1);
+                            setFacetDraft((s) => ({ ...s, printer: only }));
+                            setFormPrinter(only[0] ?? "");
+                          }}
+                          placeholder="Printer"
+                          disabled={!isOwner || busy || saveState.busy}
+                        />
+                      ) : (
+                        <FacetLinks role="printer" items={facetView.printer} />
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || facetView.material.length > 0 ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Materials
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <EntityTokenField
+                          role="material"
+                          value={facetDraft.material}
+                          onChange={(next) => {
+                            const only = next.slice(0, 1);
+                            setFacetDraft((s) => ({ ...s, material: only }));
+                            setFormMaterials(only[0] ?? "");
+                          }}
+                          placeholder="Materials"
+                          disabled={!isOwner || busy || saveState.busy}
+                        />
+                      ) : (
+                        <FacetLinks role="material" items={facetView.material} />
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || Boolean((formEditionOverride ?? "").trim()) ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Edition
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <input
+                          className="om-inline-control"
+                          value={formEditionOverride}
+                          onChange={(e) => setFormEditionOverride(e.target.value)}
+                          onKeyDown={(e) => onEnter(e, () => void saveEdits())}
+                        />
+                      ) : (
+                        (formEditionOverride ?? "").trim()
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || facetView.publisher.length > 0 ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Publisher
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <EntityTokenField
+                          role="publisher"
+                          value={facetDraft.publisher}
+                          onChange={(next) => {
+                            const only = next.slice(0, 1);
+                            setFacetDraft((s) => ({ ...s, publisher: only }));
+                            setFormPublisher(only[0] ?? "");
+                          }}
+                          placeholder="Publisher"
+                          disabled={!isOwner || busy || saveState.busy}
+                        />
+                      ) : (
+                        <FacetLinks role="publisher" items={facetView.publisher} />
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || Boolean(effectivePublishDate) ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Publish date
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <input
+                          className="om-inline-control"
+                          value={formPublishDate}
+                          onChange={(e) => setFormPublishDate(e.target.value)}
+                          onKeyDown={(e) => onEnter(e, () => void saveEdits())}
+                        />
+                      ) : (
+                        effectivePublishDate
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || Boolean(book?.pages) ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Pages
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <input
+                          className="om-inline-control"
+                          value={formPages}
+                          onChange={(e) => setFormPages(e.target.value)}
+                          onKeyDown={(e) => onEnter(e, () => void saveEdits())}
+                        />
+                      ) : book?.pages ? (
+                        String(book.pages)
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || Boolean((book?.group_label ?? "").trim()) ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Group
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <input
+                          className="om-inline-control"
+                          value={formGroupLabel}
+                          onChange={(e) => setFormGroupLabel(e.target.value)}
+                          onKeyDown={(e) => onEnter(e, () => void saveEdits())}
+                        />
+                      ) : (
+                        (book?.group_label ?? "").trim()
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || Boolean((book?.object_type ?? "").trim()) ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Object type
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <select className="om-inline-control" value={formObjectType || "book"} onChange={(e) => setFormObjectType(e.target.value)}>
+                          <option value="book">book</option>
+                          <option value="magazine">magazine</option>
+                          <option value="ephemera">ephemera</option>
+                          <option value="video">video</option>
+                          <option value="music">music</option>
+                        </select>
+                      ) : (
+                        (book?.object_type ?? "").trim()
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || Boolean((book?.decade ?? "").trim()) ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Decade
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <select className="om-inline-control" value={formDecade || ""} onChange={(e) => setFormDecade(e.target.value)}>
+                          <option value="">—</option>
+                          <option value="Prewar">Prewar</option>
+                          <option value="1950s">1950s</option>
+                          <option value="1960s">1960s</option>
+                          <option value="1970s">1970s</option>
+                          <option value="1980s">1980s</option>
+                          <option value="1990s">1990s</option>
+                          <option value="2000s">2000s</option>
+                          <option value="2010s">2010s</option>
+                          <option value="2020s">2020s</option>
+                        </select>
+                      ) : (
+                        (book?.decade ?? "").trim()
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || facetView.subject.length > 0 ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Subjects
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <EntityTokenField
+                          role="subject"
+                          value={facetDraft.subject}
+                          onChange={(next) => setFacetDraft((s) => ({ ...s, subject: next }))}
+                          placeholder="Add a subject"
+                          disabled={!isOwner || busy || saveState.busy}
+                        />
+                      ) : (
+                        <FacetLinks role="subject" items={facetView.subject} />
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || Boolean(effectiveDescription.trim()) ? (
+                  <div style={{ marginTop: 8 }}>
+                    <div className="muted">Description</div>
+                    {editMode ? (
+                      <textarea
+                        ref={descriptionTextareaRef}
+                        className="om-inline-control"
+                        value={formDescription}
+                        onChange={(e) => setFormDescription(e.target.value)}
+                        rows={1}
+                        style={{ overflow: "hidden", resize: "none", marginTop: 6 }}
+                      />
+                    ) : (
+                      <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
+                        {effectiveDescription}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
 
                 {book?.edition?.cover_url ? (
                   <div style={{ marginTop: 8 }} className="muted">
@@ -2529,7 +3016,7 @@ export default function BookDetailPage() {
                 ) : null}
               </div>
 
-              {isOwner && findMoreOpen ? (
+              {/*
                 <div style={{ marginTop: 14 }} className="card">
                   <div style={{ marginTop: 10 }} className="card">
                     <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
@@ -2744,7 +3231,7 @@ export default function BookDetailPage() {
                       })()
                     : null}
                 </div>
-              ) : null}
+              */}
 
               {isOwner ? (
                 <>
@@ -2756,13 +3243,14 @@ export default function BookDetailPage() {
                     Book info
                   </div>
                   <div style={{ marginTop: 8 }}>
-                    <div className="row">
+                    <div className="row om-row-baseline">
                       <div style={{ minWidth: 110 }} className="muted">
                         Catalog
                       </div>
                       {editMode ? (
                         <>
                           <select
+                            className="om-inline-control"
                             value={formLibraryId ?? ""}
                             onChange={(e) => moveToLibrary(Number(e.target.value))}
                             disabled={libraryMoveState.busy || libraries.length === 0}
@@ -2786,7 +3274,7 @@ export default function BookDetailPage() {
                       )}
                     </div>
 
-                    <div className="row" style={{ marginTop: 6 }}>
+                    <div className="row om-row-baseline" style={{ marginTop: 6 }}>
                       <div style={{ minWidth: 110 }} className="muted">
                         {copiesLabel}
                       </div>
@@ -2795,6 +3283,7 @@ export default function BookDetailPage() {
                           <input
                             type="number"
                             min={1}
+                            className="om-inline-control"
                             value={copiesDraft || ""}
                             onChange={(e) => setCopiesDraft(e.target.value)}
                             onKeyDown={(e) => onEnter(e, updateCopies)}
@@ -2823,85 +3312,53 @@ export default function BookDetailPage() {
                     </div>
                   </div>
 
-                  <div style={{ marginTop: 16 }} className="muted">
-                    Categories
-                  </div>
-                  <div style={{ marginTop: 8 }}>
-                    {categories.length > 0 ? (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
-                        {categories.map((t) => (
-                          <span key={t.id} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
-                            <Link href={`/app?category=${encodeURIComponent(t.name)}`}>{t.name}</Link>
-                            {editMode ? (
-                              <button onClick={() => removeCategory(t.id)} disabled={categoryState.busy} aria-label={`Remove category ${t.name}`} style={{ padding: 0 }}>
-                                ×
-                              </button>
-                            ) : null}
-                          </span>
-                        ))}
+                  {editMode || facetView.category.length > 0 ? (
+                    <div className="row om-row-baseline" style={{ marginTop: 16 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Categories
+                      </div>
+                      <div style={{ flex: "1 1 auto" }}>
                         {editMode ? (
-                          <button onClick={() => setAddPersonModal({ open: true, kind: "category", value: "" })} className="muted" style={{ padding: 0 }}>
-                            + Add
-                          </button>
-                        ) : null}
+                          <EntityTokenField
+                            role="category"
+                            value={facetDraft.category}
+                            onChange={(next) => setFacetDraft((s) => ({ ...s, category: next }))}
+                            placeholder="Add a category"
+                            disabled={!isOwner || busy || saveState.busy}
+                          />
+                        ) : (
+                          <FacetLinks role="category" items={facetView.category} />
+                        )}
                       </div>
-                    ) : editMode ? (
-                      <div className="row">
-                        <span className="muted">—</span>
-                        <button onClick={() => setAddPersonModal({ open: true, kind: "category", value: "" })} className="muted" style={{ padding: 0 }}>
-                          + Add
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="muted">—</div>
-                    )}
-                    <div className="muted" style={{ marginTop: 6 }}>
-                      {categoryState.message ? (categoryState.error ? `${categoryState.message} (${categoryState.error})` : categoryState.message) : ""}
                     </div>
-                  </div>
+                  ) : null}
 
-                  <div style={{ marginTop: 16 }} className="muted">
-                    Tags
-                  </div>
-                  <div style={{ marginTop: 8 }}>
-                    {tags.length > 0 ? (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "baseline" }}>
-                        {tags.map((t) => (
-                          <span key={t.id} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
-                            <Link href={`/app?tag=${encodeURIComponent(t.name)}`}>{t.name}</Link>
-                            {editMode ? (
-                              <button onClick={() => removeTag(t.id)} disabled={tagState.busy} aria-label={`Remove tag ${t.name}`} style={{ padding: 0 }}>
-                                ×
-                              </button>
-                            ) : null}
-                          </span>
-                        ))}
+                  {editMode || facetView.tag.length > 0 ? (
+                    <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Tags
+                      </div>
+                      <div style={{ flex: "1 1 auto" }}>
                         {editMode ? (
-                          <button onClick={() => setAddPersonModal({ open: true, kind: "tag", value: "" })} className="muted" style={{ padding: 0 }}>
-                            + Add
-                          </button>
-                        ) : null}
+                          <EntityTokenField
+                            role="tag"
+                            value={facetDraft.tag}
+                            onChange={(next) => setFacetDraft((s) => ({ ...s, tag: next }))}
+                            placeholder="Add a tag"
+                            disabled={!isOwner || busy || saveState.busy}
+                          />
+                        ) : (
+                          <FacetLinks role="tag" items={facetView.tag} />
+                        )}
                       </div>
-                    ) : editMode ? (
-                      <div className="row">
-                        <span className="muted">—</span>
-                        <button onClick={() => setAddPersonModal({ open: true, kind: "tag", value: "" })} className="muted" style={{ padding: 0 }}>
-                          + Add
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="muted">—</div>
-                    )}
-                    <div className="muted" style={{ marginTop: 6 }}>
-                      {tagState.message ? (tagState.error ? `${tagState.message} (${tagState.error})` : tagState.message) : ""}
                     </div>
-                  </div>
+                  ) : null}
 
                   <div style={{ marginTop: 16 }} className="muted">
                     Privacy &amp; lending
                   </div>
                   <div style={{ marginTop: 8 }}>
-                    <div className="row">
+                    <div className="row om-row-baseline">
                       <div style={{ minWidth: 110 }} className="muted">
                         Visibility
                       </div>
@@ -2921,6 +3378,7 @@ export default function BookDetailPage() {
                         ) : (
                           <>
                             <select
+                              className="om-inline-control"
                               value={formVisibility}
                               onChange={(e) => setFormVisibility(e.target.value as any)}
                               style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
@@ -2936,12 +3394,17 @@ export default function BookDetailPage() {
                       )}
                     </div>
 
-                    <div className="row" style={{ marginTop: 6 }}>
+                    <div className="row om-row-baseline" style={{ marginTop: 6 }}>
                       <div style={{ minWidth: 110 }} className="muted">
                         Status
                       </div>
                       {editMode ? (
-                        <select value={formStatus} onChange={(e) => setFormStatus(e.target.value as any)} style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
+                        <select
+                          className="om-inline-control"
+                          value={formStatus}
+                          onChange={(e) => setFormStatus(e.target.value as any)}
+                          style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
+                        >
                           <option value="owned">owned</option>
                           <option value="loaned">loaned</option>
                           <option value="selling">selling</option>
@@ -2952,7 +3415,7 @@ export default function BookDetailPage() {
                       )}
                     </div>
 
-                    <div className="row" style={{ marginTop: 6 }}>
+                    <div className="row om-row-baseline" style={{ marginTop: 6 }}>
                       <div style={{ minWidth: 110 }} className="muted">
                         Borrowable
                       </div>
@@ -2969,6 +3432,7 @@ export default function BookDetailPage() {
                         ) : (
                           <>
                             <select
+                              className="om-inline-control"
                               value={formBorrowable}
                               onChange={(e) => setFormBorrowable(e.target.value as any)}
                               style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
@@ -2985,47 +3449,73 @@ export default function BookDetailPage() {
                     </div>
                   </div>
 
-                  <div style={{ marginTop: 16 }} className="muted">
-                    Location
-                  </div>
-                  <div style={{ marginTop: 8 }}>
-                    <div className="row">
-                      <div style={{ minWidth: 110 }} className="muted">
+                  {editMode || Boolean((formLocation ?? "").trim()) || Boolean((formShelf ?? "").trim()) || Boolean((formNotes ?? "").trim()) ? (
+                    <>
+                      <div style={{ marginTop: 16 }} className="muted">
                         Location
                       </div>
-                      <div style={{ flex: "1 1 auto" }}>
-                        {editMode ? (
-                          <input value={formLocation} onChange={(e) => setFormLocation(e.target.value)} placeholder="Home, Studio…" style={{ width: "100%" }} />
-                        ) : (
-                          (formLocation ?? "").trim() || "—"
-                        )}
-                      </div>
-                    </div>
+                      <div style={{ marginTop: 8 }}>
+                        {editMode || Boolean((formLocation ?? "").trim()) ? (
+                          <div className="row om-row-baseline">
+                            <div style={{ minWidth: 110 }} className="muted">
+                              Location
+                            </div>
+                            <div style={{ flex: "1 1 auto" }}>
+                              {editMode ? (
+                                <input
+                                  className="om-inline-control"
+                                  value={formLocation}
+                                  onChange={(e) => setFormLocation(e.target.value)}
+                                  placeholder="Home, Studio…"
+                                />
+                              ) : (
+                                (formLocation ?? "").trim()
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
 
-                    <div className="row" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Shelf
-                      </div>
-                      <div style={{ flex: "1 1 auto" }}>
-                        {editMode ? (
-                          <input value={formShelf} onChange={(e) => setFormShelf(e.target.value)} placeholder="Shelf #" style={{ width: "100%" }} />
-                        ) : (
-                          (formShelf ?? "").trim() || "—"
-                        )}
-                      </div>
-                    </div>
+                        {editMode || Boolean((formShelf ?? "").trim()) ? (
+                          <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                            <div style={{ minWidth: 110 }} className="muted">
+                              Shelf
+                            </div>
+                            <div style={{ flex: "1 1 auto" }}>
+                              {editMode ? (
+                                <input
+                                  className="om-inline-control"
+                                  value={formShelf}
+                                  onChange={(e) => setFormShelf(e.target.value)}
+                                  placeholder="Shelf #"
+                                />
+                              ) : (
+                                (formShelf ?? "").trim()
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
 
-                    <div style={{ marginTop: 8 }}>
-                      <div className="muted">Notes</div>
-                      {editMode ? (
-                        <textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} rows={4} style={{ width: "100%", marginTop: 6 }} />
-                      ) : (
-                        <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-                          {(formNotes ?? "").trim() || "—"}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                        {editMode || Boolean((formNotes ?? "").trim()) ? (
+                          <div style={{ marginTop: 8 }}>
+                            <div className="muted">Notes</div>
+                            {editMode ? (
+                              <textarea
+                                className="om-inline-control"
+                                value={formNotes}
+                                onChange={(e) => setFormNotes(e.target.value)}
+                                rows={4}
+                                style={{ width: "100%", marginTop: 6, resize: "vertical" }}
+                              />
+                            ) : (
+                              <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
+                                {(formNotes ?? "").trim()}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : null}
 
                   <div style={{ marginTop: 16 }} className="muted">
                     Images
