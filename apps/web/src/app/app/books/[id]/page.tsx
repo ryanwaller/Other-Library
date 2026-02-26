@@ -1548,13 +1548,14 @@ export default function BookDetailPage() {
     await searchMetadata(title, author ?? "");
   }
 
-  async function linkEditionByIsbn(isbn: string) {
+  async function linkEditionByIsbn(isbn: string, coverUrlHint?: string | null) {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
 
     const value = isbn.trim();
     if (!value) return;
 
+    const hadCover = (book.media ?? []).some((m) => m.kind === "cover");
     setLinkState({ busy: true, error: null, message: "Looking up ISBN…" });
 
     try {
@@ -1594,6 +1595,13 @@ export default function BookDetailPage() {
       if (upd.error) throw new Error(upd.error.message);
 
       await refresh();
+
+      const coverToImport =
+        !hadCover ? (String(coverUrlHint ?? "").trim() || String(edition.cover_url ?? "").trim() || null) : null;
+      if (coverToImport) {
+        await importCoverFromUrl(coverToImport);
+      }
+
       setLinkState({ busy: false, error: null, message: "Linked" });
       window.setTimeout(() => setLinkState({ busy: false, error: null, message: null }), 1500);
     } catch (e: any) {
@@ -2160,7 +2168,7 @@ export default function BookDetailPage() {
                         value={lookupInput}
                         onChange={(e) => setLookupInput(e.target.value)}
                         onKeyDown={(e) => onEnter(e, smartLookup)}
-                        style={{ width: 520, maxWidth: "100%" }}
+                        style={{ width: isNarrow ? "100%" : 520, maxWidth: "100%", minWidth: 0 }}
                       />
                       <button onClick={smartLookup} disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}>
                         Find
@@ -2196,7 +2204,7 @@ export default function BookDetailPage() {
                             .join(" · ");
                           return (
                             <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="card" style={{ marginTop: 8 }}>
-                              <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                              <div className="om-lookup-row">
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
                                   {r.cover_url ? (
                                     <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
@@ -2212,7 +2220,7 @@ export default function BookDetailPage() {
                                     <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
                                   )}
                                 </div>
-                                <div>
+                                <div className="om-lookup-main">
                                   <div>{title}</div>
                                   <div className="muted" style={{ marginTop: 4 }}>
                                     {authors || "—"}
@@ -2232,10 +2240,10 @@ export default function BookDetailPage() {
                                     · {r.source}
                                   </div>
                                 </div>
-                                <div style={{ flex: "0 0 auto" }}>
+                                <div className="om-lookup-actions">
                                   <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
                                     {hasIsbn ? (
-                                      <button onClick={() => linkEditionByIsbn(bestIsbn)} disabled={linkState.busy || !bestIsbn}>
+                                      <button onClick={() => linkEditionByIsbn(bestIsbn, r.cover_url ?? null)} disabled={linkState.busy || !bestIsbn}>
                                         Link ISBN
                                       </button>
                                     ) : (
@@ -2325,7 +2333,10 @@ export default function BookDetailPage() {
                                 <div style={{ flex: "0 0 auto" }}>
                                   <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
                                     {importPreviewHasIsbn ? (
-                                      <button onClick={() => linkEditionByIsbn(importPreviewIsbn)} disabled={linkState.busy || !importPreviewIsbn}>
+                                      <button
+                                        onClick={() => linkEditionByIsbn(importPreviewIsbn, preview.cover_url ?? null)}
+                                        disabled={linkState.busy || !importPreviewIsbn}
+                                      >
                                         Link ISBN
                                       </button>
                                     ) : (

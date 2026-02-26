@@ -39,6 +39,10 @@ body {
   overflow-x: hidden;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -289,6 +293,23 @@ select.om-filter-control {
   margin: 12px 0;
 }
 
+/* Lookup results (book detail) */
+.om-lookup-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.om-lookup-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.om-lookup-actions {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
 /* Book detail helpers (public + app) */
 .om-book-detail-grid {
   display: grid;
@@ -306,7 +327,24 @@ select.om-filter-control {
   }
 
   .card {
-    padding: 8px;
+    padding: 8px 0;
+  }
+
+  /* Prevent iOS Safari "auto-zoom" on focus for small-font inputs. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  .om-lookup-row {
+    flex-wrap: wrap;
+  }
+
+  .om-lookup-actions {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
   }
 
   .om-book-detail-grid {
