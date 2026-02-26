@@ -2436,9 +2436,7 @@ function AppShell({
                 return `${active && active !== "all" ? active : "tag"}`;
               })()}
             </span>
-            <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1 }}>
-              ▼
-            </span>
+            <span aria-hidden="true">▼</span>
           </button>
 
           <button
@@ -2450,9 +2448,7 @@ function AppShell({
             aria-expanded={categoryMenu.open}
           >
             <span>{(filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : "category"}</span>
-            <span aria-hidden="true" style={{ fontSize: 12, lineHeight: 1 }}>
-              ▼
-            </span>
+            <span aria-hidden="true">▼</span>
           </button>
           <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
             <option value="all">all</option>

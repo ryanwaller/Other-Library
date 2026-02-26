@@ -257,7 +257,7 @@ export default function GlobalNav() {
 
           <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             {editInAppHref ? (
-              <Link href={editInAppHref} style={{ fontWeight: 600 }} aria-label="Edit this page in the app">
+              <Link href={editInAppHref} aria-label="Edit this page in the app">
                 Edit in app
               </Link>
             ) : null}
@@ -274,9 +274,7 @@ export default function GlobalNav() {
                     padding: "0 6px",
                     borderRadius: 4,
                     background: messagesBadge.bg,
-                    color: "white",
-                    fontSize: 12,
-                    lineHeight: "18px"
+                    color: "white"
                   }}
                 >
                   {messagesBadge.text}
@@ -296,9 +294,7 @@ export default function GlobalNav() {
                     padding: "0 6px",
                     borderRadius: 999,
                     background: "#b00020",
-                    color: "white",
-                    fontSize: 12,
-                    lineHeight: "18px"
+                    color: "white"
                   }}
                 >
                   {pendingRequests}

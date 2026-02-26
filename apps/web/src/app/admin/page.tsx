@@ -83,7 +83,7 @@ export default function AdminPage() {
   const [session, setSession] = useState<Session | null>(null);
   const token = session?.access_token ?? "";
 
-  const [view, setView] = useState<"users" | "waitlist">("users");
+  const [tab, setTab] = useState<"users" | "waitlist" | "invites">("users");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const friendlyError = useMemo(() => {
@@ -102,6 +102,7 @@ export default function AdminPage() {
   const [userPageSize, setUserPageSize] = useState(20);
 
   const [usersData, setUsersData] = useState<UsersResponse | null>(null);
+  const [usersMetrics, setUsersMetrics] = useState<UsersResponse["metrics"]>({ total: 0, active: 0, disabled: 0, pending: 0 });
 
   // Waitlist controls
   const [waitTab, setWaitTab] = useState<"all" | "pending" | "approved" | "rejected">("pending");
@@ -128,6 +129,25 @@ export default function AdminPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  async function refreshSummary() {
+    if (!token) return;
+    try {
+      const params = new URLSearchParams();
+      params.set("q", "");
+      params.set("sort", "created_at");
+      params.set("dir", "desc");
+      params.set("page", "1");
+      params.set("pageSize", "1");
+      params.set("status", "all");
+      params.set("role", "all");
+      const res = await api<UsersResponse>(`/api/admin/users?${params.toString()}`, { method: "GET", token });
+      setUsersMetrics(res.metrics);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to load summary");
+      setUsersMetrics({ total: 0, active: 0, disabled: 0, pending: 0 });
+    }
+  }
+
   async function refreshUsers() {
     if (!token) return;
     setBusy(true);
@@ -148,6 +168,7 @@ export default function AdminPage() {
       }
       const res = await api<UsersResponse>(`/api/admin/users?${params.toString()}`, { method: "GET", token });
       setUsersData(res);
+      setUsersMetrics(res.metrics);
     } catch (e: any) {
       setError(e?.message ?? "Failed to load users");
       setUsersData(null);
@@ -193,27 +214,32 @@ export default function AdminPage() {
 
   useEffect(() => {
     setInviteLink(null);
-  }, [view]);
+  }, [tab]);
 
   useEffect(() => {
-    if (!token || view !== "users") return;
+    if (!token) return;
+    refreshSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  useEffect(() => {
+    if (!token || tab !== "users") return;
     refreshUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, view, userTab, userSearch, userSort, userDir, userPage, userPageSize]);
+  }, [token, tab, userTab, userSearch, userSort, userDir, userPage, userPageSize]);
 
   useEffect(() => {
-    if (!token || view !== "waitlist") return;
+    if (!token || tab !== "waitlist") return;
     refreshWaitlist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, view, waitTab, waitSearch, waitSort, waitDir, waitPage, waitPageSize]);
+  }, [token, tab, waitTab, waitSearch, waitSort, waitDir, waitPage, waitPageSize]);
 
   useEffect(() => {
-    if (!token || view !== "users") return;
+    if (!token || tab !== "invites") return;
     refreshInvites();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, view, invitesPage]);
+  }, [token, tab, invitesPage]);
 
-  const usersMetrics = usersData?.metrics ?? { total: 0, active: 0, disabled: 0, pending: 0 };
   const userTotalPages = usersData ? Math.max(1, Math.ceil(usersData.total / usersData.pageSize)) : 1;
   const waitTotalPages = waitlistData ? Math.max(1, Math.ceil(waitlistData.total / waitlistData.pageSize)) : 1;
   const invitesTotalPages = invitesData ? Math.max(1, Math.ceil(invitesData.total / invitesData.pageSize)) : 1;
@@ -252,12 +278,10 @@ export default function AdminPage() {
               <button
                 onClick={() => {
                   setInviteLink(null);
-                  if (view === "users") {
-                    refreshUsers();
-                    refreshInvites();
-                  } else {
-                    refreshWaitlist();
-                  }
+                  refreshSummary();
+                  if (tab === "users") refreshUsers();
+                  if (tab === "waitlist") refreshWaitlist();
+                  if (tab === "invites") refreshInvites();
                 }}
                 disabled={busy}
               >
@@ -266,7 +290,16 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="row" style={{ gap: 10, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <hr className="om-hr" />
+          <div style={{ marginTop: 14 }}>
+            <div style={{ marginBottom: 8 }}>Summary</div>
+            <div className="muted">
+              total: {usersMetrics.total} · active: {usersMetrics.active} · disabled: {usersMetrics.disabled} · pending: {usersMetrics.pending}
+            </div>
+          </div>
+
+          <hr className="om-hr" />
+          <div className="row" style={{ gap: 10, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
             <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="Add via email" />
             <button
               onClick={async () => {
@@ -281,6 +314,7 @@ export default function AdminPage() {
                   });
                   setInviteLink(res.link);
                   await refreshInvites();
+                  await refreshSummary();
                 } catch (e: any) {
                   setError(e?.message ?? "Failed to create invite");
                 } finally {
@@ -300,40 +334,30 @@ export default function AdminPage() {
                 Copy link
               </button>
             ) : null}
-            <span style={{ flex: "1 1 auto" }} />
-            <button
-              onClick={() => {
-                setView("users");
-              }}
-              disabled={view === "users"}
-            >
-              Users
-            </button>
-            <button
-              onClick={() => {
-                setView("waitlist");
-              }}
-              disabled={view === "waitlist"}
-            >
-              Waitlist
-            </button>
             <div className="muted">{friendlyError ? `Error: ${friendlyError}` : busy ? "Loading…" : ""}</div>
           </div>
 
-          {view === "users" ? (
-            <>
-              <hr className="om-hr" />
-              <div className="card" style={{ marginTop: 14 }}>
-                <div style={{ marginBottom: 8 }}>Summary</div>
-                <div className="muted">
-                  total: {usersMetrics.total} · active: {usersMetrics.active} · disabled: {usersMetrics.disabled} · pending: {usersMetrics.pending}
-                </div>
+          <hr className="om-hr" />
+          <div className="card" style={{ marginTop: 14 }}>
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div>Users</div>
+              <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+                <button onClick={() => setTab("users")} disabled={tab === "users"}>
+                  Users
+                </button>
+                <button onClick={() => setTab("waitlist")} disabled={tab === "waitlist"}>
+                  Waitlist
+                </button>
+                <button onClick={() => setTab("invites")} disabled={tab === "invites"}>
+                  Invites
+                </button>
               </div>
+            </div>
 
-              <hr className="om-hr" />
-              <div className="card" style={{ marginTop: 14 }}>
+            {tab === "users" ? (
+              <div style={{ marginTop: 10 }}>
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <div>Users</div>
+                  <div />
                   <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
                     <select
                       value={userTab}
@@ -420,6 +444,7 @@ export default function AdminPage() {
                                 const next = u.status === "disabled" ? "active" : "disabled";
                                 await api(`/api/admin/users/${encodeURIComponent(u.id)}`, { method: "PATCH", token, body: JSON.stringify({ status: next }) });
                                 await refreshUsers();
+                                await refreshSummary();
                               } catch (e: any) {
                                 setError(e?.message ?? "Update failed");
                               } finally {
@@ -438,6 +463,7 @@ export default function AdminPage() {
                                 const next = u.role === "admin" ? "user" : "admin";
                                 await api(`/api/admin/users/${encodeURIComponent(u.id)}`, { method: "PATCH", token, body: JSON.stringify({ role: next }) });
                                 await refreshUsers();
+                                await refreshSummary();
                               } catch (e: any) {
                                 setError(e?.message ?? "Update failed");
                               } finally {
@@ -451,7 +477,7 @@ export default function AdminPage() {
                         </div>
                       </div>
                     ))}
-                  {(usersData?.users ?? []).length === 0 ? <div className="muted" style={{ paddingTop: 8 }}>No users.</div> : null}
+                    {(usersData?.users ?? []).length === 0 ? <div className="muted" style={{ paddingTop: 8 }}>No users.</div> : null}
                   </div>
 
                   <div className="muted" style={{ marginTop: 12 }}>
@@ -459,74 +485,18 @@ export default function AdminPage() {
                   </div>
                   {userTotalPages > 1 ? (
                     <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                      <button
-                        onClick={() => setUserPage(Math.max(1, userPage - 1))}
-                        disabled={busy || userPage <= 1}
-                      >
+                      <button onClick={() => setUserPage(Math.max(1, userPage - 1))} disabled={busy || userPage <= 1}>
                         Prev
                       </button>
-                      <button
-                        onClick={() => setUserPage(Math.min(userTotalPages, userPage + 1))}
-                        disabled={busy || userPage >= userTotalPages}
-                      >
+                      <button onClick={() => setUserPage(Math.min(userTotalPages, userPage + 1))} disabled={busy || userPage >= userTotalPages}>
                         Next
                       </button>
                     </div>
                   ) : null}
                 </div>
               </div>
-
-              <hr className="om-hr" />
-              <div className="card" style={{ marginTop: 14 }}>
-                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <div>Invites</div>
-                  <div className="muted">{invitesTotalPages > 1 ? `page ${invitesData?.page ?? invitesPage} / ${invitesTotalPages}` : ""}</div>
-                </div>
-                <div style={{ marginTop: 10 }}>
-                  {(invitesData?.invites ?? []).map((i) => (
-                    <div key={i.id} className="row" style={{ justifyContent: "space-between", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)" }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ wordBreak: "break-all" }}>
-                          <span className="muted">{fmtDate(i.created_at)}</span> · {i.email ?? <span className="muted">(any email)</span>}{" "}
-                          <span className="muted">{i.used_at ? "· used" : ""}</span>
-                        </div>
-                        <div className="muted" style={{ wordBreak: "break-all" }}>
-                          token: {i.token}
-                        </div>
-                      </div>
-                      <div className="row" style={{ gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                        <button
-                          onClick={async () => {
-                            const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(i.token)}`;
-                            await navigator.clipboard.writeText(link);
-                            setInviteLink(link);
-                          }}
-                        >
-                          Copy link
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {(invitesData?.invites ?? []).length === 0 ? <div className="muted" style={{ paddingTop: 8 }}>No invites.</div> : null}
-                </div>
-
-                {invitesTotalPages > 1 ? (
-                  <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                    <button onClick={() => setInvitesPage(Math.max(1, invitesPage - 1))} disabled={busy || invitesPage <= 1}>
-                      Prev
-                    </button>
-                    <button onClick={() => setInvitesPage(Math.min(invitesTotalPages, invitesPage + 1))} disabled={busy || invitesPage >= invitesTotalPages}>
-                      Next
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="card" style={{ marginTop: 14 }}>
-                <div style={{ marginBottom: 8 }}>Waitlist</div>
-
+            ) : tab === "waitlist" ? (
+              <div style={{ marginTop: 10 }}>
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                     <select
@@ -620,6 +590,7 @@ export default function AdminPage() {
                                   setInviteLink(res.link);
                                   await refreshWaitlist();
                                   await refreshInvites();
+                                  await refreshSummary();
                                 } catch (e: any) {
                                   setError(e?.message ?? "Approve failed");
                                 } finally {
@@ -637,6 +608,7 @@ export default function AdminPage() {
                                 try {
                                   await api(`/api/admin/waitlist/${encodeURIComponent(w.id)}`, { method: "PATCH", token, body: JSON.stringify({ action: "reject" }) });
                                   await refreshWaitlist();
+                                  await refreshSummary();
                                 } catch (e: any) {
                                   setError(e?.message ?? "Reject failed");
                                 } finally {
@@ -674,8 +646,50 @@ export default function AdminPage() {
                   </div>
                 ) : null}
               </div>
-            </>
-          )}
+            ) : (
+              <div style={{ marginTop: 10 }}>
+                <div className="muted">{invitesTotalPages > 1 ? `page ${invitesData?.page ?? invitesPage} / ${invitesTotalPages}` : ""}</div>
+                <div style={{ marginTop: 10 }}>
+                  {(invitesData?.invites ?? []).map((i) => (
+                    <div key={i.id} className="row" style={{ justifyContent: "space-between", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ wordBreak: "break-all" }}>
+                          <span className="muted">{fmtDate(i.created_at)}</span> · {i.email ?? <span className="muted">(any email)</span>}{" "}
+                          <span className="muted">{i.used_at ? "· used" : ""}</span>
+                        </div>
+                        <div className="muted" style={{ wordBreak: "break-all" }}>
+                          token: {i.token}
+                        </div>
+                      </div>
+                      <div className="row" style={{ gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        <button
+                          onClick={async () => {
+                            const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(i.token)}`;
+                            await navigator.clipboard.writeText(link);
+                            setInviteLink(link);
+                          }}
+                        >
+                          Copy link
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {(invitesData?.invites ?? []).length === 0 ? <div className="muted" style={{ paddingTop: 8 }}>No invites.</div> : null}
+                </div>
+
+                {invitesTotalPages > 1 ? (
+                  <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                    <button onClick={() => setInvitesPage(Math.max(1, invitesPage - 1))} disabled={busy || invitesPage <= 1}>
+                      Prev
+                    </button>
+                    <button onClick={() => setInvitesPage(Math.min(invitesTotalPages, invitesPage + 1))} disabled={busy || invitesPage >= invitesTotalPages}>
+                      Next
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </main>
