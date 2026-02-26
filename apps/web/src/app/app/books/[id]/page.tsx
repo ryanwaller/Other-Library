@@ -1591,7 +1591,49 @@ export default function BookDetailPage() {
         editionId = inserted.data.id as number;
       }
 
-      const upd = await supabase.from("user_books").update({ edition_id: editionId }).eq("id", book.id);
+      // Additive linking: preserve existing effective values via overrides so nothing is "lost" when edition_id changes.
+      const currentTitle = (formTitle.trim() ? formTitle.trim() : String(book.edition?.title ?? "").trim()) || null;
+      const currentPublisher = (formPublisher.trim() ? formPublisher.trim() : String(book.edition?.publisher ?? "").trim()) || null;
+      const currentPublishDate = (formPublishDate.trim() ? formPublishDate.trim() : String(book.edition?.publish_date ?? "").trim()) || null;
+      const currentDescription = (formDescription.trim() ? formDescription.trim() : String(book.edition?.description ?? "").trim()) || null;
+
+      const currentAuthors = (effectiveAuthors ?? []).map((a) => String(a ?? "").trim()).filter(Boolean);
+      const nextAuthors = (Array.isArray(edition.authors) ? edition.authors : []).map((a: any) => String(a ?? "").trim()).filter(Boolean);
+      const mergedAuthors = (() => {
+        const seen = new Set<string>();
+        const out: string[] = [];
+        for (const a of [...currentAuthors, ...nextAuthors]) {
+          const k = a.toLowerCase();
+          if (seen.has(k)) continue;
+          seen.add(k);
+          out.push(a);
+        }
+        return out;
+      })();
+
+      const currentSubjects = (effectiveSubjects ?? []).map((s) => String(s ?? "").trim()).filter(Boolean);
+      const nextSubjects = (Array.isArray(edition.subjects) ? edition.subjects : []).map((s: any) => String(s ?? "").trim()).filter(Boolean);
+      const mergedSubjects = (() => {
+        const seen = new Set<string>();
+        const out: string[] = [];
+        for (const s of [...currentSubjects, ...nextSubjects]) {
+          const k = s.toLowerCase();
+          if (seen.has(k)) continue;
+          seen.add(k);
+          out.push(s);
+        }
+        return out;
+      })();
+
+      const updates: any = { edition_id: editionId };
+      if (currentTitle) updates.title_override = currentTitle;
+      if (currentPublisher) updates.publisher_override = currentPublisher;
+      if (currentPublishDate) updates.publish_date_override = currentPublishDate;
+      if (currentDescription) updates.description_override = currentDescription;
+      if (currentAuthors.length > 0) updates.authors_override = mergedAuthors;
+      if (currentSubjects.length > 0) updates.subjects_override = mergedSubjects;
+
+      const upd = await supabase.from("user_books").update(updates).eq("id", book.id);
       if (upd.error) throw new Error(upd.error.message);
 
       await refresh();

@@ -199,6 +199,7 @@ function AppShell({
   };
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [csvRows, setCsvRows] = useState<CsvImportRow[]>([]);
+  const csvInputRef = useRef<HTMLInputElement | null>(null);
   const [csvApplyOverrides, setCsvApplyOverrides] = useState(false);
   const [csvImportState, setCsvImportState] = useState<{ busy: boolean; error: string | null; message: string | null; done: number; total: number }>({
     busy: false,
@@ -2032,6 +2033,32 @@ function AppShell({
               Cancel
             </button>
           ) : null}
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = (e.target.files ?? [])[0];
+              if (!f) return;
+              setCsvImportState({ busy: true, error: null, message: "Loading CSV…", done: 0, total: 0 });
+              loadCsvFile(f).catch((err: any) => {
+                setCsvImportState({ busy: false, error: err?.message ?? "CSV load failed", message: "CSV load failed", done: 0, total: 0 });
+              });
+            }}
+            disabled={csvImportState.busy || addState.busy || addSearchState.busy}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              csvInputRef.current?.click();
+            }}
+            disabled={csvImportState.busy || addState.busy || addSearchState.busy}
+            style={{ marginLeft: "auto", padding: 0 }}
+          >
+            Add CSV
+          </button>
+          {csvFileName ? <span className="muted">{csvFileName}</span> : null}
           <span className="muted">{addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}</span>
         </div>
 
@@ -2064,37 +2091,25 @@ function AppShell({
           </div>
         ) : null}
 
-        <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(e) => {
-              const f = (e.target.files ?? [])[0];
-              if (!f) return;
-              setCsvImportState({ busy: true, error: null, message: "Loading CSV…", done: 0, total: 0 });
-              loadCsvFile(f).catch((err: any) => {
-                setCsvImportState({ busy: false, error: err?.message ?? "CSV load failed", message: "CSV load failed", done: 0, total: 0 });
-              });
-            }}
-            disabled={csvImportState.busy || addState.busy || addSearchState.busy}
-          />
-          {csvFileName ? <span className="muted">{csvFileName}</span> : <span className="muted">Upload CSV to bulk add</span>}
-          {csvRows.length > 0 ? (
-            <>
-              <label className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <input type="checkbox" checked={csvApplyOverrides} onChange={(e) => setCsvApplyOverrides(e.target.checked)} />
-                use CSV metadata as overrides
-              </label>
-              <button onClick={importCsvRows} disabled={csvImportState.busy || !addLibraryId}>
-                {csvImportState.busy ? "Importing…" : `Import ${csvRows.length}`}
-              </button>
-              <button onClick={clearCsvImport} disabled={csvImportState.busy}>
-                Clear
-              </button>
-            </>
-          ) : null}
-          {csvImportState.message ? <span className="muted">{csvImportState.message}</span> : csvImportState.error ? <span className="muted">{csvImportState.error}</span> : null}
-        </div>
+        {csvRows.length > 0 || csvImportState.message || csvImportState.error ? (
+          <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+            {csvRows.length > 0 ? (
+              <>
+                <label className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <input type="checkbox" checked={csvApplyOverrides} onChange={(e) => setCsvApplyOverrides(e.target.checked)} />
+                  use CSV metadata as overrides
+                </label>
+                <button onClick={importCsvRows} disabled={csvImportState.busy || !addLibraryId}>
+                  {csvImportState.busy ? "Importing…" : `Import ${csvRows.length}`}
+                </button>
+                <button onClick={clearCsvImport} disabled={csvImportState.busy}>
+                  Clear
+                </button>
+              </>
+            ) : null}
+            {csvImportState.message ? <span className="muted">{csvImportState.message}</span> : csvImportState.error ? <span className="muted">{csvImportState.error}</span> : null}
+          </div>
+        ) : null}
 
         {addUrlPreview ? (
           <div style={{ marginTop: 10 }} className="card">
@@ -2412,8 +2427,8 @@ function AppShell({
           <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
             <option value="latest">latest</option>
             <option value="earliest">earliest</option>
-            <option value="title_asc">title A→Z</option>
-            <option value="title_desc">title Z→A</option>
+            <option value="title_asc">title A-Z</option>
+            <option value="title_desc">title Z-A</option>
           </select>
           <button
             ref={tagButtonRef}

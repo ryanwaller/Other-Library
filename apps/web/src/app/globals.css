@@ -75,7 +75,7 @@ select:focus-visible {
 }
 
 .om-cover-slot {
-  background: color-mix(in srgb, var(--bg) 90%, var(--border));
+  background: transparent;
   padding: 6px;
   display: flex;
   align-items: center;
@@ -142,6 +142,8 @@ button:disabled {
 }
 
 select.om-filter-control {
+  -webkit-appearance: none;
+  -moz-appearance: none;
   appearance: none;
   padding-right: 28px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%23777777'/%3E%3C/svg%3E");
