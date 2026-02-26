@@ -1718,35 +1718,9 @@ function AppShell({
   return (
     <div className="card">
       <div style={{ marginTop: 16 }} className="card">
-        <div className="row" style={{ justifyContent: "flex-start", alignItems: "baseline", flexWrap: "wrap", gap: 10 }}>
-          <span>Add to catalog</span>
-          {libraries.length > 1 ? (
-            <select
-              value={addLibraryId ?? ""}
-              onChange={(e) => {
-                const id = Number(e.target.value);
-                setAddLibraryId(id);
-                try {
-                  window.localStorage.setItem("om_addLibraryId", String(id));
-                } catch {
-                  // ignore
-                }
-              }}
-              disabled={libraryState.busy || !addLibraryId}
-            >
-              {libraries.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          ) : libraries.length === 1 ? (
-            <span className="muted">{libraries[0]?.name}</span>
-          ) : null}
-        </div>
         <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 8 }}>
           <input
-            placeholder="ISBN, URL, or title (optional: “by Author”)"
+            placeholder="Add by ISBN, URL, or title (optional: “by Author”)"
             value={addInput}
             onChange={(e) => setAddInput(e.target.value)}
             onKeyDown={(e) => {
@@ -1766,6 +1740,35 @@ function AppShell({
           ) : null}
           <span className="muted">{addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}</span>
         </div>
+
+        {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message) && libraries.length > 0 ? (
+          <div className="row" style={{ marginTop: 8, alignItems: "baseline", gap: 10 }}>
+            <span className="muted">Add to catalog</span>
+            {libraries.length > 1 ? (
+              <select
+                value={addLibraryId ?? ""}
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  setAddLibraryId(id);
+                  try {
+                    window.localStorage.setItem("om_addLibraryId", String(id));
+                  } catch {
+                    // ignore
+                  }
+                }}
+                disabled={libraryState.busy || !addLibraryId}
+              >
+                {libraries.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="muted">{libraries[0]?.name}</span>
+            )}
+          </div>
+        ) : null}
 
         {addUrlPreview ? (
           <div style={{ marginTop: 10 }} className="card">
@@ -2022,21 +2025,24 @@ function AppShell({
           </div>
         </div>
         <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-          <span className="muted">Search</span>
           <input
             placeholder="Search your catalog…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ minWidth: isMobile ? 0 : 260, width: isMobile ? "100%" : undefined, maxWidth: "100%" }}
+            style={{ minWidth: 0, flex: "1 1 auto", width: isMobile ? "100%" : undefined, maxWidth: "100%" }}
           />
           {searchQuery.trim() ? (
             <button onClick={() => setSearchQuery("")} aria-label="Clear search">
               Clear
             </button>
           ) : null}
-          <span className="muted">
-            <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}>Search friends / public</Link>
-          </span>
+          <Link
+            href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
+            className="muted"
+            style={{ whiteSpace: "nowrap" }}
+          >
+            search others
+          </Link>
           <span style={{ flex: "1 1 auto" }} />
           <button
             onClick={() => {
@@ -2158,7 +2164,7 @@ function AppShell({
                 value={tagSearch}
                 onChange={(e) => setTagSearch(e.target.value)}
                 style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }}
-                autoFocus
+                autoFocus={!isMobile}
               />
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <button
@@ -2209,7 +2215,7 @@ function AppShell({
                 value={categorySearch}
                 onChange={(e) => setCategorySearch(e.target.value)}
                 style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }}
-                autoFocus
+                autoFocus={!isMobile}
               />
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <button

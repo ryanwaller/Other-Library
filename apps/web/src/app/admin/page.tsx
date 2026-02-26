@@ -378,7 +378,43 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="row" style={{ gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+                <div className="row om-only-mobile" style={{ gap: 10, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+                  <select
+                    value={userTab}
+                    onChange={(e) => {
+                      setUserPage(1);
+                      setUserTab(e.target.value as any);
+                    }}
+                  >
+                    <option value="all">All</option>
+                    <option value="active">Active</option>
+                    <option value="disabled">Disabled</option>
+                    <option value="admins">Admins</option>
+                  </select>
+                  <select
+                    value={`${userSort}:${userDir}`}
+                    onChange={(e) => {
+                      const [sort, dir] = String(e.target.value).split(":");
+                      setUserPage(1);
+                      setUserSort(sort as any);
+                      setUserDir(dir as any);
+                    }}
+                  >
+                    <option value="created_at:desc">created (newest)</option>
+                    <option value="created_at:asc">created (oldest)</option>
+                    <option value="email:asc">email A→Z</option>
+                    <option value="email:desc">email Z→A</option>
+                    <option value="status:asc">status A→Z</option>
+                    <option value="status:desc">status Z→A</option>
+                    <option value="role:asc">role A→Z</option>
+                    <option value="role:desc">role Z→A</option>
+                  </select>
+                  <div className="muted">
+                    page {usersData?.page ?? userPage} / {userTotalPages} · {usersData?.total ?? 0} results
+                  </div>
+                </div>
+
+                <div className="row om-hide-mobile" style={{ gap: 10, marginTop: 10, flexWrap: "wrap" }}>
                   <button
                     onClick={() => {
                       setUserPage(1);
@@ -415,13 +451,11 @@ export default function AdminPage() {
                   >
                     Admins
                   </button>
-                  <div className="muted">
-                    page {usersData?.page ?? userPage} / {userTotalPages} · {usersData?.total ?? 0} results
-                  </div>
+                  <div className="muted">page {usersData?.page ?? userPage} / {userTotalPages} · {usersData?.total ?? 0} results</div>
                 </div>
 
                 <div className="card" style={{ marginTop: 12, overflowX: "auto" }}>
-                  <div className="row" style={{ gap: 10, alignItems: "center" }}>
+                  <div className="row om-hide-mobile" style={{ gap: 10, alignItems: "center" }}>
                     <button onClick={() => setSort("email")} disabled={busy}>
                       Email
                     </button>
@@ -494,20 +528,22 @@ export default function AdminPage() {
                     {(usersData?.users ?? []).length === 0 ? <div className="muted" style={{ paddingTop: 8 }}>No users.</div> : null}
                   </div>
 
-                  <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                    <button
-                      onClick={() => setUserPage(Math.max(1, userPage - 1))}
-                      disabled={busy || userPage <= 1}
-                    >
-                      Prev
-                    </button>
-                    <button
-                      onClick={() => setUserPage(Math.min(userTotalPages, userPage + 1))}
-                      disabled={busy || userPage >= userTotalPages}
-                    >
-                      Next
-                    </button>
-                  </div>
+                  {userTotalPages > 1 ? (
+                    <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                      <button
+                        onClick={() => setUserPage(Math.max(1, userPage - 1))}
+                        disabled={busy || userPage <= 1}
+                      >
+                        Prev
+                      </button>
+                      <button
+                        onClick={() => setUserPage(Math.min(userTotalPages, userPage + 1))}
+                        disabled={busy || userPage >= userTotalPages}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
@@ -547,14 +583,16 @@ export default function AdminPage() {
                   {(invitesData?.invites ?? []).length === 0 ? <div className="muted" style={{ paddingTop: 8 }}>No invites.</div> : null}
                 </div>
 
-                <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                  <button onClick={() => setInvitesPage(Math.max(1, invitesPage - 1))} disabled={busy || invitesPage <= 1}>
-                    Prev
-                  </button>
-                  <button onClick={() => setInvitesPage(Math.min(invitesTotalPages, invitesPage + 1))} disabled={busy || invitesPage >= invitesTotalPages}>
-                    Next
-                  </button>
-                </div>
+                {invitesTotalPages > 1 ? (
+                  <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                    <button onClick={() => setInvitesPage(Math.max(1, invitesPage - 1))} disabled={busy || invitesPage <= 1}>
+                      Prev
+                    </button>
+                    <button onClick={() => setInvitesPage(Math.min(invitesTotalPages, invitesPage + 1))} disabled={busy || invitesPage >= invitesTotalPages}>
+                      Next
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </>
           ) : (
@@ -563,7 +601,38 @@ export default function AdminPage() {
                 <div style={{ marginBottom: 8 }}>Waitlist</div>
 
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                  <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+                  <div className="row om-only-mobile" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    <select
+                      value={waitTab}
+                      onChange={(e) => {
+                        setWaitPage(1);
+                        setWaitTab(e.target.value as any);
+                      }}
+                    >
+                      <option value="all">All</option>
+                      <option value="pending">Pending</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                    <select
+                      value={`${waitSort}:${waitDir}`}
+                      onChange={(e) => {
+                        const [sort, dir] = String(e.target.value).split(":");
+                        setWaitPage(1);
+                        setWaitSort(sort as any);
+                        setWaitDir(dir as any);
+                      }}
+                    >
+                      <option value="created_at:desc">created (newest)</option>
+                      <option value="created_at:asc">created (oldest)</option>
+                      <option value="email:asc">email A→Z</option>
+                      <option value="email:desc">email Z→A</option>
+                      <option value="status:asc">status A→Z</option>
+                      <option value="status:desc">status Z→A</option>
+                    </select>
+                  </div>
+
+                  <div className="row om-hide-mobile" style={{ gap: 10, flexWrap: "wrap" }}>
                     <button
                       onClick={() => {
                         setWaitPage(1);
@@ -705,17 +774,19 @@ export default function AdminPage() {
                   {(waitlistData?.waitlist ?? []).length === 0 ? <div className="muted" style={{ marginTop: 10 }}>No requests.</div> : null}
                 </div>
 
-                <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                  <div className="muted">
-                    page {waitlistData?.page ?? waitPage} / {waitTotalPages} · {waitlistData?.total ?? 0} results
-                  </div>
-                  <button onClick={() => setWaitPage(Math.max(1, waitPage - 1))} disabled={busy || waitPage <= 1}>
-                    Prev
-                  </button>
-                  <button onClick={() => setWaitPage(Math.min(waitTotalPages, waitPage + 1))} disabled={busy || waitPage >= waitTotalPages}>
-                    Next
-                  </button>
+                <div className="muted" style={{ marginTop: 12 }}>
+                  page {waitlistData?.page ?? waitPage} / {waitTotalPages} · {waitlistData?.total ?? 0} results
                 </div>
+                {waitTotalPages > 1 ? (
+                  <div className="row" style={{ gap: 10, marginTop: 6, flexWrap: "wrap" }}>
+                    <button onClick={() => setWaitPage(Math.max(1, waitPage - 1))} disabled={busy || waitPage <= 1}>
+                      Prev
+                    </button>
+                    <button onClick={() => setWaitPage(Math.min(waitTotalPages, waitPage + 1))} disabled={busy || waitPage >= waitTotalPages}>
+                      Next
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </>
           )}

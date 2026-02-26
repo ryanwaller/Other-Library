@@ -1707,16 +1707,16 @@ export default function BookDetailPage() {
         <div className="card">
           <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "220px 1fr", gap: 14 }}>
             <div>
-              {coverUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  alt={effectiveTitle}
-                  src={coverUrl}
-                  style={{ width: "100%", height: isNarrow ? 360 : 280, objectFit: "contain", border: "1px solid var(--border)" }}
-                />
-              ) : (
-                <div style={{ width: "100%", height: isNarrow ? 360 : 280, border: "1px solid var(--border)" }} />
-              )}
+              <div className="om-cover-slot" style={{ width: "100%", height: isNarrow ? 360 : 280 }}>
+                {coverUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    alt={effectiveTitle}
+                    src={coverUrl}
+                    style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+                  />
+                ) : null}
+              </div>
 
               {isOwner && editMode ? (
                 <div style={{ marginTop: 10 }}>
@@ -1769,12 +1769,12 @@ export default function BookDetailPage() {
                   {coverEditorSrc ? (
                     <div style={{ marginTop: 8 }}>
                       <div
+                        className="om-cover-slot"
                         style={{
                           position: "relative",
                           width: "100%",
                           height: 260,
-                          border: "1px solid var(--border)",
-                          background: "var(--bg)",
+                          padding: 0,
                           filter: `brightness(${coverBrightness}) contrast(${coverContrast})`
                         }}
                       >
@@ -1916,13 +1916,16 @@ export default function BookDetailPage() {
                       <div className="row" style={{ marginTop: 6, justifyContent: "space-between", alignItems: "flex-start" }}>
                         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={suggestedCoverUrl}
-                            alt=""
-                            width={44}
-                            height={66}
-                            style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
-                          />
+                          <div className="om-cover-slot" style={{ width: 44, height: 66, padding: 4 }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={suggestedCoverUrl}
+                              alt=""
+                              width={44}
+                              height={66}
+                              style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                            />
+                          </div>
                           <div className="muted" style={{ maxWidth: 140, wordBreak: "break-word" }}>
                             <a href={suggestedCoverUrl} target="_blank" rel="noreferrer">
                               open
@@ -2196,15 +2199,17 @@ export default function BookDetailPage() {
                               <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
                                   {r.cover_url ? (
-                                    <img
-                                      src={r.cover_url}
-                                      alt=""
-                                      width={60}
-                                      height={90}
-                                      style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
-                                    />
+                                    <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
+                                      <img
+                                        src={r.cover_url}
+                                        alt=""
+                                        width={60}
+                                        height={90}
+                                        style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                                      />
+                                    </div>
                                   ) : (
-                                    <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
+                                    <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
                                   )}
                                 </div>
                                 <div>
@@ -2270,15 +2275,17 @@ export default function BookDetailPage() {
                               <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
                                   {previewCoverUrl ? (
-                                    <img
-                                      src={previewCoverUrl}
-                                      alt=""
-                                      width={60}
-                                      height={90}
-                                      style={{ display: "block", objectFit: "cover", border: "1px solid var(--border)" }}
-                                    />
+                                    <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
+                                      <img
+                                        src={previewCoverUrl}
+                                        alt=""
+                                        width={60}
+                                        height={90}
+                                        style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                                      />
+                                    </div>
                                   ) : (
-                                    <div style={{ width: 60, height: 90, border: "1px solid var(--border)" }} />
+                                    <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
                                   )}
                                 </div>
                                 <div style={{ flex: "1 1 auto" }}>
@@ -2989,10 +2996,12 @@ export default function BookDetailPage() {
                       return (
                         <div key={m.id} className="card">
                           {url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img alt="" src={url} style={{ width: "100%", height: 120, objectFit: "cover", border: "1px solid var(--border)" }} />
+                            <div className="om-cover-slot" style={{ width: "100%", height: 120, padding: 0 }}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img alt="" src={url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                            </div>
                           ) : (
-                            <div style={{ width: "100%", height: 120, border: "1px solid var(--border)" }} />
+                            <div className="om-cover-slot" style={{ width: "100%", height: 120, padding: 0 }} />
                           )}
                           <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
                             <button onClick={() => setAsCover(m.id)} disabled={coverState.busy}>

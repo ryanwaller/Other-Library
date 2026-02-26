@@ -205,6 +205,25 @@ select.om-filter-control {
   padding: 10px;
 }
 
+.om-only-mobile {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .om-hide-mobile {
+    display: none !important;
+  }
+
+  .om-only-mobile {
+    display: block !important;
+  }
+
+  /* Prevent iOS Safari "auto-zoom" on focus for small-font inputs in popovers. */
+  .om-popover input {
+    font-size: 16px;
+  }
+}
+
 .container {
   max-width: 880px;
   margin: 0 auto;
