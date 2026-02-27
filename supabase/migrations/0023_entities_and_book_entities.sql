@@ -149,7 +149,7 @@ set search_path = public
 as $$
 declare
   norm_name text;
-  slug text;
+  v_slug text;
   existing uuid;
   new_id uuid;
 begin
@@ -168,10 +168,10 @@ begin
     return existing;
   end if;
 
-  slug := public.make_entity_slug(norm_name);
+  v_slug := public.make_entity_slug(norm_name);
 
   insert into public.entities (name, slug)
-  values (norm_name, slug)
+  values (norm_name, v_slug)
   on conflict (slug) do update set name = excluded.name
   returning id into new_id;
 
@@ -377,4 +377,3 @@ from public.user_book_tags ubt
 join public.tags t on t.id = ubt.tag_id
 where trim(coalesce(t.name, '')) <> ''
 on conflict do nothing;
-
