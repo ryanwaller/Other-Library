@@ -102,7 +102,7 @@ export default function LibraryBlock({
           ) : manageMode && !reorderMode ? (
             <button
               onClick={() => onStartEdit(libraryId, libraryName)}
-              className="muted"
+              className="om-library-edit-trigger"
               style={{ padding: 0, border: "none", background: "transparent", textDecoration: "none" }}
               aria-label="Rename catalog"
             >

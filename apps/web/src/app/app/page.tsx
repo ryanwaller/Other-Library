@@ -2043,17 +2043,21 @@ function AppShell({
               e.preventDefault();
               smartAddOrSearch();
             }}
-            style={{ minWidth: 0, flex: "1 1 auto", width: "100%", maxWidth: "100%" }}
+            style={{ minWidth: 0, flex: "1 1 0%" }}
           />
-          <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
-            {addState.busy ? "Working…" : "Go"}
-          </button>
-          {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
-            <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
-              Cancel
+          <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
+            <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
+              {addState.busy ? "Working…" : "Go"}
             </button>
-          ) : null}
-          <span className="muted">{addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}</span>
+            {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
+              <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
+                Cancel
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <div className="muted" style={{ marginTop: 4 }}>
+          {addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}
         </div>
 
         {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || csvRows.length > 0) && libraries.length > 0 ? (
@@ -2295,16 +2299,18 @@ function AppShell({
             {libraryState.message ? <span className="muted">{libraryState.message}</span> : libraryState.error ? <span className="muted">{libraryState.error}</span> : null}
           </div>
           <div className="muted">
-            {filterTag || filterAuthor || filterSubject || filterPublisher || (filterCategory ?? categoryMode) !== "all" ? (
+            {(filterTag ?? tagMode) !== "all" || filterAuthor || filterSubject || filterPublisher || (filterCategory ?? categoryMode) !== "all" ? (
               <>
                 {(() => {
                   const activeCategory = (filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : null;
-                  if (activeCategory) return <>Category: <span>{activeCategory}</span></>;
-                  if (filterTag) return <>Tag: <span>{filterTag}</span></>;
-                  if (filterAuthor) return <>Author: <span>{filterAuthor}</span></>;
-                  if (filterSubject) return <>Subject: <span>{filterSubject}</span></>;
-                  if (filterPublisher) return <>Publisher: <span>{filterPublisher}</span></>;
-                  return null;
+                  const activeTag = (filterTag ?? tagMode) !== "all" ? String(filterTag ?? tagMode) : null;
+                  const parts: string[] = [];
+                  if (activeCategory) parts.push(`Category: ${activeCategory}`);
+                  if (activeTag) parts.push(`Tag: ${activeTag}`);
+                  if (filterAuthor) parts.push(`Author: ${filterAuthor}`);
+                  if (filterSubject) parts.push(`Subject: ${filterSubject}`);
+                  if (filterPublisher) parts.push(`Publisher: ${filterPublisher}`);
+                  return parts.length ? <span>{parts.join("   ")}</span> : null;
                 })()}{" "}
                 (
                 <button
@@ -2647,14 +2653,14 @@ function AppShell({
                 e.preventDefault();
                 createLibrary(newLibraryName);
               }}
-              style={{ minWidth: 0, flex: "1 1 auto", width: "100%", maxWidth: "100%" }}
+              style={{ minWidth: 0, flex: "1 1 0%" }}
             />
-            <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy || !newLibraryName.trim()}>
+            <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy || !newLibraryName.trim()} style={{ marginLeft: "auto" }}>
               Add
             </button>
-            <span className="muted">
-              {libraryState.message ? (libraryState.error ? `${libraryState.message} (${libraryState.error})` : libraryState.message) : libraryState.error ?? ""}
-            </span>
+          </div>
+          <div className="muted" style={{ marginTop: 4 }}>
+            {libraryState.message ? (libraryState.error ? `${libraryState.message} (${libraryState.error})` : libraryState.message) : libraryState.error ?? ""}
           </div>
         </div>
         <div style={{ height: 22 }} />
