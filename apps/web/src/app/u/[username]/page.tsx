@@ -252,10 +252,12 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                           </div>
                           <Link href={href} style={{ display: "block", marginTop: 6 }} className="om-book-card-link">
                             {coverUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain" }} />
+                              <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain" }} />
+                              </div>
                             ) : (
-                              <div style={{ width: "100%", height: 220 }} />
+                              <div className="om-cover-slot" style={{ width: "100%", height: 220 }} />
                             )}
                           </Link>
                           <div style={{ marginTop: 8 }}>
@@ -307,10 +309,12 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                   </div>
                   <Link href={href} style={{ display: "block", marginTop: 6 }} className="om-book-card-link">
                     {coverUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain" }} />
+                      <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain" }} />
+                      </div>
                     ) : (
-                      <div style={{ width: "100%", height: 220 }} />
+                      <div className="om-cover-slot" style={{ width: "100%", height: 220 }} />
                     )}
                   </Link>
                   <div style={{ marginTop: 8 }}>
