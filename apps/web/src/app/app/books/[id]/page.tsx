@@ -3371,11 +3371,11 @@ export default function BookDetailPage() {
                           );
                         })}
                       </div>
-                    ) : (
+                    ) : editMode ? (
                       <div className="muted" style={{ marginTop: 8 }}>
-                        —{/* no images */}
+                        No images yet.
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </>
               ) : null}
