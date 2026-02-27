@@ -46,6 +46,10 @@ export default function EntityTokenField(props: {
   useEffect(() => {
     let alive = true;
     (async () => {
+      if (!supabase) {
+        setSuggestions([]);
+        return;
+      }
       const q = normalizeTokenName(draft);
       if (!q) {
         setSuggestions([]);

@@ -346,6 +346,7 @@ export default function BookDetailPage() {
     formStatus: "owned" | "loaned" | "selling" | "trading";
     formBorrowable: "inherit" | "yes" | "no";
     formLibraryId: number | null;
+    facetDraft: Record<FacetRole, string[]>;
   } | null>(null);
 
   const [addPersonModal, setAddPersonModal] = useState<{
