@@ -302,21 +302,33 @@ export default function GlobalNav() {
               </Link>
             ) : null}
 
-            {avatarUrl ? (
-              <Link href={me?.username ? `/u/${me.username}` : "/app"} aria-label="Open your public profile" style={{ display: "inline-flex" }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  alt=""
-                  src={avatarUrl}
-                  style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)", objectFit: "cover" }}
-                />
-              </Link>
-            ) : null}
+            {avatarUrl || me?.username ? (
+              <div className="row" style={{ gap: 6, alignItems: "center", flexWrap: "nowrap" }}>
+                {avatarUrl ? (
+                  <Link href={me?.username ? `/u/${me.username}` : "/app"} aria-label="Open your public profile" style={{ display: "inline-flex" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt=""
+                      src={avatarUrl}
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 999,
+                        border: "1px solid var(--border)",
+                        objectFit: "cover",
+                        position: "relative",
+                        top: 2
+                      }}
+                    />
+                  </Link>
+                ) : null}
 
-            {me?.username ? (
-              <Link href="/app" className="muted" style={{ textDecoration: "none" }}>
-                {me.username}
-              </Link>
+                {me?.username ? (
+                  <Link href="/app" className="muted" style={{ textDecoration: "none" }}>
+                    {me.username}
+                  </Link>
+                ) : null}
+              </div>
             ) : null}
 
             {isAdmin ? <Link href="/admin">Admin</Link> : null}
@@ -325,7 +337,7 @@ export default function GlobalNav() {
           </div>
         </div>
       </div>
-      <hr className="om-hr" style={{ marginTop: 0, marginBottom: 12 }} />
+      <hr className="om-hr" style={{ marginTop: 3, marginBottom: 9 }} />
     </div>
   );
 }

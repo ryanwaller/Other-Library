@@ -14,13 +14,9 @@ type PublicBook = {
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
   authors_override: string[] | null;
-  borrowable_override: boolean | null;
-  borrow_request_scope_override: string | null;
   edition: { id: number; isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
-
-type BorrowScope = "anyone" | "followers" | "following";
 
 function normalizeKeyPart(input: string): string {
   return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -46,19 +42,6 @@ function groupKeyFor(b: PublicBook): string {
     .filter(Boolean)
     .join("|");
   return `m:${title}|${authors}`;
-}
-
-function effectiveBorrowableFor(b: PublicBook, profile: any): boolean {
-  if (b.borrowable_override === true) return true;
-  if (b.borrowable_override === false) return false;
-  return Boolean(profile?.borrowable_default);
-}
-
-function effectiveScopeFor(b: PublicBook, profile: any): BorrowScope {
-  const raw = String(profile?.borrow_request_scope ?? "").trim();
-  if (raw === "anyone") return "anyone";
-  if (raw === "following") return "following";
-  return "followers";
 }
 
 export default async function PublicProfilePage({ params }: { params: Promise<{ username: string }> }) {
@@ -120,7 +103,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const booksRes = await supabase
     .from("user_books")
     .select(
-      "id,library_id,visibility,title_override,authors_override,borrowable_override,borrow_request_scope_override,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
+      "id,library_id,visibility,title_override,authors_override,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
     )
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
@@ -171,10 +154,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     else cur.copies.push(b);
   }
   const groupedBooks = Array.from(groupedMap.values()).map((g) => {
-    const borrowableAny = g.copies.some((b) => effectiveBorrowableFor(b, profile));
-    const scopeAny = g.copies.some((b) => effectiveBorrowableFor(b, profile) && effectiveScopeFor(b, profile) === "anyone");
-    const primary = g.copies.find((b) => effectiveBorrowableFor(b, profile)) ?? g.copies[0];
-    return { primary, copies: g.copies, borrowableAny, scopeAny };
+    const primary = g.copies[0];
+    return { primary, copies: g.copies };
   });
   const editionIds = Array.from(new Set(groupedBooks.map((g) => g.primary.edition?.id).filter(Boolean))) as number[];
 
@@ -226,13 +207,9 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
         <FollowControls profileId={profile.id} profileUsername={profile.username} />
       </div>
 
-      <div style={{ marginTop: 14 }} className="muted">
-        Publicly visible books
-      </div>
-
       <AddToLibraryProvider editionIds={editionIds}>
         {showLibraryBlocks ? (
-          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
             {libraries.map((lib) => {
               const groups = groupsByLibraryId.get(lib.id) ?? [];
               if (groups.length === 0) return null;
@@ -260,11 +237,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                           .find(Boolean) ?? e?.cover_url ?? null;
                       const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
                       return (
-                        <div key={b.id} className="card">
+                        <div key={b.id} className="card om-book-card">
                           <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                             <span className="muted">{g.copies.length > 1 ? `(${g.copies.length})` : ""}</span>
-                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                              {g.borrowableAny ? <span className="muted">{g.scopeAny ? "borrowable (anyone)" : "borrowable"}</span> : null}
+                            <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "nowrap" }}>
                               <AddToLibraryButton
                                 editionId={e?.id ?? null}
                                 titleFallback={title}
@@ -274,12 +250,12 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                               />
                             </div>
                           </div>
-                          <Link href={href} style={{ display: "block", marginTop: 6 }}>
+                          <Link href={href} style={{ display: "block", marginTop: 6 }} className="om-book-card-link">
                             {coverUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }} />
+                              <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain" }} />
                             ) : (
-                              <div style={{ width: "100%", height: 220, border: "1px solid var(--border)" }} />
+                              <div style={{ width: "100%", height: 220 }} />
                             )}
                           </Link>
                           <div style={{ marginTop: 8 }}>
@@ -306,7 +282,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             })}
           </div>
         ) : (
-          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+          <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
             {groupedBooks.map((g) => {
               const b = g.primary;
               const e = b.edition;
@@ -322,20 +298,19 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                   .find(Boolean) ?? e?.cover_url ?? null;
               const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
               return (
-                <div key={b.id} className="card">
+                <div key={b.id} className="card om-book-card">
                   <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                     <span className="muted">{g.copies.length > 1 ? `(${g.copies.length})` : ""}</span>
-                    <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                      {g.borrowableAny ? <span className="muted">{g.scopeAny ? "borrowable (anyone)" : "borrowable"}</span> : null}
+                    <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "nowrap" }}>
                       <AddToLibraryButton editionId={e?.id ?? null} titleFallback={title} authorsFallback={effectiveAuthors} sourceOwnerId={profile.id} compact />
                     </div>
                   </div>
-                  <Link href={href} style={{ display: "block", marginTop: 6 }}>
+                  <Link href={href} style={{ display: "block", marginTop: 6 }} className="om-book-card-link">
                     {coverUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }} />
+                      <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain" }} />
                     ) : (
-                      <div style={{ width: "100%", height: 220, border: "1px solid var(--border)" }} />
+                      <div style={{ width: "100%", height: 220 }} />
                     )}
                   </Link>
                   <div style={{ marginTop: 8 }}>
