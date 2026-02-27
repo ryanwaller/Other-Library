@@ -386,6 +386,26 @@ select.om-filter-control {
   text-decoration: underline;
 }
 
+.admin-summary-row {
+  min-height: 28px;
+}
+
+.admin-invite-row input {
+  flex: 1 1 260px;
+}
+
+.admin-filter-row {
+  align-items: baseline;
+}
+
+.admin-filter-left {
+  min-width: 0;
+}
+
+.admin-page-size {
+  margin-left: auto;
+}
+
 /* Lookup results (book detail) */
 .om-lookup-row {
   display: flex;
@@ -533,5 +553,35 @@ select.om-filter-control {
 
   .om-book-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-summary-row {
+    align-items: baseline;
+  }
+
+  .admin-invite-row {
+    gap: 6px;
+  }
+
+  .admin-invite-row input {
+    flex-basis: 100%;
+    max-width: 100% !important;
+  }
+
+  .admin-filter-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .admin-filter-left {
+    width: 100%;
+  }
+
+  .admin-page-size {
+    width: 100%;
+    margin-left: 0;
+    display: flex;
+    justify-content: flex-end;
   }
 }

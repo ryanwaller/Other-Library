@@ -350,7 +350,7 @@ export default function AdminPage() {
         <SignInCard note="Sign in as an admin to access /admin." />
       ) : (
         <div className="card">
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <div className="row admin-summary-row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
             <div className="admin-meta-line">
               {tabStats.map((item) => (
                 <span className="admin-meta-pair" key={item.label}>
@@ -388,7 +388,7 @@ export default function AdminPage() {
 
           <hr className="om-hr" />
 
-          <div className="row" style={{ gap: 8, flex: "1 1 auto", minWidth: 0 }}>
+          <div className="row admin-invite-row" style={{ gap: 8, flex: "1 1 auto", minWidth: 0 }}>
             <input
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
@@ -438,8 +438,8 @@ export default function AdminPage() {
 
           <hr className="om-hr" />
 
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-            <div className="row" style={{ gap: 8, alignItems: "center", flex: "1 1 auto", minWidth: 0 }}>
+          <div className="row admin-filter-row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <div className="row admin-filter-left" style={{ gap: 8, alignItems: "center", flex: "1 1 auto", minWidth: 0 }}>
               {tab === "users" ? (
                 <>
                   <select
@@ -587,7 +587,7 @@ export default function AdminPage() {
               ) : null}
             </div>
 
-            <div style={{ flex: "0 0 auto" }}>
+            <div className="admin-page-size" style={{ flex: "0 0 auto" }}>
               {tab === "users" ? (
                 <select
                   value={userPageSize}
