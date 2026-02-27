@@ -233,16 +233,12 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 compact
               />
             </div>
-            {book.edition?.isbn13 || book.edition?.isbn10 ? (
-              <div className="muted" style={{ marginTop: 6 }}>
-                {book.edition?.isbn13 ?? book.edition?.isbn10}
-              </div>
-            ) : null}
-
             {effectiveAuthors.length > 0 ? (
-              <>
-                <div className="muted">Authors</div>
-                <div style={{ marginTop: 6 }}>
+              <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  Authors
+                </div>
+                <div>
                   {effectiveAuthors.map((a, idx) => (
                     <span key={a}>
                       <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
@@ -250,48 +246,81 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     </span>
                   ))}
                 </div>
-              </>
+              </div>
             ) : null}
 
-            {effectiveEditors.length > 0 || effectiveDesigners.length > 0 ? (
-              <>
-                <div style={{ marginTop: 12 }} className="muted">
-                  Editors / designers
+            {effectiveEditors.length > 0 ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  Editors
                 </div>
-                <div style={{ marginTop: 6 }} className="muted">
-                  {effectiveEditors.length > 0 ? `Editors: ${effectiveEditors.join(", ")}` : null}
-                  {effectiveEditors.length > 0 && effectiveDesigners.length > 0 ? <br /> : null}
-                  {effectiveDesigners.length > 0 ? `Designers: ${effectiveDesigners.join(", ")}` : null}
-                </div>
-              </>
+                <div>{effectiveEditors.join(", ")}</div>
+              </div>
             ) : null}
 
-            {effectivePrinter || effectiveMaterials || effectiveEdition ? (
-              <>
-                <div style={{ marginTop: 12 }} className="muted">
-                  Printer / materials / edition
+            {effectiveDesigners.length > 0 ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  Designers
                 </div>
-                <div style={{ marginTop: 6 }} className="muted">
-                  {effectivePrinter ? `Printer: ${effectivePrinter}` : null}
-                  {effectivePrinter && (effectiveMaterials || effectiveEdition) ? <br /> : null}
-                  {effectiveMaterials ? `Materials: ${effectiveMaterials}` : null}
-                  {effectiveMaterials && effectiveEdition ? <br /> : null}
-                  {effectiveEdition ? `Edition: ${effectiveEdition}` : null}
-                </div>
-              </>
+                <div>{effectiveDesigners.join(", ")}</div>
+              </div>
             ) : null}
 
-            {effectivePublisher || effectivePublishDate ? (
-              <>
-                <div style={{ marginTop: 12 }} className="muted">
-                  Publisher / date
+            {book.edition?.isbn13 || book.edition?.isbn10 ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  ISBN
                 </div>
-                <div style={{ marginTop: 6 }}>
-                  {effectivePublisher ? <Link href={`/u/${profile.username}/p/${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link> : null}
-                  {effectivePublisher && effectivePublishDate ? ` (${effectivePublishDate})` : null}
-                  {!effectivePublisher && effectivePublishDate ? <span className="muted">{effectivePublishDate}</span> : null}
+                <div>{book.edition?.isbn13 ?? book.edition?.isbn10}</div>
+              </div>
+            ) : null}
+
+            {effectivePrinter ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  Printer
                 </div>
-              </>
+                <div>{effectivePrinter}</div>
+              </div>
+            ) : null}
+
+            {effectiveMaterials ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  Materials
+                </div>
+                <div>{effectiveMaterials}</div>
+              </div>
+            ) : null}
+
+            {effectiveEdition ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  Edition
+                </div>
+                <div>{effectiveEdition}</div>
+              </div>
+            ) : null}
+
+            {effectivePublisher ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  Publisher
+                </div>
+                <div>
+                  <Link href={`/u/${profile.username}/p/${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link>
+                </div>
+              </div>
+            ) : null}
+
+            {effectivePublishDate ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  Publish date
+                </div>
+                <div>{effectivePublishDate}</div>
+              </div>
             ) : null}
 
             <div style={{ marginTop: 12 }} className="muted">
@@ -312,11 +341,11 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
             </div>
 
             {subjects.length > 0 ? (
-              <>
-                <div style={{ marginTop: 12 }} className="muted">
+              <div className="row om-row-baseline" style={{ marginTop: 12 }}>
+                <div style={{ minWidth: 110 }} className="muted">
                   Subjects
                 </div>
-                <div style={{ marginTop: 6 }}>
+                <div>
                   {subjects.map((s, idx) => (
                     <span key={s}>
                       <Link href={`/u/${profile.username}/s/${encodeURIComponent(s)}`}>{s}</Link>
@@ -324,7 +353,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     </span>
                   ))}
                 </div>
-              </>
+              </div>
             ) : null}
 
             {effectiveDescription ? (
@@ -345,16 +374,18 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
             <div style={{ marginTop: 14 }} className="muted">
               Images
             </div>
-            <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+            <div className="om-images-grid" style={{ marginTop: 10 }}>
               {images.map((m) => {
                 const url = signedMap[m.storage_path];
                 return (
-                  <a key={m.id} href={url || "#"} target="_blank" rel="noreferrer" className="card">
+                  <a key={m.id} href={url || "#"} target="_blank" rel="noreferrer">
                     {url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img alt="" src={url} style={{ width: "100%", height: 120, objectFit: "cover", border: "1px solid var(--border)" }} />
+                      <div className="om-cover-slot" style={{ width: "100%", height: 180 }}>
+                        <img alt="" src={url} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                      </div>
                     ) : (
-                      <div style={{ width: "100%", height: 120, border: "1px solid var(--border)" }} />
+                      <div className="om-cover-slot" style={{ width: "100%", height: 180 }} />
                     )}
                   </a>
                 );

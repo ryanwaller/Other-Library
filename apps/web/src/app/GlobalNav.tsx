@@ -247,7 +247,7 @@ export default function GlobalNav() {
 
   return (
     <div className="container">
-      <div className="card" style={{ marginBottom: 6 }}>
+      <div style={{ padding: "8px 0 6px" }}>
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div>
             <Link href="/app" style={{ textDecoration: "none" }}>

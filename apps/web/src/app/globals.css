@@ -70,19 +70,17 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+  text-decoration-color: currentColor;
 }
 
 a:hover {
   text-decoration: underline;
+  text-decoration-color: currentColor;
 }
 
-a:focus-visible,
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: 1px solid var(--border);
-  outline-offset: 2px;
+a:focus-visible {
+  outline: 0;
+  text-decoration: underline;
 }
 
 .om-book-card-link {
@@ -100,7 +98,7 @@ select:focus-visible {
 
 .om-cover-slot {
   background: transparent;
-  padding: 6px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -125,11 +123,43 @@ textarea,
 select {
   color: var(--fg);
   background: transparent;
-  border: 1px solid transparent;
-  border-bottom-color: var(--border);
+  border: 0;
+  border-bottom: 1px solid var(--border);
   padding: 0;
+  border-radius: 0;
   max-width: 100%;
   min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+input:focus,
+textarea:focus,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 0 !important;
+  box-shadow: none !important;
+  border-color: var(--border) !important;
+  border-bottom: 1px solid var(--fg) !important;
+}
+
+select:focus,
+select:focus-visible {
+  outline: 0 !important;
+  box-shadow: none !important;
+  border-color: var(--border) !important;
+  border-bottom: 1px solid var(--fg) !important;
+}
+
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-results-button,
+input[type="search"]::-webkit-search-results-decoration {
+  -webkit-appearance: none;
 }
 
 .text-primary {
@@ -160,13 +190,20 @@ select {
 button {
   color: var(--fg);
   background: transparent;
-  border: 1px solid transparent;
-  padding: 2px 4px;
+  border: 0;
+  padding: 0;
   cursor: pointer;
+  text-decoration: none;
 }
 
 button:hover {
-  border-color: var(--border);
+  text-decoration: underline;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 0 !important;
+  box-shadow: none !important;
 }
 
 button:disabled {
@@ -184,6 +221,7 @@ button:disabled {
 
 .om-filter-control {
   border: 1px solid var(--border);
+  border-bottom: 1px solid var(--border) !important;
   padding: 6px 10px;
   background: transparent;
   display: inline-flex;
@@ -191,6 +229,21 @@ button:disabled {
   justify-content: space-between;
   gap: 10px;
   min-height: 28px;
+  text-decoration: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.om-filter-control:focus,
+.om-filter-control:focus-visible {
+  outline: 0;
+  border: 1px solid var(--fg) !important;
+  border-color: var(--fg) !important;
+  box-shadow: none !important;
+}
+
+button.om-filter-control:hover,
+button.om-filter-control:focus-visible {
+  text-decoration: none;
 }
 
 .om-filter-control,
@@ -208,9 +261,36 @@ select.om-filter-control {
   -moz-appearance: none;
   appearance: none;
   padding-right: 28px;
+  border: 1px solid var(--border) !important;
+  border-bottom: 1px solid var(--border) !important;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%23777777'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
+  background-size: 10px 6px;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+select.om-filter-control:focus,
+select.om-filter-control:focus-visible {
+  outline: 0 !important;
+  box-shadow: none !important;
+  border: 1px solid var(--fg) !important;
+  border-bottom: 1px solid var(--fg) !important;
+}
+
+select.om-filter-control::-ms-expand {
+  display: none;
+}
+
+.om-filter-caret {
+  display: inline-block;
+  width: 10px;
+  height: 6px;
+  flex: 0 0 auto;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%23777777'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
   background-size: 10px 6px;
 }
 
@@ -224,6 +304,12 @@ select.om-filter-control {
   gap: 6px;
   cursor: pointer;
   user-select: none;
+}
+
+.om-menu-summary:focus,
+.om-menu-summary:focus-visible {
+  outline: 0 !important;
+  box-shadow: none !important;
 }
 
 .om-menu-summary::-webkit-details-marker {
@@ -260,11 +346,24 @@ select.om-filter-control {
   width: 100%;
   text-align: left;
   padding: 2px 0;
-  border: 1px solid transparent;
+  border: 0;
 }
 
 .om-menu-panel button:hover {
-  border-color: var(--border);
+  text-decoration: underline;
+}
+
+.om-text-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.om-text-button:hover,
+.om-text-button:focus-visible {
+  text-decoration: underline;
 }
 
 .om-popover {
@@ -355,7 +454,7 @@ select.om-filter-control {
 .admin-meta-line {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 26px;
   align-items: baseline;
 }
 
@@ -368,6 +467,10 @@ select.om-filter-control {
   gap: 16px;
   align-items: baseline;
   justify-content: flex-start;
+}
+
+.admin-tabbar-row {
+  align-items: baseline;
 }
 
 .admin-tabbar button {
@@ -391,7 +494,8 @@ select.om-filter-control {
 }
 
 .admin-invite-row input {
-  flex: 1 1 260px;
+  flex: 1 1 220px;
+  min-width: 180px;
 }
 
 .admin-filter-row {
@@ -408,9 +512,10 @@ select.om-filter-control {
 
 /* Lookup results (book detail) */
 .om-lookup-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) auto;
   gap: 12px;
-  align-items: flex-start;
+  align-items: start;
 }
 
 .om-lookup-main {
@@ -420,7 +525,7 @@ select.om-filter-control {
 
 .om-lookup-actions {
   flex: 0 0 auto;
-  margin-left: auto;
+  justify-self: end;
 }
 
 /* Book detail helpers (public + app) */
@@ -428,6 +533,38 @@ select.om-filter-control {
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: 14px;
+}
+
+.om-images-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.om-book-secondary a {
+  color: var(--muted);
+  text-decoration-color: var(--muted);
+}
+
+.om-book-card:hover .om-book-secondary a {
+  color: var(--muted);
+  text-decoration-color: var(--muted);
+}
+
+.om-book-secondary a:hover {
+  color: var(--muted);
+  text-decoration-color: var(--muted);
+}
+
+.om-book-secondary a:visited {
+  color: var(--muted);
+  text-decoration-color: var(--muted);
+}
+
+.muted a,
+.muted a:hover {
+  color: inherit;
+  text-decoration-color: currentColor;
 }
 
 .om-row-baseline {
@@ -464,6 +601,27 @@ select.om-filter-control {
   box-shadow: none !important;
   border: 0 !important;
   border-bottom: 0 !important;
+}
+
+.om-catalog-caret {
+  display: inline-block;
+  width: 10px;
+  height: 6px;
+  flex: 0 0 auto;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0h10L5 6z' fill='%23777777'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 10px 6px;
+}
+
+.om-catalog-caret[data-collapsed="true"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 10'%3E%3Cpath d='M0 0v10l6-5z' fill='%23777777'/%3E%3C/svg%3E");
+  background-size: 6px 10px;
+}
+
+.om-edit-label {
+  color: var(--fg);
+  opacity: var(--tone-strong);
 }
 
 .om-token-field {
@@ -564,17 +722,22 @@ select.om-filter-control {
   }
 
   .om-lookup-row {
-    flex-wrap: wrap;
+    grid-template-columns: 62px minmax(0, 1fr);
   }
 
   .om-lookup-actions {
     width: 100%;
     display: flex;
-    justify-content: flex-start;
+    justify-content: flex-end;
+    grid-column: 1 / -1;
   }
 
   .om-book-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .om-images-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .admin-summary-row {
@@ -583,11 +746,14 @@ select.om-filter-control {
 
   .admin-invite-row {
     gap: 6px;
+    flex-wrap: nowrap;
+    width: 100%;
   }
 
   .admin-invite-row input {
-    flex-basis: 100%;
-    max-width: 100% !important;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none !important;
   }
 
   .admin-filter-row {
@@ -601,8 +767,7 @@ select.om-filter-control {
   }
 
   .admin-page-size {
-    width: 100%;
-    margin-left: 0;
+    margin-left: auto;
     display: flex;
     justify-content: flex-end;
   }

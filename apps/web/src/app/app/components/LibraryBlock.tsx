@@ -45,7 +45,6 @@ export default function LibraryBlock({
   onMoveDown: (libraryId: number) => void;
   children: ReactNode;
 }) {
-  const caret = collapsed ? "▸" : "▾";
   return (
     <div className="card" style={{ marginTop: 14 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
@@ -60,13 +59,17 @@ export default function LibraryBlock({
             title={reorderMode ? undefined : collapsed ? "Expand" : "Collapse"}
             style={{
               padding: 0,
+              width: 16,
+              minWidth: 16,
+              display: "inline-flex",
+              justifyContent: "center",
               border: "none",
               background: "transparent",
               textDecoration: "none",
               cursor: busy || reorderMode ? "default" : "pointer"
             }}
           >
-            {caret}
+            <span className="om-catalog-caret" data-collapsed={collapsed ? "true" : "false"} aria-hidden="true" />
           </button>
           {manageMode && isEditing ? (
             <span className="row" style={{ gap: 8 }}>

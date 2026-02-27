@@ -122,7 +122,8 @@ function AppShell({
   filterAuthor,
   filterSubject,
   filterPublisher,
-  filterCategory
+  filterCategory,
+  openCsvPicker
 }: {
   session: Session;
   filterTag: string | null;
@@ -130,6 +131,7 @@ function AppShell({
   filterSubject: string | null;
   filterPublisher: string | null;
   filterCategory: string | null;
+  openCsvPicker: boolean;
 }) {
   const router = useRouter();
   const tagButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -200,6 +202,7 @@ function AppShell({
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [csvRows, setCsvRows] = useState<CsvImportRow[]>([]);
   const csvInputRef = useRef<HTMLInputElement | null>(null);
+  const csvAutoOpenDoneRef = useRef(false);
   const [csvApplyOverrides, setCsvApplyOverrides] = useState(false);
   const [csvImportState, setCsvImportState] = useState<{ busy: boolean; error: string | null; message: string | null; done: number; total: number }>({
     busy: false,
@@ -292,6 +295,7 @@ function AppShell({
   });
 
   const [bulkMode, setBulkMode] = useState(false);
+  const [searchMode, setSearchMode] = useState(false);
   const [bulkSelectedKeys, setBulkSelectedKeys] = useState<Record<string, true | undefined>>({});
   const [bulkCategoryName, setBulkCategoryName] = useState("");
   const [bulkState, setBulkState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
@@ -304,6 +308,15 @@ function AppShell({
 
   const [isMobile, setIsMobile] = useState(false);
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, true | undefined>>({});
+
+  useEffect(() => {
+    if (!openCsvPicker) return;
+    if (csvAutoOpenDoneRef.current) return;
+    csvAutoOpenDoneRef.current = true;
+    window.setTimeout(() => {
+      csvInputRef.current?.click();
+    }, 0);
+  }, [openCsvPicker]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2003,9 +2016,23 @@ function AppShell({
   }
 
   return (
-    <div className="card">
-      <div style={{ marginTop: 16 }} className="card">
+    <div style={{ marginTop: 16 }}>
         <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 8 }}>
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = (e.target.files ?? [])[0];
+              if (!f) return;
+              setCsvImportState({ busy: true, error: null, message: "Loading CSV…", done: 0, total: 0 });
+              loadCsvFile(f).catch((err: any) => {
+                setCsvImportState({ busy: false, error: err?.message ?? "CSV load failed", message: "CSV load failed", done: 0, total: 0 });
+              });
+            }}
+            disabled={csvImportState.busy || addState.busy || addSearchState.busy}
+          />
           <input
             placeholder="Add by ISBN, URL, or title (optional: “by Author”)"
             value={addInput}
@@ -2025,32 +2052,6 @@ function AppShell({
               Cancel
             </button>
           ) : null}
-          <input
-            ref={csvInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const f = (e.target.files ?? [])[0];
-              if (!f) return;
-              setCsvImportState({ busy: true, error: null, message: "Loading CSV…", done: 0, total: 0 });
-              loadCsvFile(f).catch((err: any) => {
-                setCsvImportState({ busy: false, error: err?.message ?? "CSV load failed", message: "CSV load failed", done: 0, total: 0 });
-              });
-            }}
-            disabled={csvImportState.busy || addState.busy || addSearchState.busy}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              csvInputRef.current?.click();
-            }}
-            disabled={csvImportState.busy || addState.busy || addSearchState.busy}
-            style={{ marginLeft: "auto", padding: 0 }}
-          >
-            Add CSV
-          </button>
-          {csvFileName ? <span className="muted">{csvFileName}</span> : null}
           <span className="muted">{addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}</span>
         </div>
 
@@ -2276,7 +2277,6 @@ function AppShell({
             {addSearchState.error ? `${addSearchState.message} (${addSearchState.error})` : addSearchState.message}
           </div>
         ) : null}
-      </div>
 
       <div style={{ marginTop: 16 }}>
         <div className="row" style={{ justifyContent: "space-between" }}>
@@ -2357,26 +2357,14 @@ function AppShell({
             ) : null}
           </div>
         </div>
-        <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-          <input
-            placeholder="Search your catalog…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ minWidth: 0, flex: "1 1 auto", width: isMobile ? "100%" : undefined, maxWidth: "100%" }}
-          />
-          {searchQuery.trim() ? (
-            <button onClick={() => setSearchQuery("")} aria-label="Clear search">
-              Clear
-            </button>
-          ) : null}
-          <Link
-            href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
-            className="muted"
-            style={{ whiteSpace: "nowrap" }}
+        <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            onClick={() => setSearchMode((v) => !v)}
+            className={searchMode ? "text-primary" : "muted"}
           >
-            search others
-          </Link>
-          <span style={{ flex: "1 1 auto" }} />
+            {searchMode ? "Done search" : "Search"}
+          </button>
           <button
             onClick={() => {
               setBulkMode((prev) => {
@@ -2402,6 +2390,7 @@ function AppShell({
             paddingBottom: 4
           }}
         >
+          <span className="muted">Sort by</span>
           <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
             <option value="grid">grid</option>
             <option value="list">list</option>
@@ -2436,7 +2425,7 @@ function AppShell({
                 return `${active && active !== "all" ? active : "tag"}`;
               })()}
             </span>
-            <span aria-hidden="true">▼</span>
+            <span className="om-filter-caret" aria-hidden="true" />
           </button>
 
           <button
@@ -2448,7 +2437,7 @@ function AppShell({
             aria-expanded={categoryMenu.open}
           >
             <span>{(filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : "category"}</span>
-            <span aria-hidden="true">▼</span>
+            <span className="om-filter-caret" aria-hidden="true" />
           </button>
           <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
             <option value="all">all</option>
@@ -2474,6 +2463,28 @@ function AppShell({
             </button>
           ) : null}
         </div>
+        {searchMode ? (
+          <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+            <input
+              placeholder="Search your catalog…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ minWidth: 0, flex: "1 1 auto", width: isMobile ? "100%" : undefined, maxWidth: "100%" }}
+            />
+            {searchQuery.trim() ? (
+              <button onClick={() => setSearchQuery("")} aria-label="Clear search">
+                Clear
+              </button>
+            ) : null}
+            <Link
+              href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
+              className="muted"
+              style={{ whiteSpace: "nowrap" }}
+            >
+              search others
+            </Link>
+          </div>
+        ) : null}
         {tagMenu.open ? (
           <div
             ref={tagMenuRef}
@@ -2598,12 +2609,6 @@ function AppShell({
 
         <hr className="om-hr" />
 
-        {reorderMode ? (
-          <div className="muted" style={{ marginTop: 10 }}>
-            Reordering modules
-          </div>
-        ) : null}
-
         {libraries.map((lib, idx) => {
           const groups = displayGroupsByLibraryId[lib.id] ?? [];
           const isEditing = editingLibraryId === lib.id;
@@ -2653,12 +2658,9 @@ function AppShell({
         <hr className="om-hr" />
 
         <div style={{ marginTop: 14 }} className="card">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <div>Add another catalog</div>
-          </div>
           <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10 }}>
             <input
-              placeholder="Catalog name (e.g. Home, Office)"
+              placeholder="Add another catalog (e.g. Home, Office)"
               value={newLibraryName}
               onChange={(e) => setNewLibraryName(e.target.value)}
               onKeyDown={(e) => {
@@ -2718,6 +2720,7 @@ function AppWithFilters({ session }: { session: Session }) {
   const filterSubject = searchParams.get("subject");
   const filterPublisher = searchParams.get("publisher");
   const filterCategory = searchParams.get("category");
+  const openCsvPicker = searchParams.get("csv") === "1";
   return (
     <AppShell
       session={session}
@@ -2726,6 +2729,7 @@ function AppWithFilters({ session }: { session: Session }) {
       filterSubject={filterSubject}
       filterPublisher={filterPublisher}
       filterCategory={filterCategory}
+      openCsvPicker={openCsvPicker}
     />
   );
 }

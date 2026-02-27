@@ -1701,7 +1701,7 @@ export default function BookDetailPage() {
     const currentEffectivePublisher = (formPublisher.trim() || String(book?.edition?.publisher ?? "").trim()).trim();
     const currentEffectivePublishDate = (formPublishDate.trim() || String(book?.edition?.publish_date ?? "").trim()).trim();
     const currentEffectiveDescription = (formDescription.trim() || String(book?.edition?.description ?? "").trim()).trim();
-    const hasCurrentCover = Boolean((book?.media ?? []).some((m) => m.kind === "cover") || String(book?.edition?.cover_url ?? "").trim());
+    const hasCurrentCover = Boolean((book?.media ?? []).some((m) => m.kind === "cover"));
 
     if (!currentEffectiveTitle && nextTitle) setFormTitle(nextTitle);
     if (!currentEffectivePublisher && nextPublisher) {
@@ -1734,7 +1734,7 @@ export default function BookDetailPage() {
     const value = isbn.trim();
     if (!value) return;
 
-    const hadCover = Boolean((book.media ?? []).some((m) => m.kind === "cover") || String(book.edition?.cover_url ?? "").trim());
+    const hadCover = Boolean((book.media ?? []).some((m) => m.kind === "cover"));
     setLinkState({ busy: true, error: null, message: "Looking up ISBN…" });
 
     try {
@@ -1820,6 +1820,7 @@ export default function BookDetailPage() {
       const coverToImport =
         !hadCover ? (String(coverUrlHint ?? "").trim() || String(edition.cover_url ?? "").trim() || null) : null;
       if (coverToImport) {
+        setSuggestedCoverUrl(coverToImport);
         await importCoverFromUrl(coverToImport);
       }
 
@@ -1934,7 +1935,7 @@ export default function BookDetailPage() {
         </div>
       ) : (
         <div className="card">
-          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "220px 1fr", gap: 14 }}>
+          <div className="om-book-detail-grid" style={{ marginTop: 10, gap: 14 }}>
             <div>
               <div className="om-cover-slot" style={{ width: "100%", height: isNarrow ? 360 : 280 }}>
                 {coverUrl ? (
@@ -1953,13 +1954,11 @@ export default function BookDetailPage() {
                   onToggle={(e) => {
                     const open = (e.currentTarget as HTMLDetailsElement).open;
                     setCoverToolsOpen(open);
-                    if (open && !editMode) enterEditMode();
                   }}
                   style={{ marginTop: 10 }}
                 >
                   <summary className="muted">{coverUrl ? "Change cover…" : "Add cover…"}</summary>
-                  {editMode ? (
-                    <div style={{ marginTop: 10 }}>
+                  <div style={{ marginTop: 10 }}>
                       <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                         <input
                           key={coverInputKey}
@@ -2190,11 +2189,6 @@ export default function BookDetailPage() {
                         </div>
                       ) : null}
                     </div>
-                  ) : (
-                    <div className="muted" style={{ marginTop: 8 }}>
-                      Click Edit to change the cover.
-                    </div>
-                  )}
                 </details>
               ) : null}
             </div>
@@ -2249,7 +2243,7 @@ export default function BookDetailPage() {
                     editMode ? (
                       <>
                         <button onClick={doneEditMode} disabled={busy || saveState.busy}>
-                          Done
+                          Save
                         </button>
                         <button onClick={cancelEditMode} disabled={busy || saveState.busy} className="muted">
                           Cancel
@@ -2278,24 +2272,29 @@ export default function BookDetailPage() {
               {isOwner && findMoreOpen ? (
                 <div style={{ marginTop: 14 }}>
                   <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-                    <div>Lookup</div>
                     <div className="muted">
                       {importState.busy || searchState.busy ? "Working…" : importState.error || searchState.error ? "Error" : ""}
                     </div>
                   </div>
-                  <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                  <div className="row" style={{ marginTop: 8, flexWrap: "nowrap", gap: 8, alignItems: "center", width: "100%" }}>
                     <input
                       className="om-inline-control"
-                      placeholder='ISBN, URL, or "Title by Author"'
+                      placeholder='Lookup by ISBN, URL, or "Title by Author"'
                       value={lookupInput}
                       onChange={(e) => setLookupInput(e.target.value)}
                       onKeyDown={(e) => onEnter(e, smartLookup)}
-                      style={{ width: isNarrow ? "100%" : 520, maxWidth: "100%", minWidth: 0 }}
+                      style={{ flex: "1 1 auto", width: "100%", maxWidth: "100%", minWidth: 0 }}
                     />
-                    <button onClick={smartLookup} disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}>
+                    <button
+                      onClick={smartLookup}
+                      disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
+                      style={{ marginLeft: "auto", whiteSpace: "nowrap" }}
+                    >
                       Find
                     </button>
-                    <span className="muted" style={{ marginLeft: 10 }}>
+                  </div>
+                  <div className="muted" style={{ marginTop: 6 }}>
+                    <span>
                       {importState.message
                         ? importState.error
                           ? `${importState.message} (${importState.error})`
@@ -2321,7 +2320,7 @@ export default function BookDetailPage() {
                             .filter(Boolean)
                             .join(" · ");
                           return (
-                            <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="card" style={{ marginTop: 8 }}>
+                            <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="om-list-row" style={{ marginTop: 8, paddingTop: 8, paddingBottom: 8 }}>
                               <div className="om-lookup-row">
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
                                   {r.cover_url ? (
@@ -2396,8 +2395,8 @@ export default function BookDetailPage() {
                         return (
                           <div style={{ marginTop: 10 }}>
                             <div className="muted">Preview</div>
-                            <div style={{ marginTop: 6 }} className="card">
-                              <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                            <div style={{ marginTop: 6 }} className="om-list-row">
+                              <div className="om-lookup-row">
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
                                   {previewCoverUrl ? (
                                     <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
@@ -2413,7 +2412,7 @@ export default function BookDetailPage() {
                                     <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
                                   )}
                                 </div>
-                                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                                <div className="om-lookup-main">
                                   <div>{(preview.title ?? "").trim() || "—"}</div>
                                   <div className="muted" style={{ marginTop: 4 }}>
                                     {(preview.authors ?? []).filter(Boolean).join(", ") || "—"}
@@ -2447,7 +2446,7 @@ export default function BookDetailPage() {
                                     ) : null}
                                   </div>
                                 </div>
-                                <div style={{ flex: "0 0 auto" }}>
+                                <div className="om-lookup-actions">
                                   <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
                                     {(() => {
                                       const importPreviewIsbn = String(preview.isbn13 ?? preview.isbn10 ?? "").trim();
@@ -2488,10 +2487,10 @@ export default function BookDetailPage() {
                                         </button>
                                       );
                                     })()}
-                                  </div>
                                 </div>
                               </div>
                             </div>
+                          </div>
                           </div>
                         );
                       })()
@@ -2514,15 +2513,6 @@ export default function BookDetailPage() {
               </div>
 
               <div style={{ marginTop: 14 }}>
-                {editMode || Boolean(book?.edition?.isbn13 ?? book?.edition?.isbn10) ? (
-                  <div className="row om-row-baseline">
-                    <div style={{ minWidth: 110 }} className="muted">
-                      ISBN
-                    </div>
-                    <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10}</div>
-                  </div>
-                ) : null}
-
                 {editMode || facetView.author.length > 0 ? (
                   <div className="row om-row-baseline" style={{ marginTop: 6 }}>
                     <div style={{ minWidth: 110 }} className="muted">
@@ -2818,6 +2808,15 @@ export default function BookDetailPage() {
                   </div>
                 ) : null}
 
+                {editMode || Boolean(book?.edition?.isbn13 ?? book?.edition?.isbn10) ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      ISBN
+                    </div>
+                    <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10}</div>
+                  </div>
+                ) : null}
+
                 {editMode || Boolean(effectiveDescription.trim()) ? (
                   <div style={{ marginTop: 8 }}>
                     <div className="muted">Description</div>
@@ -2838,33 +2837,6 @@ export default function BookDetailPage() {
                   </div>
                 ) : null}
 
-                {book?.edition?.cover_url ? (
-                  <div style={{ marginTop: 8 }} className="muted">
-                    Online cover:{" "}
-                    <a href={book.edition.cover_url} target="_blank" rel="noreferrer">
-                      open
-                    </a>
-                  </div>
-                ) : null}
-
-                {publicBookUrl ? (
-                  <div className="row" style={{ marginTop: 10, justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                    <div style={{ minWidth: 110 }} className="muted">
-                      URL
-                    </div>
-                    <div style={{ flex: "1 1 auto", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      <a href={publicBookUrl} target="_blank" rel="noreferrer">
-                        {publicBookUrl}
-                      </a>
-                    </div>
-                    <button onClick={copyPublicLink} style={{ flex: "0 0 auto" }}>
-                      Copy
-                    </button>
-                    <div className="muted" style={{ flex: "0 0 auto" }}>
-                      {shareState.message ? (shareState.error ? `${shareState.message} (${shareState.error})` : shareState.message) : ""}
-                    </div>
-                  </div>
-                ) : null}
               </div>
 
               {isOwner ? (
@@ -2873,7 +2845,7 @@ export default function BookDetailPage() {
                     <hr className="om-hr" />
                   </div>
 
-                  <div style={{ marginTop: 16 }} className="muted">
+                  <div style={{ marginTop: 16 }} className="om-edit-label">
                     Book info
                   </div>
                   <div style={{ marginTop: 8 }}>
@@ -2944,51 +2916,50 @@ export default function BookDetailPage() {
                         <div className="muted">{copiesCountState.busy ? "…" : copiesCount !== null ? String(copiesCount) : "—"}</div>
                       )}
                     </div>
+                    {editMode || facetView.category.length > 0 ? (
+                      <div className="row om-row-baseline" style={{ marginTop: 2 }}>
+                        <div style={{ minWidth: 110 }} className="muted">
+                          Categories
+                        </div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField
+                              role="category"
+                              value={facetDraft.category}
+                              onChange={(next) => setFacetDraft((s) => ({ ...s, category: next }))}
+                              placeholder="Add a category"
+                              disabled={!isOwner || busy || saveState.busy}
+                            />
+                          ) : (
+                            <FacetLinks role="category" items={facetView.category} />
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {editMode || facetView.tag.length > 0 ? (
+                      <div className="row om-row-baseline" style={{ marginTop: 2 }}>
+                        <div style={{ minWidth: 110 }} className="muted">
+                          Tags
+                        </div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField
+                              role="tag"
+                              value={facetDraft.tag}
+                              onChange={(next) => setFacetDraft((s) => ({ ...s, tag: next }))}
+                              placeholder="Add a tag"
+                              disabled={!isOwner || busy || saveState.busy}
+                            />
+                          ) : (
+                            <FacetLinks role="tag" items={facetView.tag} />
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
-                  {editMode || facetView.category.length > 0 ? (
-                    <div className="row om-row-baseline" style={{ marginTop: 16 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Categories
-                      </div>
-                      <div style={{ flex: "1 1 auto" }}>
-                        {editMode ? (
-                          <EntityTokenField
-                            role="category"
-                            value={facetDraft.category}
-                            onChange={(next) => setFacetDraft((s) => ({ ...s, category: next }))}
-                            placeholder="Add a category"
-                            disabled={!isOwner || busy || saveState.busy}
-                          />
-                        ) : (
-                          <FacetLinks role="category" items={facetView.category} />
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {editMode || facetView.tag.length > 0 ? (
-                    <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Tags
-                      </div>
-                      <div style={{ flex: "1 1 auto" }}>
-                        {editMode ? (
-                          <EntityTokenField
-                            role="tag"
-                            value={facetDraft.tag}
-                            onChange={(next) => setFacetDraft((s) => ({ ...s, tag: next }))}
-                            placeholder="Add a tag"
-                            disabled={!isOwner || busy || saveState.busy}
-                          />
-                        ) : (
-                          <FacetLinks role="tag" items={facetView.tag} />
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <div style={{ marginTop: 16 }} className="muted">
+                  <div style={{ marginTop: 16 }} className="om-edit-label">
                     Privacy &amp; lending
                   </div>
                   <div style={{ marginTop: 8 }}>
@@ -3085,7 +3056,7 @@ export default function BookDetailPage() {
 
                   {editMode || Boolean((formLocation ?? "").trim()) || Boolean((formShelf ?? "").trim()) || Boolean((formNotes ?? "").trim()) ? (
                     <>
-                      <div style={{ marginTop: 16 }} className="muted">
+                      <div style={{ marginTop: 16 }} className="om-edit-label">
                         Location
                       </div>
                       <div style={{ marginTop: 8 }}>
@@ -3151,92 +3122,109 @@ export default function BookDetailPage() {
                     </>
                   ) : null}
 
-                  <div style={{ marginTop: 16 }} className="muted">
-                    Images
-                  </div>
-                  <div style={{ marginTop: 8 }}>
-                    {editMode ? (
-                      <details>
-                        <summary className="muted">Add images…</summary>
-                        <div style={{ marginTop: 8 }}>
-                          <input key={imagesInputKey} type="file" accept="image/*" multiple onChange={(ev) => selectPendingImages(ev.target.files)} />
-
-                          {pendingImages.length > 0 ? (
-                            <div className="muted" style={{ marginTop: 8 }}>
-                              <div>Selected (not uploaded yet):</div>
-                              <div style={{ marginTop: 6 }}>
-                                {pendingImages.map((f) => (
-                                  <div key={`${f.name}:${f.size}:${f.lastModified}`}>{f.name}</div>
-                                ))}
-                              </div>
-                              <div className="row" style={{ marginTop: 8 }}>
-                                <button onClick={uploadImages} disabled={imagesState.busy}>
-                                  {imagesState.busy ? "Uploading…" : "Submit"}
-                                </button>
-                                <button onClick={clearPendingImages} disabled={imagesState.busy} className="muted">
-                                  Clear
-                                </button>
-                                <div className="muted" style={{ marginLeft: 10 }}>
-                                  {imagesState.message ? (imagesState.error ? `${imagesState.message} (${imagesState.error})` : imagesState.message) : ""}
-                                </div>
-                              </div>
-                            </div>
-                          ) : imagesState.message ? (
-                            <div className="muted" style={{ marginTop: 6 }}>
-                              {imagesState.error ? `${imagesState.message} (${imagesState.error})` : imagesState.message}
-                            </div>
-                          ) : (
-                            <div className="muted" style={{ marginTop: 6 }}>
-                              Select one or more images, then click Submit.
-                            </div>
-                          )}
-                        </div>
-                      </details>
-                    ) : null}
-
-                    {imageMedia.length > 0 ? (
-                      <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-                        {imageMedia.map((m) => {
-                          const url = mediaUrlsByPath[m.storage_path];
-                          return (
-                            <div key={m.id} className="card">
-                              {url ? (
-                                <a href={url} target="_blank" rel="noreferrer" className="om-cover-slot" style={{ width: "100%", height: 120, padding: 0 }}>
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img alt="" src={url} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                                </a>
-                              ) : (
-                                <div className="om-cover-slot" style={{ width: "100%", height: 120, padding: 0 }} />
-                              )}
-                              {editMode ? (
-                                <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
-                                  <button onClick={() => setAsCover(m.id)} disabled={coverState.busy}>
-                                    Use as cover
-                                  </button>
-                                  <button onClick={() => deleteMedia(m.id, m.storage_path)} disabled={imagesState.busy || coverState.busy}>
-                                    Delete
-                                  </button>
-                                </div>
-                              ) : null}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : editMode ? (
-                      <div className="muted" style={{ marginTop: 8 }}>
-                        No images yet.
-                      </div>
-                    ) : null}
-                  </div>
                 </>
               ) : null}
             </div>
           </div>
 
-          <div style={{ marginTop: 16 }}>
-            <hr className="om-hr" />
-            {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} /> : null}
-          </div>
+          {publicBookUrl ? (
+            <div style={{ gridColumn: "1 / -1", marginTop: 10 }}>
+              <div className="row om-row-baseline" style={{ gap: 10, alignItems: "baseline" }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  URL
+                </div>
+                <div style={{ flex: "1 1 auto", minWidth: 0, display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                  <a href={publicBookUrl} target="_blank" rel="noreferrer" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {publicBookUrl}
+                  </a>
+                  <button onClick={copyPublicLink}>Copy</button>
+                  <span className="muted">{shareState.message ? (shareState.error ? `${shareState.message} (${shareState.error})` : shareState.message) : ""}</span>
+                </div>
+              </div>
+              <hr className="om-hr" style={{ marginTop: 10, width: "100%" }} />
+            </div>
+          ) : null}
+
+          {(isOwner && editMode) || imageMedia.length > 0 ? (
+            <div style={{ gridColumn: "1 / -1", marginTop: 16 }}>
+              {isOwner && editMode ? (
+                <details style={{ marginTop: 8 }}>
+                  <summary className="muted">Add images…</summary>
+                  <div style={{ marginTop: 8 }}>
+                    <input key={imagesInputKey} type="file" accept="image/*" multiple onChange={(ev) => selectPendingImages(ev.target.files)} />
+
+                    {pendingImages.length > 0 ? (
+                      <div className="muted" style={{ marginTop: 8 }}>
+                        <div>Selected (not uploaded yet):</div>
+                        <div style={{ marginTop: 6 }}>
+                          {pendingImages.map((f) => (
+                            <div key={`${f.name}:${f.size}:${f.lastModified}`}>{f.name}</div>
+                          ))}
+                        </div>
+                        <div className="row" style={{ marginTop: 8 }}>
+                          <button onClick={uploadImages} disabled={imagesState.busy}>
+                            {imagesState.busy ? "Uploading…" : "Submit"}
+                          </button>
+                          <button onClick={clearPendingImages} disabled={imagesState.busy} className="muted">
+                            Clear
+                          </button>
+                          <div className="muted" style={{ marginLeft: 10 }}>
+                            {imagesState.message ? (imagesState.error ? `${imagesState.message} (${imagesState.error})` : imagesState.message) : ""}
+                          </div>
+                        </div>
+                      </div>
+                    ) : imagesState.message ? (
+                      <div className="muted" style={{ marginTop: 6 }}>
+                        {imagesState.error ? `${imagesState.message} (${imagesState.error})` : imagesState.message}
+                      </div>
+                    ) : (
+                      <div className="muted" style={{ marginTop: 6 }}>
+                        Select one or more images, then click Submit.
+                      </div>
+                    )}
+                  </div>
+                </details>
+              ) : null}
+
+              {imageMedia.length > 0 ? (
+                <div className="om-images-grid" style={{ marginTop: 10 }}>
+                  {imageMedia.map((m) => {
+                    const url = mediaUrlsByPath[m.storage_path];
+                    return (
+                      <div key={m.id}>
+                        {url ? (
+                          <a href={url} target="_blank" rel="noreferrer" className="om-cover-slot" style={{ width: "100%", height: isNarrow ? 140 : 180, padding: 0 }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img alt="" src={url} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+                          </a>
+                        ) : (
+                          <div className="om-cover-slot" style={{ width: "100%", height: isNarrow ? 140 : 180, padding: 0 }} />
+                        )}
+                        {editMode ? (
+                          <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
+                            <button onClick={() => setAsCover(m.id)} disabled={coverState.busy}>
+                              Use as cover
+                            </button>
+                            <button onClick={() => deleteMedia(m.id, m.storage_path)} disabled={imagesState.busy || coverState.busy}>
+                              Delete
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : editMode ? (
+                <div className="muted" style={{ marginTop: 8 }}>
+                  No images yet.
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        <div style={{ marginTop: 16 }}>
+          <hr className="om-hr" />
+          {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} /> : null}
+        </div>
         </div>
       )}
 

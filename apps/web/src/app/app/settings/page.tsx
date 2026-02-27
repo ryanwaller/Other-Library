@@ -754,6 +754,21 @@ export default function SettingsPage() {
 
           <hr className="om-hr" />
 
+          <div style={{ marginTop: 16 }} className="card" id="bulk-update">
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <div>Bulk update</div>
+              <div className="muted">catalog import</div>
+            </div>
+            <div className="muted" style={{ marginTop: 8 }}>
+              Upload CSV files from your catalog workspace.
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <Link href="/app?csv=1">Add CSV</Link>
+            </div>
+          </div>
+
+          <hr className="om-hr" />
+
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Account</div>

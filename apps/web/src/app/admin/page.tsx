@@ -116,7 +116,7 @@ function AdminListItem({
   secondary?: ReactNode;
 }) {
   return (
-    <div className="om-list-row" style={{ borderTop: "1px solid var(--border)", borderBottom: 0 }}>
+    <div className="om-list-row">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
         <div style={{ minWidth: 0, wordBreak: "break-word" }}>
           {primaryHref ? <Link href={primaryHref}>{primary}</Link> : primary}
@@ -154,6 +154,7 @@ export default function AdminPage() {
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const [userTab, setUserTab] = useState<"all" | "active" | "disabled" | "admins">("all");
   const [userSearchDraft, setUserSearchDraft] = useState("");
@@ -310,6 +311,7 @@ export default function AdminPage() {
   useEffect(() => setUserPage((prev) => clampPage(prev, userTotalPages)), [userTotalPages]);
   useEffect(() => setWaitPage((prev) => clampPage(prev, waitTotalPages)), [waitTotalPages]);
   useEffect(() => setInvitesPage((prev) => clampPage(prev, invitesTotalPages)), [invitesTotalPages]);
+  useEffect(() => setSearchOpen(false), [tab]);
 
   const tabStats = useMemo(() => {
     if (tab === "users") {
@@ -378,60 +380,59 @@ export default function AdminPage() {
 
           <hr className="om-hr" />
 
-          <div className="admin-tabbar">
-            <button type="button" onClick={() => setTab("users")} aria-current={tab === "users" ? "page" : undefined}>
-              Users
-            </button>
-            <button type="button" onClick={() => setTab("waitlist")} aria-current={tab === "waitlist" ? "page" : undefined}>
-              Waitlist
-            </button>
-            <button type="button" onClick={() => setTab("invites")} aria-current={tab === "invites" ? "page" : undefined}>
-              Invites
-            </button>
-          </div>
-
-          <hr className="om-hr" />
-
-          <div className="row admin-invite-row" style={{ gap: 8, flex: "1 1 auto", minWidth: 0 }}>
-            <input
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="Add via email"
-              style={{ maxWidth: 320 }}
-            />
-            <button
-              onClick={async () => {
-                setBusy(true);
-                setError(null);
-                setInviteLink(null);
-                try {
-                  const res = await api<{ link: string }>("/api/admin/invites", {
-                    method: "POST",
-                    token,
-                    body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
-                  });
-                  setInviteLink(res.link);
-                  await refreshInvites();
-                  await refreshSummary();
-                } catch (e: any) {
-                  setError(e?.message ?? "Failed to create invite");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-              disabled={busy}
-            >
-              Invite
-            </button>
-            {inviteLink ? (
+          <div className="row admin-tabbar-row" style={{ justifyContent: "space-between", gap: 10 }}>
+            <div className="admin-tabbar">
+              <button type="button" onClick={() => setTab("users")} aria-current={tab === "users" ? "page" : undefined}>
+                Users
+              </button>
+              <button type="button" onClick={() => setTab("waitlist")} aria-current={tab === "waitlist" ? "page" : undefined}>
+                Waitlist
+              </button>
+              <button type="button" onClick={() => setTab("invites")} aria-current={tab === "invites" ? "page" : undefined}>
+                Invites
+              </button>
+            </div>
+            <div className="row admin-invite-row" style={{ gap: 8, minWidth: 0 }}>
+              <input
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="Add via email"
+                style={{ maxWidth: 320 }}
+              />
               <button
                 onClick={async () => {
-                  await navigator.clipboard.writeText(inviteLink);
+                  setBusy(true);
+                  setError(null);
+                  setInviteLink(null);
+                  try {
+                    const res = await api<{ link: string }>("/api/admin/invites", {
+                      method: "POST",
+                      token,
+                      body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
+                    });
+                    setInviteLink(res.link);
+                    await refreshInvites();
+                    await refreshSummary();
+                  } catch (e: any) {
+                    setError(e?.message ?? "Failed to create invite");
+                  } finally {
+                    setBusy(false);
+                  }
                 }}
+                disabled={busy}
               >
-                Copy link
+                Invite
               </button>
-            ) : null}
+              {inviteLink ? (
+                <button
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(inviteLink);
+                  }}
+                >
+                  Copy link
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {friendlyError ? (
@@ -471,31 +472,7 @@ export default function AdminPage() {
                   >
                     <option value="created_at:desc">Newest</option>
                     <option value="created_at:asc">Oldest</option>
-                    <option value="email:asc">Email</option>
-                    <option value="status:asc">Status</option>
-                    <option value="role:asc">Role</option>
                   </select>
-                  <input
-                    value={userSearchDraft}
-                    onChange={(e) => setUserSearchDraft(e.target.value)}
-                    placeholder="Search email…"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        setUserPage(1);
-                        setUserSearch(userSearchDraft.trim());
-                      }
-                    }}
-                    style={{ minWidth: 180 }}
-                  />
-                  <button
-                    onClick={() => {
-                      setUserPage(1);
-                      setUserSearch(userSearchDraft.trim());
-                    }}
-                    disabled={busy}
-                  >
-                    Search
-                  </button>
                 </>
               ) : null}
 
@@ -526,9 +503,60 @@ export default function AdminPage() {
                   >
                     <option value="created_at:desc">Newest</option>
                     <option value="created_at:asc">Oldest</option>
-                    <option value="email:asc">Email</option>
-                    <option value="status:asc">Status</option>
                   </select>
+                </>
+              ) : null}
+
+              {tab === "invites" ? (
+                <>
+                  <select
+                    value={invitesDir}
+                    onChange={(e) => {
+                      setInvitesPage(1);
+                      setInvitesDir(e.target.value as "asc" | "desc");
+                    }}
+                    className="om-filter-control"
+                  >
+                    <option value="desc">Newest</option>
+                    <option value="asc">Oldest</option>
+                  </select>
+                </>
+              ) : null}
+            </div>
+            <button type="button" onClick={() => setSearchOpen((v) => !v)} style={{ marginLeft: "auto" }}>
+              {searchOpen ? "Done search" : "Search"}
+            </button>
+          </div>
+
+          {searchOpen ? (
+            <div className="row admin-search-row" style={{ marginTop: 10, gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
+              {tab === "users" ? (
+                <>
+                  <input
+                    value={userSearchDraft}
+                    onChange={(e) => setUserSearchDraft(e.target.value)}
+                    placeholder="Search email…"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setUserPage(1);
+                        setUserSearch(userSearchDraft.trim());
+                      }
+                    }}
+                    style={{ minWidth: 180 }}
+                  />
+                  <button
+                    onClick={() => {
+                      setUserPage(1);
+                      setUserSearch(userSearchDraft.trim());
+                    }}
+                    disabled={busy}
+                  >
+                    Search
+                  </button>
+                </>
+              ) : null}
+              {tab === "waitlist" ? (
+                <>
                   <input
                     value={waitSearchDraft}
                     onChange={(e) => setWaitSearchDraft(e.target.value)}
@@ -552,20 +580,8 @@ export default function AdminPage() {
                   </button>
                 </>
               ) : null}
-
               {tab === "invites" ? (
                 <>
-                  <select
-                    value={invitesDir}
-                    onChange={(e) => {
-                      setInvitesPage(1);
-                      setInvitesDir(e.target.value as "asc" | "desc");
-                    }}
-                    className="om-filter-control"
-                  >
-                    <option value="desc">Newest</option>
-                    <option value="asc">Oldest</option>
-                  </select>
                   <input
                     value={invitesSearchDraft}
                     onChange={(e) => setInvitesSearchDraft(e.target.value)}
@@ -590,54 +606,7 @@ export default function AdminPage() {
                 </>
               ) : null}
             </div>
-
-            <div className="admin-page-size" style={{ flex: "0 0 auto" }}>
-              {tab === "users" ? (
-                <select
-                  value={userPageSize}
-                  onChange={(e) => {
-                    setUserPage(1);
-                    setUserPageSize(Number(e.target.value));
-                  }}
-                  className="om-filter-control"
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                </select>
-              ) : null}
-              {tab === "waitlist" ? (
-                <select
-                  value={waitPageSize}
-                  onChange={(e) => {
-                    setWaitPage(1);
-                    setWaitPageSize(Number(e.target.value));
-                  }}
-                  className="om-filter-control"
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                </select>
-              ) : null}
-              {tab === "invites" ? (
-                <select
-                  value={invitesPageSize}
-                  onChange={(e) => {
-                    setInvitesPage(1);
-                    setInvitesPageSize(Number(e.target.value));
-                  }}
-                  className="om-filter-control"
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                </select>
-              ) : null}
-            </div>
-          </div>
-
-          <hr className="om-hr" />
+          ) : null}
 
           <div className="om-list">
             {tab === "users"
@@ -824,44 +793,57 @@ export default function AdminPage() {
 
           <hr className="om-hr" />
 
-          <div className="muted">
-            {tab === "users" ? resultLabel(usersData?.page ?? userPage, userTotalPages, usersData?.total ?? 0) : null}
-            {tab === "waitlist" ? resultLabel(waitlistData?.page ?? waitPage, waitTotalPages, waitlistData?.total ?? 0) : null}
-            {tab === "invites" ? resultLabel(invitesData?.page ?? invitesPage, invitesTotalPages, invitesData?.total ?? 0) : null}
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <div className="muted">
+              {tab === "users" ? resultLabel(usersData?.page ?? userPage, userTotalPages, usersData?.total ?? 0) : null}
+              {tab === "waitlist" ? resultLabel(waitlistData?.page ?? waitPage, waitTotalPages, waitlistData?.total ?? 0) : null}
+              {tab === "invites" ? resultLabel(invitesData?.page ?? invitesPage, invitesTotalPages, invitesData?.total ?? 0) : null}
+            </div>
+            <div className="admin-page-size" style={{ flex: "0 0 auto" }}>
+              {tab === "users" ? (
+                <select
+                  value={userPageSize}
+                  onChange={(e) => {
+                    setUserPage(1);
+                    setUserPageSize(Number(e.target.value));
+                  }}
+                  className="om-filter-control"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              ) : null}
+              {tab === "waitlist" ? (
+                <select
+                  value={waitPageSize}
+                  onChange={(e) => {
+                    setWaitPage(1);
+                    setWaitPageSize(Number(e.target.value));
+                  }}
+                  className="om-filter-control"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              ) : null}
+              {tab === "invites" ? (
+                <select
+                  value={invitesPageSize}
+                  onChange={(e) => {
+                    setInvitesPage(1);
+                    setInvitesPageSize(Number(e.target.value));
+                  }}
+                  className="om-filter-control"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              ) : null}
+            </div>
           </div>
-
-          {tab === "users" && userTotalPages > 1 ? (
-            <div className="row" style={{ gap: 10, marginTop: 8 }}>
-              <button onClick={() => setUserPage((p) => Math.max(1, p - 1))} disabled={busy || userPage <= 1}>
-                Prev
-              </button>
-              <button onClick={() => setUserPage((p) => Math.min(userTotalPages, p + 1))} disabled={busy || userPage >= userTotalPages}>
-                Next
-              </button>
-            </div>
-          ) : null}
-
-          {tab === "waitlist" && waitTotalPages > 1 ? (
-            <div className="row" style={{ gap: 10, marginTop: 8 }}>
-              <button onClick={() => setWaitPage((p) => Math.max(1, p - 1))} disabled={busy || waitPage <= 1}>
-                Prev
-              </button>
-              <button onClick={() => setWaitPage((p) => Math.min(waitTotalPages, p + 1))} disabled={busy || waitPage >= waitTotalPages}>
-                Next
-              </button>
-            </div>
-          ) : null}
-
-          {tab === "invites" && invitesTotalPages > 1 ? (
-            <div className="row" style={{ gap: 10, marginTop: 8 }}>
-              <button onClick={() => setInvitesPage((p) => Math.max(1, p - 1))} disabled={busy || invitesPage <= 1}>
-                Prev
-              </button>
-              <button onClick={() => setInvitesPage((p) => Math.min(invitesTotalPages, p + 1))} disabled={busy || invitesPage >= invitesTotalPages}>
-                Next
-              </button>
-            </div>
-          ) : null}
 
           {inviteLink ? (
             <div className="muted" style={{ marginTop: 8, wordBreak: "break-all" }}>

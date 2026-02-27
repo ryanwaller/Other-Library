@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export type BookCardViewMode = "grid" | "list";
 
@@ -39,6 +40,8 @@ export default function BookCard({
   hideCopyCount?: boolean;
   showDeleteCopy?: boolean;
 }) {
+  const router = useRouter();
+
   const coverEl = (
     <div className="om-cover-slot" style={{ height: coverHeight }}>
       {coverUrl ? (
@@ -146,7 +149,19 @@ export default function BookCard({
           </div>
         </>
       ) : (
-        <Link href={href} className="om-book-card-link" style={{ display: "block", color: "inherit" }}>
+        <div
+          className="om-book-card-link"
+          style={{ display: "block", color: "inherit", cursor: "pointer" }}
+          role="link"
+          tabIndex={0}
+          onClick={() => router.push(href)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              router.push(href);
+            }
+          }}
+        >
           {coverEl}
           <div style={{ marginTop: 14 }}>
             <div className="row" style={{ justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
@@ -154,10 +169,23 @@ export default function BookCard({
               {!hideCopyCount ? <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span> : null}
             </div>
             {authorLine ? (
-              <div className="om-book-secondary">{authorLine}</div>
+              <div className="om-book-secondary">
+                {authors.map((author, index) => (
+                  <span key={author}>
+                    <Link
+                      href={`/app?author=${encodeURIComponent(author)}`}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      {author}
+                    </Link>
+                    {index < authors.length - 1 ? <span>, </span> : null}
+                  </span>
+                ))}
+              </div>
             ) : null}
           </div>
-        </Link>
+        </div>
       )}
     </div>
   );
