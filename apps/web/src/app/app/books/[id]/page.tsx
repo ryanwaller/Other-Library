@@ -1880,6 +1880,50 @@ export default function BookDetailPage() {
     await searchMetadata(title, author ?? "");
   }
 
+  function fillFieldsAdditive(input: {
+    title?: string | null;
+    authors?: string[] | null;
+    publisher?: string | null;
+    publish_date?: string | null;
+    description?: string | null;
+    subjects?: string[] | null;
+    cover_url?: string | null;
+  }) {
+    const nextTitle = String(input.title ?? "").trim();
+    const nextPublisher = String(input.publisher ?? "").trim();
+    const nextPublishDate = String(input.publish_date ?? "").trim();
+    const nextDescription = String(input.description ?? "").trim();
+    const nextCover = String(input.cover_url ?? "").trim();
+    const nextAuthors = (input.authors ?? []).map((a) => String(a ?? "").trim()).filter(Boolean);
+    const nextSubjects = (input.subjects ?? []).map((s) => String(s ?? "").trim()).filter(Boolean);
+
+    const currentEffectiveTitle = (formTitle.trim() || String(book?.edition?.title ?? "").trim()).trim();
+    const currentEffectivePublisher = (formPublisher.trim() || String(book?.edition?.publisher ?? "").trim()).trim();
+    const currentEffectivePublishDate = (formPublishDate.trim() || String(book?.edition?.publish_date ?? "").trim()).trim();
+    const currentEffectiveDescription = (formDescription.trim() || String(book?.edition?.description ?? "").trim()).trim();
+    const hasCurrentCover = Boolean((book?.media ?? []).some((m) => m.kind === "cover") || String(book?.edition?.cover_url ?? "").trim());
+
+    if (!currentEffectiveTitle && nextTitle) setFormTitle(nextTitle);
+    if (!currentEffectivePublisher && nextPublisher) setFormPublisher(nextPublisher);
+    if (!currentEffectivePublishDate && nextPublishDate) setFormPublishDate(nextPublishDate);
+    if (!currentEffectiveDescription && nextDescription) setFormDescription(nextDescription);
+    if (!hasCurrentCover && nextCover) setSuggestedCoverUrl(nextCover);
+
+    const mergedAuthors = uniqStrings([...(effectiveAuthors ?? []), ...nextAuthors]);
+    if (mergedAuthors.length > 0) {
+      setFacetDraft((s) => ({ ...s, author: mergedAuthors }));
+      setFormAuthors(mergedAuthors.join(", "));
+    }
+
+    const mergedSubjects = uniqStrings([...(effectiveSubjects ?? []), ...nextSubjects]);
+    if (mergedSubjects.length > 0) {
+      setFacetDraft((s) => ({ ...s, subject: mergedSubjects }));
+    }
+
+    setSearchState((s) => ({ ...s, message: "Filled missing fields (not saved)" }));
+    setImportState((s) => ({ ...s, message: "Filled missing fields (not saved)" }));
+  }
+
   async function linkEditionByIsbn(isbn: string, coverUrlHint?: string | null) {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
@@ -1887,7 +1931,7 @@ export default function BookDetailPage() {
     const value = isbn.trim();
     if (!value) return;
 
-    const hadCover = (book.media ?? []).some((m) => m.kind === "cover");
+    const hadCover = Boolean((book.media ?? []).some((m) => m.kind === "cover") || String(book.edition?.cover_url ?? "").trim());
     setLinkState({ busy: true, error: null, message: "Looking up ISBN…" });
 
     try {
@@ -2517,12 +2561,14 @@ export default function BookDetailPage() {
                                       <button
                                         onClick={() => {
                                           enterEditMode();
-                                          if (r.title) setFormTitle(r.title);
-                                          setFormAuthors((r.authors ?? []).filter(Boolean).join(", "));
-                                          if (r.publisher) setFormPublisher(r.publisher);
-                                          if (r.publish_date) setFormPublishDate(r.publish_date);
-                                          if (r.cover_url) setSuggestedCoverUrl(r.cover_url);
-                                          setSearchState((s) => ({ ...s, message: "Filled fields (not saved)" }));
+                                          fillFieldsAdditive({
+                                            title: r.title,
+                                            authors: r.authors,
+                                            publisher: r.publisher,
+                                            publish_date: r.publish_date,
+                                            subjects: r.subjects,
+                                            cover_url: r.cover_url
+                                          });
                                         }}
                                         disabled={!r.title && (!r.authors || r.authors.length === 0) && !r.publisher && !r.publish_date}
                                       >
@@ -2617,13 +2663,15 @@ export default function BookDetailPage() {
                                         <button
                                           onClick={() => {
                                             enterEditMode();
-                                            if (preview.title) setFormTitle(preview.title);
-                                            setFormAuthors((preview.authors ?? []).filter(Boolean).join(", "));
-                                            if (preview.publisher) setFormPublisher(preview.publisher);
-                                            if (preview.publish_date) setFormPublishDate(preview.publish_date);
-                                            if (preview.description) setFormDescription(preview.description);
-                                            if (preview.cover_url) setSuggestedCoverUrl(preview.cover_url);
-                                            setImportState((s) => ({ ...s, message: "Filled fields (not saved)" }));
+                                            fillFieldsAdditive({
+                                              title: preview.title,
+                                              authors: preview.authors,
+                                              publisher: preview.publisher,
+                                              publish_date: preview.publish_date,
+                                              description: preview.description,
+                                              subjects: preview.subjects,
+                                              cover_url: preview.cover_url
+                                            });
                                           }}
                                           disabled={
                                             !preview.title &&
