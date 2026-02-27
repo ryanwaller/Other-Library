@@ -304,23 +304,11 @@ export default function GlobalNav() {
             ) : null}
 
             {avatarUrl || me?.username ? (
-              <div className="row" style={{ gap: 6, alignItems: "center", flexWrap: "nowrap" }}>
+              <div className="om-avatar-lockup">
                 {avatarUrl ? (
-                  <Link href={me?.username ? `/u/${me.username}` : "/app"} aria-label="Open your public profile" style={{ display: "inline-flex" }}>
+                  <Link href={me?.username ? `/u/${me.username}` : "/app"} aria-label="Open your public profile" className="om-avatar-link">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      alt=""
-                      src={avatarUrl}
-                      style={{
-                        width: NAV_AVATAR_SIZE,
-                        height: NAV_AVATAR_SIZE,
-                        borderRadius: 999,
-                        border: "1px solid var(--border)",
-                        objectFit: "cover",
-                        position: "relative",
-                        top: 1
-                      }}
-                    />
+                    <img alt="" src={avatarUrl} className="om-avatar-img" style={{ width: NAV_AVATAR_SIZE, height: NAV_AVATAR_SIZE }} />
                   </Link>
                 ) : null}
 

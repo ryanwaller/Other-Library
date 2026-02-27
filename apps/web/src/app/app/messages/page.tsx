@@ -219,18 +219,18 @@ export default function MessagesPage() {
                 return (
                   <div key={r.id} className="card" style={{ marginTop: 10 }}>
                     <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                      <div className="row" style={{ gap: 8 }}>
+                      <div className="om-avatar-lockup">
                         {avatarUrl ? (
-                          <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar">
+                          <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar" className="om-avatar-link">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               alt=""
                               src={avatarUrl}
-                              style={{ width: 18, height: 18, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
+                              className="om-avatar-img om-avatar-img-sm"
                             />
                           </a>
                         ) : (
-                          <div style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
+                          <div className="om-avatar-img om-avatar-img-sm" />
                         )}
                         <div>
                           <span className="muted">{isOwner ? "request from " : "to "}</span>

@@ -114,12 +114,12 @@ export default function AlsoOwnedBy({
             const avatarPath = r.owner?.avatar_path ?? null;
             const avatarUrl = avatarPath ? avatarUrlsByPath[avatarPath] ?? null : null;
             return (
-              <Link key={r.owner_id} href={`/u/${username}`} className="card" style={{ textDecoration: "none", display: "inline-flex", gap: 8 }}>
+              <Link key={r.owner_id} href={`/u/${username}`} className="card om-avatar-lockup" style={{ textDecoration: "none", gap: 8 }}>
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img alt="" src={avatarUrl} style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
+                  <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
                 ) : (
-                  <span style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)", display: "inline-block" }} />
+                  <span className="om-avatar-img om-avatar-img-sm" style={{ display: "inline-block" }} />
                 )}
                 <span>{username}</span>
                 <span className="muted">{r.copies > 1 ? `(${r.copies})` : ""}</span>

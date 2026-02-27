@@ -97,10 +97,10 @@ export default async function PublicFollowingPage({ params }: { params: Promise<
             return (
               <div key={p.id} className="card" style={{ marginTop: 10 }}>
                 <div className="row" style={{ justifyContent: "space-between" }}>
-                  <div className="row">
+                  <div className="om-avatar-lockup">
                     {avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img alt="" src={avatarUrl} style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
+                      <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
                     ) : null}
                     <Link href={`/u/${p.username}`}>{label}</Link>
                   </div>
@@ -114,4 +114,3 @@ export default async function PublicFollowingPage({ params }: { params: Promise<
     </main>
   );
 }
-

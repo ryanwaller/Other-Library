@@ -168,18 +168,18 @@ export default function BorrowRequestsPage() {
                 return (
                   <div key={r.id} className="om-list-row">
                     <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
-                      <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      <div className="om-avatar-lockup">
                         {avatarUrl ? (
-                          <Link href={requester?.username ? `/u/${requester.username}` : "/app"} aria-label="Open requester profile" style={{ display: "inline-flex" }}>
+                          <Link href={requester?.username ? `/u/${requester.username}` : "/app"} aria-label="Open requester profile" className="om-avatar-link">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               alt=""
                               src={avatarUrl}
-                              style={{ width: 18, height: 18, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
+                              className="om-avatar-img om-avatar-img-sm"
                             />
                           </Link>
                         ) : (
-                          <div style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
+                          <div className="om-avatar-img om-avatar-img-sm" />
                         )}
                         <div>
                           {requester?.username ? <Link href={`/u/${requester.username}`}>{requester.username}</Link> : <span className="muted">{r.requester_id}</span>}

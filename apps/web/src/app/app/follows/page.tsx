@@ -287,10 +287,10 @@ export default function FollowsPage() {
                   const avatarUrl = avatarUrlFor(pid);
                   return (
                     <div key={`${r.follower_id}:${r.followee_id}`} className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
-                      <div className="row">
+                      <div className="om-avatar-lockup">
                         {avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
+                          <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
                         ) : null}
                         {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
                       </div>
@@ -328,10 +328,10 @@ export default function FollowsPage() {
                   const outgoingStatus = myOutgoingStatusFor(pid);
                   return (
                     <div key={`${r.follower_id}:${r.followee_id}`} className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
-                      <div className="row">
+                      <div className="om-avatar-lockup">
                         {avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
+                          <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
                         ) : null}
                         {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
                       </div>
@@ -382,10 +382,10 @@ export default function FollowsPage() {
                   const avatarUrl = avatarUrlFor(pid);
                   return (
                     <div key={`${r.follower_id}:${r.followee_id}`} className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
-                      <div className="row">
+                      <div className="om-avatar-lockup">
                         {avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
+                          <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
                         ) : null}
                         {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
                       </div>
@@ -419,10 +419,10 @@ export default function FollowsPage() {
                   const avatarUrl = avatarUrlFor(pid);
                   return (
                     <div key={`${r.follower_id}:${r.followee_id}`} className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
-                      <div className="row">
+                      <div className="om-avatar-lockup">
                         {avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
+                          <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
                         ) : null}
                         {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
                       </div>
@@ -456,10 +456,10 @@ export default function FollowsPage() {
                   const avatarUrl = avatarUrlFor(pid);
                   return (
                     <div key={`${r.follower_id}:${r.followee_id}`} className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
-                      <div className="row">
+                      <div className="om-avatar-lockup">
                         {avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid var(--border)" }} />
+                          <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
                         ) : null}
                         {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
                       </div>

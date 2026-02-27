@@ -109,6 +109,36 @@ a:focus-visible {
   filter: brightness(1.03);
 }
 
+.om-avatar-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.om-avatar-link {
+  display: inline-flex;
+  line-height: 0;
+  align-items: center;
+  text-decoration: none !important;
+}
+
+.om-avatar-img {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  position: relative;
+  top: 1px;
+}
+
+.om-avatar-img-sm {
+  width: 18px;
+  height: 18px;
+}
+
 input,
 button,
 textarea,
