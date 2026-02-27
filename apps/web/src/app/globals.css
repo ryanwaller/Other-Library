@@ -1,6 +1,22 @@
+@font-face {
+  font-family: "OMBauerFolio";
+  src: url("/fonts/OMBauerFolio-MediumText.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "OMBauerFolio";
+  src: url("/fonts/OMBauerFolio-MediumTextItalic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light dark;
-  --font-family: "Times New Roman", Times, serif;
+  --font-family: "OMBauerFolio", "Times New Roman", Times, serif;
   --text-size-1: 16px;
   --text-size-2: 16px;
   --text-size-3: 16px;
@@ -97,7 +113,8 @@ select:focus-visible {
 input,
 button,
 textarea,
-select {
+select,
+option {
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
@@ -323,6 +340,17 @@ select.om-filter-control {
   border: 0;
   border-top: 1px solid var(--border);
   margin: 12px 0;
+}
+
+.admin-meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.admin-meta-pair {
+  white-space: nowrap;
 }
 
 /* Lookup results (book detail) */

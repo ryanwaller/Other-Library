@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { Session } from "@supabase/supabase-js";
 import SignInCard from "../components/SignInCard";
 import { supabase } from "../../lib/supabaseClient";
+import { formatDateShort } from "../../lib/formatDate";
 
 type ProfileRow = {
   id: string;
@@ -53,7 +54,17 @@ type WaitlistResponse = {
   metrics: { total: number; pending: number; approved: number; rejected: number };
 };
 
-type InvitesResponse = { invites: InviteRow[]; page: number; pageSize: number; total: number };
+type InvitesResponse = {
+  invites: InviteRow[];
+  page: number;
+  pageSize: number;
+  total: number;
+  metrics: { total: number; pending: number; used: number; expired: number };
+};
+
+type TabKey = "users" | "waitlist" | "invites";
+
+type MetaPair = { label: string; value: string | number };
 
 async function api<T>(path: string, opts: RequestInit & { token: string }): Promise<T> {
   const res = await fetch(path, {
@@ -69,21 +80,66 @@ async function api<T>(path: string, opts: RequestInit & { token: string }): Prom
   return json as T;
 }
 
-function fmtDate(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (!Number.isFinite(d.getTime())) return iso;
-    return d.toISOString().slice(0, 10);
-  } catch {
-    return iso;
+function clampPage(current: number, totalPages: number) {
+  return Math.max(1, Math.min(current, Math.max(1, totalPages)));
+}
+
+function titleCase(input: string): string {
+  if (!input) return "";
+  return input.charAt(0).toUpperCase() + input.slice(1).toLowerCase();
+}
+
+function inviteStatus(row: InviteRow): "pending" | "used" | "expired" {
+  if (row.used_at) return "used";
+  if (row.expires_at) {
+    const expiry = new Date(row.expires_at);
+    if (Number.isFinite(expiry.getTime()) && expiry.getTime() < Date.now()) return "expired";
   }
+  return "pending";
+}
+
+function AdminListItem({
+  primary,
+  primaryHref,
+  actions,
+  meta,
+  secondary
+}: {
+  primary: string;
+  primaryHref?: string | null;
+  actions?: ReactNode;
+  meta: MetaPair[];
+  secondary?: ReactNode;
+}) {
+  return (
+    <div className="om-list-row" style={{ borderTop: "1px solid var(--border)", borderBottom: 0 }}>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+        <div style={{ minWidth: 0, wordBreak: "break-word" }}>
+          {primaryHref ? <Link href={primaryHref}>{primary}</Link> : primary}
+        </div>
+        {actions ? <div className="row" style={{ gap: 10, justifyContent: "flex-end" }}>{actions}</div> : null}
+      </div>
+      <div className="admin-meta-line" style={{ marginTop: 4 }}>
+        {meta.map((pair, idx) => (
+          <span className="admin-meta-pair" key={`${pair.label}-${idx}`}>
+            <span className="muted">{pair.label}</span> {pair.value}
+          </span>
+        ))}
+      </div>
+      {secondary ? (
+        <div className="muted" style={{ marginTop: 4, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+          {secondary}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null>(null);
   const token = session?.access_token ?? "";
 
-  const [tab, setTab] = useState<"users" | "waitlist" | "invites">("users");
+  const [tab, setTab] = useState<TabKey>("users");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const friendlyError = useMemo(() => {
@@ -92,7 +148,9 @@ export default function AdminPage() {
     return error;
   }, [error]);
 
-  // Users controls
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+
   const [userTab, setUserTab] = useState<"all" | "active" | "disabled" | "admins">("all");
   const [userSearchDraft, setUserSearchDraft] = useState("");
   const [userSearch, setUserSearch] = useState("");
@@ -100,11 +158,9 @@ export default function AdminPage() {
   const [userDir, setUserDir] = useState<"asc" | "desc">("desc");
   const [userPage, setUserPage] = useState(1);
   const [userPageSize, setUserPageSize] = useState(20);
-
   const [usersData, setUsersData] = useState<UsersResponse | null>(null);
   const [usersMetrics, setUsersMetrics] = useState<UsersResponse["metrics"]>({ total: 0, active: 0, disabled: 0, pending: 0 });
 
-  // Waitlist controls
   const [waitTab, setWaitTab] = useState<"all" | "pending" | "approved" | "rejected">("pending");
   const [waitSearchDraft, setWaitSearchDraft] = useState("");
   const [waitSearch, setWaitSearch] = useState("");
@@ -112,15 +168,14 @@ export default function AdminPage() {
   const [waitDir, setWaitDir] = useState<"asc" | "desc">("desc");
   const [waitPage, setWaitPage] = useState(1);
   const [waitPageSize, setWaitPageSize] = useState(20);
-
   const [waitlistData, setWaitlistData] = useState<WaitlistResponse | null>(null);
 
-  // Invites
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const [invitesData, setInvitesData] = useState<InvitesResponse | null>(null);
+  const [invitesSearchDraft, setInvitesSearchDraft] = useState("");
+  const [invitesSearch, setInvitesSearch] = useState("");
+  const [invitesDir, setInvitesDir] = useState<"asc" | "desc">("desc");
   const [invitesPage, setInvitesPage] = useState(1);
-  const invitesPageSize = 20;
+  const [invitesPageSize, setInvitesPageSize] = useState(20);
+  const [invitesData, setInvitesData] = useState<InvitesResponse | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -132,14 +187,7 @@ export default function AdminPage() {
   async function refreshSummary() {
     if (!token) return;
     try {
-      const params = new URLSearchParams();
-      params.set("q", "");
-      params.set("sort", "created_at");
-      params.set("dir", "desc");
-      params.set("page", "1");
-      params.set("pageSize", "1");
-      params.set("status", "all");
-      params.set("role", "all");
+      const params = new URLSearchParams({ q: "", sort: "created_at", dir: "desc", page: "1", pageSize: "1", status: "all", role: "all" });
       const res = await api<UsersResponse>(`/api/admin/users?${params.toString()}`, { method: "GET", token });
       setUsersMetrics(res.metrics);
     } catch (e: any) {
@@ -153,12 +201,13 @@ export default function AdminPage() {
     setBusy(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
-      params.set("q", userSearch);
-      params.set("sort", userSort);
-      params.set("dir", userDir);
-      params.set("page", String(userPage));
-      params.set("pageSize", String(userPageSize));
+      const params = new URLSearchParams({
+        q: userSearch,
+        sort: userSort,
+        dir: userDir,
+        page: String(userPage),
+        pageSize: String(userPageSize)
+      });
       if (userTab === "active") params.set("status", "active");
       if (userTab === "disabled") params.set("status", "disabled");
       if (userTab === "admins") params.set("role", "admin");
@@ -182,13 +231,14 @@ export default function AdminPage() {
     setBusy(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
-      params.set("q", waitSearch);
-      params.set("sort", waitSort);
-      params.set("dir", waitDir);
-      params.set("page", String(waitPage));
-      params.set("pageSize", String(waitPageSize));
-      params.set("status", waitTab);
+      const params = new URLSearchParams({
+        q: waitSearch,
+        sort: waitSort,
+        dir: waitDir,
+        page: String(waitPage),
+        pageSize: String(waitPageSize),
+        status: waitTab
+      });
       const res = await api<WaitlistResponse>(`/api/admin/waitlist?${params.toString()}`, { method: "GET", token });
       setWaitlistData(res);
     } catch (e: any) {
@@ -201,14 +251,23 @@ export default function AdminPage() {
 
   async function refreshInvites() {
     if (!token) return;
+    setBusy(true);
+    setError(null);
     try {
-      const params = new URLSearchParams();
-      params.set("page", String(invitesPage));
-      params.set("pageSize", String(invitesPageSize));
+      const params = new URLSearchParams({
+        q: invitesSearch,
+        sort: "created_at",
+        dir: invitesDir,
+        page: String(invitesPage),
+        pageSize: String(invitesPageSize)
+      });
       const res = await api<InvitesResponse>(`/api/admin/invites?${params.toString()}`, { method: "GET", token });
       setInvitesData(res);
-    } catch {
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to load invites");
       setInvitesData(null);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -238,24 +297,43 @@ export default function AdminPage() {
     if (!token || tab !== "invites") return;
     refreshInvites();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, tab, invitesPage]);
+  }, [token, tab, invitesSearch, invitesDir, invitesPage, invitesPageSize]);
 
   const userTotalPages = usersData ? Math.max(1, Math.ceil(usersData.total / usersData.pageSize)) : 1;
   const waitTotalPages = waitlistData ? Math.max(1, Math.ceil(waitlistData.total / waitlistData.pageSize)) : 1;
   const invitesTotalPages = invitesData ? Math.max(1, Math.ceil(invitesData.total / invitesData.pageSize)) : 1;
 
-  function pageLabel(page: number, totalPages: number, total: number): string {
-    if (totalPages > 1) return `page ${page} / ${totalPages} · ${total} results`;
-    return `${total} results`;
-  }
+  useEffect(() => setUserPage((prev) => clampPage(prev, userTotalPages)), [userTotalPages]);
+  useEffect(() => setWaitPage((prev) => clampPage(prev, waitTotalPages)), [waitTotalPages]);
+  useEffect(() => setInvitesPage((prev) => clampPage(prev, invitesTotalPages)), [invitesTotalPages]);
 
-  function setSort(next: "email" | "role" | "status" | "created_at") {
-    if (userSort === next) setUserDir(userDir === "asc" ? "desc" : "asc");
-    else {
-      setUserSort(next);
-      setUserDir(next === "created_at" ? "desc" : "asc");
+  const tabStats = useMemo(() => {
+    if (tab === "users") {
+      return [
+        { label: "Total", value: usersMetrics.total },
+        { label: "Active", value: usersMetrics.active },
+        { label: "Disabled", value: usersMetrics.disabled },
+        { label: "Pending", value: usersMetrics.pending }
+      ];
     }
-    setUserPage(1);
+    if (tab === "waitlist") {
+      return [
+        { label: "Total", value: waitlistData?.metrics.total ?? 0 },
+        { label: "Pending", value: waitlistData?.metrics.pending ?? 0 },
+        { label: "Approved", value: waitlistData?.metrics.approved ?? 0 }
+      ];
+    }
+    return [
+      { label: "Total", value: invitesData?.metrics.total ?? 0 },
+      { label: "Pending", value: invitesData?.metrics.pending ?? 0 },
+      { label: "Used", value: invitesData?.metrics.used ?? 0 },
+      { label: "Expired", value: invitesData?.metrics.expired ?? 0 }
+    ];
+  }, [tab, usersMetrics, waitlistData?.metrics, invitesData?.metrics]);
+
+  function resultLabel(page: number, totalPages: number, total: number): string {
+    if (totalPages > 1) return `Results ${total} Page ${page} / ${totalPages}`;
+    return `Results ${total}`;
   }
 
   if (!supabase) {
@@ -272,170 +350,303 @@ export default function AdminPage() {
         <SignInCard note="Sign in as an admin to access /admin." />
       ) : (
         <div className="card">
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-            <div>Admin</div>
-            <div className="row" style={{ gap: 10 }}>
-              <button
-                onClick={() => {
-                  setInviteLink(null);
-                  refreshSummary();
-                  if (tab === "users") refreshUsers();
-                  if (tab === "waitlist") refreshWaitlist();
-                  if (tab === "invites") refreshInvites();
-                }}
-                disabled={busy}
-              >
-                Refresh
-              </button>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <div className="admin-meta-line">
+              {tabStats.map((item) => (
+                <span className="admin-meta-pair" key={item.label}>
+                  <span className="muted">{item.label}</span> {item.value}
+                </span>
+              ))}
             </div>
-          </div>
-
-          <hr className="om-hr" />
-          <div style={{ marginTop: 14 }}>
-            <div style={{ marginBottom: 8 }}>Summary</div>
-            <div className="muted">
-              total: {usersMetrics.total} · active: {usersMetrics.active} · disabled: {usersMetrics.disabled} · pending: {usersMetrics.pending}
-            </div>
-          </div>
-
-          <hr className="om-hr" />
-          <div className="row" style={{ gap: 10, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
-            <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="Add via email" />
             <button
-              onClick={async () => {
-                setBusy(true);
-                setError(null);
+              onClick={() => {
                 setInviteLink(null);
-                try {
-                  const res = await api<{ link: string }>("/api/admin/invites", {
-                    method: "POST",
-                    token,
-                    body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
-                  });
-                  setInviteLink(res.link);
-                  await refreshInvites();
-                  await refreshSummary();
-                } catch (e: any) {
-                  setError(e?.message ?? "Failed to create invite");
-                } finally {
-                  setBusy(false);
-                }
+                refreshSummary();
+                if (tab === "users") refreshUsers();
+                if (tab === "waitlist") refreshWaitlist();
+                if (tab === "invites") refreshInvites();
               }}
               disabled={busy}
             >
-              Invite
+              Refresh
             </button>
-            {inviteLink ? (
-              <button
-                onClick={async () => {
-                  await navigator.clipboard.writeText(inviteLink);
-                }}
-              >
-                Copy link
-              </button>
-            ) : null}
-            <div className="muted">{friendlyError ? `Error: ${friendlyError}` : busy ? "Loading…" : ""}</div>
           </div>
 
           <hr className="om-hr" />
-          <div className="card" style={{ marginTop: 14 }}>
-            <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <div>Users</div>
-              <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
-                <button onClick={() => setTab("users")} disabled={tab === "users"}>
-                  Users
+
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+            <div className="row" style={{ gap: 8, flex: "1 1 auto", minWidth: 0 }}>
+              <input
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="Add via email"
+                style={{ maxWidth: 320 }}
+              />
+              <button
+                onClick={async () => {
+                  setBusy(true);
+                  setError(null);
+                  setInviteLink(null);
+                  try {
+                    const res = await api<{ link: string }>("/api/admin/invites", {
+                      method: "POST",
+                      token,
+                      body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
+                    });
+                    setInviteLink(res.link);
+                    await refreshInvites();
+                    await refreshSummary();
+                  } catch (e: any) {
+                    setError(e?.message ?? "Failed to create invite");
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                disabled={busy}
+              >
+                Invite
+              </button>
+              {inviteLink ? (
+                <button
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(inviteLink);
+                  }}
+                >
+                  Copy link
                 </button>
-                <button onClick={() => setTab("waitlist")} disabled={tab === "waitlist"}>
-                  Waitlist
-                </button>
-                <button onClick={() => setTab("invites")} disabled={tab === "invites"}>
-                  Invites
-                </button>
-              </div>
+              ) : null}
             </div>
 
-            {tab === "users" ? (
-              <div style={{ marginTop: 10 }}>
-                <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <div />
-                  <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
-                    <select
-                      value={userTab}
-                      onChange={(e) => {
-                        setUserPage(1);
-                        setUserTab(e.target.value as any);
-                      }}
-                    >
-                      <option value="all">All</option>
-                      <option value="active">Active</option>
-                      <option value="disabled">Disabled</option>
-                      <option value="admins">Admins</option>
-                    </select>
-                    <select
-                      value={`${userSort}:${userDir}`}
-                      onChange={(e) => {
-                        const [sort, dir] = String(e.target.value).split(":");
-                        setUserPage(1);
-                        setUserSort(sort as any);
-                        setUserDir(dir as any);
-                      }}
-                    >
-                      <option value="created_at:desc">created (newest)</option>
-                      <option value="created_at:asc">created (oldest)</option>
-                      <option value="email:asc">email</option>
-                      <option value="status:asc">status</option>
-                      <option value="role:asc">role</option>
-                    </select>
-                    <input
-                      value={userSearchDraft}
-                      onChange={(e) => setUserSearchDraft(e.target.value)}
-                      placeholder="Search email…"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          setUserPage(1);
-                          setUserSearch(userSearchDraft.trim());
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={() => {
+            <div className="row" style={{ gap: 14, flex: "0 0 auto" }}>
+              <button onClick={() => setTab("users")} disabled={tab === "users"}>
+                Users
+              </button>
+              <button onClick={() => setTab("waitlist")} disabled={tab === "waitlist"}>
+                Waitlist
+              </button>
+              <button onClick={() => setTab("invites")} disabled={tab === "invites"}>
+                Invites
+              </button>
+            </div>
+          </div>
+
+          {friendlyError ? (
+            <div className="muted" style={{ marginTop: 8 }}>
+              {friendlyError}
+            </div>
+          ) : null}
+
+          <hr className="om-hr" />
+
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <div className="row" style={{ gap: 8, alignItems: "center", flex: "1 1 auto", minWidth: 0 }}>
+              {tab === "users" ? (
+                <>
+                  <select
+                    value={userTab}
+                    onChange={(e) => {
+                      setUserPage(1);
+                      setUserTab(e.target.value as any);
+                    }}
+                    className="om-filter-control"
+                  >
+                    <option value="all">All</option>
+                    <option value="active">Active</option>
+                    <option value="disabled">Disabled</option>
+                    <option value="admins">Admins</option>
+                  </select>
+                  <select
+                    value={`${userSort}:${userDir}`}
+                    onChange={(e) => {
+                      const [sort, dir] = String(e.target.value).split(":");
+                      setUserPage(1);
+                      setUserSort(sort as any);
+                      setUserDir(dir as any);
+                    }}
+                    className="om-filter-control"
+                  >
+                    <option value="created_at:desc">Newest</option>
+                    <option value="created_at:asc">Oldest</option>
+                    <option value="email:asc">Email</option>
+                    <option value="status:asc">Status</option>
+                    <option value="role:asc">Role</option>
+                  </select>
+                  <input
+                    value={userSearchDraft}
+                    onChange={(e) => setUserSearchDraft(e.target.value)}
+                    placeholder="Search email…"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
                         setUserPage(1);
                         setUserSearch(userSearchDraft.trim());
-                      }}
-                      disabled={busy}
-                    >
-                      Search
-                    </button>
-                    <select
-                      value={userPageSize}
-                      onChange={(e) => {
-                        setUserPage(1);
-                        setUserPageSize(Number(e.target.value));
-                      }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                    </select>
-                  </div>
-                </div>
+                      }
+                    }}
+                    style={{ minWidth: 180 }}
+                  />
+                  <button
+                    onClick={() => {
+                      setUserPage(1);
+                      setUserSearch(userSearchDraft.trim());
+                    }}
+                    disabled={busy}
+                  >
+                    Search
+                  </button>
+                </>
+              ) : null}
 
-                <div className="card" style={{ marginTop: 12, overflowX: "auto" }}>
-                  <div style={{ marginTop: 10 }}>
-                    {(usersData?.users ?? []).map((u) => (
-                      <div key={u.id} className="row" style={{ justifyContent: "space-between", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)" }}>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ wordBreak: "break-all" }}>
-                            {u.email ?? <span className="muted">(no email)</span>}{" "}
-                            <span className="muted">
-                              · {u.role}/{u.status} · {fmtDate(u.created_at)}
-                            </span>
-                          </div>
-                          <div className="muted">
-                            <Link href={`/u/${encodeURIComponent(u.username)}`}>{u.username}</Link>
-                          </div>
-                        </div>
-                        <div className="row" style={{ gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {tab === "waitlist" ? (
+                <>
+                  <select
+                    value={waitTab}
+                    onChange={(e) => {
+                      setWaitPage(1);
+                      setWaitTab(e.target.value as any);
+                    }}
+                    className="om-filter-control"
+                  >
+                    <option value="all">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                  <select
+                    value={`${waitSort}:${waitDir}`}
+                    onChange={(e) => {
+                      const [sort, dir] = String(e.target.value).split(":");
+                      setWaitPage(1);
+                      setWaitSort(sort as any);
+                      setWaitDir(dir as any);
+                    }}
+                    className="om-filter-control"
+                  >
+                    <option value="created_at:desc">Newest</option>
+                    <option value="created_at:asc">Oldest</option>
+                    <option value="email:asc">Email</option>
+                    <option value="status:asc">Status</option>
+                  </select>
+                  <input
+                    value={waitSearchDraft}
+                    onChange={(e) => setWaitSearchDraft(e.target.value)}
+                    placeholder="Search email…"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setWaitPage(1);
+                        setWaitSearch(waitSearchDraft.trim());
+                      }
+                    }}
+                    style={{ minWidth: 180 }}
+                  />
+                  <button
+                    onClick={() => {
+                      setWaitPage(1);
+                      setWaitSearch(waitSearchDraft.trim());
+                    }}
+                    disabled={busy}
+                  >
+                    Search
+                  </button>
+                </>
+              ) : null}
+
+              {tab === "invites" ? (
+                <>
+                  <select
+                    value={invitesDir}
+                    onChange={(e) => {
+                      setInvitesPage(1);
+                      setInvitesDir(e.target.value as "asc" | "desc");
+                    }}
+                    className="om-filter-control"
+                  >
+                    <option value="desc">Newest</option>
+                    <option value="asc">Oldest</option>
+                  </select>
+                  <input
+                    value={invitesSearchDraft}
+                    onChange={(e) => setInvitesSearchDraft(e.target.value)}
+                    placeholder="Search email…"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setInvitesPage(1);
+                        setInvitesSearch(invitesSearchDraft.trim());
+                      }
+                    }}
+                    style={{ minWidth: 180 }}
+                  />
+                  <button
+                    onClick={() => {
+                      setInvitesPage(1);
+                      setInvitesSearch(invitesSearchDraft.trim());
+                    }}
+                    disabled={busy}
+                  >
+                    Search
+                  </button>
+                </>
+              ) : null}
+            </div>
+
+            <div style={{ flex: "0 0 auto" }}>
+              {tab === "users" ? (
+                <select
+                  value={userPageSize}
+                  onChange={(e) => {
+                    setUserPage(1);
+                    setUserPageSize(Number(e.target.value));
+                  }}
+                  className="om-filter-control"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              ) : null}
+              {tab === "waitlist" ? (
+                <select
+                  value={waitPageSize}
+                  onChange={(e) => {
+                    setWaitPage(1);
+                    setWaitPageSize(Number(e.target.value));
+                  }}
+                  className="om-filter-control"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              ) : null}
+              {tab === "invites" ? (
+                <select
+                  value={invitesPageSize}
+                  onChange={(e) => {
+                    setInvitesPage(1);
+                    setInvitesPageSize(Number(e.target.value));
+                  }}
+                  className="om-filter-control"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              ) : null}
+            </div>
+          </div>
+
+          <hr className="om-hr" />
+
+          <div className="om-list">
+            {tab === "users"
+              ? (usersData?.users ?? []).map((u) => {
+                  const primary = u.username?.trim() ? u.username : (u.email ?? "(no email)");
+                  const secondary = u.username?.trim() ? (u.email ?? null) : null;
+                  return (
+                    <AdminListItem
+                      key={u.id}
+                      primary={primary}
+                      primaryHref={u.username?.trim() ? `/u/${encodeURIComponent(u.username)}` : null}
+                      actions={
+                        <>
                           <button
                             onClick={async () => {
                               setBusy(true);
@@ -474,222 +685,162 @@ export default function AdminPage() {
                           >
                             {u.role === "admin" ? "Demote" : "Promote"}
                           </button>
-                        </div>
-                      </div>
-                    ))}
-                    {(usersData?.users ?? []).length === 0 ? <div className="muted" style={{ paddingTop: 8 }}>No users.</div> : null}
-                  </div>
-
-                  <div className="muted" style={{ marginTop: 12 }}>
-                    {pageLabel(usersData?.page ?? userPage, userTotalPages, usersData?.total ?? 0)}
-                  </div>
-                  {userTotalPages > 1 ? (
-                    <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                      <button onClick={() => setUserPage(Math.max(1, userPage - 1))} disabled={busy || userPage <= 1}>
-                        Prev
-                      </button>
-                      <button onClick={() => setUserPage(Math.min(userTotalPages, userPage + 1))} disabled={busy || userPage >= userTotalPages}>
-                        Next
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            ) : tab === "waitlist" ? (
-              <div style={{ marginTop: 10 }}>
-                <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-                  <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                    <select
-                      value={waitTab}
-                      onChange={(e) => {
-                        setWaitPage(1);
-                        setWaitTab(e.target.value as any);
-                      }}
-                    >
-                      <option value="all">All</option>
-                      <option value="pending">Pending</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                    <select
-                      value={`${waitSort}:${waitDir}`}
-                      onChange={(e) => {
-                        const [sort, dir] = String(e.target.value).split(":");
-                        setWaitPage(1);
-                        setWaitSort(sort as any);
-                        setWaitDir(dir as any);
-                      }}
-                    >
-                      <option value="created_at:desc">created (newest)</option>
-                      <option value="created_at:asc">created (oldest)</option>
-                      <option value="email:asc">email</option>
-                      <option value="status:asc">status</option>
-                    </select>
-                  </div>
-
-                  <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
-                    <input
-                      value={waitSearchDraft}
-                      onChange={(e) => setWaitSearchDraft(e.target.value)}
-                      placeholder="Search email…"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          setWaitPage(1);
-                          setWaitSearch(waitSearchDraft.trim());
-                        }
-                      }}
+                        </>
+                      }
+                      meta={[
+                        { label: "Status", value: titleCase(u.status) },
+                        { label: "Date", value: formatDateShort(u.created_at) },
+                        { label: "Role", value: titleCase(u.role) }
+                      ]}
+                      secondary={secondary}
                     />
-                    <button
-                      onClick={() => {
-                        setWaitPage(1);
-                        setWaitSearch(waitSearchDraft.trim());
-                      }}
-                      disabled={busy}
-                    >
-                      Search
-                    </button>
-                    <select
-                      value={waitPageSize}
-                      onChange={(e) => {
-                        setWaitPage(1);
-                        setWaitPageSize(Number(e.target.value));
-                      }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                    </select>
-                  </div>
-                </div>
+                  );
+                })
+              : null}
 
-                <div className="muted" style={{ marginTop: 10 }}>
-                  total: {waitlistData?.metrics.total ?? 0} · pending: {waitlistData?.metrics.pending ?? 0} · approved: {waitlistData?.metrics.approved ?? 0} · rejected:{" "}
-                  {waitlistData?.metrics.rejected ?? 0}
-                </div>
+            {tab === "waitlist"
+              ? (waitlistData?.waitlist ?? []).map((w) => (
+                  <AdminListItem
+                    key={w.id}
+                    primary={w.email}
+                    actions={
+                      w.status === "pending" ? (
+                        <>
+                          <button
+                            onClick={async () => {
+                              setBusy(true);
+                              setError(null);
+                              setInviteLink(null);
+                              try {
+                                const res = await api<{ link: string }>(`/api/admin/waitlist/${encodeURIComponent(w.id)}`, {
+                                  method: "PATCH",
+                                  token,
+                                  body: JSON.stringify({ action: "approve" })
+                                });
+                                setInviteLink(res.link);
+                                await refreshWaitlist();
+                                await refreshInvites();
+                                await refreshSummary();
+                              } catch (e: any) {
+                                setError(e?.message ?? "Approve failed");
+                              } finally {
+                                setBusy(false);
+                              }
+                            }}
+                            disabled={busy}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={async () => {
+                              setBusy(true);
+                              setError(null);
+                              try {
+                                await api(`/api/admin/waitlist/${encodeURIComponent(w.id)}`, { method: "PATCH", token, body: JSON.stringify({ action: "reject" }) });
+                                await refreshWaitlist();
+                                await refreshSummary();
+                              } catch (e: any) {
+                                setError(e?.message ?? "Reject failed");
+                              } finally {
+                                setBusy(false);
+                              }
+                            }}
+                            disabled={busy}
+                          >
+                            Reject
+                          </button>
+                        </>
+                      ) : undefined
+                    }
+                    meta={[
+                      { label: "Status", value: titleCase(w.status) },
+                      { label: "Date", value: formatDateShort(w.created_at) }
+                    ]}
+                    secondary={w.note}
+                  />
+                ))
+              : null}
 
-                <div style={{ marginTop: 10 }}>
-                  {(waitlistData?.waitlist ?? []).map((w) => (
-                    <div key={w.id} className="card" style={{ marginTop: 10 }}>
-                      <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                        <div>
-                          <span style={{ wordBreak: "break-all" }}>{w.email}</span> <span className="muted">({w.status} · {fmtDate(w.created_at)})</span>
-                        </div>
-                        {w.status === "pending" ? (
-                          <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
-                            <button
-                              onClick={async () => {
-                                setBusy(true);
-                                setError(null);
-                                setInviteLink(null);
-                                try {
-                                  const res = await api<{ link: string }>(`/api/admin/waitlist/${encodeURIComponent(w.id)}`, {
-                                    method: "PATCH",
-                                    token,
-                                    body: JSON.stringify({ action: "approve" })
-                                  });
-                                  setInviteLink(res.link);
-                                  await refreshWaitlist();
-                                  await refreshInvites();
-                                  await refreshSummary();
-                                } catch (e: any) {
-                                  setError(e?.message ?? "Approve failed");
-                                } finally {
-                                  setBusy(false);
-                                }
-                              }}
-                              disabled={busy}
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={async () => {
-                                setBusy(true);
-                                setError(null);
-                                try {
-                                  await api(`/api/admin/waitlist/${encodeURIComponent(w.id)}`, { method: "PATCH", token, body: JSON.stringify({ action: "reject" }) });
-                                  await refreshWaitlist();
-                                  await refreshSummary();
-                                } catch (e: any) {
-                                  setError(e?.message ?? "Reject failed");
-                                } finally {
-                                  setBusy(false);
-                                }
-                              }}
-                              disabled={busy}
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                      {w.note ? (
-                        <div className="muted" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
-                          {w.note}
-                        </div>
-                      ) : null}
-                    </div>
-                  ))}
-                  {(waitlistData?.waitlist ?? []).length === 0 ? <div className="muted" style={{ marginTop: 10 }}>No requests.</div> : null}
-                </div>
-
-                <div className="muted" style={{ marginTop: 12 }}>
-                  {pageLabel(waitlistData?.page ?? waitPage, waitTotalPages, waitlistData?.total ?? 0)}
-                </div>
-                {waitTotalPages > 1 ? (
-                  <div className="row" style={{ gap: 10, marginTop: 6, flexWrap: "wrap" }}>
-                    <button onClick={() => setWaitPage(Math.max(1, waitPage - 1))} disabled={busy || waitPage <= 1}>
-                      Prev
-                    </button>
-                    <button onClick={() => setWaitPage(Math.min(waitTotalPages, waitPage + 1))} disabled={busy || waitPage >= waitTotalPages}>
-                      Next
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div style={{ marginTop: 10 }}>
-                <div className="muted">{invitesTotalPages > 1 ? `page ${invitesData?.page ?? invitesPage} / ${invitesTotalPages}` : ""}</div>
-                <div style={{ marginTop: 10 }}>
-                  {(invitesData?.invites ?? []).map((i) => (
-                    <div key={i.id} className="row" style={{ justifyContent: "space-between", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)" }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ wordBreak: "break-all" }}>
-                          <span className="muted">{fmtDate(i.created_at)}</span> · {i.email ?? <span className="muted">(any email)</span>}{" "}
-                          <span className="muted">{i.used_at ? "· used" : ""}</span>
-                        </div>
-                        <div className="muted" style={{ wordBreak: "break-all" }}>
-                          token: {i.token}
-                        </div>
-                      </div>
-                      <div className="row" style={{ gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {tab === "invites"
+              ? (invitesData?.invites ?? []).map((invite) => {
+                  const status = inviteStatus(invite);
+                  const primary = invite.email?.trim() ? invite.email : "Any email";
+                  return (
+                    <AdminListItem
+                      key={invite.id}
+                      primary={primary}
+                      actions={
                         <button
                           onClick={async () => {
-                            const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(i.token)}`;
+                            const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(invite.token)}`;
                             await navigator.clipboard.writeText(link);
                             setInviteLink(link);
                           }}
                         >
                           Copy link
                         </button>
-                      </div>
-                    </div>
-                  ))}
-                  {(invitesData?.invites ?? []).length === 0 ? <div className="muted" style={{ paddingTop: 8 }}>No invites.</div> : null}
-                </div>
+                      }
+                      meta={[
+                        { label: "Status", value: titleCase(status) },
+                        { label: "Date", value: formatDateShort(invite.created_at) }
+                      ]}
+                      secondary={`Token ${invite.token}`}
+                    />
+                  );
+                })
+              : null}
 
-                {invitesTotalPages > 1 ? (
-                  <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                    <button onClick={() => setInvitesPage(Math.max(1, invitesPage - 1))} disabled={busy || invitesPage <= 1}>
-                      Prev
-                    </button>
-                    <button onClick={() => setInvitesPage(Math.min(invitesTotalPages, invitesPage + 1))} disabled={busy || invitesPage >= invitesTotalPages}>
-                      Next
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            )}
+            {tab === "users" && (usersData?.users ?? []).length === 0 ? <div className="muted">No users.</div> : null}
+            {tab === "waitlist" && (waitlistData?.waitlist ?? []).length === 0 ? <div className="muted">No requests.</div> : null}
+            {tab === "invites" && (invitesData?.invites ?? []).length === 0 ? <div className="muted">No invites.</div> : null}
           </div>
+
+          <hr className="om-hr" />
+
+          <div className="muted">
+            {tab === "users" ? resultLabel(usersData?.page ?? userPage, userTotalPages, usersData?.total ?? 0) : null}
+            {tab === "waitlist" ? resultLabel(waitlistData?.page ?? waitPage, waitTotalPages, waitlistData?.total ?? 0) : null}
+            {tab === "invites" ? resultLabel(invitesData?.page ?? invitesPage, invitesTotalPages, invitesData?.total ?? 0) : null}
+          </div>
+
+          {tab === "users" && userTotalPages > 1 ? (
+            <div className="row" style={{ gap: 10, marginTop: 8 }}>
+              <button onClick={() => setUserPage((p) => Math.max(1, p - 1))} disabled={busy || userPage <= 1}>
+                Prev
+              </button>
+              <button onClick={() => setUserPage((p) => Math.min(userTotalPages, p + 1))} disabled={busy || userPage >= userTotalPages}>
+                Next
+              </button>
+            </div>
+          ) : null}
+
+          {tab === "waitlist" && waitTotalPages > 1 ? (
+            <div className="row" style={{ gap: 10, marginTop: 8 }}>
+              <button onClick={() => setWaitPage((p) => Math.max(1, p - 1))} disabled={busy || waitPage <= 1}>
+                Prev
+              </button>
+              <button onClick={() => setWaitPage((p) => Math.min(waitTotalPages, p + 1))} disabled={busy || waitPage >= waitTotalPages}>
+                Next
+              </button>
+            </div>
+          ) : null}
+
+          {tab === "invites" && invitesTotalPages > 1 ? (
+            <div className="row" style={{ gap: 10, marginTop: 8 }}>
+              <button onClick={() => setInvitesPage((p) => Math.max(1, p - 1))} disabled={busy || invitesPage <= 1}>
+                Prev
+              </button>
+              <button onClick={() => setInvitesPage((p) => Math.min(invitesTotalPages, p + 1))} disabled={busy || invitesPage >= invitesTotalPages}>
+                Next
+              </button>
+            </div>
+          ) : null}
+
+          {inviteLink ? (
+            <div className="muted" style={{ marginTop: 8, wordBreak: "break-all" }}>
+              {inviteLink}
+            </div>
+          ) : null}
         </div>
       )}
     </main>
