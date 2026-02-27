@@ -11,15 +11,13 @@ type FacetEntity = { id: string; name: string; slug: string };
 type FacetBook = {
   id: number;
   owner_id: string;
+  library_id: number | null;
+  created_at: string;
   title_override: string | null;
   authors_override: string[] | null;
-  publisher_override: string | null;
-  publish_date_override: string | null;
   edition: {
     title: string | null;
     authors: string[] | null;
-    publisher: string | null;
-    publish_date: string | null;
     cover_url: string | null;
   } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
@@ -29,24 +27,24 @@ function isFacetRole(input: string): input is FacetRole {
   return FACET_ROLES.includes(input as FacetRole);
 }
 
-function headingFor(role: FacetRole, name: string): string {
-  if (role === "author") return `By ${name}`;
-  if (role === "editor") return `Edited by ${name}`;
-  if (role === "designer") return `Designed by ${name}`;
-  if (role === "subject") return `Subject: ${name}`;
-  if (role === "tag") return `Tag: ${name}`;
-  if (role === "category") return `Category: ${name}`;
-  if (role === "material") return `Material: ${name}`;
-  if (role === "printer") return `Printed by ${name}`;
-  return `Published by ${name}`;
-}
-
 function safeDecode(input: string): string {
   try {
     return decodeURIComponent(input);
   } catch {
     return input;
   }
+}
+
+function labelForRole(role: FacetRole): string {
+  if (role === "author") return "Author";
+  if (role === "editor") return "Editor";
+  if (role === "designer") return "Designer";
+  if (role === "subject") return "Subject";
+  if (role === "tag") return "Tag";
+  if (role === "category") return "Category";
+  if (role === "material") return "Material";
+  if (role === "printer") return "Printer";
+  return "Publisher";
 }
 
 export default async function FacetBrowsePage({ params }: { params: Promise<{ role: string; slug: string }> }) {
@@ -94,7 +92,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
     .eq("role", role)
     .eq("entity_id", entity.id)
     .order("position", { ascending: true })
-    .limit(500);
+    .limit(1000);
 
   if (idsRes.error) {
     return (
@@ -116,25 +114,24 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
   if (bookIds.length > 0) {
     const booksRes = await supabase
       .from("user_books")
-      .select(
-        "id,owner_id,title_override,authors_override,publisher_override,publish_date_override,edition:editions(title,authors,publisher,publish_date,cover_url),media:user_book_media(kind,storage_path)"
-      )
+      .select("id,owner_id,library_id,created_at,title_override,authors_override,edition:editions(title,authors,cover_url),media:user_book_media(kind,storage_path)")
       .in("id", bookIds)
       .order("created_at", { ascending: false })
-      .limit(500);
-    if (!booksRes.error) {
-      books = (booksRes.data ?? []) as unknown as FacetBook[];
-    }
+      .limit(1000);
+    if (!booksRes.error) books = (booksRes.data ?? []) as unknown as FacetBook[];
   }
 
-  const ownerIds = Array.from(new Set(books.map((b) => b.owner_id).filter(Boolean)));
-  const usernamesByOwnerId: Record<string, string> = {};
-  if (ownerIds.length > 0) {
-    const profilesRes = await supabase.from("profiles").select("id,username").in("id", ownerIds);
-    for (const p of profilesRes.data ?? []) {
-      const id = String((p as any).id ?? "");
-      const username = String((p as any).username ?? "").trim();
-      if (id && username) usernamesByOwnerId[id] = username;
+  const libraryIds = Array.from(new Set(books.map((b) => b.library_id).filter((id): id is number => Number.isFinite(id as number))));
+  const libraryNameById: Record<number, string> = {};
+  const librarySortById: Record<number, number> = {};
+  if (libraryIds.length > 0) {
+    const librariesRes = await supabase.from("libraries").select("id,name,sort_order").in("id", libraryIds);
+    for (const row of librariesRes.data ?? []) {
+      const id = Number((row as any).id);
+      if (!Number.isFinite(id)) continue;
+      libraryNameById[id] = String((row as any).name ?? "").trim() || `Catalog ${id}`;
+      const sortOrder = Number((row as any).sort_order);
+      librarySortById[id] = Number.isFinite(sortOrder) ? sortOrder : 0;
     }
   }
 
@@ -154,67 +151,92 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
     }
   }
 
+  const grouped = new Map<number, FacetBook[]>();
+  for (const book of books) {
+    const libId = Number(book.library_id ?? 0) || 0;
+    if (!grouped.has(libId)) grouped.set(libId, []);
+    grouped.get(libId)!.push(book);
+  }
+
+  const groups = Array.from(grouped.entries())
+    .map(([libraryId, rows]) => ({
+      libraryId,
+      name: libraryId > 0 ? libraryNameById[libraryId] ?? `Catalog ${libraryId}` : "Unassigned",
+      sortOrder: libraryId > 0 ? librarySortById[libraryId] ?? 0 : 999999,
+      rows
+    }))
+    .sort((a, b) => {
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      return a.name.localeCompare(b.name);
+    });
+
+  const catalogsCount = groups.length;
+  const booksCount = books.length;
+  const facetLabel = `${labelForRole(role)}: ${entity.name}`;
+
   return (
     <main className="container">
-      <div>{headingFor(role, entity.name)}</div>
-      <div className="muted" style={{ marginTop: 4 }}>
-        {books.length} result{books.length === 1 ? "" : "s"}
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+        <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <span className="muted">Catalogs</span>
+          <span>{catalogsCount}</span>
+          <span className="muted">Books</span>
+          <span>{booksCount}</span>
+        </div>
+        <div className="muted">
+          {facetLabel}{" "}
+          <Link href="/app" style={{ textDecoration: "underline" }}>
+            (clear)
+          </Link>
+        </div>
       </div>
-      <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
-        {books.map((b) => {
-          const title = String((b.title_override ?? "").trim() || b.edition?.title || "(untitled)");
-          const authors =
-            (b.authors_override ?? []).filter(Boolean).length > 0
-              ? (b.authors_override ?? []).filter(Boolean)
-              : (b.edition?.authors ?? []).filter(Boolean);
-          const coverMedia = (b.media ?? []).find((m) => m.kind === "cover");
-          const coverUrl = coverMedia ? signedByPath[coverMedia.storage_path] : b.edition?.cover_url ?? null;
-          const username = usernamesByOwnerId[b.owner_id] ?? "";
-          const href = username ? `/u/${username}/b/${bookIdSlug(b.id, title)}` : "";
-          const publisher = String((b.publisher_override ?? "").trim() || b.edition?.publisher || "").trim();
-          const publishDate = String((b.publish_date_override ?? "").trim() || b.edition?.publish_date || "").trim();
-          return (
-            <div key={b.id} className="card">
-              {href ? (
-                <Link href={href} className="om-book-card-link">
-                  <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
-                    {coverUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img alt={title} src={coverUrl} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
-                    ) : null}
-                  </div>
-                  <div style={{ marginTop: 10 }} className="book-title">
-                    {title}
-                  </div>
-                </Link>
-              ) : (
-                <>
-                  <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
-                    {coverUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img alt={title} src={coverUrl} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
-                    ) : null}
-                  </div>
-                  <div style={{ marginTop: 10 }} className="book-title">
-                    {title}
-                  </div>
-                </>
-              )}
-              {authors.length > 0 ? <div className="om-book-secondary">{authors.join(", ")}</div> : null}
-              {publisher || publishDate ? (
-                <div className="om-book-secondary">
-                  {[publisher, publishDate].filter(Boolean).join(" · ")}
-                </div>
-              ) : null}
-              {username ? (
-                <div className="om-book-secondary">
-                  <Link href={`/u/${username}`}>{username}</Link>
-                </div>
-              ) : null}
+
+      <hr className="om-hr" style={{ marginTop: 10 }} />
+
+      {groups.length === 0 ? (
+        <div className="card muted">No books in this facet yet.</div>
+      ) : (
+        groups.map((group, index) => (
+          <div key={group.libraryId} style={{ marginTop: index === 0 ? 0 : 12 }}>
+            {index > 0 ? <hr className="om-hr" /> : null}
+            <div className="row" style={{ gap: 10, marginTop: 8 }}>
+              <span>{group.name}</span>
+              <span className="muted">
+                {group.rows.length} book{group.rows.length === 1 ? "" : "s"}
+              </span>
             </div>
-          );
-        })}
-      </div>
+
+            <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
+              {group.rows.map((book) => {
+                const title = String((book.title_override ?? "").trim() || book.edition?.title || "(untitled)");
+                const authors =
+                  (book.authors_override ?? []).filter(Boolean).length > 0
+                    ? (book.authors_override ?? []).filter(Boolean)
+                    : (book.edition?.authors ?? []).filter(Boolean);
+                const coverMedia = (book.media ?? []).find((m) => m.kind === "cover");
+                const coverUrl = coverMedia ? signedByPath[coverMedia.storage_path] : book.edition?.cover_url ?? null;
+                const href = `/app/books/${book.id}`;
+                return (
+                  <div key={book.id} className="card om-book-card">
+                    <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
+                      <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
+                        {coverUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img alt={title} src={coverUrl} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+                        ) : null}
+                      </div>
+                      <div style={{ marginTop: 10 }} className="book-title">
+                        {title}
+                      </div>
+                    </Link>
+                    {authors.length > 0 ? <div className="om-book-secondary">{authors.join(", ")}</div> : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))
+      )}
     </main>
   );
 }

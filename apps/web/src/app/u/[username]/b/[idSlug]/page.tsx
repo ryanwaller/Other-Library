@@ -2,6 +2,7 @@ import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
+import { formatDateShort } from "../../../../../lib/formatDate";
 import AddToLibraryButton from "../../AddToLibraryButton";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
 import BorrowRequestWidget from "../../BorrowRequestWidget";
@@ -148,6 +149,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
   const effectivePublisher = (book.publisher_override ?? "").trim() || book.edition?.publisher || "";
   const effectivePublishDate = (book.publish_date_override ?? "").trim() || book.edition?.publish_date || "";
+  const displayPublishDate = formatDateShort(effectivePublishDate || null);
   const effectiveDescription = (book.description_override ?? "").trim() || book.edition?.description || "";
   const effectiveSubjects =
     book.subjects_override !== null && book.subjects_override !== undefined
@@ -238,7 +240,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 <div style={{ minWidth: 110 }} className="muted">
                   Authors
                 </div>
-                <div>
+                <div className="om-hanging-value">
                   {effectiveAuthors.map((a, idx) => (
                     <span key={a}>
                       <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
@@ -319,7 +321,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 <div style={{ minWidth: 110 }} className="muted">
                   Publish date
                 </div>
-                <div>{effectivePublishDate}</div>
+                <div>{displayPublishDate}</div>
               </div>
             ) : null}
 

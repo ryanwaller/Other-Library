@@ -2296,36 +2296,15 @@ function AppShell({
           <div className="muted">
             {filterTag || filterAuthor || filterSubject || filterPublisher || (filterCategory ?? categoryMode) !== "all" ? (
               <>
-                filtered{" "}
-                {filterTag ? (
-                  <>
-                    tag: <span>{filterTag}</span>
-                  </>
-                ) : null}
-                {filterTag && (filterAuthor || filterSubject || filterPublisher || (filterCategory ?? categoryMode) !== "all") ? <span>, </span> : null}
-                {filterAuthor ? (
-                  <>
-                    author: <span>{filterAuthor}</span>
-                  </>
-                ) : null}{" "}
-                {filterAuthor && (filterSubject || filterPublisher || (filterCategory ?? categoryMode) !== "all") ? <span>, </span> : null}
-                {filterSubject ? (
-                  <>
-                    subject: <span>{filterSubject}</span>
-                  </>
-                ) : null}{" "}
-                {filterSubject && (filterPublisher || (filterCategory ?? categoryMode) !== "all") ? <span>, </span> : null}
-                {filterPublisher ? (
-                  <>
-                    publisher: <span>{filterPublisher}</span>
-                  </>
-                ) : null}{" "}
-                {filterPublisher && (filterCategory ?? categoryMode) !== "all" ? <span>, </span> : null}
-                {(filterCategory ?? categoryMode) !== "all" ? (
-                  <>
-                    category: <span>{filterCategory ?? categoryMode}</span>
-                  </>
-                ) : null}{" "}
+                {(() => {
+                  const activeCategory = (filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : null;
+                  if (activeCategory) return <>Category: <span>{activeCategory}</span></>;
+                  if (filterTag) return <>Tag: <span>{filterTag}</span></>;
+                  if (filterAuthor) return <>Author: <span>{filterAuthor}</span></>;
+                  if (filterSubject) return <>Subject: <span>{filterSubject}</span></>;
+                  if (filterPublisher) return <>Publisher: <span>{filterPublisher}</span></>;
+                  return null;
+                })()}{" "}
                 (
                 <button
                   type="button"
