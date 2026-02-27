@@ -295,7 +295,8 @@ function AppShell({
   });
 
   const [bulkMode, setBulkMode] = useState(false);
-  const [searchMode, setSearchMode] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [bulkSelectedKeys, setBulkSelectedKeys] = useState<Record<string, true | undefined>>({});
   const [bulkCategoryName, setBulkCategoryName] = useState("");
   const [bulkState, setBulkState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
@@ -2017,7 +2018,7 @@ function AppShell({
 
   return (
     <div style={{ marginTop: 16 }}>
-        <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 8 }}>
+        <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%" }}>
           <input
             ref={csvInputRef}
             type="file"
@@ -2042,7 +2043,7 @@ function AppShell({
               e.preventDefault();
               smartAddOrSearch();
             }}
-            style={{ minWidth: isMobile ? 0 : 380, width: isMobile ? "100%" : 520, maxWidth: "100%" }}
+            style={{ minWidth: 0, flex: "1 1 auto", width: "100%", maxWidth: "100%" }}
           />
           <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
             {addState.busy ? "Working…" : "Go"}
@@ -2278,7 +2279,7 @@ function AppShell({
           </div>
         ) : null}
 
-      <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16 }}>
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <span className="muted">Catalogs</span>
@@ -2336,32 +2337,71 @@ function AppShell({
             ) : null}
           </div>
         </div>
-        <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            onClick={() => setSearchMode((v) => !v)}
-            className={searchMode ? "text-primary" : "muted"}
-          >
-            {searchMode ? "Done search" : "Search"}
-          </button>
-          <button
-            onClick={() => {
-              setBulkMode((prev) => {
-                const next = !prev;
-                if (!next) setBulkSelectedKeys({});
-                setBulkState({ busy: false, error: null, message: null });
-                setReorderMode(false);
-                return next;
-              });
-            }}
-          >
-            {bulkMode ? "Done" : "Edit"}
-          </button>
+        <div className="row" style={{ marginTop: 10, alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+          <div className="row" style={{ gap: 12, alignItems: "center", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
+            <button
+              type="button"
+              className={sortOpen ? "text-primary" : "muted"}
+              onClick={() => setSortOpen((v) => !v)}
+            >
+              Sort
+            </button>
+            <button
+              onClick={() => {
+                setBulkMode((prev) => {
+                  const next = !prev;
+                  if (!next) setBulkSelectedKeys({});
+                  setBulkState({ busy: false, error: null, message: null });
+                  setReorderMode(false);
+                  return next;
+                });
+              }}
+            >
+              {bulkMode ? "Done" : "Edit"}
+            </button>
+            {bulkMode ? (
+              <button
+                type="button"
+                className={reorderMode ? "text-primary" : "muted"}
+                onClick={() => {
+                  setReorderMode((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setBulkSelectedKeys({});
+                      setBulkState({ busy: false, error: null, message: null });
+                    }
+                    return next;
+                  });
+                }}
+              >
+                Reorder
+              </button>
+            ) : null}
+            <input
+              placeholder="Search your catalog…"
+              value={searchQuery}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ minWidth: 0, flex: "1 1 auto", width: isMobile ? "100%" : 260, maxWidth: "100%" }}
+            />
+          </div>
+          {(searchFocused || searchQuery.trim()) ? (
+            <Link
+              href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
+              className="muted"
+              style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}
+            >
+              search others
+            </Link>
+          ) : null}
         </div>
+        {sortOpen ? (
         <div
           className="om-filter-row"
           style={{
-            marginTop: 10,
+            marginTop: 16,
+            marginBottom: 14,
             flexWrap: isMobile ? "wrap" : "nowrap",
             gap: 10,
             alignItems: "center",
@@ -2369,7 +2409,6 @@ function AppShell({
             paddingBottom: 4
           }}
         >
-          <span className="muted">Sort by</span>
           <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
             <option value="grid">grid</option>
             <option value="list">list</option>
@@ -2393,7 +2432,7 @@ function AppShell({
           <button
             ref={tagButtonRef}
             onClick={() => (tagMenu.open ? closeTagMenu() : openTagMenu())}
-            className="om-filter-control"
+            className={`om-filter-control${tagMenu.open ? " is-open" : ""}`}
             style={{ minWidth: 120 }}
             aria-haspopup="menu"
             aria-expanded={tagMenu.open}
@@ -2410,7 +2449,7 @@ function AppShell({
           <button
             ref={categoryButtonRef}
             onClick={() => (categoryMenu.open ? closeCategoryMenu() : openCategoryMenu())}
-            className="om-filter-control"
+            className={`om-filter-control${categoryMenu.open ? " is-open" : ""}`}
             style={{ minWidth: 160 }}
             aria-haspopup="menu"
             aria-expanded={categoryMenu.open}
@@ -2423,46 +2462,7 @@ function AppShell({
             <option value="public">public</option>
             <option value="private">private</option>
           </select>
-          {bulkMode ? (
-            <button
-              type="button"
-              onClick={() => {
-                setReorderMode((prev) => {
-                  const next = !prev;
-                  if (next) {
-                    setBulkSelectedKeys({});
-                    setBulkState({ busy: false, error: null, message: null });
-                  }
-                  return next;
-                });
-              }}
-              style={{ marginLeft: "auto" }}
-            >
-              {reorderMode ? "Done reordering" : "Reorder modules"}
-            </button>
-          ) : null}
         </div>
-        {searchMode ? (
-          <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-            <input
-              placeholder="Search your catalog…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ minWidth: 0, flex: "1 1 auto", width: isMobile ? "100%" : undefined, maxWidth: "100%" }}
-            />
-            {searchQuery.trim() ? (
-              <button onClick={() => setSearchQuery("")} aria-label="Clear search">
-                Clear
-              </button>
-            ) : null}
-            <Link
-              href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
-              className="muted"
-              style={{ whiteSpace: "nowrap" }}
-            >
-              search others
-            </Link>
-          </div>
         ) : null}
         {tagMenu.open ? (
           <div
@@ -2637,7 +2637,7 @@ function AppShell({
         <hr className="om-hr" />
 
         <div style={{ marginTop: 14 }} className="card">
-          <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10 }}>
+          <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, width: "100%" }}>
             <input
               placeholder="Add another catalog (e.g. Home, Office)"
               value={newLibraryName}
@@ -2647,7 +2647,7 @@ function AppShell({
                 e.preventDefault();
                 createLibrary(newLibraryName);
               }}
-              style={{ minWidth: isMobile ? 0 : 260, width: isMobile ? "100%" : undefined, maxWidth: "100%" }}
+              style={{ minWidth: 0, flex: "1 1 auto", width: "100%", maxWidth: "100%" }}
             />
             <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy || !newLibraryName.trim()}>
               Add
@@ -2657,6 +2657,7 @@ function AppShell({
             </span>
           </div>
         </div>
+        <div style={{ height: 22 }} />
       </div>
     </div>
   );

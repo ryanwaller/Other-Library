@@ -397,9 +397,10 @@ export default function AdminPage() {
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="Add via email"
-                style={{ maxWidth: 320 }}
+                style={{ width: "100%" }}
               />
               <button
+                className="om-inline-link-muted"
                 onClick={async () => {
                   setBusy(true);
                   setError(null);

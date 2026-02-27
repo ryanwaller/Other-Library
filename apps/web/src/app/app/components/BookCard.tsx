@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { MouseEvent } from "react";
 
 export type BookCardViewMode = "grid" | "list";
 
@@ -41,6 +42,12 @@ export default function BookCard({
   showDeleteCopy?: boolean;
 }) {
   const router = useRouter();
+  const openAuthorFilter = (event: MouseEvent, author: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    router.push(`/app?author=${encodeURIComponent(author)}`);
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "auto" }));
+  };
 
   const coverEl = (
     <div className="om-cover-slot" style={{ height: coverHeight }}>
@@ -75,7 +82,12 @@ export default function BookCard({
               <>
                 {authors.map((a, idx) => (
                   <span key={a}>
-                    <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
+                    <Link
+                      href={`/app?author=${encodeURIComponent(a)}`}
+                      onClick={(e) => openAuthorFilter(e, a)}
+                    >
+                      {a}
+                    </Link>
                     {idx < authors.length - 1 ? <span>, </span> : null}
                   </span>
                 ))}
@@ -174,7 +186,7 @@ export default function BookCard({
                   <span key={author}>
                     <Link
                       href={`/app?author=${encodeURIComponent(author)}`}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => openAuthorFilter(e, author)}
                       onKeyDown={(e) => e.stopPropagation()}
                     >
                       {author}

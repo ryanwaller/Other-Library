@@ -102,7 +102,8 @@ export default function LibraryBlock({
           ) : manageMode && !reorderMode ? (
             <button
               onClick={() => onStartEdit(libraryId, libraryName)}
-              style={{ padding: 0, border: "none", background: "transparent", textDecoration: "underline" }}
+              className="muted"
+              style={{ padding: 0, border: "none", background: "transparent", textDecoration: "none" }}
               aria-label="Rename catalog"
             >
               {libraryName}
