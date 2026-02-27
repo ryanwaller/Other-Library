@@ -7,6 +7,7 @@ import AddToLibraryButton from "../../AddToLibraryButton";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
 import BorrowRequestWidget from "../../BorrowRequestWidget";
 import ScrollToTopOnMount from "../../../../components/ScrollToTopOnMount";
+import FollowControls from "../../FollowControls";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +105,11 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       </main>
     );
   }
+
+  const countsRes = await supabase.rpc("get_follow_counts", { target_username: usernameNorm });
+  const countsRow = (countsRes.data as any[] | null)?.[0] ?? null;
+  const followersCount = typeof countsRow?.followers_count === "number" ? (countsRow.followers_count as number) : null;
+  const followingCount = typeof countsRow?.following_count === "number" ? (countsRow.following_count as number) : null;
 
   const bookRes = await supabase
     .from("user_books")
@@ -205,6 +211,22 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           <div className="muted">public</div>
         </div>
         {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
+        <div className="row muted" style={{ marginTop: 6, gap: 16, flexWrap: "wrap" }}>
+          <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
+            Followers <span style={{ marginLeft: 6 }}>{followersCount ?? "—"}</span>
+          </Link>
+          <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
+            Following <span style={{ marginLeft: 6 }}>{followingCount ?? "—"}</span>
+          </Link>
+        </div>
+        {profile.bio ? (
+          <div className="muted" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
+            {profile.bio}
+          </div>
+        ) : null}
+        <div style={{ marginTop: 8 }}>
+          <FollowControls profileId={profile.id} profileUsername={profile.username} />
+        </div>
       </div>
 
       <div style={{ marginTop: 14 }} className="card">

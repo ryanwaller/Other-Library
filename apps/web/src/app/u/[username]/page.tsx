@@ -185,13 +185,12 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           </div>
           <div className="muted">{profile.visibility}</div>
         </div>
-        <div className="row muted" style={{ marginTop: 6, gap: 10 }}>
+        <div className="row muted" style={{ marginTop: 6, gap: 16, flexWrap: "wrap" }}>
           <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
-            Followers {followersCount ?? "—"}
+            Followers <span style={{ marginLeft: 6 }}>{followersCount ?? "—"}</span>
           </Link>
-          <span>·</span>
           <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
-            Following {followingCount ?? "—"}
+            Following <span style={{ marginLeft: 6 }}>{followingCount ?? "—"}</span>
           </Link>
         </div>
         {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
