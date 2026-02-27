@@ -2271,40 +2271,31 @@ export default function BookDetailPage() {
 
               {isOwner && findMoreOpen ? (
                 <div style={{ marginTop: 14 }}>
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-                    <div className="muted">
-                      {importState.busy || searchState.busy ? "Working…" : importState.error || searchState.error ? "Error" : ""}
-                    </div>
-                  </div>
-                  <div className="row" style={{ marginTop: 8, flexWrap: "nowrap", gap: 8, alignItems: "center", width: "100%" }}>
+                  <div className="om-lookup-controls" style={{ marginTop: 8 }}>
                     <input
                       className="om-inline-control"
                       placeholder='Lookup by ISBN, URL, or "Title by Author"'
                       value={lookupInput}
                       onChange={(e) => setLookupInput(e.target.value)}
                       onKeyDown={(e) => onEnter(e, smartLookup)}
-                      style={{ flex: "1 1 auto", width: "100%", maxWidth: "100%", minWidth: 0 }}
+                      style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
                     />
                     <button
                       onClick={smartLookup}
                       disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
-                      style={{ marginLeft: "auto", whiteSpace: "nowrap" }}
+                      style={{ whiteSpace: "nowrap" }}
                     >
                       Find
                     </button>
                   </div>
                   <div className="muted" style={{ marginTop: 6 }}>
-                    <span>
-                      {importState.message
-                        ? importState.error
-                          ? `${importState.message} (${importState.error})`
-                          : importState.message
-                        : searchState.message
-                          ? searchState.error
-                            ? `${searchState.message} (${searchState.error})`
-                            : searchState.message
+                    {importState.busy || searchState.busy
+                      ? "Working…"
+                      : importState.error
+                        ? `Import failed (${importState.error})`
+                        : searchState.error
+                          ? `Search failed (${searchState.error})`
                           : ""}
-                    </span>
                   </div>
 
                   {searchResults.length > 0 ? (
@@ -2320,7 +2311,7 @@ export default function BookDetailPage() {
                             .filter(Boolean)
                             .join(" · ");
                           return (
-                            <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="om-list-row" style={{ marginTop: 8, paddingTop: 8, paddingBottom: 8 }}>
+                            <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="om-lookup-item">
                               <div className="om-lookup-row">
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
                                   {r.cover_url ? (
@@ -2395,7 +2386,7 @@ export default function BookDetailPage() {
                         return (
                           <div style={{ marginTop: 10 }}>
                             <div className="muted">Preview</div>
-                            <div style={{ marginTop: 6 }} className="om-list-row">
+                            <div style={{ marginTop: 6 }} className="om-lookup-item">
                               <div className="om-lookup-row">
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
                                   {previewCoverUrl ? (
@@ -2487,10 +2478,10 @@ export default function BookDetailPage() {
                                         </button>
                                       );
                                     })()}
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
                           </div>
                         );
                       })()

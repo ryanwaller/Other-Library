@@ -16,6 +16,7 @@
 
 :root {
   color-scheme: light dark;
+  --page-pad: 16px;
   --font-family: "OMBauerFolio", "Times New Roman", Times, serif;
   --text-size-1: 16px;
   --text-size-2: 16px;
@@ -132,6 +133,8 @@ select {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
+  padding-inline: 0 !important;
+  text-indent: 0;
   border-radius: 0 !important;
   box-shadow: none !important;
   outline: 0 !important;
@@ -389,7 +392,7 @@ select.om-filter-control::-ms-expand {
 .container {
   max-width: 880px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 16px var(--page-pad);
 }
 
 .row {
@@ -449,6 +452,7 @@ select.om-filter-control::-ms-expand {
   border: 0;
   border-top: 1px solid var(--border);
   margin: 12px 0;
+  width: 100%;
 }
 
 .admin-meta-line {
@@ -519,13 +523,27 @@ select.om-filter-control::-ms-expand {
 }
 
 .om-lookup-main {
-  flex: 1 1 auto;
   min-width: 0;
 }
 
 .om-lookup-actions {
-  flex: 0 0 auto;
   justify-self: end;
+  min-width: 88px;
+}
+
+.om-lookup-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+}
+
+.om-lookup-item {
+  margin-top: 8px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
 }
 
 /* Book detail helpers (public + app) */
@@ -709,8 +727,12 @@ select.om-filter-control::-ms-expand {
 }
 
 @media (max-width: 720px) {
+  :root {
+    --page-pad: 12px;
+  }
+
   .container {
-    padding: 8px;
+    padding: 8px var(--page-pad);
   }
 
   .row {
@@ -723,6 +745,7 @@ select.om-filter-control::-ms-expand {
 
   .om-lookup-row {
     grid-template-columns: 62px minmax(0, 1fr);
+    gap: 10px;
   }
 
   .om-lookup-actions {
@@ -730,6 +753,11 @@ select.om-filter-control::-ms-expand {
     display: flex;
     justify-content: flex-end;
     grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .om-lookup-controls {
+    grid-template-columns: 1fr;
   }
 
   .om-book-detail-grid {
