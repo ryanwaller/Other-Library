@@ -55,6 +55,35 @@ export async function GET(req: Request) {
 
     const res = await query;
     if (res.error) return NextResponse.json({ error: res.error.message }, { status: 500 });
+    const rows = res.data ?? [];
+    const emailList = Array.from(
+      new Set(
+        rows
+          .map((row) => (typeof row.email === "string" ? row.email.trim() : ""))
+          .filter(Boolean)
+      )
+    );
+
+    let profileByEmail = new Map<string, { username: string | null; display_name: string | null }>();
+    if (emailList.length > 0) {
+      const profiles = await admin.from("profiles").select("email,username,display_name").in("email", emailList);
+      if (!profiles.error) {
+        profileByEmail = new Map(
+          (profiles.data ?? [])
+            .map((row) => [String(row.email ?? "").trim().toLowerCase(), { username: row.username ?? null, display_name: row.display_name ?? null }] as const)
+            .filter(([email]) => email.length > 0)
+        );
+      }
+    }
+
+    const enrichedRows = rows.map((row) => {
+      const profile = profileByEmail.get(String(row.email ?? "").trim().toLowerCase());
+      return {
+        ...row,
+        username: profile?.username ?? null,
+        display_name: profile?.display_name ?? null
+      };
+    });
     const nowIso = new Date().toISOString();
     const [mTotal, mUsed, mExpired] = await Promise.all([
       admin.from("invites").select("id", { count: "exact", head: true }),
@@ -67,7 +96,7 @@ export async function GET(req: Request) {
     const pendingCount = Math.max(0, totalCount - usedCount - expiredCount);
 
     return NextResponse.json({
-      invites: res.data ?? [],
+      invites: enrichedRows,
       page,
       pageSize,
       total: res.count ?? 0,

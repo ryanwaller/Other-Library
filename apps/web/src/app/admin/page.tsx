@@ -21,6 +21,8 @@ type InviteRow = {
   id: string;
   token: string;
   email: string | null;
+  username: string | null;
+  display_name: string | null;
   created_by: string | null;
   expires_at: string | null;
   used_by: string | null;
@@ -31,6 +33,8 @@ type InviteRow = {
 type WaitlistRow = {
   id: string;
   email: string;
+  username: string | null;
+  display_name: string | null;
   note: string | null;
   status: "pending" | "approved" | "rejected";
   created_at: string;
@@ -699,76 +703,99 @@ export default function AdminPage() {
               : null}
 
             {tab === "waitlist"
-              ? (waitlistData?.waitlist ?? []).map((w) => (
-                  <AdminListItem
-                    key={w.id}
-                    primary={w.email}
-                    actions={
-                      w.status === "pending" ? (
-                        <>
-                          <button
-                            onClick={async () => {
-                              setBusy(true);
-                              setError(null);
-                              setInviteLink(null);
-                              try {
-                                const res = await api<{ link: string }>(`/api/admin/waitlist/${encodeURIComponent(w.id)}`, {
-                                  method: "PATCH",
-                                  token,
-                                  body: JSON.stringify({ action: "approve" })
-                                });
-                                setInviteLink(res.link);
-                                await refreshWaitlist();
-                                await refreshInvites();
-                                await refreshSummary();
-                              } catch (e: any) {
-                                setError(e?.message ?? "Approve failed");
-                              } finally {
-                                setBusy(false);
-                              }
-                            }}
-                            disabled={busy}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={async () => {
-                              setBusy(true);
-                              setError(null);
-                              try {
-                                await api(`/api/admin/waitlist/${encodeURIComponent(w.id)}`, { method: "PATCH", token, body: JSON.stringify({ action: "reject" }) });
-                                await refreshWaitlist();
-                                await refreshSummary();
-                              } catch (e: any) {
-                                setError(e?.message ?? "Reject failed");
-                              } finally {
-                                setBusy(false);
-                              }
-                            }}
-                            disabled={busy}
-                          >
-                            Reject
-                          </button>
-                        </>
-                      ) : undefined
-                    }
-                    meta={[
-                      { label: "Status", value: titleCase(w.status) },
-                      { label: "Date", value: formatDateShort(w.created_at) }
-                    ]}
-                    secondary={w.note}
-                  />
-                ))
+              ? (waitlistData?.waitlist ?? []).map((w) => {
+                  const hasUsername = Boolean(w.username?.trim());
+                  const primary = hasUsername ? String(w.username).trim() : w.email;
+                  const secondary = hasUsername ? (
+                    <>
+                      <div>{w.email}</div>
+                      {w.note ? <div>{w.note}</div> : null}
+                    </>
+                  ) : (
+                    w.note
+                  );
+                  return (
+                    <AdminListItem
+                      key={w.id}
+                      primary={primary}
+                      primaryHref={hasUsername ? `/u/${encodeURIComponent(String(w.username).trim())}` : null}
+                      actions={
+                        w.status === "pending" ? (
+                          <>
+                            <button
+                              onClick={async () => {
+                                setBusy(true);
+                                setError(null);
+                                setInviteLink(null);
+                                try {
+                                  const res = await api<{ link: string }>(`/api/admin/waitlist/${encodeURIComponent(w.id)}`, {
+                                    method: "PATCH",
+                                    token,
+                                    body: JSON.stringify({ action: "approve" })
+                                  });
+                                  setInviteLink(res.link);
+                                  await refreshWaitlist();
+                                  await refreshInvites();
+                                  await refreshSummary();
+                                } catch (e: any) {
+                                  setError(e?.message ?? "Approve failed");
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                              disabled={busy}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setBusy(true);
+                                setError(null);
+                                try {
+                                  await api(`/api/admin/waitlist/${encodeURIComponent(w.id)}`, { method: "PATCH", token, body: JSON.stringify({ action: "reject" }) });
+                                  await refreshWaitlist();
+                                  await refreshSummary();
+                                } catch (e: any) {
+                                  setError(e?.message ?? "Reject failed");
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                              disabled={busy}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        ) : undefined
+                      }
+                      meta={[
+                        { label: "Status", value: titleCase(w.status) },
+                        { label: "Date", value: formatDateShort(w.created_at) }
+                      ]}
+                      secondary={secondary}
+                    />
+                  );
+                })
               : null}
 
             {tab === "invites"
               ? (invitesData?.invites ?? []).map((invite) => {
                   const status = inviteStatus(invite);
-                  const primary = invite.email?.trim() ? invite.email : "Any email";
+                  const hasUsername = Boolean(invite.username?.trim());
+                  const primary = hasUsername ? String(invite.username).trim() : invite.email?.trim() ? invite.email : "Any email";
+                  const secondary = hasUsername ? (
+                    <>
+                      <div>{invite.email}</div>
+                      <div>Token {invite.token}</div>
+                    </>
+                  ) : (
+                    `Token ${invite.token}`
+                  );
                   return (
                     <AdminListItem
                       key={invite.id}
                       primary={primary}
+                      primaryHref={hasUsername ? `/u/${encodeURIComponent(String(invite.username).trim())}` : null}
                       actions={
                         <button
                           onClick={async () => {
@@ -784,7 +811,7 @@ export default function AdminPage() {
                         { label: "Status", value: titleCase(status) },
                         { label: "Date", value: formatDateShort(invite.created_at) }
                       ]}
-                      secondary={`Token ${invite.token}`}
+                      secondary={secondary}
                     />
                   );
                 })
