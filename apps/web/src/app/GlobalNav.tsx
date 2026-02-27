@@ -29,6 +29,7 @@ function parsePublicBookId(pathname: string): number | null {
 }
 
 export default function GlobalNav() {
+  const NAV_AVATAR_SIZE = 24;
   const pathname = usePathname();
   const router = useRouter();
   const viewingUsername = useMemo(() => parseViewingUsername(pathname), [pathname]);
@@ -269,8 +270,8 @@ export default function GlobalNav() {
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    minWidth: 18,
-                    height: 18,
+                    minWidth: NAV_AVATAR_SIZE,
+                    height: NAV_AVATAR_SIZE,
                     padding: "0 6px",
                     borderRadius: 4,
                     background: messagesBadge.bg,
@@ -289,8 +290,8 @@ export default function GlobalNav() {
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    minWidth: 18,
-                    height: 18,
+                    minWidth: NAV_AVATAR_SIZE,
+                    height: NAV_AVATAR_SIZE,
                     padding: "0 6px",
                     borderRadius: 999,
                     background: "#b00020",
@@ -311,13 +312,13 @@ export default function GlobalNav() {
                       alt=""
                       src={avatarUrl}
                       style={{
-                        width: 24,
-                        height: 24,
+                        width: NAV_AVATAR_SIZE,
+                        height: NAV_AVATAR_SIZE,
                         borderRadius: 999,
                         border: "1px solid var(--border)",
                         objectFit: "cover",
                         position: "relative",
-                        top: 2
+                        top: 1
                       }}
                     />
                   </Link>
