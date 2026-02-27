@@ -193,6 +193,16 @@ button:disabled {
   min-height: 28px;
 }
 
+.om-filter-control,
+.om-filter-control option,
+.om-menu-summary,
+.om-menu-panel,
+.om-menu-panel * {
+  font-family: var(--font-family);
+  font-size: var(--text-size-1);
+  line-height: var(--text-line);
+}
+
 select.om-filter-control {
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -351,6 +361,29 @@ select.om-filter-control {
 
 .admin-meta-pair {
   white-space: nowrap;
+}
+
+.admin-tabbar {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  justify-content: flex-start;
+}
+
+.admin-tabbar button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.admin-tabbar button:hover {
+  border: 0;
+  text-decoration: underline;
+}
+
+.admin-tabbar button[aria-current="page"] {
+  text-decoration: underline;
 }
 
 /* Lookup results (book detail) */

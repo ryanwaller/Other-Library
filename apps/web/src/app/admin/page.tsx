@@ -374,60 +374,60 @@ export default function AdminPage() {
 
           <hr className="om-hr" />
 
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-            <div className="row" style={{ gap: 8, flex: "1 1 auto", minWidth: 0 }}>
-              <input
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="Add via email"
-                style={{ maxWidth: 320 }}
-              />
+          <div className="admin-tabbar">
+            <button type="button" onClick={() => setTab("users")} aria-current={tab === "users" ? "page" : undefined}>
+              Users
+            </button>
+            <button type="button" onClick={() => setTab("waitlist")} aria-current={tab === "waitlist" ? "page" : undefined}>
+              Waitlist
+            </button>
+            <button type="button" onClick={() => setTab("invites")} aria-current={tab === "invites" ? "page" : undefined}>
+              Invites
+            </button>
+          </div>
+
+          <hr className="om-hr" />
+
+          <div className="row" style={{ gap: 8, flex: "1 1 auto", minWidth: 0 }}>
+            <input
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="Add via email"
+              style={{ maxWidth: 320 }}
+            />
+            <button
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                setInviteLink(null);
+                try {
+                  const res = await api<{ link: string }>("/api/admin/invites", {
+                    method: "POST",
+                    token,
+                    body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
+                  });
+                  setInviteLink(res.link);
+                  await refreshInvites();
+                  await refreshSummary();
+                } catch (e: any) {
+                  setError(e?.message ?? "Failed to create invite");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              disabled={busy}
+            >
+              Invite
+            </button>
+            {inviteLink ? (
               <button
                 onClick={async () => {
-                  setBusy(true);
-                  setError(null);
-                  setInviteLink(null);
-                  try {
-                    const res = await api<{ link: string }>("/api/admin/invites", {
-                      method: "POST",
-                      token,
-                      body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
-                    });
-                    setInviteLink(res.link);
-                    await refreshInvites();
-                    await refreshSummary();
-                  } catch (e: any) {
-                    setError(e?.message ?? "Failed to create invite");
-                  } finally {
-                    setBusy(false);
-                  }
+                  await navigator.clipboard.writeText(inviteLink);
                 }}
-                disabled={busy}
               >
-                Invite
+                Copy link
               </button>
-              {inviteLink ? (
-                <button
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(inviteLink);
-                  }}
-                >
-                  Copy link
-                </button>
-              ) : null}
-            </div>
-
-            <div className="row" style={{ gap: 14, flex: "0 0 auto" }}>
-              <button onClick={() => setTab("users")} disabled={tab === "users"}>
-                Users
-              </button>
-              <button onClick={() => setTab("waitlist")} disabled={tab === "waitlist"}>
-                Waitlist
-              </button>
-              <button onClick={() => setTab("invites")} disabled={tab === "invites"}>
-                Invites
-              </button>
-            </div>
+            ) : null}
           </div>
 
           {friendlyError ? (
