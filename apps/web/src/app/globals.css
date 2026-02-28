@@ -135,6 +135,7 @@ a:focus-visible {
   object-fit: cover;
   border: 0;
   display: block;
+  transform: translateY(-1px);
 }
 
 .om-avatar-img-nav {
