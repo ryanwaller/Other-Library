@@ -2,6 +2,7 @@ import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
+import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,8 @@ type PublicBook = {
   title_override: string | null;
   authors_override: string[] | null;
   subjects_override: string[] | null;
+  cover_original_url: string | null;
+  cover_crop: CoverCrop | null;
   edition: { isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null; subjects: string[] | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
@@ -78,7 +81,7 @@ export default async function PublicSubjectPage({ params }: { params: Promise<{ 
 
   const booksRes = await supabase
     .from("user_books")
-    .select("id,library_id,visibility,title_override,authors_override,subjects_override,edition:editions(isbn13,title,authors,cover_url,subjects),media:user_book_media(kind,storage_path)")
+    .select("id,library_id,visibility,title_override,authors_override,subjects_override,cover_original_url,cover_crop,edition:editions(isbn13,title,authors,cover_url,subjects),media:user_book_media(kind,storage_path)")
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
     .limit(200);
@@ -95,12 +98,15 @@ export default async function PublicSubjectPage({ params }: { params: Promise<{ 
   });
 
   const paths = Array.from(
-    new Set(
-      filtered
+    new Set([
+      ...filtered
         .flatMap((b) => (Array.isArray(b.media) ? b.media : []))
         .filter((m) => typeof m.storage_path === "string" && m.storage_path.length > 0)
-        .map((m) => m.storage_path)
-    )
+        .map((m) => m.storage_path),
+      ...filtered
+        .filter((b) => b.cover_crop && typeof b.cover_original_url === "string" && b.cover_original_url)
+        .map((b) => b.cover_original_url as string)
+    ])
   );
 
   const signedMap: Record<string, string> = {};
@@ -191,18 +197,15 @@ export default async function PublicSubjectPage({ params }: { params: Promise<{ 
                     : (e?.authors ?? []).filter(Boolean)) as string[];
                   const cover = (b.media ?? []).find((m) => m.kind === "cover");
                   const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
+                  const cropData = b.cover_crop ?? null;
+                  const imageSrc = cropData && b.cover_original_url ? (signedMap[b.cover_original_url] ?? coverUrl) : coverUrl;
                   const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
                   return (
                     <div key={b.id} className="om-book-card">
                       <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
-                        {coverUrl ? (
-                          <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain" }} />
-                          </div>
-                        ) : (
-                          <div className="om-cover-slot" style={{ width: "100%", height: 220 }} />
-                        )}
+                        <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
+                          <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
+                        </div>
                       </Link>
                       <div style={{ marginTop: 8 }}>
                         <Link href={href} className="om-book-title">

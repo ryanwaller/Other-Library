@@ -5,6 +5,7 @@ import { bookIdSlug } from "../../../lib/slug";
 import FollowControls from "./FollowControls";
 import AddToLibraryButton from "./AddToLibraryButton";
 import AddToLibraryProvider from "./AddToLibraryProvider";
+import CoverImage, { type CoverCrop } from "../../../components/CoverImage";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ type PublicBook = {
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
   authors_override: string[] | null;
+  cover_original_url: string | null;
+  cover_crop: CoverCrop | null;
   edition: { id: number; isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
@@ -103,7 +106,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const booksRes = await supabase
     .from("user_books")
     .select(
-      "id,library_id,visibility,title_override,authors_override,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
+      "id,library_id,visibility,title_override,authors_override,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
     )
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
@@ -128,13 +131,16 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const libraries = librariesRaw.length > 0 ? librariesRaw : fallbackLibraries;
 
   const paths = Array.from(
-    new Set(
-      books
+    new Set([
+      ...books
         .flatMap((b) => (Array.isArray(b.media) ? b.media : []))
         .filter((m) => m?.kind === "cover")
         .filter((m) => typeof m.storage_path === "string" && m.storage_path.length > 0)
-        .map((m) => m.storage_path)
-    )
+        .map((m) => m.storage_path),
+      ...books
+        .filter((b) => b.cover_crop && typeof b.cover_original_url === "string" && b.cover_original_url)
+        .map((b) => b.cover_original_url as string)
+    ])
   );
 
   const signedMap: Record<string, string> = {};
@@ -174,7 +180,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     <main className="container">
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <div className="om-avatar-lockup">
+          <div className="om-avatar-lockup om-avatar-lockup-tight">
             {avatarUrl ? (
               <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar" className="om-avatar-link">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -186,13 +192,13 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           <div className="muted">{profile.visibility}</div>
         </div>
         {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
-        <div className="row muted" style={{ marginTop: 8, justifyContent: "flex-start", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+        <div className="row muted" style={{ marginTop: 8, justifyContent: "flex-start", alignItems: "baseline", gap: 18, flexWrap: "wrap" }}>
           <div className="row muted" style={{ gap: 18, flexWrap: "wrap", alignItems: "baseline" }}>
             <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
-              Followers <span style={{ marginLeft: 10 }}>{followersCount ?? "—"}</span>
+              Followers <span style={{ marginInline: 10 }}>{followersCount ?? "—"}</span>
             </Link>
             <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
-              Following <span style={{ marginLeft: 10 }}>{followingCount ?? "—"}</span>
+              Following <span style={{ marginInline: 10 }}>{followingCount ?? "—"}</span>
             </Link>
           </div>
           <FollowControls profileId={profile.id} profileUsername={profile.username} inline />
@@ -232,6 +238,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                             return signedMap[cover.storage_path] ?? null;
                           })
                           .find(Boolean) ?? e?.cover_url ?? null;
+                      const cropData = b.cover_crop ?? null;
+                      const imageSrc = cropData && b.cover_original_url ? (signedMap[b.cover_original_url] ?? coverUrl) : coverUrl;
                       const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
                       return (
                         <div key={b.id} className="om-book-card">
@@ -248,14 +256,9 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                             </div>
                           </div>
                           <Link href={href} style={{ display: "block", marginTop: 6 }} className="om-book-card-link">
-                            {coverUrl ? (
-                              <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain" }} />
-                              </div>
-                            ) : (
-                              <div className="om-cover-slot" style={{ width: "100%", height: 220 }} />
-                            )}
+                            <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
+                              <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
+                            </div>
                           </Link>
                           <div style={{ marginTop: 8 }}>
                             <Link href={href}>{title}</Link>
@@ -293,6 +296,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                     return signedMap[cover.storage_path] ?? null;
                   })
                   .find(Boolean) ?? e?.cover_url ?? null;
+              const cropData = b.cover_crop ?? null;
+              const imageSrc = cropData && b.cover_original_url ? (signedMap[b.cover_original_url] ?? coverUrl) : coverUrl;
               const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
               return (
                 <div key={b.id} className="om-book-card">
@@ -303,14 +308,9 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                     </div>
                   </div>
                   <Link href={href} style={{ display: "block", marginTop: 6 }} className="om-book-card-link">
-                    {coverUrl ? (
-                      <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain" }} />
-                      </div>
-                    ) : (
-                      <div className="om-cover-slot" style={{ width: "100%", height: 220 }} />
-                    )}
+                    <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
+                      <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
+                    </div>
                   </Link>
                   <div style={{ marginTop: 8 }}>
                     <Link href={href}>{title}</Link>

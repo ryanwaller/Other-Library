@@ -8,6 +8,7 @@ import AlsoOwnedBy from "../../AlsoOwnedBy";
 import BorrowRequestWidget from "../../BorrowRequestWidget";
 import ScrollToTopOnMount from "../../../../components/ScrollToTopOnMount";
 import FollowControls from "../../FollowControls";
+import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,8 @@ type PublicBookDetail = {
   subjects_override: string[] | null;
   borrowable_override: boolean | null;
   borrow_request_scope_override: string | null;
+  cover_original_url: string | null;
+  cover_crop: CoverCrop | null;
   edition: {
     id: number;
     isbn13: string | null;
@@ -118,7 +121,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const bookRes = await supabase
     .from("user_books")
     .select(
-      "id,owner_id,visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,pages,group_label,object_type,decade,description_override,subjects_override,borrowable_override,borrow_request_scope_override,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
+      "id,owner_id,visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,pages,group_label,object_type,decade,description_override,subjects_override,borrowable_override,borrow_request_scope_override,cover_original_url,cover_crop,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
     )
     .eq("id", bookId)
     .eq("owner_id", profile.id)
@@ -167,7 +170,10 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       : ((book.edition?.subjects ?? []).filter(Boolean) as string[]);
   const subjects = effectiveSubjects.slice().sort((a, b) => a.localeCompare(b));
 
-  const paths = Array.from(new Set((book.media ?? []).map((m) => m.storage_path).filter(Boolean)));
+  const paths = Array.from(new Set([
+    ...(book.media ?? []).map((m) => m.storage_path).filter(Boolean),
+    ...(book.cover_crop && book.cover_original_url ? [book.cover_original_url] : [])
+  ]));
   const signedMap: Record<string, string> = {};
   if (paths.length > 0) {
     const signedRes = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 30);
@@ -184,6 +190,8 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
   const coverMedia = (book.media ?? []).find((m) => m.kind === "cover") ?? null;
   const coverUrl = coverMedia ? signedMap[coverMedia.storage_path] : book.edition?.cover_url ?? null;
+  const cropData = book.cover_crop ?? null;
+  const coverSrc = cropData && book.cover_original_url ? (signedMap[book.cover_original_url] ?? coverUrl) : coverUrl;
   const images = (book.media ?? []).filter((m) => m.kind === "image");
   const editionId = book.edition?.id ?? null;
 
@@ -202,7 +210,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div>
-            <div className="om-avatar-lockup">
+            <div className="om-avatar-lockup om-avatar-lockup-tight">
               {avatarUrl ? (
                 <Link href={`/u/${profile.username}`} className="om-avatar-link" aria-label="Open profile">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -215,13 +223,13 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           <div className="muted">public</div>
         </div>
         {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
-        <div className="row muted" style={{ marginTop: 8, justifyContent: "flex-start", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
+        <div className="row muted" style={{ marginTop: 8, justifyContent: "flex-start", alignItems: "baseline", gap: 18, flexWrap: "wrap" }}>
           <div className="row muted" style={{ gap: 18, flexWrap: "wrap", alignItems: "baseline" }}>
             <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
-              Followers <span style={{ marginLeft: 10 }}>{followersCount ?? "—"}</span>
+              Followers <span style={{ marginInline: 10 }}>{followersCount ?? "—"}</span>
             </Link>
             <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
-              Following <span style={{ marginLeft: 10 }}>{followingCount ?? "—"}</span>
+              Following <span style={{ marginInline: 10 }}>{followingCount ?? "—"}</span>
             </Link>
           </div>
           <FollowControls profileId={profile.id} profileUsername={profile.username} inline />
@@ -236,14 +244,9 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       <div style={{ marginTop: 14 }} className="card">
         <div className="om-book-detail-grid">
           <div>
-            {coverUrl ? (
-              <div className="om-cover-slot" style={{ width: "100%", height: 280 }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img alt={effectiveTitle} src={coverUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-              </div>
-            ) : (
-              <div className="om-cover-slot" style={{ width: "100%", height: 280 }} />
-            )}
+            <div className="om-cover-slot" style={{ width: "100%", height: 280 }}>
+              <CoverImage alt={effectiveTitle} src={coverSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
+            </div>
           </div>
 
           <div>

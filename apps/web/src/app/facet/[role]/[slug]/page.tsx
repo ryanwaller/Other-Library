@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getServerSupabase } from "../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../lib/slug";
+import CoverImage, { type CoverCrop } from "../../../../components/CoverImage";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,8 @@ type FacetBook = {
   created_at: string;
   title_override: string | null;
   authors_override: string[] | null;
+  cover_original_url: string | null;
+  cover_crop: CoverCrop | null;
   edition: {
     title: string | null;
     authors: string[] | null;
@@ -114,7 +117,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
   if (bookIds.length > 0) {
     const booksRes = await supabase
       .from("user_books")
-      .select("id,owner_id,library_id,created_at,title_override,authors_override,edition:editions(title,authors,cover_url),media:user_book_media(kind,storage_path)")
+      .select("id,owner_id,library_id,created_at,title_override,authors_override,cover_original_url,cover_crop,edition:editions(title,authors,cover_url),media:user_book_media(kind,storage_path)")
       .in("id", bookIds)
       .order("created_at", { ascending: false })
       .limit(1000);
@@ -136,12 +139,15 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
   }
 
   const mediaPaths = Array.from(
-    new Set(
-      books
+    new Set([
+      ...books
         .flatMap((b) => (Array.isArray(b.media) ? b.media : []))
         .map((m) => m.storage_path)
-        .filter((p): p is string => typeof p === "string" && p.length > 0)
-    )
+        .filter((p): p is string => typeof p === "string" && p.length > 0),
+      ...books
+        .filter((b) => b.cover_crop && typeof b.cover_original_url === "string" && b.cover_original_url)
+        .map((b) => b.cover_original_url as string),
+    ])
   );
   const signedByPath: Record<string, string> = {};
   if (mediaPaths.length > 0) {
@@ -216,15 +222,14 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
                     : (book.edition?.authors ?? []).filter(Boolean);
                 const coverMedia = (book.media ?? []).find((m) => m.kind === "cover");
                 const coverUrl = coverMedia ? signedByPath[coverMedia.storage_path] : book.edition?.cover_url ?? null;
+                const cropData = book.cover_crop ?? null;
+                const imageSrc = cropData && book.cover_original_url ? (signedByPath[book.cover_original_url] ?? coverUrl) : coverUrl;
                 const href = `/app/books/${book.id}`;
                 return (
                   <div key={book.id} className="om-book-card">
                     <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
                       <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
-                        {coverUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img alt={title} src={coverUrl} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
-                        ) : null}
+                        <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
                       </div>
                       <div style={{ marginTop: 10 }} className="book-title">
                         {title}

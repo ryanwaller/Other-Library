@@ -12,6 +12,7 @@ import { formatDateShort } from "../../../../lib/formatDate";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
 import SignInCard from "../../../components/SignInCard";
 import EntityTokenField from "../../components/EntityTokenField";
+import CoverImage, { type CoverCrop } from "../../../../components/CoverImage";
 
 type FacetRole =
   | "author"
@@ -56,6 +57,7 @@ type UserBookDetail = {
   trim_height: number | null;
   trim_unit: string | null;
   cover_original_url: string | null;
+  cover_crop: CoverCrop | null;
   edition: {
     id: number;
     isbn10: string | null;
@@ -137,88 +139,11 @@ function safeFileName(name: string): string {
   return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
 }
 
-function clamp(n: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, n));
-}
-
 function toProxyImageUrl(url: string): string {
   const raw = (url ?? "").trim();
   if (!raw) return "";
   if (raw.startsWith("blob:")) return raw;
   return `/api/image-proxy?url=${encodeURIComponent(raw)}`;
-}
-
-function getRadianAngle(deg: number): number {
-  return (deg * Math.PI) / 180;
-}
-
-function rotateSize(width: number, height: number, rotation: number): { width: number; height: number } {
-  const rotRad = getRadianAngle(rotation);
-  return {
-    width: Math.abs(Math.cos(rotRad) * width) + Math.abs(Math.sin(rotRad) * height),
-    height: Math.abs(Math.sin(rotRad) * width) + Math.abs(Math.cos(rotRad) * height)
-  };
-}
-
-async function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Failed to load image"));
-    img.crossOrigin = "anonymous";
-    img.src = src;
-  });
-}
-
-async function cropCoverToBlob(opts: {
-  imageSrc: string;
-  crop: Area;
-  rotation: number;
-  brightness: number;
-  contrast: number;
-}): Promise<Blob> {
-  const image = await loadImage(opts.imageSrc);
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas not supported");
-
-  const { width: bW, height: bH } = rotateSize(image.width, image.height, opts.rotation);
-  canvas.width = Math.floor(bW);
-  canvas.height = Math.floor(bH);
-
-  ctx.translate(canvas.width / 2, canvas.height / 2);
-  ctx.rotate(getRadianAngle(opts.rotation));
-  ctx.translate(-image.width / 2, -image.height / 2);
-  ctx.filter = `brightness(${opts.brightness}) contrast(${opts.contrast})`;
-  ctx.drawImage(image, 0, 0);
-
-  const pixelCrop = opts.crop;
-  const cropCanvas = document.createElement("canvas");
-  cropCanvas.width = Math.floor(pixelCrop.width);
-  cropCanvas.height = Math.floor(pixelCrop.height);
-  const cropCtx = cropCanvas.getContext("2d");
-  if (!cropCtx) throw new Error("Canvas not supported");
-
-  const data = ctx.getImageData(Math.floor(pixelCrop.x), Math.floor(pixelCrop.y), Math.floor(pixelCrop.width), Math.floor(pixelCrop.height));
-  cropCtx.putImageData(data, 0, 0);
-
-  const maxDim = 1400;
-  const scale = Math.min(1, maxDim / Math.max(cropCanvas.width, cropCanvas.height));
-  const outW = Math.max(1, Math.floor(cropCanvas.width * scale));
-  const outH = Math.max(1, Math.floor(cropCanvas.height * scale));
-  const outCanvas = document.createElement("canvas");
-  outCanvas.width = outW;
-  outCanvas.height = outH;
-  const outCtx = outCanvas.getContext("2d");
-  if (!outCtx) throw new Error("Canvas not supported");
-  outCtx.imageSmoothingEnabled = true;
-  outCtx.imageSmoothingQuality = "high";
-  outCtx.drawImage(cropCanvas, 0, 0, outW, outH);
-
-  const blob: Blob = await new Promise((resolve, reject) => {
-    outCanvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to encode image"))), "image/jpeg", 0.9);
-  });
-  return blob;
 }
 
 function onEnter(e: KeyboardEvent<HTMLInputElement>, fn: () => void) {
@@ -465,7 +390,7 @@ export default function BookDetailPage() {
   const [coverContrast, setCoverContrast] = useState<number>(1);
   const [coverAspectW, setCoverAspectW] = useState<number>(2);
   const [coverAspectH, setCoverAspectH] = useState<number>(3);
-  const [coverCroppedAreaPixels, setCoverCroppedAreaPixels] = useState<Area | null>(null);
+  const [coverCroppedArea, setCoverCroppedArea] = useState<Area | null>(null); // percentage area (0-100)
   const [coverState, setCoverState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -526,7 +451,7 @@ export default function BookDetailPage() {
     setCoverContrast(1);
     setCoverAspectW(2);
     setCoverAspectH(3);
-    setCoverCroppedAreaPixels(null);
+    setCoverCroppedArea(null);
     return () => {
       URL.revokeObjectURL(url);
     };
@@ -636,7 +561,7 @@ export default function BookDetailPage() {
     setCopiesCountState({ busy: false, error: null });
     try {
       const baseNew =
-        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
       const baseOld =
         "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
 
@@ -648,8 +573,8 @@ export default function BookDetailPage() {
       if (res.error) {
         const msg = (res.error.message ?? "").toLowerCase();
         if (msg.includes("trim_width") && msg.includes("does not exist")) {
-          // trim_width (and possibly cover_original_url) not yet added; strip both and retry.
-          const noTrim = (s: string) => s.replace(",trim_width,trim_height,trim_unit,cover_original_url", "");
+          // trim_width (and possibly cover_original_url/cover_crop) not yet added; strip them and retry.
+          const noTrim = (s: string) => s.replace(",trim_width,trim_height,trim_unit,cover_original_url,cover_crop", "").replace(",cover_crop", "");
           res = await supabase.from("user_books").select(noTrim(selectNew)).eq("id", bookId).maybeSingle();
           if (res.error) {
             const msg2 = (res.error.message ?? "").toLowerCase();
@@ -657,9 +582,13 @@ export default function BookDetailPage() {
               res = await supabase.from("user_books").select(noTrim(baseNew)).eq("id", bookId).maybeSingle();
             }
           }
+        } else if (msg.includes("cover_crop") && msg.includes("does not exist")) {
+          // cover_crop column not yet added; strip it and retry.
+          const noCrop = (s: string) => s.replace(",cover_crop", "");
+          res = await supabase.from("user_books").select(noCrop(selectNew)).eq("id", bookId).maybeSingle();
         } else if (msg.includes("cover_original_url") && msg.includes("does not exist")) {
           // cover_original_url column not yet added; strip it and retry.
-          const noCoverOrig = (s: string) => s.replace(",cover_original_url", "");
+          const noCoverOrig = (s: string) => s.replace(",cover_original_url", "").replace(",cover_crop", "");
           res = await supabase.from("user_books").select(noCoverOrig(selectNew)).eq("id", bookId).maybeSingle();
         } else if ((msg.includes("book_entities") || msg.includes("entities")) && (res.error.message ?? "").toLowerCase().includes("does not exist")) {
           res = await supabase.from("user_books").select(baseNew).eq("id", bookId).maybeSingle();
@@ -1307,7 +1236,7 @@ export default function BookDetailPage() {
     setCoverToolsOpen(false);
     setPendingCover(null);
     setCoverEditorSrc(null);
-    setCoverCroppedAreaPixels(null);
+    setCoverCroppedArea(null);
     setSaveState({ busy: false, error: null, message: null });
     setEditMode(false);
   }
@@ -1566,87 +1495,56 @@ export default function BookDetailPage() {
   async function uploadCover() {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
-    if (!coverEditorSrc) return;
-    setCoverState({ busy: true, error: null, message: "Uploading cover…" });
+    if (!coverCroppedArea) { setCoverState({ busy: false, error: null, message: "Adjust crop first." }); return; }
+    setCoverState({ busy: true, error: null, message: "Saving…" });
 
     try {
-      if (!coverCroppedAreaPixels) {
-        setCoverState({ busy: false, error: null, message: "Adjust crop first." });
-        return;
-      }
-
-      const baseName = pendingCover ? safeFileName(pendingCover.name.replace(/\.[^/.]+$/, "")) : "cover-edit";
-      const path = `${userId}/${book.id}/cover-${Date.now()}-${baseName}.jpg`;
-
-      // Remove existing cover(s) so we don't accumulate old covers.
-      const existing = (book.media ?? []).filter((m) => m.kind === "cover");
-      for (const m of existing) {
-        if (m?.storage_path) await supabase.storage.from("user-book-media").remove([m.storage_path]);
-        if (m?.id) await supabase.from("user_book_media").delete().eq("id", m.id);
-      }
-
-      const body: Blob = await cropCoverToBlob({
-        imageSrc: coverEditorSrc,
-        crop: coverCroppedAreaPixels,
+      // Build crop data to store (convert percentage area to 0-1 ratios)
+      const cropData: CoverCrop = {
+        x: coverCroppedArea.x / 100,
+        y: coverCroppedArea.y / 100,
+        width: coverCroppedArea.width / 100,
+        height: coverCroppedArea.height / 100,
+        zoom: coverZoom,
+        cropX: coverCrop.x,
+        cropY: coverCrop.y,
         rotation: coverRotation,
-        brightness: clamp(coverBrightness, 0.5, 2),
-        contrast: clamp(coverContrast, 0.5, 2)
-      });
+        brightness: coverBrightness,
+        contrast: coverContrast
+      };
 
-      const up = await supabase.storage.from("user-book-media").upload(path, body, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: "image/jpeg"
-      });
-      if (up.error) {
-        setCoverState({ busy: false, error: up.error.message, message: "Upload failed" });
-        return;
-      }
+      // If there's a new file to upload (pendingCover set), upload it as the new original
+      if (pendingCover && coverEditorSrc) {
+        const baseName = safeFileName(pendingCover.name.replace(/\.[^/.]+$/, ""));
+        const ext = pendingCover.type.includes("png") ? "png" : pendingCover.type.includes("webp") ? "webp" : "jpg";
+        const path = `${userId}/${book.id}/cover-original-${Date.now()}-${baseName}.${ext}`;
 
-      const inserted = await supabase
-        .from("user_book_media")
-        .insert({ user_book_id: book.id, kind: "cover", storage_path: path, caption: null })
-        .select("id")
-        .single();
-      if (inserted.error) {
-        setCoverState({ busy: false, error: inserted.error.message, message: "Upload failed" });
-        return;
-      }
+        // Remove existing cover(s) from storage + media table
+        const existing = (book.media ?? []).filter((m) => m.kind === "cover");
+        for (const m of existing) {
+          if (m.storage_path) await supabase.storage.from("user-book-media").remove([m.storage_path]);
+          if (m.id) await supabase.from("user_book_media").delete().eq("id", m.id);
+        }
 
-      await supabase
-        .from("user_book_media")
-        .update({ kind: "image" })
-        .eq("user_book_id", book.id)
-        .eq("kind", "cover")
-        .neq("id", inserted.data.id);
+        // Upload original file
+        const up = await supabase.storage.from("user-book-media").upload(path, pendingCover, {
+          cacheControl: "31536000", upsert: false, contentType: pendingCover.type || "image/jpeg"
+        });
+        if (up.error) { setCoverState({ busy: false, error: up.error.message, message: "Upload failed" }); return; }
 
-      // If no original has been stored yet, save the image that the cropper loaded as the
-      // permanent original so all future crops work from the same full-resolution source.
-      // Fetching coverEditorSrc works for both cases: a blob: URL (new file upload) and a
-      // proxied URL (re-editing an existing cover that predates this feature).
-      if (!book.cover_original_url) {
+        // Record in user_book_media
+        await supabase.from("user_book_media").insert({ user_book_id: book.id, kind: "cover", storage_path: path, caption: null });
+
+        // Update cover_original_url and sign immediately for coverOriginalSrc state
+        await supabase.from("user_books").update({ cover_original_url: path }).eq("id", book.id);
         try {
-          const origRes = await fetch(coverEditorSrc);
-          if (origRes.ok) {
-            const origBlob = await origRes.blob();
-            const origExt = extFromContentType(origRes.headers.get("content-type"));
-            const origPath = `${userId}/${book.id}/cover-original-${Date.now()}-${baseName}.${origExt}`;
-            const origUp = await supabase.storage.from("user-book-media").upload(origPath, origBlob, {
-              cacheControl: "31536000",
-              upsert: false,
-              contentType: origBlob.type || "image/jpeg"
-            });
-            if (!origUp.error) {
-              await supabase.from("user_books").update({ cover_original_url: origPath }).eq("id", book.id);
-              // Set coverOriginalSrc immediately so "Edit" can use it without waiting for refresh().
-              try {
-                const { data: sd } = await supabase.storage.from("user-book-media").createSignedUrl(origPath, 3600);
-                if (sd?.signedUrl) setCoverOriginalSrc(toProxyImageUrl(sd.signedUrl));
-              } catch { /* best-effort */ }
-            }
-          }
-        } catch { /* best-effort; don't block the cover save */ }
+          const { data: sd } = await supabase.storage.from("user-book-media").createSignedUrl(path, 3600);
+          if (sd?.signedUrl) setCoverOriginalSrc(toProxyImageUrl(sd.signedUrl));
+        } catch { /* best-effort */ }
       }
+
+      // Save crop params (always — for both new file and re-edit)
+      await supabase.from("user_books").update({ cover_crop: cropData as any }).eq("id", book.id);
 
       // Persist trim values to the database before refresh() reloads form state from Supabase.
       // In in/mm mode the crop W/H are physical dimensions and should be saved; in ratio mode
@@ -1673,11 +1571,12 @@ export default function BookDetailPage() {
 
       setPendingCover(null);
       setCoverEditorSrc(null);
+      setCoverCroppedArea(null);
       setCoverInputKey((k) => k + 1);
       await refresh();
-      setCoverState({ busy: false, error: null, message: "Cover uploaded" });
+      setCoverState({ busy: false, error: null, message: "Saved" });
     } catch (e: any) {
-      setCoverState({ busy: false, error: e?.message ?? "Upload failed", message: "Upload failed" });
+      setCoverState({ busy: false, error: e?.message ?? "Save failed", message: "Save failed" });
     }
   }
 
@@ -1730,8 +1629,8 @@ export default function BookDetailPage() {
       if (inserted.error) throw new Error(inserted.error.message);
 
       // Save the imported blob as the permanent original so the crop editor can always
-      // work from the full-resolution source. Only written on first import.
-      if (!book.cover_original_url) {
+      // work from the full-resolution source. Always save on import (new cover).
+      {
         const origPath = `${userId}/${book.id}/cover-original-${Date.now()}.${ext}`;
         const origUp = await supabase.storage.from("user-book-media").upload(origPath, blob, {
           cacheControl: "31536000",
@@ -1739,7 +1638,7 @@ export default function BookDetailPage() {
           contentType: blob.type || "application/octet-stream"
         });
         if (!origUp.error) {
-          await supabase.from("user_books").update({ cover_original_url: origPath }).eq("id", book.id);
+          await supabase.from("user_books").update({ cover_original_url: origPath, cover_crop: null }).eq("id", book.id);
         }
       }
 
@@ -2491,17 +2390,17 @@ export default function BookDetailPage() {
                     onCropChange={setCoverCrop}
                     onZoomChange={setCoverZoom}
                     onRotationChange={setCoverRotation}
-                    onCropComplete={(_area, pixels) => setCoverCroppedAreaPixels(pixels)}
+                    onCropComplete={(area, _pixels) => setCoverCroppedArea(area)}
                     showGrid={false}
                   />
-                ) : coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                ) : (
+                  <CoverImage
                     alt={effectiveTitle}
-                    src={coverUrl}
-                    style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+                    src={coverOriginalSrc ?? coverUrl}
+                    cropData={book?.cover_crop ?? null}
+                    style={{ width: "100%", height: "100%", display: "block" }}
                   />
-                ) : null}
+                )}
               </div>
 
               {isOwner ? (
@@ -2531,17 +2430,24 @@ export default function BookDetailPage() {
                             onClick={() => {
                               if (!coverUrl) return;
                               setPendingCover(null);
-                              // Always crop from the original uncropped image when available.
-                              // coverOriginalSrc is set eagerly in uploadCover and on refresh(),
-                              // so it's ready without a two-step async lookup.
                               const origSrc = coverOriginalSrc ?? toProxyImageUrl(coverUrl);
                               setCoverEditorSrc(origSrc);
-                              setCoverCrop({ x: 0, y: 0 });
-                              setCoverZoom(1);
-                              setCoverRotation(0);
-                              setCoverBrightness(1);
-                              setCoverContrast(1);
-                              setCoverCroppedAreaPixels(null);
+                              if (book?.cover_crop) {
+                                const c = book.cover_crop;
+                                setCoverZoom(c.zoom);
+                                setCoverCrop({ x: c.cropX, y: c.cropY });
+                                setCoverRotation(c.rotation);
+                                setCoverBrightness(c.brightness);
+                                setCoverContrast(c.contrast);
+                                setCoverCroppedArea({ x: c.x * 100, y: c.y * 100, width: c.width * 100, height: c.height * 100 });
+                              } else {
+                                setCoverZoom(1);
+                                setCoverCrop({ x: 0, y: 0 });
+                                setCoverRotation(0);
+                                setCoverBrightness(1);
+                                setCoverContrast(1);
+                                setCoverCroppedArea(null);
+                              }
                             }}
                             disabled={coverState.busy}
                           >
@@ -2651,7 +2557,7 @@ export default function BookDetailPage() {
                       {coverEditorSrc ? (
                         <div className="row" style={{ marginTop: 8, gap: 8 }}>
                           <button onClick={uploadCover} disabled={coverState.busy}>
-                            {coverState.busy ? "Uploading…" : "Save"}
+                            {coverState.busy ? "Saving…" : "Save"}
                           </button>
                           <button
                             onClick={() => {

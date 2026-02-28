@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { MouseEvent } from "react";
+import CoverImage, { type CoverCrop } from "../../../components/CoverImage";
 
 export type BookCardViewMode = "grid" | "list";
 
@@ -19,6 +20,8 @@ export default function BookCard({
   href,
   coverUrl,
   coverHeight,
+  cropData,
+  originalSrc,
   onDeleteCopy,
   deleteState,
   hideCopyCount,
@@ -36,6 +39,8 @@ export default function BookCard({
   href: string;
   coverUrl: string | null;
   coverHeight: number;
+  cropData?: CoverCrop | null;
+  originalSrc?: string | null;
   onDeleteCopy: () => void;
   deleteState: { busy: boolean; error: string | null; message: string | null } | undefined;
   hideCopyCount?: boolean;
@@ -51,12 +56,12 @@ export default function BookCard({
 
   const coverEl = (
     <div className="om-cover-slot" style={{ height: coverHeight }}>
-      {coverUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img alt={title} src={coverUrl} style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }} />
-      ) : (
-        <div style={{ width: "100%", height: "100%" }} />
-      )}
+      <CoverImage
+        alt={title}
+        src={originalSrc ?? coverUrl}
+        cropData={cropData}
+        style={{ display: "block", width: "100%", height: "100%" }}
+      />
     </div>
   );
 
@@ -66,8 +71,7 @@ export default function BookCard({
         {bulkMode ? <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" /> : null}
         <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link">
           <div className="om-cover-slot" style={{ width: 70, height: 70 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {coverUrl ? <img alt={title} src={coverUrl} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <div style={{ width: "100%", height: "100%" }} />}
+            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "100%" }} />
           </div>
         </Link>
         <div>

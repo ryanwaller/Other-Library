@@ -9,6 +9,7 @@ import SignInCard from "../components/SignInCard";
 import BulkBar from "./components/BulkBar";
 import LibraryBlock from "./components/LibraryBlock";
 import BookCard from "./components/BookCard";
+import type { CoverCrop } from "../../components/CoverImage";
 
 type EditionMetadata = {
   isbn10?: string | null;
@@ -225,6 +226,8 @@ function AppShell({
     authors_override: string[] | null;
     subjects_override: string[] | null;
     publisher_override: string | null;
+    cover_original_url: string | null;
+    cover_crop: CoverCrop | null;
     edition: {
       id: number;
       isbn13: string | null;
@@ -295,6 +298,7 @@ function AppShell({
   });
 
   const [bulkMode, setBulkMode] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [bulkSelectedKeys, setBulkSelectedKeys] = useState<Record<string, true | undefined>>({});
@@ -314,6 +318,7 @@ function AppShell({
     if (!openCsvPicker) return;
     if (csvAutoOpenDoneRef.current) return;
     csvAutoOpenDoneRef.current = true;
+    setAddOpen(true);
     window.setTimeout(() => {
       csvInputRef.current?.click();
     }, 0);
@@ -440,7 +445,7 @@ function AppShell({
     const { data, error } = await supabase
       .from("user_books")
       .select(
-        "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
+        "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
       )
       .eq("owner_id", userId)
       .order("created_at", { ascending: false })
@@ -450,12 +455,15 @@ function AppShell({
     setItems(rows as any);
 
     const paths = Array.from(
-      new Set(
-        rows
+      new Set([
+        ...rows
           .flatMap((r) => (Array.isArray(r.media) ? r.media : []))
           .map((m: any) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
-          .filter(Boolean)
-      )
+          .filter(Boolean),
+        ...rows
+          .filter((r: any) => r.cover_crop && typeof r.cover_original_url === "string" && r.cover_original_url)
+          .map((r: any) => r.cover_original_url as string)
+      ])
     );
     const missing = paths.filter((p) => !mediaUrlsByPath[p]);
     if (missing.length === 0) return;
@@ -1994,6 +2002,8 @@ function AppShell({
           return mediaUrlsByPath[cover.storage_path] ?? null;
         })
         .find(Boolean) ?? e?.cover_url ?? null;
+    const cropData = it.cover_crop ?? null;
+    const originalSrc = cropData && it.cover_original_url ? (mediaUrlsByPath[it.cover_original_url] ?? coverUrl) : coverUrl;
     const delState = deleteStateByBookId[it.id];
     return (
       <BookCard
@@ -2009,6 +2019,8 @@ function AppShell({
         href={`/app/books/${it.id}`}
         coverUrl={coverUrl}
         coverHeight={coverHeight}
+        cropData={cropData}
+        originalSrc={originalSrc}
         onDeleteCopy={() => deleteEntry(it.id)}
         deleteState={delState as any}
         showDeleteCopy={false}
@@ -2016,49 +2028,149 @@ function AppShell({
     );
   }
 
+  const showAddPanel =
+    addOpen ||
+    Boolean(addUrlPreview) ||
+    addSearchResults.length > 0 ||
+    Boolean(addSearchState.message) ||
+    Boolean(addState.message) ||
+    csvRows.length > 0 ||
+    Boolean(csvImportState.message) ||
+    Boolean(csvImportState.error);
+
   return (
     <div style={{ marginTop: 16 }}>
-        <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%" }}>
-          <input
-            ref={csvInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const f = (e.target.files ?? [])[0];
-              if (!f) return;
-              setCsvImportState({ busy: true, error: null, message: "Loading CSV…", done: 0, total: 0 });
-              loadCsvFile(f).catch((err: any) => {
-                setCsvImportState({ busy: false, error: err?.message ?? "CSV load failed", message: "CSV load failed", done: 0, total: 0 });
-              });
-            }}
-            disabled={csvImportState.busy || addState.busy || addSearchState.busy}
-          />
-          <input
-            placeholder="Add by ISBN, URL, or title (optional: “by Author”)"
-            value={addInput}
-            onChange={(e) => setAddInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              smartAddOrSearch();
-            }}
-            style={{ minWidth: 0, flex: "1 1 0%" }}
-          />
-          <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
-            <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
-              {addState.busy ? "Working…" : "Go"}
+        <input
+          ref={csvInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = (e.target.files ?? [])[0];
+            if (!f) return;
+            setCsvImportState({ busy: true, error: null, message: "Loading CSV…", done: 0, total: 0 });
+            loadCsvFile(f).catch((err: any) => {
+              setCsvImportState({ busy: false, error: err?.message ?? "CSV load failed", message: "CSV load failed", done: 0, total: 0 });
+            });
+          }}
+          disabled={csvImportState.busy || addState.busy || addSearchState.busy}
+        />
+
+        <div className="row" style={{ marginTop: 10, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+          <div className="row" style={{ gap: 12, alignItems: "baseline", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
+            <button
+              type="button"
+              className={showAddPanel ? "text-primary" : "muted"}
+              onClick={() => {
+                setAddOpen((prev) => !prev);
+                setSortOpen(false);
+                closeTagMenu();
+                closeCategoryMenu();
+              }}
+            >
+              Add
             </button>
-            {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
-              <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
-                Cancel
+            <button
+              type="button"
+              className={sortOpen ? "text-primary" : "muted"}
+              onClick={() => {
+                setSortOpen((v) => !v);
+                setAddOpen(false);
+                closeTagMenu();
+                closeCategoryMenu();
+              }}
+            >
+              Sort
+            </button>
+            <button
+              onClick={() => {
+                setBulkMode((prev) => {
+                  const next = !prev;
+                  if (!next) setBulkSelectedKeys({});
+                  setBulkState({ busy: false, error: null, message: null });
+                  setReorderMode(false);
+                  setSortOpen(false);
+                  setAddOpen(false);
+                  closeTagMenu();
+                  closeCategoryMenu();
+                  return next;
+                });
+              }}
+            >
+              {bulkMode ? "Done" : "Edit"}
+            </button>
+            {bulkMode ? (
+              <button
+                type="button"
+                className={reorderMode ? "text-primary" : "muted"}
+                onClick={() => {
+                  setReorderMode((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setBulkSelectedKeys({});
+                      setBulkState({ busy: false, error: null, message: null });
+                      setSortOpen(false);
+                      setAddOpen(false);
+                    }
+                    return next;
+                  });
+                }}
+              >
+                Reorder
               </button>
             ) : null}
+            <input
+              className="om-inline-search-input"
+              placeholder="Search your catalog…"
+              value={searchQuery}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ minWidth: 0, flex: "1 1 auto", width: isMobile ? "100%" : 280, maxWidth: "100%" }}
+            />
           </div>
+          {(searchFocused || searchQuery.trim()) ? (
+            <Link
+              href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
+              className="muted"
+              style={{ whiteSpace: "nowrap", flex: "0 0 auto", marginTop: isMobile ? 6 : 0 }}
+            >
+              Search others
+            </Link>
+          ) : null}
         </div>
-        <div className="muted" style={{ marginTop: 4 }}>
-          {addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}
-        </div>
+        <div style={{ marginTop: 10 }} />
+
+        {showAddPanel ? (
+          <>
+            <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%" }}>
+              <input
+                placeholder="Add by ISBN, URL, or title (optional: “by Author”)"
+                value={addInput}
+                onChange={(e) => setAddInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  smartAddOrSearch();
+                }}
+                style={{ minWidth: 0, flex: "1 1 0%" }}
+              />
+              <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
+                <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
+                  {addState.busy ? "Working…" : "Go"}
+                </button>
+                {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
+                  <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
+                    Cancel
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            <div className="muted" style={{ marginTop: 4 }}>
+              {addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}
+            </div>
+          </>
+        ) : null}
 
         {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || csvRows.length > 0) && libraries.length > 0 ? (
           <div className="row" style={{ marginTop: 8, alignItems: "baseline", gap: 10 }}>
@@ -2351,68 +2463,6 @@ function AppShell({
               </>
             ) : null}
           </div>
-        </div>
-        <div className="row" style={{ marginTop: 10, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-          <div className="row" style={{ gap: 12, alignItems: "center", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
-            <button
-              type="button"
-              className={sortOpen ? "text-primary" : "muted"}
-              onClick={() => setSortOpen((v) => !v)}
-            >
-              Sort
-            </button>
-            <button
-              onClick={() => {
-                setBulkMode((prev) => {
-                  const next = !prev;
-                  if (!next) setBulkSelectedKeys({});
-                  setBulkState({ busy: false, error: null, message: null });
-                  setReorderMode(false);
-                  setSortOpen(false);
-                  closeTagMenu();
-                  closeCategoryMenu();
-                  return next;
-                });
-              }}
-            >
-              {bulkMode ? "Done" : "Edit"}
-            </button>
-            {bulkMode ? (
-              <button
-                type="button"
-                className={reorderMode ? "text-primary" : "muted"}
-                onClick={() => {
-                  setReorderMode((prev) => {
-                    const next = !prev;
-                    if (next) {
-                      setBulkSelectedKeys({});
-                      setBulkState({ busy: false, error: null, message: null });
-                    }
-                    return next;
-                  });
-                }}
-              >
-                Reorder
-              </button>
-            ) : null}
-            <input
-              placeholder="Search your catalog…"
-              value={searchQuery}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ minWidth: 0, flex: "1 1 auto", width: isMobile ? "100%" : 260, maxWidth: "100%" }}
-            />
-          </div>
-          {(searchFocused || searchQuery.trim()) ? (
-            <Link
-              href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
-              className="muted"
-              style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}
-            >
-              Search others
-            </Link>
-          ) : null}
         </div>
         {sortOpen ? (
         <div
