@@ -256,7 +256,7 @@ export default function GlobalNav() {
             </Link>
           </div>
 
-          <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             {editInAppHref ? (
               <Link href={editInAppHref} aria-label="Edit this page in the app">
                 Edit in app
@@ -265,19 +265,7 @@ export default function GlobalNav() {
 
             {messagesBadge ? (
               <Link href={messagesHref} aria-label={`${unreadThreads} unread conversations`} style={{ textDecoration: "none" }}>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minWidth: NAV_AVATAR_SIZE,
-                    height: NAV_AVATAR_SIZE,
-                    padding: "0 6px",
-                    borderRadius: 4,
-                    background: messagesBadge.bg,
-                    color: "white"
-                  }}
-                >
+                <span className="om-nav-badge" style={{ background: messagesBadge.bg }}>
                   {messagesBadge.text}
                 </span>
               </Link>
@@ -285,19 +273,7 @@ export default function GlobalNav() {
 
             {pendingRequests > 0 ? (
               <Link href="/app/follows" aria-label={`${pendingRequests} pending follow requests`} style={{ textDecoration: "none" }}>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minWidth: NAV_AVATAR_SIZE,
-                    height: NAV_AVATAR_SIZE,
-                    padding: "0 6px",
-                    borderRadius: 999,
-                    background: "#b00020",
-                    color: "white"
-                  }}
-                >
+                <span className="om-nav-badge" style={{ background: "#b00020" }}>
                   {pendingRequests}
                 </span>
               </Link>

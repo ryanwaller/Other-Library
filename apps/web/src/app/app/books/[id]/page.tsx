@@ -1852,11 +1852,12 @@ export default function BookDetailPage() {
 
       await refresh();
 
-      const coverToImport =
-        !hadCover ? (String(coverUrlHint ?? "").trim() || String(edition.cover_url ?? "").trim() || null) : null;
-      if (coverToImport) {
-        setSuggestedCoverUrl(coverToImport);
-        await importCoverFromUrl(coverToImport);
+      const hintedCover = String(coverUrlHint ?? "").trim();
+      const resolvedCover = hintedCover || String(edition.cover_url ?? "").trim();
+      const shouldImportCover = Boolean(resolvedCover) && (!hadCover || Boolean(hintedCover));
+      if (shouldImportCover && resolvedCover) {
+        setSuggestedCoverUrl(resolvedCover);
+        await importCoverFromUrl(resolvedCover);
       }
 
       setLinkState({ busy: false, error: null, message: "Linked" });

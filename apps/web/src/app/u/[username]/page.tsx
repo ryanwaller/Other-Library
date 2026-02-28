@@ -186,7 +186,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           <div className="muted">{profile.visibility}</div>
         </div>
         {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
-        <div className="row muted" style={{ marginTop: 6, justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div className="row muted" style={{ marginTop: 6, justifyContent: "flex-start", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div className="row muted" style={{ gap: 16, flexWrap: "wrap" }}>
             <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
               Followers <span style={{ marginLeft: 6 }}>{followersCount ?? "—"}</span>
