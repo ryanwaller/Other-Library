@@ -140,7 +140,7 @@ export default async function PublicAuthorPage({ params }: { params: Promise<{ u
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div>
-            <div className="om-avatar-lockup om-avatar-lockup-tight">
+            <div className="om-avatar-lockup">
               {avatarUrl ? (
                 <Link href={`/u/${profile.username}`} className="om-avatar-link" aria-label="Open profile">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -30,36 +30,45 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  async function refreshDefaultLibrary() {
+  async function ensureDefaultLibraryId(): Promise<number | null> {
     if (!supabase || !sessionUserId) {
       setDefaultLibraryId(null);
-      return;
+      return null;
     }
-    let preferredId: number | null = null;
+
+    const seen = new Set<number>();
+    const candidateIds: number[] = [];
+    if (Number.isFinite(defaultLibraryId as number) && (defaultLibraryId as number) > 0) {
+      candidateIds.push(defaultLibraryId as number);
+      seen.add(defaultLibraryId as number);
+    }
     try {
       const raw = typeof window !== "undefined" ? window.localStorage.getItem("om_currentLibraryId") : null;
       const parsed = raw ? Number(raw) : NaN;
-      if (Number.isFinite(parsed) && parsed > 0) preferredId = parsed;
+      if (Number.isFinite(parsed) && parsed > 0 && !seen.has(parsed)) {
+        candidateIds.push(parsed);
+        seen.add(parsed);
+      }
     } catch {
       // ignore
     }
 
-    if (preferredId) {
-      const preferred = await supabase.from("libraries").select("id").eq("id", preferredId).eq("owner_id", sessionUserId).maybeSingle();
+    for (const candidateId of candidateIds) {
+      const preferred = await supabase.from("libraries").select("id").eq("id", candidateId).eq("owner_id", sessionUserId).maybeSingle();
       if (!preferred.error && preferred.data) {
-        setDefaultLibraryId(preferredId);
-        return;
-      }
-      try {
-        window.localStorage.removeItem("om_currentLibraryId");
-      } catch {
-        // ignore
+        setDefaultLibraryId(candidateId);
+        try {
+          window.localStorage.setItem("om_currentLibraryId", String(candidateId));
+        } catch {
+          // ignore
+        }
+        return candidateId;
       }
     }
 
     // Fallback: first library owned by this user.
     const libs = await supabase.from("libraries").select("id").eq("owner_id", sessionUserId).order("created_at", { ascending: true }).limit(1);
-    if (libs.error) return;
+    if (libs.error) return null;
     const id = (libs.data?.[0] as any)?.id as number | undefined;
     if (id) {
       setDefaultLibraryId(id);
@@ -68,21 +77,27 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
       } catch {
         // ignore
       }
-      return;
+      return id;
     }
 
     // If none exist yet, create a default library and retry once.
     const created = await supabase.from("libraries").insert({ owner_id: sessionUserId, name: "Your catalog" }).select("id").single();
-    if (created.error) return;
-    const createdId = (created.data as any)?.id as number | undefined;
-    if (createdId) {
-      setDefaultLibraryId(createdId);
+    if (created.error) return null;
+    const createdLibraryId = (created.data as any)?.id as number | undefined;
+    if (createdLibraryId) {
+      setDefaultLibraryId(createdLibraryId);
       try {
-        window.localStorage.setItem("om_currentLibraryId", String(createdId));
+        window.localStorage.setItem("om_currentLibraryId", String(createdLibraryId));
       } catch {
         // ignore
       }
+      return createdLibraryId;
     }
+    return null;
+  }
+
+  async function refreshDefaultLibrary() {
+    await ensureDefaultLibraryId();
   }
 
   const isSelf = useMemo(() => {
@@ -134,14 +149,15 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
 
   async function add() {
     if (!supabase || !sessionUserId) return;
-    if (!defaultLibraryId) {
+    const targetLibraryId = await ensureDefaultLibraryId();
+    if (!targetLibraryId) {
       setError("No catalog selected");
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      const payload: any = { owner_id: sessionUserId, library_id: defaultLibraryId, edition_id: editionId };
+      const payload: any = { owner_id: sessionUserId, library_id: targetLibraryId, edition_id: editionId };
       if (!editionId) {
         payload.edition_id = null;
         payload.title_override = titleFallback.trim() ? titleFallback.trim() : null;

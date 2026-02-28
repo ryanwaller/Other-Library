@@ -102,27 +102,35 @@ export default function FollowControls({
   }
 
   const status = row?.status ?? null;
+  const containerStyle = {
+    marginTop: compact || inline ? 0 : 10,
+    display: "inline-flex",
+    gap: 10,
+    alignItems: "baseline" as const,
+    flexWrap: "wrap" as const
+  };
+  const actionStyle = compact ? undefined : ({ marginLeft: 2 } as const);
 
   return (
-    <div style={{ marginTop: compact || inline ? 0 : 10 }} className="row">
+    <div style={containerStyle}>
       {status === "approved" ? (
         <>
           {!compact ? <span className="muted">You follow</span> : null}
-          <button onClick={cancelOrUnfollow} disabled={busy} style={{ marginLeft: compact ? 0 : 10 }}>
+          <button onClick={cancelOrUnfollow} disabled={busy} style={actionStyle}>
             {busy ? "Working…" : "Unfollow"}
           </button>
         </>
       ) : status === "pending" ? (
         <>
           {!compact ? <span className="muted">Requested</span> : null}
-          <button onClick={cancelOrUnfollow} disabled={busy} style={{ marginLeft: compact ? 0 : 10 }}>
+          <button onClick={cancelOrUnfollow} disabled={busy} style={actionStyle}>
             {busy ? "Working…" : "Cancel request"}
           </button>
         </>
       ) : status === "rejected" ? (
         <>
           {!compact ? <span className="muted">Request was rejected</span> : null}
-          <button onClick={requestFollow} disabled={busy} style={{ marginLeft: compact ? 0 : 10 }}>
+          <button onClick={requestFollow} disabled={busy} style={actionStyle}>
             {busy ? "Working…" : "Request again"}
           </button>
         </>

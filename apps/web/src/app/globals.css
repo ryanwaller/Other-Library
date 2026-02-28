@@ -104,6 +104,15 @@ a:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+.om-cover-slot img {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
 }
 
 .om-book-card:hover .om-cover-slot {
@@ -113,13 +122,13 @@ a:focus-visible {
 .om-avatar-lockup {
   display: inline-flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   flex-wrap: nowrap;
   min-width: 0;
 }
 
 .om-avatar-lockup-tight {
-  gap: 12px;
+  gap: 14px;
 }
 
 .om-avatar-link {
@@ -151,15 +160,20 @@ a:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: var(--avatar-size);
   min-width: var(--avatar-size);
   height: var(--avatar-size);
-  padding: 0 5px;
+  padding: 0;
   border-radius: 0;
   color: #fff;
   line-height: 1em;
   font-size: calc(var(--text-size-1) - 1px);
   transform: translateY(-1px);
   align-self: center;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  font-variant-numeric: tabular-nums;
 }
 
 input,
