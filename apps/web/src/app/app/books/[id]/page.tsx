@@ -118,7 +118,21 @@ type MergeSource = {
   publish_date_override: string | null;
   description_override: string | null;
   subjects_override: string[] | null;
+  pages: number | null;
+  trim_width: number | null;
+  trim_height: number | null;
+  trim_unit: string | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
+};
+
+type FieldCandidate = { value: string; count: number };
+
+type MergeFieldGroup = {
+  key: string;
+  label: string;
+  localValue: string | null;
+  candidates: FieldCandidate[];
+  isArray: boolean;
 };
 
 function uniqStrings(values: Array<string | null | undefined>): string[] {
@@ -414,7 +428,9 @@ export default function BookDetailPage() {
     error: null,
     message: null
   });
-  const [mergeDismissed, setMergeDismissed] = useState(false);
+  const [mergeAllSources, setMergeAllSources] = useState<MergeSource[]>([]);
+  const [mergePanelOpen, setMergePanelOpen] = useState(false);
+  const [mergeSelections, setMergeSelections] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -424,19 +440,6 @@ export default function BookDetailPage() {
     mq.addEventListener?.("change", update);
     return () => mq.removeEventListener?.("change", update);
   }, []);
-
-  useEffect(() => {
-    try {
-      if (!Number.isFinite(bookId) || bookId <= 0) {
-        setMergeDismissed(false);
-        return;
-      }
-      const raw = window.localStorage.getItem(`om_mergeDismissed:${bookId}`);
-      setMergeDismissed(raw === "1");
-    } catch {
-      setMergeDismissed(false);
-    }
-  }, [bookId]);
 
   useEffect(() => {
     if (!pendingCover) return;
@@ -785,7 +788,6 @@ export default function BookDetailPage() {
       try {
         if (userId && row.owner_id === userId && row.edition?.id) {
           const hasCoverMedia = (row.media ?? []).some((m) => m.kind === "cover");
-          const hasEditionCover = Boolean(row.edition.cover_url);
           const hasAnyImages = (row.media ?? []).some((m) => m.kind === "image");
 
           const missingTitle = !(row.title_override ?? "").trim();
@@ -794,86 +796,59 @@ export default function BookDetailPage() {
           const missingPublishDate = !row.publish_date_override && !row.edition.publish_date;
           const missingDescription = !row.description_override && !row.edition.description;
           const missingSubjects = (!row.subjects_override || row.subjects_override.length === 0) && (!row.edition.subjects || row.edition.subjects.length === 0);
+          const missingEditors = !row.editors_override || row.editors_override.length === 0;
+          const missingDesigners = !row.designers_override || row.designers_override.length === 0;
+          const missingPrinter = !row.printer_override;
+          const missingMaterials = !row.materials_override;
+          const missingEditionOverride = !row.edition_override;
+          const missingPages = !row.pages;
+          const missingTrim = !row.trim_width || !row.trim_height;
 
           const needsAny =
-            !hasCoverMedia ||
-            !hasAnyImages ||
-            missingTitle ||
-            missingAuthors ||
-            missingPublisher ||
-            missingPublishDate ||
-            missingDescription ||
-            missingSubjects;
+            !hasCoverMedia || !hasAnyImages ||
+            missingTitle || missingAuthors || missingPublisher || missingPublishDate ||
+            missingDescription || missingSubjects ||
+            missingEditors || missingDesigners || missingPrinter ||
+            missingMaterials || missingEditionOverride ||
+            missingPages || missingTrim;
 
           if (needsAny) {
             const cand = await supabase
               .from("user_books")
               .select(
-                "id,owner_id,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,media:user_book_media(kind,storage_path)"
+                "id,owner_id,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,pages,trim_width,trim_height,trim_unit,media:user_book_media(kind,storage_path)"
               )
               .eq("edition_id", row.edition.id)
               .neq("id", row.id)
-              .limit(20);
+              .limit(50);
             if (!cand.error) {
-              const rows = (cand.data ?? []) as any[];
-              let best: any | null = null;
-              let bestScore = -1;
-              for (const r of rows) {
-                const media = (r.media ?? []) as any[];
-                const candHasCover = media.some((m) => m.kind === "cover" && m.storage_path);
-                const candHasImgs = media.some((m) => m.kind === "image" && m.storage_path);
-
-                let score = 0;
-                // Only count improvements relative to what you're missing.
-                if (!hasCoverMedia && candHasCover) score += 100;
-                if (!hasAnyImages && candHasImgs) score += 10;
-                if (missingPublisher && r.publisher_override) score += 2;
-                if (missingPublishDate && r.publish_date_override) score += 1;
-                if (missingDescription && r.description_override) score += 1;
-                if (missingSubjects && Array.isArray(r.subjects_override) && r.subjects_override.length > 0) score += 1;
-                if (missingAuthors && Array.isArray(r.authors_override) && r.authors_override.length > 0) score += 1;
-                if (missingTitle && r.title_override) score += 1;
-
-                const missingEditors = (!row.editors_override || row.editors_override.length === 0);
-                const missingDesigners = (!row.designers_override || row.designers_override.length === 0);
-                const missingPrinter = !row.printer_override;
-                const missingMaterials = !row.materials_override;
-                const missingEdition = !row.edition_override;
-
-                if (missingEditors && Array.isArray(r.editors_override) && r.editors_override.length > 0) score += 1;
-                if (missingDesigners && Array.isArray(r.designers_override) && r.designers_override.length > 0) score += 1;
-                if (missingPrinter && r.printer_override) score += 1;
-                if (missingMaterials && r.materials_override) score += 1;
-                if (missingEdition && r.edition_override) score += 1;
-
-                if (score > bestScore) {
-                  bestScore = score;
-                  best = r;
-                }
-              }
-
-              if (best && bestScore > 0) {
-                const profileRes = await supabase.from("profiles").select("username").eq("id", best.owner_id).maybeSingle();
-                const owner_username = (profileRes.data?.username as string | undefined) ?? null;
-                setMergeSource({
-                  user_book_id: best.id as number,
-                  owner_id: best.owner_id as string,
-                  owner_username,
-                  title_override: best.title_override ?? null,
-                  authors_override: (best.authors_override ?? null) as any,
-                  editors_override: (best.editors_override ?? null) as any,
-                  designers_override: (best.designers_override ?? null) as any,
-                  publisher_override: best.publisher_override ?? null,
-                  printer_override: best.printer_override ?? null,
-                  materials_override: best.materials_override ?? null,
-                  edition_override: best.edition_override ?? null,
-                  publish_date_override: best.publish_date_override ?? null,
-                  description_override: best.description_override ?? null,
-                  subjects_override: (best.subjects_override ?? null) as any,
-                  media: ((best.media ?? []) as any[])
-                    .filter((m) => (m.kind === "cover" || m.kind === "image") && typeof m.storage_path === "string" && m.storage_path)
-                    .map((m) => ({ kind: m.kind as "cover" | "image", storage_path: m.storage_path as string }))
-                });
+              const candRows = (cand.data ?? []) as any[];
+              const allSources: MergeSource[] = candRows.map((r) => ({
+                user_book_id: r.id as number,
+                owner_id: r.owner_id as string,
+                owner_username: null,
+                title_override: r.title_override ?? null,
+                authors_override: (r.authors_override ?? null) as any,
+                editors_override: (r.editors_override ?? null) as any,
+                designers_override: (r.designers_override ?? null) as any,
+                publisher_override: r.publisher_override ?? null,
+                printer_override: r.printer_override ?? null,
+                materials_override: r.materials_override ?? null,
+                edition_override: r.edition_override ?? null,
+                publish_date_override: r.publish_date_override ?? null,
+                description_override: r.description_override ?? null,
+                subjects_override: (r.subjects_override ?? null) as any,
+                pages: r.pages ?? null,
+                trim_width: r.trim_width ?? null,
+                trim_height: r.trim_height ?? null,
+                trim_unit: r.trim_unit ?? null,
+                media: ((r.media ?? []) as any[])
+                  .filter((m) => (m.kind === "cover" || m.kind === "image") && typeof m.storage_path === "string" && m.storage_path)
+                  .map((m) => ({ kind: m.kind as "cover" | "image", storage_path: m.storage_path as string }))
+              }));
+              if (allSources.length > 0) {
+                setMergeAllSources(allSources);
+                setMergeSource(allSources[0] ?? null);
               }
             }
           }
@@ -950,6 +925,160 @@ export default function BookDetailPage() {
       .map((t) => ({ id: t.id as number, name: String(t.name) }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [book]);
+
+  const updatesCount = useMemo(() => {
+    if (!book || mergeAllSources.length === 0) return 0;
+    let n = 0;
+    const hasCover = book.media.some((m) => m.kind === "cover");
+    const hasImg   = book.media.some((m) => m.kind === "image");
+    if (!hasCover && mergeAllSources.some((s) => s.media.some((m) => m.kind === "cover"))) n++;
+    if (!hasImg   && mergeAllSources.some((s) => s.media.some((m) => m.kind === "image"))) n++;
+    const strFields: Array<[keyof MergeSource, string | null | undefined]> = [
+      ["title_override",        book.title_override],
+      ["publisher_override",    book.publisher_override],
+      ["printer_override",      book.printer_override],
+      ["materials_override",    book.materials_override],
+      ["edition_override",      book.edition_override],
+      ["publish_date_override", book.publish_date_override],
+      ["description_override",  book.description_override],
+    ];
+    for (const [key, local] of strFields) {
+      const editionFallback =
+        key === "publish_date_override" ? book.edition?.publish_date :
+        key === "publisher_override"    ? book.edition?.publisher :
+        key === "description_override"  ? book.edition?.description :
+        "";
+      const blank = !(local ?? "").trim() && !(editionFallback ?? "").trim();
+      if (blank && mergeAllSources.some((s) => (s[key] as string | null)?.trim())) n++;
+    }
+    const arrFields: Array<[keyof MergeSource, string[] | null | undefined]> = [
+      ["authors_override",   book.authors_override],
+      ["editors_override",   book.editors_override],
+      ["designers_override", book.designers_override],
+      ["subjects_override",  book.subjects_override],
+    ];
+    for (const [key, local] of arrFields) {
+      const editionFallbackArr =
+        key === "authors_override"  ? book.edition?.authors :
+        key === "subjects_override" ? book.edition?.subjects :
+        null;
+      const blank = (!local || local.length === 0) && (!editionFallbackArr || editionFallbackArr.length === 0);
+      if (blank && mergeAllSources.some((s) => Array.isArray(s[key]) && (s[key] as string[]).length > 0)) n++;
+    }
+    if (!book.pages && mergeAllSources.some((s) => s.pages)) n++;
+    if ((!book.trim_width || !book.trim_height) && mergeAllSources.some((s) => s.trim_width && s.trim_height)) n++;
+    return n;
+  }, [book, mergeAllSources]);
+
+  const mergeFieldGroups = useMemo((): MergeFieldGroup[] => {
+    if (!book || mergeAllSources.length === 0) return [];
+
+    function aggregateStr(key: keyof MergeSource, localVal: string | null | undefined): MergeFieldGroup | null {
+      const counts: Record<string, number> = {};
+      for (const s of mergeAllSources) {
+        const v = (s[key] as string | null)?.trim();
+        if (!v) continue;
+        counts[v] = (counts[v] ?? 0) + 1;
+      }
+      const candidates: FieldCandidate[] = Object.entries(counts)
+        .sort(([a, ca], [b, cb]) => cb - ca || a.localeCompare(b))
+        .slice(0, 4)
+        .map(([value, count]) => ({ value, count }));
+      if (candidates.length === 0) return null;
+      return { key: String(key), label: "", localValue: (localVal ?? "").trim() || null, candidates, isArray: false };
+    }
+
+    function aggregateArr(key: keyof MergeSource, localVal: string[] | null | undefined): MergeFieldGroup | null {
+      const counts: Record<string, number> = {};
+      for (const s of mergeAllSources) {
+        const arr = s[key] as string[] | null;
+        if (!Array.isArray(arr) || arr.length === 0) continue;
+        const joined = arr.filter(Boolean).join(", ");
+        if (!joined) continue;
+        counts[joined] = (counts[joined] ?? 0) + 1;
+      }
+      const candidates: FieldCandidate[] = Object.entries(counts)
+        .sort(([a, ca], [b, cb]) => cb - ca || a.localeCompare(b))
+        .slice(0, 4)
+        .map(([value, count]) => ({ value, count }));
+      if (candidates.length === 0) return null;
+      const localJoined = (localVal ?? []).filter(Boolean).join(", ") || null;
+      return { key: String(key), label: "", localValue: localJoined, candidates, isArray: true };
+    }
+
+    const groups: MergeFieldGroup[] = [];
+
+    const hasCover = book.media.some((m) => m.kind === "cover");
+    const hasImg   = book.media.some((m) => m.kind === "image");
+    const coverVariants = mergeAllSources.filter((s) => s.media.some((m) => m.kind === "cover")).length;
+    const imgVariants   = mergeAllSources.filter((s) => s.media.some((m) => m.kind === "image")).length;
+    if (!hasCover && coverVariants > 0) {
+      groups.push({ key: "cover", label: "Cover", localValue: null, candidates: [{ value: `${coverVariants} variant${coverVariants !== 1 ? "s" : ""}`, count: coverVariants }], isArray: false });
+    }
+    if (!hasImg && imgVariants > 0) {
+      groups.push({ key: "images", label: "Images", localValue: null, candidates: [{ value: `${imgVariants} variant${imgVariants !== 1 ? "s" : ""}`, count: imgVariants }], isArray: false });
+    }
+
+    const strDefs: Array<[keyof MergeSource, string, string | null | undefined]> = [
+      ["title_override",        "Title",       book.title_override],
+      ["publisher_override",    "Publisher",   book.publisher_override ?? book.edition?.publisher],
+      ["publish_date_override", "Publish date",book.publish_date_override ?? book.edition?.publish_date],
+      ["description_override",  "Description", book.description_override ?? book.edition?.description],
+      ["printer_override",      "Printer",     book.printer_override],
+      ["materials_override",    "Materials",   book.materials_override],
+      ["edition_override",      "Edition",     book.edition_override],
+    ];
+    for (const [key, label, localVal] of strDefs) {
+      const g = aggregateStr(key, localVal);
+      if (g) groups.push({ ...g, label });
+    }
+
+    const arrDefs: Array<[keyof MergeSource, string, string[] | null | undefined]> = [
+      ["authors_override",   "Authors",   book.authors_override ?? book.edition?.authors],
+      ["editors_override",   "Editors",   book.editors_override],
+      ["designers_override", "Designers", book.designers_override],
+      ["subjects_override",  "Subjects",  book.subjects_override ?? book.edition?.subjects],
+    ];
+    for (const [key, label, localVal] of arrDefs) {
+      const g = aggregateArr(key, localVal);
+      if (g) groups.push({ ...g, label });
+    }
+
+    // Pages
+    if (!book.pages) {
+      const pageCounts: Record<string, number> = {};
+      for (const s of mergeAllSources) {
+        if (s.pages) { const v = String(s.pages); pageCounts[v] = (pageCounts[v] ?? 0) + 1; }
+      }
+      const pageCandidates = Object.entries(pageCounts)
+        .sort(([a, ca], [b, cb]) => cb - ca || Number(a) - Number(b))
+        .slice(0, 4)
+        .map(([value, count]) => ({ value, count }));
+      if (pageCandidates.length > 0) {
+        groups.push({ key: "pages", label: "Pages", localValue: null, candidates: pageCandidates, isArray: false });
+      }
+    }
+
+    // Trim
+    if (!book.trim_width || !book.trim_height) {
+      const trimCounts: Record<string, number> = {};
+      for (const s of mergeAllSources) {
+        if (s.trim_width && s.trim_height) {
+          const v = `${s.trim_width} × ${s.trim_height}${s.trim_unit ? ` ${s.trim_unit}` : ""}`;
+          trimCounts[v] = (trimCounts[v] ?? 0) + 1;
+        }
+      }
+      const trimCandidates = Object.entries(trimCounts)
+        .sort(([a, ca], [b, cb]) => cb - ca || a.localeCompare(b))
+        .slice(0, 4)
+        .map(([value, count]) => ({ value, count }));
+      if (trimCandidates.length > 0) {
+        groups.push({ key: "trim", label: "Trim size", localValue: null, candidates: trimCandidates, isArray: false });
+      }
+    }
+
+    return groups;
+  }, [book, mergeAllSources]);
 
   const categories = useMemo(() => {
     const all = ((book?.book_tags ?? []).map((bt) => bt.tag).filter(Boolean) as any[]).filter((t) => t?.id && t?.name);
@@ -2000,79 +2129,88 @@ export default function BookDetailPage() {
     }
   }
 
-  async function mergeFromSource() {
-    if (!supabase || !book || !mergeSource || !userId) return;
+  async function applyMerge(selections: Record<string, string | null>) {
+    if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
-    if (!window.confirm(`Merge missing metadata + images from ${mergeSource.owner_username ? `@${mergeSource.owner_username}` : "another user"}? This will only fill missing fields and add media to your copy.`)) {
-      return;
-    }
 
     setMergeState({ busy: true, error: null, message: "Merging…" });
     try {
       const updates: any = {};
 
-      const needsTitle = !(book.title_override ?? "").trim();
-      const needsAuthors = (!book.authors_override || book.authors_override.length === 0) && (!book.edition?.authors || book.edition.authors.length === 0);
-      const needsPublisher = !(book.publisher_override ?? "").trim() && !(book.edition?.publisher ?? "").trim();
-      const needsPublishDate = !(book.publish_date_override ?? "").trim() && !(book.edition?.publish_date ?? "").trim();
-      const needsDescription = !(book.description_override ?? "").trim() && !(book.edition?.description ?? "").trim();
-      const needsSubjects = (!book.subjects_override || book.subjects_override.length === 0) && (!book.edition?.subjects || book.edition.subjects.length === 0);
-      const needsEditors = !book.editors_override || book.editors_override.length === 0;
-      const needsDesigners = !book.designers_override || book.designers_override.length === 0;
-      const needsPrinter = !(book.printer_override ?? "").trim();
-      const needsMaterials = !(book.materials_override ?? "").trim();
-      const needsEditionOverride = !(book.edition_override ?? "").trim();
+      // String scalar fields
+      const strKeys = ["title_override", "publisher_override", "printer_override", "materials_override", "edition_override", "publish_date_override", "description_override"] as const;
+      for (const key of strKeys) {
+        if (selections[key] != null) updates[key] = selections[key];
+      }
 
-      if (needsTitle && mergeSource.title_override) updates.title_override = mergeSource.title_override.trim();
-      if (needsAuthors && mergeSource.authors_override && mergeSource.authors_override.length > 0) {
-        const base = (book.edition?.authors ?? []).filter(Boolean);
-        updates.authors_override = uniqStrings([...base, ...mergeSource.authors_override]);
+      // Array fields (stored as comma-joined string in selections)
+      const arrKeys = ["authors_override", "editors_override", "designers_override", "subjects_override"] as const;
+      for (const key of arrKeys) {
+        if (selections[key] != null) {
+          updates[key] = selections[key]!.split(",").map((s) => s.trim()).filter(Boolean);
+        }
       }
-      if (needsPublisher && mergeSource.publisher_override) updates.publisher_override = mergeSource.publisher_override.trim();
-      if (needsPublishDate && mergeSource.publish_date_override) updates.publish_date_override = mergeSource.publish_date_override.trim();
-      if (needsDescription && mergeSource.description_override) updates.description_override = mergeSource.description_override.trim();
-      if (needsSubjects && mergeSource.subjects_override && mergeSource.subjects_override.length > 0) {
-        const base = (book.edition?.subjects ?? []).filter(Boolean);
-        updates.subjects_override = uniqStrings([...base, ...mergeSource.subjects_override]);
+
+      // Numeric/physical fields
+      if (selections["pages"] != null) {
+        const p = Number(selections["pages"]);
+        if (Number.isFinite(p) && p > 0) updates.pages = p;
       }
-      if (needsEditors && mergeSource.editors_override && mergeSource.editors_override.length > 0) updates.editors_override = mergeSource.editors_override;
-      if (needsDesigners && mergeSource.designers_override && mergeSource.designers_override.length > 0) updates.designers_override = mergeSource.designers_override;
-      if (needsPrinter && mergeSource.printer_override) updates.printer_override = mergeSource.printer_override.trim();
-      if (needsMaterials && mergeSource.materials_override) updates.materials_override = mergeSource.materials_override.trim();
-      if (needsEditionOverride && mergeSource.edition_override) updates.edition_override = mergeSource.edition_override.trim();
+      if (selections["trim"] != null) {
+        // value is "W × H unit" — find first matching source
+        const matchingSrc = mergeAllSources.find((s) => {
+          if (!s.trim_width || !s.trim_height) return false;
+          const v = `${s.trim_width} × ${s.trim_height}${s.trim_unit ? ` ${s.trim_unit}` : ""}`;
+          return v === selections["trim"];
+        });
+        if (matchingSrc) {
+          updates.trim_width = matchingSrc.trim_width;
+          updates.trim_height = matchingSrc.trim_height;
+          if (matchingSrc.trim_unit) updates.trim_unit = matchingSrc.trim_unit;
+        }
+      }
 
       if (Object.keys(updates).length > 0) {
         const upd = await supabase.from("user_books").update(updates).eq("id", book.id);
         if (upd.error) throw new Error(upd.error.message);
       }
 
-      const existingCover = (book.media ?? []).some((m) => m.kind === "cover");
-      const existingImages = (book.media ?? []).some((m) => m.kind === "image");
-      const toCopy = mergeSource.media.filter((m) => {
-        if (m.kind === "cover") return !existingCover;
-        return !existingImages;
-      });
-
-      for (const m of toCopy) {
-        const signed = await supabase.storage.from("user-book-media").createSignedUrl(m.storage_path, 60 * 15);
-        if (signed.error || !signed.data?.signedUrl) continue;
-        const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(signed.data.signedUrl)}`);
-        if (!resp.ok) continue;
-        const blob = await resp.blob();
-        const fileName = safeFileName(String(m.storage_path.split("/").pop() ?? "image"));
-        const destPath = `${userId}/${book.id}/merge-${Date.now()}-${fileName}`;
-        const up = await supabase.storage.from("user-book-media").upload(destPath, blob, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: resp.headers.get("content-type") || "application/octet-stream"
-        });
-        if (up.error) continue;
-        const ins = await supabase.from("user_book_media").insert({ user_book_id: book.id, kind: m.kind, storage_path: destPath, caption: null });
-        if (ins.error) {
-          // ignore; still uploaded
+      // Media copy — driven by panel selections
+      const includeCover  = selections["cover"]  != null;
+      const includeImages = selections["images"] != null;
+      if (includeCover || includeImages) {
+        const existingCover  = (book.media ?? []).some((m) => m.kind === "cover");
+        const existingImages = (book.media ?? []).some((m) => m.kind === "image");
+        // Collect all candidate media from all sources
+        const allMedia: Array<{ kind: "cover" | "image"; storage_path: string }> = [];
+        for (const s of mergeAllSources) {
+          for (const m of s.media) {
+            if (m.kind === "cover" && includeCover && !existingCover) allMedia.push(m);
+            if (m.kind === "image" && includeImages && !existingImages) allMedia.push(m);
+          }
+        }
+        // Deduplicate by storage_path, keep first (highest-scoring source)
+        const seen = new Set<string>();
+        const toCopy = allMedia.filter((m) => { if (seen.has(m.storage_path)) return false; seen.add(m.storage_path); return true; }).slice(0, 1);
+        for (const m of toCopy) {
+          const signed = await supabase.storage.from("user-book-media").createSignedUrl(m.storage_path, 60 * 15);
+          if (signed.error || !signed.data?.signedUrl) continue;
+          const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(signed.data.signedUrl)}`);
+          if (!resp.ok) continue;
+          const blob = await resp.blob();
+          const fileName = safeFileName(String(m.storage_path.split("/").pop() ?? "image"));
+          const destPath = `${userId}/${book.id}/merge-${Date.now()}-${fileName}`;
+          const up = await supabase.storage.from("user-book-media").upload(destPath, blob, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: resp.headers.get("content-type") || "application/octet-stream"
+          });
+          if (up.error) continue;
+          await supabase.from("user_book_media").insert({ user_book_id: book.id, kind: m.kind, storage_path: destPath, caption: null });
         }
       }
 
+      setMergePanelOpen(false);
       await refresh();
       setMergeState({ busy: false, error: null, message: "Merged" });
       window.setTimeout(() => setMergeState({ busy: false, error: null, message: null }), 1500);
@@ -2128,9 +2266,20 @@ export default function BookDetailPage() {
                         </button>
                       </>
                     ) : (
-                      <button onClick={enterEditMode} disabled={busy}>
-                        Edit
-                      </button>
+                      <>
+                        <button onClick={enterEditMode} disabled={busy}>
+                          Edit
+                        </button>
+                        {updatesCount > 0 ? (
+                          <button
+                            onClick={() => setMergePanelOpen((v) => !v)}
+                            className="muted"
+                            style={{ fontSize: "0.85em", whiteSpace: "nowrap" }}
+                          >
+                            Updates available {updatesCount}
+                          </button>
+                        ) : null}
+                      </>
                     )
                   ) : null}
                 </div>
@@ -2146,6 +2295,89 @@ export default function BookDetailPage() {
                       ? error
                       : ""}
               </div>
+
+              {isOwner && mergePanelOpen && mergeAllSources.length > 0 ? (
+                <div style={{ marginTop: 14, padding: "12px 14px", border: "1px solid var(--color-border, #ddd)", borderRadius: 6 }}>
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+                    <strong>Updates available</strong>
+                    <button className="muted" onClick={() => setMergePanelOpen(false)} style={{ padding: 0, fontSize: "1em" }}>×</button>
+                  </div>
+                  <div className="muted" style={{ marginBottom: 12, fontSize: "0.9em" }}>
+                    Add missing fields from the community.
+                  </div>
+                  <div>
+                    {mergeFieldGroups.map((group) => {
+                      const isBlank = !group.localValue;
+                      const defaultVal = isBlank ? (group.candidates[0]?.value ?? null) : null;
+                      const currentSel = mergeSelections[group.key] !== undefined ? mergeSelections[group.key] : defaultVal;
+                      return (
+                        <div key={group.key} style={{ marginBottom: 10 }}>
+                          <div className="row" style={{ alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                            <div style={{ minWidth: 90, flexShrink: 0 }} className="muted">{group.label}</div>
+                            <div style={{ flex: "1 1 auto" }}>
+                              {!isBlank ? (
+                                <div className="muted" style={{ fontSize: "0.85em", marginBottom: 4 }}>
+                                  Current: {group.localValue}
+                                </div>
+                              ) : null}
+                              {group.candidates.map((c) => (
+                                <label key={c.value} style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 2, cursor: "pointer" }}>
+                                  <input
+                                    type="radio"
+                                    name={`merge-${group.key}`}
+                                    value={c.value}
+                                    checked={currentSel === c.value}
+                                    onChange={() => setMergeSelections((s) => ({ ...s, [group.key]: c.value }))}
+                                  />
+                                  <span style={{ flex: "1 1 auto" }}>{c.value}</span>
+                                  <span className="muted" style={{ fontSize: "0.8em" }}>{c.count}</span>
+                                </label>
+                              ))}
+                              {currentSel != null ? (
+                                <label style={{ display: "flex", alignItems: "baseline", gap: 6, cursor: "pointer" }}>
+                                  <input
+                                    type="radio"
+                                    name={`merge-${group.key}`}
+                                    value=""
+                                    checked={currentSel === null || currentSel === ""}
+                                    onChange={() => setMergeSelections((s) => ({ ...s, [group.key]: null }))}
+                                  />
+                                  <span className="muted">Skip</span>
+                                </label>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="row" style={{ marginTop: 12, gap: 10 }}>
+                    <button
+                      onClick={() => {
+                        const effectiveSels: Record<string, string | null> = {};
+                        for (const group of mergeFieldGroups) {
+                          const isBlank = !group.localValue;
+                          const defaultVal = isBlank ? (group.candidates[0]?.value ?? null) : null;
+                          const v = mergeSelections[group.key] !== undefined ? mergeSelections[group.key] : defaultVal;
+                          if (v != null && v !== "") effectiveSels[group.key] = v;
+                        }
+                        void applyMerge(effectiveSels);
+                      }}
+                      disabled={mergeState.busy || busy}
+                    >
+                      {mergeState.busy ? "Merging…" : "Apply merge"}
+                    </button>
+                    <button className="muted" onClick={() => setMergePanelOpen(false)} disabled={mergeState.busy}>
+                      Cancel
+                    </button>
+                    {mergeState.message ? (
+                      <div className="muted" style={{ fontSize: "0.9em" }}>
+                        {mergeState.error ? `${mergeState.message} (${mergeState.error})` : mergeState.message}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
 
               {isOwner && findMoreOpen ? (
                 <div style={{ marginTop: 14 }}>
@@ -2626,37 +2858,6 @@ export default function BookDetailPage() {
             </div>
 
             <div>
-              {mergeSource && book?.owner_id === userId && !mergeDismissed ? (
-                <div style={{ marginBottom: 12 }} className="card">
-                  <div className="row" style={{ justifyContent: "space-between" }}>
-                    <div>Merge from community</div>
-                    <div className="muted">{mergeSource.owner_username ? `@${mergeSource.owner_username}` : "available"}</div>
-                  </div>
-                  <div className="muted" style={{ marginTop: 8 }}>
-                    Copy missing metadata + images from another visible copy of this same edition.
-                  </div>
-                  <div className="row" style={{ marginTop: 10 }}>
-                    <button onClick={mergeFromSource} disabled={mergeState.busy || busy}>
-                      {mergeState.busy ? "Merging…" : "Merge"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        try {
-                          window.localStorage.setItem(`om_mergeDismissed:${bookId}`, "1");
-                        } catch {
-                          // ignore
-                        }
-                        setMergeDismissed(true);
-                      }}
-                      disabled={mergeState.busy || busy}
-                    >
-                      Dismiss
-                    </button>
-                    <div className="muted">{mergeState.message ? (mergeState.error ? `${mergeState.message} (${mergeState.error})` : mergeState.message) : ""}</div>
-                  </div>
-                </div>
-              ) : null}
-
               <div style={{ marginTop: 10 }}>
                 {editMode ? (
                   <input
