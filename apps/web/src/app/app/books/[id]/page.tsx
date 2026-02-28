@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import type { Session } from "@supabase/supabase-js";
 import Cropper, { type Area } from "react-easy-crop";
 import { supabase } from "../../../../lib/supabaseClient";
+import { isValidTrimSize, convertTrimUnit, type TrimUnit } from "../../../../lib/trimSize";
 import { bookIdSlug } from "../../../../lib/slug";
 import { formatDateShort } from "../../../../lib/formatDate";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
@@ -51,6 +52,9 @@ type UserBookDetail = {
   location: string | null;
   shelf: string | null;
   notes: string | null;
+  trim_width: number | null;
+  trim_height: number | null;
+  trim_unit: string | null;
   edition: {
     id: number;
     isbn10: string | null;
@@ -336,6 +340,9 @@ export default function BookDetailPage() {
     formBorrowable: "inherit" | "yes" | "no";
     formLibraryId: number | null;
     facetDraft: Record<FacetRole, string[]>;
+    formTrimWidth: string;
+    formTrimHeight: string;
+    formTrimUnit: TrimUnit;
   } | null>(null);
 
   const [busy, setBusy] = useState(false);
@@ -384,6 +391,9 @@ export default function BookDetailPage() {
   const [formVisibility, setFormVisibility] = useState<"inherit" | "followers_only" | "public">("inherit");
   const [formStatus, setFormStatus] = useState<"owned" | "loaned" | "selling" | "trading">("owned");
   const [formBorrowable, setFormBorrowable] = useState<"inherit" | "yes" | "no">("inherit");
+  const [formTrimWidth, setFormTrimWidth] = useState<string>("");
+  const [formTrimHeight, setFormTrimHeight] = useState<string>("");
+  const [formTrimUnit, setFormTrimUnit] = useState<TrimUnit>("in");
   const [saveState, setSaveState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -602,7 +612,7 @@ export default function BookDetailPage() {
     setCopiesCountState({ busy: false, error: null });
     try {
       const baseNew =
-        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,decade,pages,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,decade,pages,trim_width,trim_height,trim_unit,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
       const baseOld =
         "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
 
@@ -613,7 +623,17 @@ export default function BookDetailPage() {
       let res = await supabase.from("user_books").select(selectNew).eq("id", bookId).maybeSingle();
       if (res.error) {
         const msg = (res.error.message ?? "").toLowerCase();
-        if ((msg.includes("book_entities") || msg.includes("entities")) && (res.error.message ?? "").toLowerCase().includes("does not exist")) {
+        if (msg.includes("trim_width") && msg.includes("does not exist")) {
+          // Migration 0025 not yet applied; strip trim fields and retry.
+          const noTrim = (s: string) => s.replace(",trim_width,trim_height,trim_unit", "");
+          res = await supabase.from("user_books").select(noTrim(selectNew)).eq("id", bookId).maybeSingle();
+          if (res.error) {
+            const msg2 = (res.error.message ?? "").toLowerCase();
+            if ((msg2.includes("book_entities") || msg2.includes("entities")) && msg2.includes("does not exist")) {
+              res = await supabase.from("user_books").select(noTrim(baseNew)).eq("id", bookId).maybeSingle();
+            }
+          }
+        } else if ((msg.includes("book_entities") || msg.includes("entities")) && (res.error.message ?? "").toLowerCase().includes("does not exist")) {
           res = await supabase.from("user_books").select(baseNew).eq("id", bookId).maybeSingle();
         } else if (msg.includes("group_label") && msg.includes("does not exist")) {
           res = await supabase.from("user_books").select(selectOld).eq("id", bookId).maybeSingle();
@@ -701,6 +721,9 @@ export default function BookDetailPage() {
       setFormLocation(row.location ?? "");
       setFormShelf(row.shelf ?? "");
       setFormNotes(row.notes ?? "");
+      setFormTrimWidth(row.trim_width != null ? String(row.trim_width) : "");
+      setFormTrimHeight(row.trim_height != null ? String(row.trim_height) : "");
+      setFormTrimUnit((row.trim_unit as TrimUnit | null) === "mm" ? "mm" : "in");
       setFormVisibility(row.visibility);
       setFormStatus(row.status);
       setFormLibraryId((row as any).library_id ?? null);
@@ -1051,7 +1074,20 @@ export default function BookDetailPage() {
 
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
   const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : suggestedCoverUrl ?? book?.edition?.cover_url ?? null;
-  const coverAspect = useMemo(() => aspectFrom(coverAspectW, coverAspectH), [coverAspectW, coverAspectH]);
+
+  const trimSizeValid = useMemo(
+    () => isValidTrimSize(formTrimWidth, formTrimHeight, formTrimUnit),
+    [formTrimWidth, formTrimHeight, formTrimUnit]
+  );
+
+  const coverAspect = useMemo(() => {
+    if (trimSizeValid) {
+      const w = parseFloat(formTrimWidth);
+      const h = parseFloat(formTrimHeight);
+      return w / h;
+    }
+    return aspectFrom(coverAspectW, coverAspectH);
+  }, [trimSizeValid, formTrimWidth, formTrimHeight, coverAspectW, coverAspectH]);
   const imageMedia = useMemo(() => (book?.media ?? []).filter((m) => m.kind === "image") ?? [], [book]);
 
   const publicBookPath = useMemo(() => {
@@ -1096,6 +1132,21 @@ export default function BookDetailPage() {
     }
   }
 
+  function handleTrimUnitChange(newUnit: TrimUnit) {
+    if (newUnit === formTrimUnit) return;
+    const w = parseFloat(formTrimWidth);
+    const h = parseFloat(formTrimHeight);
+    if (Number.isFinite(w) && w > 0) {
+      const converted = convertTrimUnit(w, formTrimUnit, newUnit);
+      setFormTrimWidth(String(converted));
+    }
+    if (Number.isFinite(h) && h > 0) {
+      const converted = convertTrimUnit(h, formTrimUnit, newUnit);
+      setFormTrimHeight(String(converted));
+    }
+    setFormTrimUnit(newUnit);
+  }
+
   function enterEditMode() {
     if (!isOwner) return;
     if (editMode) return;
@@ -1121,7 +1172,10 @@ export default function BookDetailPage() {
       formStatus,
       formBorrowable,
       formLibraryId,
-      facetDraft: JSON.parse(JSON.stringify(facetDraft))
+      facetDraft: JSON.parse(JSON.stringify(facetDraft)),
+      formTrimWidth,
+      formTrimHeight,
+      formTrimUnit
     };
     setEditMode(true);
   }
@@ -1152,6 +1206,9 @@ export default function BookDetailPage() {
       setFormBorrowable(snap.formBorrowable);
       setFormLibraryId(snap.formLibraryId);
       if (snap.facetDraft) setFacetDraft(snap.facetDraft);
+      setFormTrimWidth(snap.formTrimWidth);
+      setFormTrimHeight(snap.formTrimHeight);
+      setFormTrimUnit(snap.formTrimUnit);
     }
     setCoverToolsOpen(false);
     setPendingCover(null);
@@ -1182,11 +1239,19 @@ export default function BookDetailPage() {
       setSaveState({ busy: false, error: "Pages must be a number.", message: "Save failed" });
       return false;
     }
+    const trimWRaw = parseFloat(formTrimWidth);
+    const trimHRaw = parseFloat(formTrimHeight);
+    const trim_width = Number.isFinite(trimWRaw) && trimWRaw > 0 ? trimWRaw : null;
+    const trim_height = Number.isFinite(trimHRaw) && trimHRaw > 0 ? trimHRaw : null;
+    const trim_unit = trim_width !== null && trim_height !== null ? (formTrimUnit || "in") : null;
     const payload: any = {
       group_label,
       object_type,
       decade,
       pages: pages === null ? null : Math.max(1, Math.floor(pages)),
+      trim_width,
+      trim_height,
+      trim_unit,
       title_override,
       authors_override: authors_override.length > 0 ? authors_override : null,
       editors_override: editors_override.length > 0 ? editors_override : null,
@@ -1206,6 +1271,16 @@ export default function BookDetailPage() {
       borrowable_override: formBorrowable === "inherit" ? null : formBorrowable === "yes"
     };
     let res = await supabase.from("user_books").update(payload).eq("id", book.id);
+    if (res.error) {
+      const msg = (res.error.message ?? "").toLowerCase();
+      if (msg.includes("trim_width") && msg.includes("does not exist")) {
+        // Migration 0025 not yet applied; save without trim fields.
+        delete payload.trim_width;
+        delete payload.trim_height;
+        delete payload.trim_unit;
+        res = await supabase.from("user_books").update(payload).eq("id", book.id);
+      }
+    }
     if (res.error) {
       const msg = (res.error.message ?? "").toLowerCase();
       if (msg.includes("group_label") && msg.includes("does not exist")) {
@@ -2332,51 +2407,92 @@ export default function BookDetailPage() {
                           </div>
 
                           <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
-                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                              <div className="muted" style={{ width: 72 }}>
-                                Aspect
+                            {/* Book size — shared with metadata panel (two-way sync via shared state) */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                                <div className="muted" style={{ width: 72 }}>
+                                  Book size
+                                </div>
+                                <input
+                                  type="number"
+                                  value={formTrimWidth}
+                                  min={0.01}
+                                  step={0.01}
+                                  onChange={(e) => setFormTrimWidth(e.target.value)}
+                                  placeholder="W"
+                                  style={{ width: 64 }}
+                                />
+                                <span className="muted">×</span>
+                                <input
+                                  type="number"
+                                  value={formTrimHeight}
+                                  min={0.01}
+                                  step={0.01}
+                                  onChange={(e) => setFormTrimHeight(e.target.value)}
+                                  placeholder="H"
+                                  style={{ width: 64 }}
+                                />
+                                <select
+                                  value={formTrimUnit}
+                                  onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)}
+                                  style={{ width: 52 }}
+                                >
+                                  <option value="in">in</option>
+                                  <option value="mm">mm</option>
+                                </select>
                               </div>
-                              <input
-                                type="number"
-                                value={coverAspectW}
-                                min={1}
-                                step={1}
-                                onChange={(e) => setCoverAspectW(Math.max(1, Number(e.target.value) || 1))}
-                                style={{ width: 64 }}
-                              />
-                              <span className="muted">:</span>
-                              <input
-                                type="number"
-                                value={coverAspectH}
-                                min={1}
-                                step={1}
-                                onChange={(e) => setCoverAspectH(Math.max(1, Number(e.target.value) || 1))}
-                                style={{ width: 64 }}
-                              />
-                              <button
-                                onClick={() => {
-                                  setCoverAspectW(2);
-                                  setCoverAspectH(3);
-                                }}
-                              >
-                                2:3
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setCoverAspectW(1);
-                                  setCoverAspectH(1);
-                                }}
-                              >
-                                1:1
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setCoverAspectW(3);
-                                  setCoverAspectH(2);
-                                }}
-                              >
-                                3:2
-                              </button>
+                              {trimSizeValid ? (
+                                <div className="muted" style={{ fontSize: "0.85em", paddingLeft: 80 }}>
+                                  Aspect locked ({parseFloat(formTrimWidth)} × {parseFloat(formTrimHeight)} {formTrimUnit})
+                                </div>
+                              ) : (
+                                <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                                  <div className="muted" style={{ width: 72 }}>
+                                    Aspect
+                                  </div>
+                                  <input
+                                    type="number"
+                                    value={coverAspectW}
+                                    min={1}
+                                    step={1}
+                                    onChange={(e) => setCoverAspectW(Math.max(1, Number(e.target.value) || 1))}
+                                    style={{ width: 64 }}
+                                  />
+                                  <span className="muted">:</span>
+                                  <input
+                                    type="number"
+                                    value={coverAspectH}
+                                    min={1}
+                                    step={1}
+                                    onChange={(e) => setCoverAspectH(Math.max(1, Number(e.target.value) || 1))}
+                                    style={{ width: 64 }}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      setCoverAspectW(2);
+                                      setCoverAspectH(3);
+                                    }}
+                                  >
+                                    2:3
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setCoverAspectW(1);
+                                      setCoverAspectH(1);
+                                    }}
+                                  >
+                                    1:1
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setCoverAspectW(3);
+                                      setCoverAspectH(2);
+                                    }}
+                                  >
+                                    3:2
+                                  </button>
+                                </div>
+                              )}
                             </div>
                             <div className="row" style={{ gap: 8, alignItems: "center" }}>
                               <div className="muted" style={{ width: 72 }}>
@@ -2745,6 +2861,52 @@ export default function BookDetailPage() {
                         />
                       ) : book?.pages ? (
                         String(book.pages)
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
+                {editMode || Boolean((book as any)?.trim_width) ? (
+                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                    <div style={{ minWidth: 110 }} className="muted">
+                      Trim size
+                    </div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <div className="row" style={{ gap: 6, alignItems: "center" }}>
+                          <input
+                            className="om-inline-control"
+                            type="number"
+                            min={0.01}
+                            step={0.01}
+                            value={formTrimWidth}
+                            onChange={(e) => setFormTrimWidth(e.target.value)}
+                            placeholder="W"
+                            style={{ width: 72 }}
+                          />
+                          <span className="muted">×</span>
+                          <input
+                            className="om-inline-control"
+                            type="number"
+                            min={0.01}
+                            step={0.01}
+                            value={formTrimHeight}
+                            onChange={(e) => setFormTrimHeight(e.target.value)}
+                            placeholder="H"
+                            style={{ width: 72 }}
+                          />
+                          <select
+                            className="om-inline-control"
+                            value={formTrimUnit}
+                            onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)}
+                            style={{ width: 56 }}
+                          >
+                            <option value="in">in</option>
+                            <option value="mm">mm</option>
+                          </select>
+                        </div>
+                      ) : (book as any)?.trim_width && (book as any)?.trim_height ? (
+                        `${(book as any).trim_width} × ${(book as any).trim_height} ${(book as any).trim_unit ?? "in"}`
                       ) : null}
                     </div>
                   </div>
