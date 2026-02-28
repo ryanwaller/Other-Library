@@ -2226,7 +2226,11 @@ export default function BookDetailPage() {
           <div className="om-book-detail-grid" style={{ marginTop: 10, gap: 14 }}>
             <div style={{ gridColumn: "1 / -1" }}>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: 10 }}>
-                <span />
+                {isOwner && mergePanelOpen ? (
+                  <span className="muted">Add missing fields from the community.</span>
+                ) : (
+                  <span />
+                )}
 
                 <div className="row" style={{ gap: 20, alignItems: "baseline", flexWrap: "nowrap", justifyContent: "flex-end", marginLeft: "auto" }}>
                   {isOwner ? (
@@ -2268,14 +2272,14 @@ export default function BookDetailPage() {
                                 for (const cand of group.candidates) {
                                   const selKey = `${group.key}::${cand.value}`;
                                   const stored = mergeSelections[selKey];
-                                  const isChecked = stored !== undefined ? stored != null : !group.localValue;
+                                  const isChecked = stored !== undefined ? stored != null : true;
                                   if (isChecked) sels[selKey] = cand.value;
                                 }
                               } else {
                                 const topCand = group.candidates[0];
                                 if (!topCand) continue;
                                 const stored = mergeSelections[group.key];
-                                const isChecked = stored !== undefined ? (stored != null && stored !== "") : !group.localValue;
+                                const isChecked = stored !== undefined ? (stored != null && stored !== "") : true;
                                 if (isChecked) sels[group.key] = stored != null && stored !== "" ? stored : topCand.value;
                               }
                             }
@@ -2340,10 +2344,10 @@ export default function BookDetailPage() {
 
               {isOwner && mergePanelOpen && mergeAllSources.length > 0 ? (
                 <div style={{ marginTop: 14, paddingBottom: 24 }}>
-                  {/* Description + Sources column header on one line */}
-                  <div style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 8, marginBottom: 8, alignItems: "baseline" }}>
+                  {/* Sources column header */}
+                  <div style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 8, marginBottom: 0, alignItems: "baseline" }}>
                     <span />
-                    <span className="muted">Add missing fields from the community.</span>
+                    <span />
                     <span className="muted" style={{ textAlign: "right" }}>Sources</span>
                   </div>
                   {/* Field rows — spacing matches metadata list (marginTop: 8) */}
@@ -2352,7 +2356,7 @@ export default function BookDetailPage() {
                       return group.candidates.map((cand, i) => {
                         const selKey = `${group.key}::${cand.value}`;
                         const stored = mergeSelections[selKey];
-                        const isChecked = stored !== undefined ? stored != null : !group.localValue;
+                        const isChecked = stored !== undefined ? stored != null : true;
                         return (
                           <div
                             key={selKey}
@@ -2372,7 +2376,7 @@ export default function BookDetailPage() {
                       const cand = group.candidates[0];
                       if (!cand) return [];
                       const stored = mergeSelections[group.key];
-                      const isChecked = stored !== undefined ? (stored != null && stored !== "") : !group.localValue;
+                      const isChecked = stored !== undefined ? (stored != null && stored !== "") : true;
                       return [(
                         <div
                           key={group.key}
