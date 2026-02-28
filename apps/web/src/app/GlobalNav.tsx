@@ -255,7 +255,7 @@ export default function GlobalNav() {
             </Link>
           </div>
 
-          <div className="row" style={{ gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             {editInAppHref ? (
               <Link href={editInAppHref} aria-label="Edit this page in the app">
                 Edit in app
@@ -264,7 +264,7 @@ export default function GlobalNav() {
 
             {messagesBadge ? (
               <Link href={messagesHref} aria-label={`${unreadThreads} unread conversations`} style={{ textDecoration: "none" }}>
-                <span className="om-nav-badge" style={{ background: messagesBadge.bg }}>
+                <span className="om-nav-badge om-nav-badge--square" style={{ background: messagesBadge.bg }}>
                   {messagesBadge.text}
                 </span>
               </Link>
@@ -272,7 +272,7 @@ export default function GlobalNav() {
 
             {pendingRequests > 0 ? (
               <Link href="/app/follows" aria-label={`${pendingRequests} pending follow requests`} style={{ textDecoration: "none" }}>
-                <span className="om-nav-badge" style={{ background: "#b00020" }}>
+                <span className="om-nav-badge om-nav-badge--circle" style={{ background: "#b00020" }}>
                   {pendingRequests}
                 </span>
               </Link>

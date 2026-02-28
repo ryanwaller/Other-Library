@@ -210,7 +210,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div>
-            <div className="om-avatar-lockup om-avatar-lockup-tight">
+            <div className="om-avatar-lockup">
               {avatarUrl ? (
                 <Link href={`/u/${profile.username}`} className="om-avatar-link" aria-label="Open profile">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -224,14 +224,12 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
         </div>
         {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
         <div className="row muted" style={{ marginTop: 8, justifyContent: "flex-start", alignItems: "baseline", gap: 18, flexWrap: "wrap" }}>
-          <div className="row muted" style={{ gap: 18, flexWrap: "wrap", alignItems: "baseline" }}>
-            <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
-              Followers <span style={{ marginInline: 10 }}>{followersCount ?? "—"}</span>
-            </Link>
-            <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
-              Following <span style={{ marginInline: 10 }}>{followingCount ?? "—"}</span>
-            </Link>
-          </div>
+          <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
+            Followers <span style={{ marginInline: 10 }}>{followersCount ?? "—"}</span>
+          </Link>
+          <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
+            Following <span style={{ marginInline: 10 }}>{followingCount ?? "—"}</span>
+          </Link>
           <FollowControls profileId={profile.id} profileUsername={profile.username} inline />
         </div>
         {profile.bio ? (

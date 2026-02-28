@@ -89,6 +89,13 @@ a:focus-visible {
   text-decoration: none;
 }
 
+.om-book-card {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
 .om-book-title:hover {
   text-decoration: underline;
 }
@@ -122,13 +129,13 @@ a:focus-visible {
 .om-avatar-lockup {
   display: inline-flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: nowrap;
   min-width: 0;
 }
 
 .om-avatar-lockup-tight {
-  gap: 14px;
+  gap: 12px;
 }
 
 .om-avatar-link {
@@ -145,7 +152,7 @@ a:focus-visible {
   object-fit: cover;
   border: 0;
   display: block;
-  transform: none;
+  transform: translateY(-1px);
 }
 
 .om-avatar-img-nav {
@@ -153,7 +160,7 @@ a:focus-visible {
 }
 
 .om-avatar-img-public {
-  transform: none;
+  transform: translateY(-1px);
 }
 
 .om-nav-badge {
@@ -174,6 +181,14 @@ a:focus-visible {
   outline: 0;
   box-shadow: none;
   font-variant-numeric: tabular-nums;
+}
+
+.om-nav-badge--square {
+  border-radius: 0;
+}
+
+.om-nav-badge--circle {
+  border-radius: 999px;
 }
 
 input,

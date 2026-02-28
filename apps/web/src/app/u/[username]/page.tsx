@@ -180,7 +180,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     <main className="container">
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <div className="om-avatar-lockup om-avatar-lockup-tight">
+          <div className="om-avatar-lockup">
             {avatarUrl ? (
               <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar" className="om-avatar-link">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -193,14 +193,12 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
         </div>
         {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
         <div className="row muted" style={{ marginTop: 8, justifyContent: "flex-start", alignItems: "baseline", gap: 18, flexWrap: "wrap" }}>
-          <div className="row muted" style={{ gap: 18, flexWrap: "wrap", alignItems: "baseline" }}>
-            <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
-              Followers <span style={{ marginInline: 10 }}>{followersCount ?? "—"}</span>
-            </Link>
-            <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
-              Following <span style={{ marginInline: 10 }}>{followingCount ?? "—"}</span>
-            </Link>
-          </div>
+          <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
+            Followers <span style={{ marginInline: 10 }}>{followersCount ?? "—"}</span>
+          </Link>
+          <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
+            Following <span style={{ marginInline: 10 }}>{followingCount ?? "—"}</span>
+          </Link>
           <FollowControls profileId={profile.id} profileUsername={profile.username} inline />
         </div>
         {profile.bio ? (
