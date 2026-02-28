@@ -455,6 +455,7 @@ export default function BookDetailPage() {
 
   const [pendingCover, setPendingCover] = useState<File | null>(null);
   const [coverEditorSrc, setCoverEditorSrc] = useState<string | null>(null);
+  const [coverOriginalSrc, setCoverOriginalSrc] = useState<string | null>(null);
   const coverEditorObjectUrlRef = useRef<string | null>(null);
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [coverCrop, setCoverCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -846,6 +847,9 @@ export default function BookDetailPage() {
           if (s.path && s.signedUrl) next[s.path] = s.signedUrl;
         }
         setMediaUrlsByPath(next);
+        if (origStoragePath && next[origStoragePath]) {
+          setCoverOriginalSrc(toProxyImageUrl(next[origStoragePath]));
+        }
       }
 
       // If you own this book and it's missing key metadata/media, look for a visible "source" to merge from.
@@ -1634,6 +1638,11 @@ export default function BookDetailPage() {
             });
             if (!origUp.error) {
               await supabase.from("user_books").update({ cover_original_url: origPath }).eq("id", book.id);
+              // Set coverOriginalSrc immediately so "Edit" can use it without waiting for refresh().
+              try {
+                const { data: sd } = await supabase.storage.from("user-book-media").createSignedUrl(origPath, 3600);
+                if (sd?.signedUrl) setCoverOriginalSrc(toProxyImageUrl(sd.signedUrl));
+              } catch { /* best-effort */ }
             }
           }
         } catch { /* best-effort; don't block the cover save */ }
@@ -2523,10 +2532,9 @@ export default function BookDetailPage() {
                               if (!coverUrl) return;
                               setPendingCover(null);
                               // Always crop from the original uncropped image when available.
-                              const origPath = book?.cover_original_url;
-                              const origSrc = origPath && mediaUrlsByPath[origPath]
-                                ? toProxyImageUrl(mediaUrlsByPath[origPath])
-                                : toProxyImageUrl(coverUrl);
+                              // coverOriginalSrc is set eagerly in uploadCover and on refresh(),
+                              // so it's ready without a two-step async lookup.
+                              const origSrc = coverOriginalSrc ?? toProxyImageUrl(coverUrl);
                               setCoverEditorSrc(origSrc);
                               setCoverCrop({ x: 0, y: 0 });
                               setCoverZoom(1);
