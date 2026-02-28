@@ -1609,6 +1609,29 @@ export default function BookDetailPage() {
         .eq("kind", "cover")
         .neq("id", inserted.data.id);
 
+      // Persist trim values to the database before refresh() reloads form state from Supabase.
+      // In in/mm mode the crop W/H are physical dimensions and should be saved; in ratio mode
+      // the W/H are aspect-only hints so we preserve whatever is already stored in form state.
+      {
+        let tw: number | null = null;
+        let th: number | null = null;
+        let tu: string | null = null;
+        if (cropTrimUnit !== "ratio") {
+          const w = parseFloat(cropTrimWidth);
+          const h = parseFloat(cropTrimHeight);
+          if (Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0) {
+            tw = w; th = h; tu = cropTrimUnit;
+          }
+        } else {
+          const w = parseFloat(formTrimWidth);
+          const h = parseFloat(formTrimHeight);
+          if (Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0) {
+            tw = w; th = h; tu = formTrimUnit;
+          }
+        }
+        await supabase.from("user_books").update({ trim_width: tw, trim_height: th, trim_unit: tu }).eq("id", book.id);
+      }
+
       setPendingCover(null);
       setCoverEditorSrc(null);
       setCoverInputKey((k) => k + 1);
