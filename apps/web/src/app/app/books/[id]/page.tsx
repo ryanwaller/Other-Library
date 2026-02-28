@@ -1616,19 +1616,27 @@ export default function BookDetailPage() {
         .eq("kind", "cover")
         .neq("id", inserted.data.id);
 
-      // On first upload (pendingCover set, no existing original), save the raw uncropped file
-      // as the permanent original so future crops always work from the full-resolution source.
-      if (pendingCover && !book.cover_original_url) {
-        const origExt = (pendingCover.name.split(".").pop() ?? "jpg").toLowerCase();
-        const origPath = `${userId}/${book.id}/cover-original-${Date.now()}-${baseName}.${origExt}`;
-        const origUp = await supabase.storage.from("user-book-media").upload(origPath, pendingCover, {
-          cacheControl: "31536000",
-          upsert: false,
-          contentType: pendingCover.type || "image/jpeg"
-        });
-        if (!origUp.error) {
-          await supabase.from("user_books").update({ cover_original_url: origPath }).eq("id", book.id);
-        }
+      // If no original has been stored yet, save the image that the cropper loaded as the
+      // permanent original so all future crops work from the same full-resolution source.
+      // Fetching coverEditorSrc works for both cases: a blob: URL (new file upload) and a
+      // proxied URL (re-editing an existing cover that predates this feature).
+      if (!book.cover_original_url) {
+        try {
+          const origRes = await fetch(coverEditorSrc);
+          if (origRes.ok) {
+            const origBlob = await origRes.blob();
+            const origExt = extFromContentType(origRes.headers.get("content-type"));
+            const origPath = `${userId}/${book.id}/cover-original-${Date.now()}-${baseName}.${origExt}`;
+            const origUp = await supabase.storage.from("user-book-media").upload(origPath, origBlob, {
+              cacheControl: "31536000",
+              upsert: false,
+              contentType: origBlob.type || "image/jpeg"
+            });
+            if (!origUp.error) {
+              await supabase.from("user_books").update({ cover_original_url: origPath }).eq("id", book.id);
+            }
+          }
+        } catch { /* best-effort; don't block the cover save */ }
       }
 
       // Persist trim values to the database before refresh() reloads form state from Supabase.
