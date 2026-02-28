@@ -24,6 +24,10 @@ type PublicBookDetail = {
   materials_override: string | null;
   edition_override: string | null;
   publish_date_override: string | null;
+  pages: number | null;
+  group_label: string | null;
+  object_type: string | null;
+  decade: string | null;
   description_override: string | null;
   subjects_override: string[] | null;
   borrowable_override: boolean | null;
@@ -114,7 +118,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const bookRes = await supabase
     .from("user_books")
     .select(
-      "id,owner_id,visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,borrowable_override,borrow_request_scope_override,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
+      "id,owner_id,visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,pages,group_label,object_type,decade,description_override,subjects_override,borrowable_override,borrow_request_scope_override,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
     )
     .eq("id", bookId)
     .eq("owner_id", profile.id)
@@ -287,15 +291,6 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
               </div>
             ) : null}
 
-            {book.edition?.isbn13 || book.edition?.isbn10 ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  ISBN
-                </div>
-                <div>{book.edition?.isbn13 ?? book.edition?.isbn10}</div>
-              </div>
-            ) : null}
-
             {effectivePrinter ? (
               <div className="row om-row-baseline" style={{ marginTop: 6 }}>
                 <div style={{ minWidth: 110 }} className="muted">
@@ -343,22 +338,41 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
               </div>
             ) : null}
 
-            <div style={{ marginTop: 12 }} className="muted">
-              Borrowing
-            </div>
-            <div style={{ marginTop: 6 }} className="muted">
-              {effectiveBorrowable ? `borrowable (${effectiveBorrowScope})` : "not borrowable"}
-            </div>
-            <div style={{ marginTop: 10 }}>
-              <BorrowRequestWidget
-                userBookId={book.id}
-                ownerId={book.owner_id}
-                ownerUsername={profile.username}
-                bookTitle={effectiveTitle}
-                borrowable={effectiveBorrowable}
-                scope={effectiveBorrowScope}
-              />
-            </div>
+            {book.pages ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  Pages
+                </div>
+                <div>{book.pages}</div>
+              </div>
+            ) : null}
+
+            {(book.group_label ?? "").trim() ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  Group
+                </div>
+                <div>{(book.group_label ?? "").trim()}</div>
+              </div>
+            ) : null}
+
+            {(book.object_type ?? "").trim() ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  Object type
+                </div>
+                <div>{(book.object_type ?? "").trim()}</div>
+              </div>
+            ) : null}
+
+            {(book.decade ?? "").trim() ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  Decade
+                </div>
+                <div>{(book.decade ?? "").trim()}</div>
+              </div>
+            ) : null}
 
             {subjects.length > 0 ? (
               <div className="row om-row-baseline" style={{ marginTop: 12 }}>
@@ -376,6 +390,15 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
               </div>
             ) : null}
 
+            {book.edition?.isbn13 || book.edition?.isbn10 ? (
+              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                <div style={{ minWidth: 110 }} className="muted">
+                  ISBN
+                </div>
+                <div>{book.edition?.isbn13 ?? book.edition?.isbn10}</div>
+              </div>
+            ) : null}
+
             {effectiveDescription ? (
               <>
                 <div style={{ marginTop: 12 }} className="muted">
@@ -386,6 +409,23 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               </>
             ) : null}
+
+            <div style={{ marginTop: 12 }} className="muted">
+              Borrowing
+            </div>
+            <div style={{ marginTop: 6 }} className="muted">
+              {effectiveBorrowable ? `borrowable (${effectiveBorrowScope})` : "not borrowable"}
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <BorrowRequestWidget
+                userBookId={book.id}
+                ownerId={book.owner_id}
+                ownerUsername={profile.username}
+                bookTitle={effectiveTitle}
+                borrowable={effectiveBorrowable}
+                scope={effectiveBorrowScope}
+              />
+            </div>
           </div>
         </div>
 

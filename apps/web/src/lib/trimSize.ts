@@ -1,6 +1,29 @@
 /** Unit for physical trim dimensions. */
 export type TrimUnit = "in" | "mm";
 
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+/**
+ * Formats a width/height pair as a reduced integer ratio string, e.g. "2:3".
+ * Returns null when either value is not a positive finite number.
+ * Scales to integers by multiplying by 100 (handles up to 2 decimal places).
+ */
+export function formatTrimRatio(
+  width: string | number | null | undefined,
+  height: string | number | null | undefined
+): string | null {
+  const w = typeof width === "string" ? parseFloat(width) : (width ?? NaN);
+  const h = typeof height === "string" ? parseFloat(height) : (height ?? NaN);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
+  const scale = 100;
+  const wi = Math.round(w * scale);
+  const hi = Math.round(h * scale);
+  const g = gcd(wi, hi);
+  return `${wi / g}:${hi / g}`;
+}
+
 const MM_PER_INCH = 25.4;
 
 /**

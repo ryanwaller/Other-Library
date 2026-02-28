@@ -73,7 +73,6 @@ export default function BulkBar({
   if (selectedGroupsCount === 0) return null;
 
   const filteredMoveTargets = libraries.filter((l) => l.name.toLowerCase().includes(moveQuery.trim().toLowerCase()));
-  const copyTargets = libraries;
 
   return (
     <div className="om-bulkbar" style={{ marginTop: 10 }}>
@@ -159,7 +158,7 @@ export default function BulkBar({
               <input
                 value={moveQuery}
                 onChange={(e) => setMoveQuery(e.target.value)}
-                placeholder="Move to…"
+                placeholder="Search"
               />
               <div className="om-menu-list">
                 {filteredMoveTargets.map((l) => (
@@ -217,38 +216,23 @@ export default function BulkBar({
                     onBulkAssignCategory();
                   }}
                 />
-                <button type="button" onClick={onBulkAssignCategory} disabled={!canAct || !bulkCategoryName.trim()}>
-                  Add
+              </div>
+              <div style={{ borderTop: "1px solid var(--border)", marginTop: 12, paddingTop: 10 }}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    close(moreRef);
+                    onBulkDeleteSelected();
+                  }}
+                  disabled={!canAct}
+                  style={{ textAlign: "left" }}
+                >
+                  Delete
                 </button>
-              </div>
-
-              <div className="muted" style={{ marginTop: 12, marginBottom: 6 }}>
-                Copy to
-              </div>
-              <div className="om-menu-list" style={{ marginTop: 8 }}>
-                {copyTargets.map((l) => (
-                  <button
-                    key={l.id}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      close(moreRef);
-                      onBulkCopySelected(l.id);
-                    }}
-                    disabled={!canAct}
-                    style={{ textAlign: "left" }}
-                  >
-                    {l.name}
-                  </button>
-                ))}
-                {copyTargets.length === 0 ? <div className="muted">No catalogs.</div> : null}
               </div>
             </div>
           </details>
-
-          <button type="button" onClick={() => onBulkDeleteSelected()} disabled={!canAct}>
-            Delete…
-          </button>
         </div>
       </div>
     </div>

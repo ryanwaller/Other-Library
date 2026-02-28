@@ -35,18 +35,29 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
       setDefaultLibraryId(null);
       return;
     }
+    let preferredId: number | null = null;
     try {
       const raw = typeof window !== "undefined" ? window.localStorage.getItem("om_currentLibraryId") : null;
       const parsed = raw ? Number(raw) : NaN;
-      if (Number.isFinite(parsed) && parsed > 0) {
-        setDefaultLibraryId(parsed);
-        return;
-      }
+      if (Number.isFinite(parsed) && parsed > 0) preferredId = parsed;
     } catch {
       // ignore
     }
 
-    // Fallback: first library.
+    if (preferredId) {
+      const preferred = await supabase.from("libraries").select("id").eq("id", preferredId).eq("owner_id", sessionUserId).maybeSingle();
+      if (!preferred.error && preferred.data) {
+        setDefaultLibraryId(preferredId);
+        return;
+      }
+      try {
+        window.localStorage.removeItem("om_currentLibraryId");
+      } catch {
+        // ignore
+      }
+    }
+
+    // Fallback: first library owned by this user.
     const libs = await supabase.from("libraries").select("id").eq("owner_id", sessionUserId).order("created_at", { ascending: true }).limit(1);
     if (libs.error) return;
     const id = (libs.data?.[0] as any)?.id as number | undefined;

@@ -2298,19 +2298,28 @@ function AppShell({
             ) : null}
             {libraryState.message ? <span className="muted">{libraryState.message}</span> : libraryState.error ? <span className="muted">{libraryState.error}</span> : null}
           </div>
-          <div className="muted">
+          <div className="row muted" style={{ gap: 10, justifyContent: "flex-end" }}>
             {(filterTag ?? tagMode) !== "all" || filterAuthor || filterSubject || filterPublisher || (filterCategory ?? categoryMode) !== "all" ? (
               <>
                 {(() => {
                   const activeCategory = (filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : null;
                   const activeTag = (filterTag ?? tagMode) !== "all" ? String(filterTag ?? tagMode) : null;
-                  const parts: string[] = [];
-                  if (activeCategory) parts.push(`Category: ${activeCategory}`);
-                  if (activeTag) parts.push(`Tag: ${activeTag}`);
-                  if (filterAuthor) parts.push(`Author: ${filterAuthor}`);
-                  if (filterSubject) parts.push(`Subject: ${filterSubject}`);
-                  if (filterPublisher) parts.push(`Publisher: ${filterPublisher}`);
-                  return parts.length ? <span>{parts.join("   ")}</span> : null;
+                  const pairs: Array<{ label: string; value: string }> = [];
+                  if (activeCategory) pairs.push({ label: "Category", value: activeCategory });
+                  if (activeTag) pairs.push({ label: "Tag", value: activeTag });
+                  if (filterAuthor) pairs.push({ label: "Author", value: filterAuthor });
+                  if (filterSubject) pairs.push({ label: "Subject", value: filterSubject });
+                  if (filterPublisher) pairs.push({ label: "Publisher", value: filterPublisher });
+                  return pairs.length ? (
+                    <span style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
+                      {pairs.map((p) => (
+                        <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 6, alignItems: "baseline" }}>
+                          <span className="muted">{p.label}</span>
+                          <span style={{ color: "var(--fg)" }}>{p.value}</span>
+                        </span>
+                      ))}
+                    </span>
+                  ) : null;
                 })()}{" "}
                 (
                 <button
@@ -2343,7 +2352,7 @@ function AppShell({
             ) : null}
           </div>
         </div>
-        <div className="row" style={{ marginTop: 10, alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+        <div className="row" style={{ marginTop: 10, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
           <div className="row" style={{ gap: 12, alignItems: "center", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
             <button
               type="button"
@@ -2359,6 +2368,9 @@ function AppShell({
                   if (!next) setBulkSelectedKeys({});
                   setBulkState({ busy: false, error: null, message: null });
                   setReorderMode(false);
+                  setSortOpen(false);
+                  closeTagMenu();
+                  closeCategoryMenu();
                   return next;
                 });
               }}
@@ -2398,7 +2410,7 @@ function AppShell({
               className="muted"
               style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}
             >
-              search others
+              Search others
             </Link>
           ) : null}
         </div>
@@ -2591,8 +2603,6 @@ function AppShell({
             closeCategoryMenu();
           }}
         />
-
-        <hr className="om-hr" />
 
         {libraries.map((lib, idx) => {
           const groups = displayGroupsByLibraryId[lib.id] ?? [];

@@ -7,8 +7,10 @@ export const dynamic = "force-dynamic";
 
 type PublicBook = {
   id: number;
+  library_id: number;
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
+  authors_override: string[] | null;
   subjects_override: string[] | null;
   edition: { isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null; subjects: string[] | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
@@ -76,7 +78,7 @@ export default async function PublicSubjectPage({ params }: { params: Promise<{ 
 
   const booksRes = await supabase
     .from("user_books")
-    .select("id,visibility,title_override,subjects_override,edition:editions(isbn13,title,authors,cover_url,subjects),media:user_book_media(kind,storage_path)")
+    .select("id,library_id,visibility,title_override,authors_override,subjects_override,edition:editions(isbn13,title,authors,cover_url,subjects),media:user_book_media(kind,storage_path)")
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
     .limit(200);
@@ -109,6 +111,29 @@ export default async function PublicSubjectPage({ params }: { params: Promise<{ 
     }
   }
 
+  const librariesRes = await supabase
+    .from("libraries")
+    .select("id,name,created_at")
+    .eq("owner_id", profile.id)
+    .order("created_at", { ascending: true });
+
+  const librariesRaw = (librariesRes.data ?? []) as Array<{ id: number; name: string; created_at: string }>;
+  const fallbackLibraries = Array.from(new Set(filtered.map((b) => Number(b.library_id)).filter((n) => Number.isFinite(n) && n > 0)))
+    .sort((a, b) => a - b)
+    .map((id) => ({ id, name: `Catalog ${id}`, created_at: new Date(0).toISOString() }));
+  const libraries = librariesRaw.length > 0 ? librariesRaw : fallbackLibraries;
+
+  const groupsByLibraryId = new Map<number, PublicBook[]>();
+  for (const b of filtered) {
+    const libId = Number(b.library_id);
+    if (!Number.isFinite(libId) || libId <= 0) continue;
+    const cur = groupsByLibraryId.get(libId);
+    if (!cur) groupsByLibraryId.set(libId, [b]);
+    else cur.push(b);
+  }
+
+  const visibleLibraryCount = libraries.filter((lib) => (groupsByLibraryId.get(lib.id) ?? []).length > 0).length;
+
   return (
     <main className="container">
       <div className="card">
@@ -129,32 +154,74 @@ export default async function PublicSubjectPage({ params }: { params: Promise<{ 
         <div style={{ marginTop: 8 }}>{subjectName || "—"}</div>
       </div>
 
-      <div style={{ marginTop: 14 }} className="muted">
-        Books ({filtered.length})
+      <div className="row muted" style={{ marginTop: 14, justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+        <div className="row muted" style={{ gap: 12 }}>
+          <span>Catalogs</span>
+          <span>{visibleLibraryCount}</span>
+          <span>Books</span>
+          <span>{filtered.length}</span>
+        </div>
+        <div className="row muted" style={{ gap: 8 }}>
+          <span>Subject</span>
+          <span style={{ color: "var(--fg)" }}>{subjectName || "—"}</span>
+          <Link href={`/u/${profile.username}`} className="om-inline-link-muted">
+            clear
+          </Link>
+        </div>
       </div>
 
-      <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-        {filtered.map((b) => {
-          const e = b.edition;
-          const title = ((b.title_override ?? "").trim() || e?.title || "(untitled)") as string;
-          const cover = (b.media ?? []).find((m) => m.kind === "cover");
-          const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
-          const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
+      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 14 }}>
+        {libraries.map((lib) => {
+          const libraryBooks = groupsByLibraryId.get(lib.id) ?? [];
+          if (libraryBooks.length === 0) return null;
           return (
-            <div key={b.id} className="card">
-              <Link href={href} style={{ display: "block" }}>
-                {coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain", border: "1px solid var(--border)" }} />
-                ) : (
-                  <div style={{ width: "100%", height: 220, border: "1px solid var(--border)" }} />
-                )}
-              </Link>
-              <div style={{ marginTop: 8 }}>
-                <Link href={href}>{title}</Link>
+            <div key={lib.id}>
+              <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
+                <div>{lib.name}</div>
+                <div className="muted">
+                  {libraryBooks.length} book{libraryBooks.length === 1 ? "" : "s"}
+                </div>
               </div>
-              <div className="muted" style={{ marginTop: 4 }}>
-                {e?.isbn13 || ""}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+                {libraryBooks.map((b) => {
+                  const e = b.edition;
+                  const title = ((b.title_override ?? "").trim() || e?.title || "(untitled)") as string;
+                  const authors = ((b.authors_override ?? []).filter(Boolean).length > 0
+                    ? (b.authors_override ?? []).filter(Boolean)
+                    : (e?.authors ?? []).filter(Boolean)) as string[];
+                  const cover = (b.media ?? []).find((m) => m.kind === "cover");
+                  const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
+                  const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
+                  return (
+                    <div key={b.id} className="om-book-card">
+                      <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
+                        {coverUrl ? (
+                          <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img alt={title} src={coverUrl} style={{ width: "100%", height: 220, objectFit: "contain" }} />
+                          </div>
+                        ) : (
+                          <div className="om-cover-slot" style={{ width: "100%", height: 220 }} />
+                        )}
+                      </Link>
+                      <div style={{ marginTop: 8 }}>
+                        <Link href={href} className="om-book-title">
+                          {title}
+                        </Link>
+                      </div>
+                      <div className="om-book-secondary">
+                        {authors.length > 0
+                          ? authors.map((a, idx) => (
+                              <span key={a}>
+                                <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                                {idx < authors.length - 1 ? <span>, </span> : null}
+                              </span>
+                            ))
+                          : "—"}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );

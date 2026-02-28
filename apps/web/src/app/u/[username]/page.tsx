@@ -234,7 +234,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                           .find(Boolean) ?? e?.cover_url ?? null;
                       const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
                       return (
-                        <div key={b.id} className="card om-book-card">
+                        <div key={b.id} className="om-book-card">
                           <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                             <span className="muted">{g.copies.length > 1 ? `(${g.copies.length})` : ""}</span>
                             <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "nowrap" }}>
@@ -260,7 +260,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                           <div style={{ marginTop: 8 }}>
                             <Link href={href}>{title}</Link>
                           </div>
-                          <div className="muted" style={{ marginTop: 4 }}>
+                          <div className="om-book-secondary">
                             {effectiveAuthors.length > 0 ? (
                               effectiveAuthors.map((a, idx) => (
                                 <span key={a}>
@@ -268,9 +268,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                                   {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
                                 </span>
                               ))
-                            ) : (
-                              e?.isbn13 || ""
-                            )}
+                            ) : "—"}
                           </div>
                         </div>
                       );
@@ -297,7 +295,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                   .find(Boolean) ?? e?.cover_url ?? null;
               const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
               return (
-                <div key={b.id} className="card om-book-card">
+                <div key={b.id} className="om-book-card">
                   <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                     <span className="muted">{g.copies.length > 1 ? `(${g.copies.length})` : ""}</span>
                     <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "nowrap" }}>
@@ -317,7 +315,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                   <div style={{ marginTop: 8 }}>
                     <Link href={href}>{title}</Link>
                   </div>
-                  <div className="muted" style={{ marginTop: 4 }}>
+                  <div className="om-book-secondary">
                     {effectiveAuthors.length > 0 ? (
                       effectiveAuthors.map((a, idx) => (
                         <span key={a}>
@@ -325,9 +323,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                           {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
                         </span>
                       ))
-                    ) : (
-                      e?.isbn13 || ""
-                    )}
+                    ) : "—"}
                   </div>
                 </div>
               );

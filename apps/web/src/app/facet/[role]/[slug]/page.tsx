@@ -172,7 +172,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
 
   const catalogsCount = groups.length;
   const booksCount = books.length;
-  const facetLabel = `${labelForRole(role)}: ${entity.name}`;
+  const facetLabel = labelForRole(role);
 
   return (
     <main className="container">
@@ -183,8 +183,9 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
           <span className="muted">Books</span>
           <span>{booksCount}</span>
         </div>
-        <div className="muted">
-          {facetLabel}{" "}
+        <div className="row muted" style={{ gap: 8, flexWrap: "wrap" }}>
+          <span>{facetLabel}</span>
+          <span style={{ color: "var(--fg)" }}>{entity.name}</span>
           <Link href="/app" style={{ textDecoration: "underline" }}>
             (clear)
           </Link>
@@ -217,7 +218,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
                 const coverUrl = coverMedia ? signedByPath[coverMedia.storage_path] : book.edition?.cover_url ?? null;
                 const href = `/app/books/${book.id}`;
                 return (
-                  <div key={book.id} className="card om-book-card">
+                  <div key={book.id} className="om-book-card">
                     <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
                       <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
                         {coverUrl ? (

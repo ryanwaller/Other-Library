@@ -45,6 +45,7 @@ export default function LibraryBlock({
   onMoveDown: (libraryId: number) => void;
   children: ReactNode;
 }) {
+  const hasNameChanges = nameDraft.trim() !== libraryName.trim();
   return (
     <div className="card" style={{ marginTop: 14 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
@@ -72,7 +73,7 @@ export default function LibraryBlock({
             <span className="om-catalog-caret" data-collapsed={collapsed ? "true" : "false"} aria-hidden="true" />
           </button>
           {manageMode && isEditing ? (
-            <span className="row" style={{ gap: 8 }}>
+            <span className="row" style={{ gap: 8, flex: "1 1 auto", minWidth: 0, flexWrap: "nowrap" }}>
               <input
                 value={nameDraft}
                 onChange={(e) => onNameDraftChange(e.target.value)}
@@ -87,16 +88,20 @@ export default function LibraryBlock({
                   onSaveName(libraryId, nameDraft);
                 }}
                 autoFocus
-                style={{ minWidth: 220 }}
+                style={{ minWidth: 220, flex: "1 1 auto" }}
               />
-              <button onClick={() => onSaveName(libraryId, nameDraft)} disabled={busy || !nameDraft.trim()}>
-                Save
-              </button>
-              <button onClick={onCancelEdit} disabled={busy}>
-                Cancel
-              </button>
-              <button onClick={() => onDelete(libraryId)} disabled={busy} style={{ marginLeft: 10 }}>
-                Delete…
+              {hasNameChanges ? (
+                <>
+                  <button onClick={() => onSaveName(libraryId, nameDraft)} disabled={busy || !nameDraft.trim()}>
+                    Save
+                  </button>
+                  <button onClick={onCancelEdit} disabled={busy}>
+                    Cancel
+                  </button>
+                </>
+              ) : null}
+              <button onClick={() => onDelete(libraryId)} disabled={busy} style={{ marginLeft: "auto" }}>
+                Delete
               </button>
             </span>
           ) : manageMode && !reorderMode ? (
@@ -111,9 +116,11 @@ export default function LibraryBlock({
           ) : (
             <span>{libraryName}</span>
           )}
-          <span className="muted">
-            {bookCount} book{bookCount === 1 ? "" : "s"}
-          </span>
+          {!isEditing ? (
+            <span className="muted">
+              {bookCount} book{bookCount === 1 ? "" : "s"}
+            </span>
+          ) : null}
         </div>
         {reorderMode ? (
           <div className="row" style={{ gap: 10 }}>

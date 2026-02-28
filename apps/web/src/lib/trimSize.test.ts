@@ -1,4 +1,4 @@
-import { isValidTrimSize, computeTrimAspect, convertTrimUnit, refitCropBox } from "./trimSize";
+import { isValidTrimSize, computeTrimAspect, convertTrimUnit, refitCropBox, formatTrimRatio } from "./trimSize";
 
 // ---------------------------------------------------------------------------
 // isValidTrimSize
@@ -133,5 +133,34 @@ describe("refitCropBox", () => {
     // Taller aspect → height must stay ≤ imgH
     const result = refitCropBox(box, 1 / 3, img.w, img.h);
     expect(result.y + result.height).toBeLessThanOrEqual(img.h + 0.001);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatTrimRatio
+// ---------------------------------------------------------------------------
+describe("formatTrimRatio", () => {
+  it("reduces integer pairs", () => {
+    expect(formatTrimRatio(6, 9)).toBe("2:3");
+    expect(formatTrimRatio(3, 2)).toBe("3:2");
+    expect(formatTrimRatio(1, 1)).toBe("1:1");
+    expect(formatTrimRatio(4, 5)).toBe("4:5");
+  });
+
+  it("handles decimal sizes (up to 2dp)", () => {
+    expect(formatTrimRatio(5.5, 8.5)).toBe("11:17");
+    expect(formatTrimRatio("5.5", "8.5")).toBe("11:17");
+  });
+
+  it("handles integer mm sizes", () => {
+    expect(formatTrimRatio(148, 210)).toBe("74:105");
+  });
+
+  it("returns null for invalid values", () => {
+    expect(formatTrimRatio(0, 9)).toBeNull();
+    expect(formatTrimRatio(null, 9)).toBeNull();
+    expect(formatTrimRatio("abc", 9)).toBeNull();
+    expect(formatTrimRatio(6, -1)).toBeNull();
+    expect(formatTrimRatio(null, null)).toBeNull();
   });
 });

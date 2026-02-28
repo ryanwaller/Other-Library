@@ -29,7 +29,6 @@ function parsePublicBookId(pathname: string): number | null {
 }
 
 export default function GlobalNav() {
-  const NAV_AVATAR_SIZE = 24;
   const pathname = usePathname();
   const router = useRouter();
   const viewingUsername = useMemo(() => parseViewingUsername(pathname), [pathname]);
@@ -256,7 +255,7 @@ export default function GlobalNav() {
             </Link>
           </div>
 
-          <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="row" style={{ gap: 14, alignItems: "center", flexWrap: "wrap" }}>
             {editInAppHref ? (
               <Link href={editInAppHref} aria-label="Edit this page in the app">
                 Edit in app
@@ -284,7 +283,7 @@ export default function GlobalNav() {
                 {avatarUrl ? (
                   <Link href={me?.username ? `/u/${me.username}` : "/app"} aria-label="Open your public profile" className="om-avatar-link">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-nav" style={{ width: NAV_AVATAR_SIZE, height: NAV_AVATAR_SIZE }} />
+                    <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-nav" />
                   </Link>
                 ) : null}
 

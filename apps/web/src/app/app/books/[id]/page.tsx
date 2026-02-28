@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import type { Session } from "@supabase/supabase-js";
 import Cropper, { type Area } from "react-easy-crop";
 import { supabase } from "../../../../lib/supabaseClient";
-import { isValidTrimSize, convertTrimUnit, type TrimUnit } from "../../../../lib/trimSize";
+import { isValidTrimSize, convertTrimUnit, formatTrimRatio, type TrimUnit } from "../../../../lib/trimSize";
 import { bookIdSlug } from "../../../../lib/slug";
 import { formatDateShort } from "../../../../lib/formatDate";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
@@ -343,6 +343,9 @@ export default function BookDetailPage() {
     formTrimWidth: string;
     formTrimHeight: string;
     formTrimUnit: TrimUnit;
+    cropTrimWidth: string;
+    cropTrimHeight: string;
+    cropTrimUnit: TrimUnit | null;
   } | null>(null);
 
   const [busy, setBusy] = useState(false);
@@ -394,6 +397,10 @@ export default function BookDetailPage() {
   const [formTrimWidth, setFormTrimWidth] = useState<string>("");
   const [formTrimHeight, setFormTrimHeight] = useState<string>("");
   const [formTrimUnit, setFormTrimUnit] = useState<TrimUnit>("in");
+  // Crop-editor-local trim state; syncs to form only when cropTrimUnit is set.
+  const [cropTrimWidth, setCropTrimWidth] = useState<string>("");
+  const [cropTrimHeight, setCropTrimHeight] = useState<string>("");
+  const [cropTrimUnit, setCropTrimUnit] = useState<TrimUnit | null>(null);
   const [saveState, setSaveState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -531,6 +538,21 @@ export default function BookDetailPage() {
       }
     };
   }, []);
+
+  // Restore last-used crop unit from localStorage on first mount (when no book loaded yet).
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("om_trimUnit");
+      if (stored === "in" || stored === "mm") setCropTrimUnit(stored);
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Metadata panel W/H always syncs into the crop editor (spec: "always syncs to crop editor immediately").
+  useEffect(() => {
+    setCropTrimWidth(formTrimWidth);
+    setCropTrimHeight(formTrimHeight);
+  }, [formTrimWidth, formTrimHeight]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -721,9 +743,25 @@ export default function BookDetailPage() {
       setFormLocation(row.location ?? "");
       setFormShelf(row.shelf ?? "");
       setFormNotes(row.notes ?? "");
-      setFormTrimWidth(row.trim_width != null ? String(row.trim_width) : "");
-      setFormTrimHeight(row.trim_height != null ? String(row.trim_height) : "");
-      setFormTrimUnit((row.trim_unit as TrimUnit | null) === "mm" ? "mm" : "in");
+      const loadedTrimW = row.trim_width != null ? String(row.trim_width) : "";
+      const loadedTrimH = row.trim_height != null ? String(row.trim_height) : "";
+      const loadedTrimU: TrimUnit = (row.trim_unit as TrimUnit | null) === "mm" ? "mm" : "in";
+      setFormTrimWidth(loadedTrimW);
+      setFormTrimHeight(loadedTrimH);
+      setFormTrimUnit(loadedTrimU);
+      setCropTrimWidth(loadedTrimW);
+      setCropTrimHeight(loadedTrimH);
+      // Crop unit: prefer book's stored unit; fall back to localStorage; fall back to null (—).
+      let initCropUnit: TrimUnit | null = null;
+      if (row.trim_unit === "in" || row.trim_unit === "mm") {
+        initCropUnit = row.trim_unit;
+      } else {
+        try {
+          const stored = localStorage.getItem("om_trimUnit");
+          if (stored === "in" || stored === "mm") initCropUnit = stored;
+        } catch { /* ignore */ }
+      }
+      setCropTrimUnit(initCropUnit);
       setFormVisibility(row.visibility);
       setFormStatus(row.status);
       setFormLibraryId((row as any).library_id ?? null);
@@ -1075,19 +1113,26 @@ export default function BookDetailPage() {
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
   const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : suggestedCoverUrl ?? book?.edition?.cover_url ?? null;
 
+  // Used by metadata panel to decide whether to show the computed display value.
   const trimSizeValid = useMemo(
     () => isValidTrimSize(formTrimWidth, formTrimHeight, formTrimUnit),
     [formTrimWidth, formTrimHeight, formTrimUnit]
   );
 
+  // Used by the crop editor; based on crop-local state so it can diverge from metadata.
+  const cropTrimSizeValid = useMemo(
+    () => isValidTrimSize(cropTrimWidth, cropTrimHeight, cropTrimUnit),
+    [cropTrimWidth, cropTrimHeight, cropTrimUnit]
+  );
+
   const coverAspect = useMemo(() => {
-    if (trimSizeValid) {
-      const w = parseFloat(formTrimWidth);
-      const h = parseFloat(formTrimHeight);
+    if (cropTrimSizeValid) {
+      const w = parseFloat(cropTrimWidth);
+      const h = parseFloat(cropTrimHeight);
       return w / h;
     }
     return aspectFrom(coverAspectW, coverAspectH);
-  }, [trimSizeValid, formTrimWidth, formTrimHeight, coverAspectW, coverAspectH]);
+  }, [cropTrimSizeValid, cropTrimWidth, cropTrimHeight, coverAspectW, coverAspectH]);
   const imageMedia = useMemo(() => (book?.media ?? []).filter((m) => m.kind === "image") ?? [], [book]);
 
   const publicBookPath = useMemo(() => {
@@ -1132,19 +1177,71 @@ export default function BookDetailPage() {
     }
   }
 
+  /** Metadata panel unit toggle: converts values and syncs formTrimUnit. */
   function handleTrimUnitChange(newUnit: TrimUnit) {
     if (newUnit === formTrimUnit) return;
     const w = parseFloat(formTrimWidth);
     const h = parseFloat(formTrimHeight);
-    if (Number.isFinite(w) && w > 0) {
-      const converted = convertTrimUnit(w, formTrimUnit, newUnit);
-      setFormTrimWidth(String(converted));
-    }
-    if (Number.isFinite(h) && h > 0) {
-      const converted = convertTrimUnit(h, formTrimUnit, newUnit);
-      setFormTrimHeight(String(converted));
-    }
+    const nextW = Number.isFinite(w) && w > 0 ? String(convertTrimUnit(w, formTrimUnit, newUnit)) : formTrimWidth;
+    const nextH = Number.isFinite(h) && h > 0 ? String(convertTrimUnit(h, formTrimUnit, newUnit)) : formTrimHeight;
+    setFormTrimWidth(nextW);
+    setFormTrimHeight(nextH);
     setFormTrimUnit(newUnit);
+    try { localStorage.setItem("om_trimUnit", newUnit); } catch { /* ignore */ }
+  }
+
+  /** Crop editor W input: always updates local crop state; syncs to form only when unit is selected. */
+  function handleCropTrimWidthChange(val: string) {
+    setCropTrimWidth(val);
+    if (cropTrimUnit !== null) setFormTrimWidth(val);
+  }
+
+  /** Crop editor H input: always updates local crop state; syncs to form only when unit is selected. */
+  function handleCropTrimHeightChange(val: string) {
+    setCropTrimHeight(val);
+    if (cropTrimUnit !== null) setFormTrimHeight(val);
+  }
+
+  /** Crop editor unit toggle (3-state: in | mm | null=—). */
+  function handleCropTrimUnitChange(newUnit: TrimUnit | null) {
+    if (newUnit === cropTrimUnit) return;
+    let nextW = cropTrimWidth;
+    let nextH = cropTrimHeight;
+    if (newUnit !== null && cropTrimUnit !== null) {
+      // Both real units: convert existing values.
+      const w = parseFloat(cropTrimWidth);
+      const h = parseFloat(cropTrimHeight);
+      if (Number.isFinite(w) && w > 0) nextW = String(convertTrimUnit(w, cropTrimUnit, newUnit));
+      if (Number.isFinite(h) && h > 0) nextH = String(convertTrimUnit(h, cropTrimUnit, newUnit));
+      setCropTrimWidth(nextW);
+      setCropTrimHeight(nextH);
+    }
+    setCropTrimUnit(newUnit);
+    if (newUnit !== null) {
+      // Begin syncing to form (or re-sync after switching from —).
+      setFormTrimWidth(nextW);
+      setFormTrimHeight(nextH);
+      setFormTrimUnit(newUnit);
+      try { localStorage.setItem("om_trimUnit", newUnit); } catch { /* ignore */ }
+    }
+  }
+
+  /** Clear trim size from the metadata panel (clears form + crop follows via sync effect). */
+  function handleTrimClear() {
+    setFormTrimWidth("");
+    setFormTrimHeight("");
+  }
+
+  /** Clear trim size from the crop editor (clears crop local state; clears form too if unit was set). */
+  function handleCropTrimClear() {
+    const hadUnit = cropTrimUnit !== null;
+    setCropTrimWidth("");
+    setCropTrimHeight("");
+    setCropTrimUnit(null);
+    if (hadUnit) {
+      setFormTrimWidth("");
+      setFormTrimHeight("");
+    }
   }
 
   function enterEditMode() {
@@ -1175,7 +1272,10 @@ export default function BookDetailPage() {
       facetDraft: JSON.parse(JSON.stringify(facetDraft)),
       formTrimWidth,
       formTrimHeight,
-      formTrimUnit
+      formTrimUnit,
+      cropTrimWidth,
+      cropTrimHeight,
+      cropTrimUnit
     };
     setEditMode(true);
   }
@@ -1209,6 +1309,9 @@ export default function BookDetailPage() {
       setFormTrimWidth(snap.formTrimWidth);
       setFormTrimHeight(snap.formTrimHeight);
       setFormTrimUnit(snap.formTrimUnit);
+      setCropTrimWidth(snap.cropTrimWidth);
+      setCropTrimHeight(snap.cropTrimHeight);
+      setCropTrimUnit(snap.cropTrimUnit);
     }
     setCoverToolsOpen(false);
     setPendingCover(null);
@@ -2407,93 +2510,77 @@ export default function BookDetailPage() {
                           </div>
 
                           <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
-                            {/* Book size — shared with metadata panel (two-way sync via shared state) */}
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                              <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                                <div className="muted" style={{ width: 72 }}>
-                                  Book size
-                                </div>
+                            {/* Book size — crop-local state; syncs to metadata when unit is set */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              <div className="row" style={{ gap: 6, alignItems: "center", justifyContent: "space-between" }}>
+                                <div className="muted" style={{ fontSize: "0.85em" }}>Book size</div>
+                                <button onClick={handleCropTrimClear} style={{ padding: "0 4px", fontSize: "0.8em" }} title="Clear trim size">×</button>
+                              </div>
+                              <div className="row" style={{ gap: 6, alignItems: "center" }}>
                                 <input
                                   type="number"
-                                  value={formTrimWidth}
+                                  value={cropTrimWidth}
                                   min={0.01}
                                   step={0.01}
-                                  onChange={(e) => setFormTrimWidth(e.target.value)}
+                                  onChange={(e) => handleCropTrimWidthChange(e.target.value)}
                                   placeholder="W"
                                   style={{ width: 64 }}
                                 />
                                 <span className="muted">×</span>
                                 <input
                                   type="number"
-                                  value={formTrimHeight}
+                                  value={cropTrimHeight}
                                   min={0.01}
                                   step={0.01}
-                                  onChange={(e) => setFormTrimHeight(e.target.value)}
+                                  onChange={(e) => handleCropTrimHeightChange(e.target.value)}
                                   placeholder="H"
                                   style={{ width: 64 }}
                                 />
-                                <select
-                                  value={formTrimUnit}
-                                  onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)}
-                                  style={{ width: 52 }}
-                                >
-                                  <option value="in">in</option>
-                                  <option value="mm">mm</option>
-                                </select>
+                                <div className="row" style={{ gap: 2 }}>
+                                  {(["in", "mm", null] as const).map((u) => (
+                                    <button
+                                      key={u ?? "none"}
+                                      onClick={() => handleCropTrimUnitChange(u)}
+                                      style={{ padding: "2px 6px", fontWeight: cropTrimUnit === u ? "bold" : "normal", opacity: cropTrimUnit === u ? 1 : 0.45 }}
+                                    >
+                                      {u ?? "—"}
+                                    </button>
+                                  ))}
+                                </div>
+                                {cropTrimSizeValid ? (
+                                  <span className="muted" style={{ fontSize: "0.8em" }}>
+                                    {formatTrimRatio(cropTrimWidth, cropTrimHeight)}
+                                  </span>
+                                ) : null}
                               </div>
-                              {trimSizeValid ? (
-                                <div className="muted" style={{ fontSize: "0.85em", paddingLeft: 80 }}>
-                                  Aspect locked ({parseFloat(formTrimWidth)} × {parseFloat(formTrimHeight)} {formTrimUnit})
-                                </div>
-                              ) : (
-                                <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                                  <div className="muted" style={{ width: 72 }}>
-                                    Aspect
-                                  </div>
-                                  <input
-                                    type="number"
-                                    value={coverAspectW}
-                                    min={1}
-                                    step={1}
-                                    onChange={(e) => setCoverAspectW(Math.max(1, Number(e.target.value) || 1))}
-                                    style={{ width: 64 }}
-                                  />
-                                  <span className="muted">:</span>
-                                  <input
-                                    type="number"
-                                    value={coverAspectH}
-                                    min={1}
-                                    step={1}
-                                    onChange={(e) => setCoverAspectH(Math.max(1, Number(e.target.value) || 1))}
-                                    style={{ width: 64 }}
-                                  />
-                                  <button
-                                    onClick={() => {
-                                      setCoverAspectW(2);
-                                      setCoverAspectH(3);
-                                    }}
-                                  >
-                                    2:3
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setCoverAspectW(1);
-                                      setCoverAspectH(1);
-                                    }}
-                                  >
-                                    1:1
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setCoverAspectW(3);
-                                      setCoverAspectH(2);
-                                    }}
-                                  >
-                                    3:2
-                                  </button>
-                                </div>
-                              )}
                             </div>
+                            {!cropTrimSizeValid ? (
+                              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                                <div className="muted" style={{ width: 72 }}>
+                                  Aspect
+                                </div>
+                                <input
+                                  type="number"
+                                  value={coverAspectW}
+                                  min={1}
+                                  step={1}
+                                  onChange={(e) => setCoverAspectW(Math.max(1, Number(e.target.value) || 1))}
+                                  style={{ width: 64 }}
+                                />
+                                <span className="muted">:</span>
+                                <input
+                                  type="number"
+                                  value={coverAspectH}
+                                  min={1}
+                                  step={1}
+                                  onChange={(e) => setCoverAspectH(Math.max(1, Number(e.target.value) || 1))}
+                                  style={{ width: 64 }}
+                                />
+                                <button onClick={() => { setCoverAspectW(2); setCoverAspectH(3); }}>2:3</button>
+                                <button onClick={() => { setCoverAspectW(1); setCoverAspectH(1); }}>1:1</button>
+                                <button onClick={() => { setCoverAspectW(3); setCoverAspectH(2); }}>3:2</button>
+                              </div>
+                            ) : null}
                             <div className="row" style={{ gap: 8, alignItems: "center" }}>
                               <div className="muted" style={{ width: 72 }}>
                                 Zoom
@@ -2904,6 +2991,12 @@ export default function BookDetailPage() {
                             <option value="in">in</option>
                             <option value="mm">mm</option>
                           </select>
+                          {trimSizeValid ? (
+                            <span className="muted" style={{ fontSize: "0.8em" }}>
+                              {formatTrimRatio(formTrimWidth, formTrimHeight)}
+                            </span>
+                          ) : null}
+                          <button onClick={handleTrimClear} style={{ padding: "0 4px", fontSize: "0.8em" }} title="Clear trim size">×</button>
                         </div>
                       ) : (book as any)?.trim_width && (book as any)?.trim_height ? (
                         `${(book as any).trim_width} × ${(book as any).trim_height} ${(book as any).trim_unit ?? "in"}`
