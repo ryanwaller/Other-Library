@@ -55,6 +55,7 @@ type UserBookDetail = {
   trim_width: number | null;
   trim_height: number | null;
   trim_unit: string | null;
+  cover_original_url: string | null;
   edition: {
     id: number;
     isbn10: string | null;
@@ -634,7 +635,7 @@ export default function BookDetailPage() {
     setCopiesCountState({ busy: false, error: null });
     try {
       const baseNew =
-        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,decade,pages,trim_width,trim_height,trim_unit,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
       const baseOld =
         "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
 
@@ -646,8 +647,8 @@ export default function BookDetailPage() {
       if (res.error) {
         const msg = (res.error.message ?? "").toLowerCase();
         if (msg.includes("trim_width") && msg.includes("does not exist")) {
-          // Migration 0025 not yet applied; strip trim fields and retry.
-          const noTrim = (s: string) => s.replace(",trim_width,trim_height,trim_unit", "");
+          // trim_width (and possibly cover_original_url) not yet added; strip both and retry.
+          const noTrim = (s: string) => s.replace(",trim_width,trim_height,trim_unit,cover_original_url", "");
           res = await supabase.from("user_books").select(noTrim(selectNew)).eq("id", bookId).maybeSingle();
           if (res.error) {
             const msg2 = (res.error.message ?? "").toLowerCase();
@@ -655,6 +656,10 @@ export default function BookDetailPage() {
               res = await supabase.from("user_books").select(noTrim(baseNew)).eq("id", bookId).maybeSingle();
             }
           }
+        } else if (msg.includes("cover_original_url") && msg.includes("does not exist")) {
+          // cover_original_url column not yet added; strip it and retry.
+          const noCoverOrig = (s: string) => s.replace(",cover_original_url", "");
+          res = await supabase.from("user_books").select(noCoverOrig(selectNew)).eq("id", bookId).maybeSingle();
         } else if ((msg.includes("book_entities") || msg.includes("entities")) && (res.error.message ?? "").toLowerCase().includes("does not exist")) {
           res = await supabase.from("user_books").select(baseNew).eq("id", bookId).maybeSingle();
         } else if (msg.includes("group_label") && msg.includes("does not exist")) {
@@ -825,12 +830,14 @@ export default function BookDetailPage() {
         }
       }
 
+      const origStoragePath = typeof row.cover_original_url === "string" && row.cover_original_url ? row.cover_original_url : null;
       const paths = Array.from(
-        new Set(
-          (row.media ?? [])
+        new Set([
+          ...(row.media ?? [])
             .map((m) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
-            .filter(Boolean)
-        )
+            .filter(Boolean),
+          ...(origStoragePath ? [origStoragePath] : [])
+        ])
       );
       if (paths.length > 0) {
         const signedRes = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 60);
@@ -1609,6 +1616,21 @@ export default function BookDetailPage() {
         .eq("kind", "cover")
         .neq("id", inserted.data.id);
 
+      // On first upload (pendingCover set, no existing original), save the raw uncropped file
+      // as the permanent original so future crops always work from the full-resolution source.
+      if (pendingCover && !book.cover_original_url) {
+        const origExt = (pendingCover.name.split(".").pop() ?? "jpg").toLowerCase();
+        const origPath = `${userId}/${book.id}/cover-original-${Date.now()}-${baseName}.${origExt}`;
+        const origUp = await supabase.storage.from("user-book-media").upload(origPath, pendingCover, {
+          cacheControl: "31536000",
+          upsert: false,
+          contentType: pendingCover.type || "image/jpeg"
+        });
+        if (!origUp.error) {
+          await supabase.from("user_books").update({ cover_original_url: origPath }).eq("id", book.id);
+        }
+      }
+
       // Persist trim values to the database before refresh() reloads form state from Supabase.
       // In in/mm mode the crop W/H are physical dimensions and should be saved; in ratio mode
       // the W/H are aspect-only hints so we preserve whatever is already stored in form state.
@@ -1689,6 +1711,20 @@ export default function BookDetailPage() {
 
       const inserted = await supabase.from("user_book_media").insert({ user_book_id: book.id, kind: "cover", storage_path: path, caption: null });
       if (inserted.error) throw new Error(inserted.error.message);
+
+      // Save the imported blob as the permanent original so the crop editor can always
+      // work from the full-resolution source. Only written on first import.
+      if (!book.cover_original_url) {
+        const origPath = `${userId}/${book.id}/cover-original-${Date.now()}.${ext}`;
+        const origUp = await supabase.storage.from("user-book-media").upload(origPath, blob, {
+          cacheControl: "31536000",
+          upsert: false,
+          contentType: blob.type || "application/octet-stream"
+        });
+        if (!origUp.error) {
+          await supabase.from("user_books").update({ cover_original_url: origPath }).eq("id", book.id);
+        }
+      }
 
       setSuggestedCoverUrl(null);
       await refresh();
@@ -2478,7 +2514,12 @@ export default function BookDetailPage() {
                             onClick={() => {
                               if (!coverUrl) return;
                               setPendingCover(null);
-                              setCoverEditorSrc(toProxyImageUrl(coverUrl));
+                              // Always crop from the original uncropped image when available.
+                              const origPath = book?.cover_original_url;
+                              const origSrc = origPath && mediaUrlsByPath[origPath]
+                                ? toProxyImageUrl(mediaUrlsByPath[origPath])
+                                : toProxyImageUrl(coverUrl);
+                              setCoverEditorSrc(origSrc);
                               setCoverCrop({ x: 0, y: 0 });
                               setCoverZoom(1);
                               setCoverRotation(0);
