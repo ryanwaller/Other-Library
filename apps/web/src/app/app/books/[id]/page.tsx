@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import Cropper, { type Area } from "react-easy-crop";
 import { supabase } from "../../../../lib/supabaseClient";
@@ -947,16 +947,18 @@ export default function BookDetailPage() {
     }
 
     function aggregateArr(key: keyof MergeSource, localVal: string[] | null | undefined): MergeFieldGroup | null {
+      const localSet = new Set((localVal ?? []).filter(Boolean).map((v) => v.toLowerCase()));
       const localJoined = (localVal ?? []).filter(Boolean).join(", ");
-      const localNorm = localJoined.toLowerCase();
       const counts: Record<string, number> = {};
       for (const s of mergeAllSources) {
         const arr = s[key] as string[] | null;
         if (!Array.isArray(arr) || arr.length === 0) continue;
-        const joined = arr.filter(Boolean).join(", ");
-        if (!joined) continue;
-        if (localNorm && joined.toLowerCase() === localNorm) continue;
-        counts[joined] = (counts[joined] ?? 0) + 1;
+        for (const item of arr) {
+          const v = item?.trim();
+          if (!v) continue;
+          if (localSet.has(v.toLowerCase())) continue;
+          counts[v] = (counts[v] ?? 0) + 1;
+        }
       }
       const candidates: FieldCandidate[] = Object.entries(counts)
         .sort(([a, ca], [b, cb]) => cb - ca || a.localeCompare(b))
@@ -1255,6 +1257,8 @@ export default function BookDetailPage() {
   function enterEditMode() {
     if (!isOwner) return;
     if (editMode) return;
+    setFindMoreOpen(false);
+    setMergePanelOpen(false);
     editSnapshotRef.current = {
       formTitle,
       formAuthors,
@@ -2102,11 +2106,29 @@ export default function BookDetailPage() {
         if (selections[key] != null) updates[key] = selections[key];
       }
 
-      // Array fields (stored as comma-joined string in selections)
+      // Array fields — additive: append selected net-new items keyed as "field::value"
       const arrKeys = ["authors_override", "editors_override", "designers_override", "subjects_override"] as const;
+      const localArrays: Record<string, string[]> = {
+        authors_override: [...(book.authors_override ?? book.edition?.authors ?? [])],
+        editors_override: [...(book.editors_override ?? [])],
+        designers_override: [...(book.designers_override ?? [])],
+        subjects_override: [...(book.subjects_override ?? book.edition?.subjects ?? [])],
+      };
       for (const key of arrKeys) {
-        if (selections[key] != null) {
-          updates[key] = selections[key]!.split(",").map((s) => s.trim()).filter(Boolean);
+        const existingItems = localArrays[key].filter(Boolean);
+        const existingSet = new Set(existingItems.map((s) => s.toLowerCase()));
+        const newItems: string[] = [];
+        const prefix = `${key}::`;
+        for (const [selKey, selVal] of Object.entries(selections)) {
+          if (!selKey.startsWith(prefix)) continue;
+          if (selVal == null) continue;
+          const item = selKey.slice(prefix.length).trim();
+          if (!item || existingSet.has(item.toLowerCase())) continue;
+          newItems.push(item);
+          existingSet.add(item.toLowerCase());
+        }
+        if (newItems.length > 0) {
+          updates[key] = [...existingItems, ...newItems];
         }
       }
 
@@ -2205,7 +2227,7 @@ export default function BookDetailPage() {
             <div style={{ gridColumn: "1 / -1" }}>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: 10 }}>
                 {isOwner ? (
-                  <button onClick={() => setFindMoreOpen((v) => !v)} className="muted om-disclosure-summary" style={{ padding: 0 }}>
+                  <button onClick={() => { if (!findMoreOpen) { cancelEditMode(); setMergePanelOpen(false); } setFindMoreOpen((v) => !v); }} className="muted om-disclosure-summary" style={{ padding: 0 }}>
                     <span className="om-disclosure-caret" data-open={findMoreOpen ? "true" : "false"} aria-hidden="true" />
                     <span>Find more info</span>
                   </button>
@@ -2229,13 +2251,44 @@ export default function BookDetailPage() {
                         <button onClick={enterEditMode} disabled={busy}>
                           Edit
                         </button>
-                        {updatesCount > 0 ? (
+                        {mergePanelOpen ? (
+                          <>
+                            <button
+                              onClick={() => {
+                                const sels: Record<string, string | null> = {};
+                                for (const group of mergeFieldGroups) {
+                                  if (group.isArray) {
+                                    for (const cand of group.candidates) {
+                                      const selKey = `${group.key}::${cand.value}`;
+                                      const stored = mergeSelections[selKey];
+                                      const isChecked = stored !== undefined ? stored != null : !group.localValue;
+                                      if (isChecked) sels[selKey] = cand.value;
+                                    }
+                                  } else {
+                                    const topCand = group.candidates[0];
+                                    if (!topCand) continue;
+                                    const stored = mergeSelections[group.key];
+                                    const isChecked = stored !== undefined ? (stored != null && stored !== "") : !group.localValue;
+                                    if (isChecked) sels[group.key] = stored != null && stored !== "" ? stored : topCand.value;
+                                  }
+                                }
+                                void applyMerge(sels);
+                              }}
+                              disabled={mergeState.busy || busy}
+                            >
+                              {mergeState.busy ? "Merging…" : "Apply merge"}
+                            </button>
+                            <button onClick={() => setMergePanelOpen(false)} className="muted" style={{ whiteSpace: "nowrap" }}>
+                              Close
+                            </button>
+                          </>
+                        ) : updatesCount > 0 ? (
                           <button
-                            onClick={() => setMergePanelOpen((v) => !v)}
+                            onClick={() => { cancelEditMode(); setFindMoreOpen(false); setMergePanelOpen(true); }}
                             className="muted"
                             style={{ whiteSpace: "nowrap" }}
                           >
-                            {mergePanelOpen ? "Close" : `Updates available ${updatesCount}`}
+                            {`Updates available ${updatesCount}`}
                           </button>
                         ) : null}
                       </>
@@ -2244,15 +2297,19 @@ export default function BookDetailPage() {
                 </div>
               </div>
               <div className="muted" style={{ marginTop: 6, textAlign: "right" }}>
-                {saveState.message
-                  ? saveState.error
-                    ? `${saveState.message} (${saveState.error})`
-                    : saveState.message
-                  : busy
-                    ? "Loading…"
-                    : error
-                      ? error
-                      : ""}
+                {mergeState.message
+                  ? mergeState.error
+                    ? `${mergeState.message} (${mergeState.error})`
+                    : mergeState.message
+                  : saveState.message
+                    ? saveState.error
+                      ? `${saveState.message} (${saveState.error})`
+                      : saveState.message
+                    : busy
+                      ? "Loading…"
+                      : error
+                        ? error
+                        : ""}
               </div>
 
               {isOwner && mergePanelOpen && mergeAllSources.length > 0 ? (
@@ -2260,59 +2317,55 @@ export default function BookDetailPage() {
                   <div className="muted" style={{ marginBottom: 10 }}>
                     Add missing fields from the community.
                   </div>
-                  <div>
-                    {mergeFieldGroups.map((group) => {
-                      const topCandidate = group.candidates[0];
-                      if (!topCandidate) return null;
-                      const isBlank = !group.localValue;
-                      const defaultChecked = isBlank;
+                  {/* Column header */}
+                  <div style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 8, marginBottom: 4, alignItems: "baseline" }}>
+                    <span />
+                    <span />
+                    <span className="muted" style={{ textAlign: "right" }}>Sources</span>
+                  </div>
+                  {/* Field rows */}
+                  {mergeFieldGroups.flatMap((group): ReactNode[] => {
+                    if (group.isArray) {
+                      return group.candidates.map((cand, i) => {
+                        const selKey = `${group.key}::${cand.value}`;
+                        const stored = mergeSelections[selKey];
+                        const isChecked = stored !== undefined ? stored != null : !group.localValue;
+                        return (
+                          <div key={selKey} style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 8, marginBottom: 6, alignItems: "baseline" }}>
+                            <span className="muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{i === 0 ? group.label : ""}</span>
+                            <label style={{ display: "flex", alignItems: "baseline", gap: 6, cursor: "pointer", minWidth: 0 }}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => setMergeSelections((s) => ({ ...s, [selKey]: isChecked ? null : cand.value }))}
+                              />
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{cand.value}</span>
+                            </label>
+                            <span className="muted" style={{ textAlign: "right" }}>{cand.count}</span>
+                          </div>
+                        );
+                      });
+                    } else {
+                      const cand = group.candidates[0];
+                      if (!cand) return [];
                       const stored = mergeSelections[group.key];
-                      const isChecked = stored !== undefined ? (stored != null && stored !== "") : defaultChecked;
-                      return (
-                        <div key={group.key} className="row om-row-baseline" style={{ marginBottom: 6, gap: 8 }}>
-                          <label style={{ display: "flex", alignItems: "baseline", gap: 6, cursor: "pointer", flex: "1 1 auto" }}>
+                      const isChecked = stored !== undefined ? (stored != null && stored !== "") : !group.localValue;
+                      return [(
+                        <div key={group.key} style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 8, marginBottom: 6, alignItems: "baseline" }}>
+                          <span className="muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{group.label}</span>
+                          <label style={{ display: "flex", alignItems: "baseline", gap: 6, cursor: "pointer", minWidth: 0 }}>
                             <input
                               type="checkbox"
                               checked={isChecked}
-                              onChange={() => {
-                                setMergeSelections((s) => ({
-                                  ...s,
-                                  [group.key]: isChecked ? null : topCandidate.value
-                                }));
-                              }}
+                              onChange={() => setMergeSelections((s) => ({ ...s, [group.key]: isChecked ? null : cand.value }))}
                             />
-                            <span style={{ minWidth: 90, flexShrink: 0 }} className="muted">{group.label}</span>
-                            <span style={{ flex: "1 1 auto" }}>{topCandidate.value}</span>
-                            <span className="muted">{topCandidate.count} sources</span>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{cand.value}</span>
                           </label>
+                          <span className="muted" style={{ textAlign: "right" }}>{cand.count}</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div className="row" style={{ marginTop: 10, gap: 10 }}>
-                    <button
-                      onClick={() => {
-                        const effectiveSels: Record<string, string | null> = {};
-                        for (const group of mergeFieldGroups) {
-                          const topCandidate = group.candidates[0];
-                          if (!topCandidate) continue;
-                          const isBlank = !group.localValue;
-                          const stored = mergeSelections[group.key];
-                          const isChecked = stored !== undefined ? (stored != null && stored !== "") : isBlank;
-                          if (isChecked) effectiveSels[group.key] = stored != null && stored !== "" ? stored : topCandidate.value;
-                        }
-                        void applyMerge(effectiveSels);
-                      }}
-                      disabled={mergeState.busy || busy}
-                    >
-                      {mergeState.busy ? "Merging…" : "Apply merge"}
-                    </button>
-                    {mergeState.message ? (
-                      <div className="muted">
-                        {mergeState.error ? `${mergeState.message} (${mergeState.error})` : mergeState.message}
-                      </div>
-                    ) : null}
-                  </div>
+                      )];
+                    }
+                  })}
                 </div>
               ) : null}
 
