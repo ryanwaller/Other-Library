@@ -175,11 +175,11 @@ export default function BorrowRequestsPage() {
                             <img
                               alt=""
                               src={avatarUrl}
-                              className="om-avatar-img om-avatar-img-sm"
+                              className="om-avatar-img"
                             />
                           </Link>
                         ) : (
-                          <div className="om-avatar-img om-avatar-img-sm" />
+                          <div className="om-avatar-img" />
                         )}
                         <div>
                           {requester?.username ? <Link href={`/u/${requester.username}`}>{requester.username}</Link> : <span className="muted">{r.requester_id}</span>}

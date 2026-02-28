@@ -100,7 +100,7 @@ export default async function PublicFollowingPage({ params }: { params: Promise<
                   <div className="om-avatar-lockup">
                     {avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
+                      <img alt="" src={avatarUrl} className="om-avatar-img" />
                     ) : null}
                     <Link href={`/u/${p.username}`}>{label}</Link>
                   </div>

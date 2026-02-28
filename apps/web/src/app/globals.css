@@ -130,13 +130,7 @@ a:focus-visible {
   border-radius: 999px;
   object-fit: cover;
   border: 1px solid var(--border);
-  position: relative;
-  top: 1px;
-}
-
-.om-avatar-img-sm {
-  width: 18px;
-  height: 18px;
+  display: block;
 }
 
 input,

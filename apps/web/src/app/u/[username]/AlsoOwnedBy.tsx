@@ -117,9 +117,9 @@ export default function AlsoOwnedBy({
               <Link key={r.owner_id} href={`/u/${username}`} className="card om-avatar-lockup" style={{ textDecoration: "none", gap: 8 }}>
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
+                  <img alt="" src={avatarUrl} className="om-avatar-img" />
                 ) : (
-                  <span className="om-avatar-img om-avatar-img-sm" style={{ display: "inline-block" }} />
+                  <span className="om-avatar-img" style={{ display: "inline-block" }} />
                 )}
                 <span>{username}</span>
                 <span className="muted">{r.copies > 1 ? `(${r.copies})` : ""}</span>

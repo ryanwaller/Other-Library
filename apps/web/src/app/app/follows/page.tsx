@@ -290,7 +290,7 @@ export default function FollowsPage() {
                       <div className="om-avatar-lockup">
                         {avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
+                          <img alt="" src={avatarUrl} className="om-avatar-img" />
                         ) : null}
                         {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
                       </div>
@@ -331,7 +331,7 @@ export default function FollowsPage() {
                       <div className="om-avatar-lockup">
                         {avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
+                          <img alt="" src={avatarUrl} className="om-avatar-img" />
                         ) : null}
                         {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
                       </div>
@@ -385,7 +385,7 @@ export default function FollowsPage() {
                       <div className="om-avatar-lockup">
                         {avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
+                          <img alt="" src={avatarUrl} className="om-avatar-img" />
                         ) : null}
                         {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
                       </div>
@@ -422,7 +422,7 @@ export default function FollowsPage() {
                       <div className="om-avatar-lockup">
                         {avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
+                          <img alt="" src={avatarUrl} className="om-avatar-img" />
                         ) : null}
                         {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
                       </div>
@@ -459,7 +459,7 @@ export default function FollowsPage() {
                       <div className="om-avatar-lockup">
                         {avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-sm" />
+                          <img alt="" src={avatarUrl} className="om-avatar-img" />
                         ) : null}
                         {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
                       </div>

@@ -226,11 +226,11 @@ export default function MessagesPage() {
                             <img
                               alt=""
                               src={avatarUrl}
-                              className="om-avatar-img om-avatar-img-sm"
+                              className="om-avatar-img"
                             />
                           </a>
                         ) : (
-                          <div className="om-avatar-img om-avatar-img-sm" />
+                          <div className="om-avatar-img" />
                         )}
                         <div>
                           <span className="muted">{isOwner ? "request from " : "to "}</span>
