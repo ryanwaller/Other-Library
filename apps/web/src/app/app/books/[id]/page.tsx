@@ -2413,8 +2413,32 @@ export default function BookDetailPage() {
               ) : null}
             </div>
             <div>
-              <div className="om-cover-slot" style={{ width: "100%", height: isNarrow ? 360 : 280 }}>
-                {coverUrl ? (
+              <div
+                className="om-cover-slot"
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: isNarrow ? 360 : 280,
+                  padding: 0,
+                  filter: coverEditorSrc
+                    ? `brightness(${coverBrightness}) contrast(${coverContrast})`
+                    : undefined
+                }}
+              >
+                {coverEditorSrc ? (
+                  <Cropper
+                    image={coverEditorSrc}
+                    crop={coverCrop}
+                    zoom={coverZoom}
+                    rotation={coverRotation}
+                    aspect={coverAspect}
+                    onCropChange={setCoverCrop}
+                    onZoomChange={setCoverZoom}
+                    onRotationChange={setCoverRotation}
+                    onCropComplete={(_area, pixels) => setCoverCroppedAreaPixels(pixels)}
+                    showGrid={false}
+                  />
+                ) : coverUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     alt={effectiveTitle}
@@ -2485,31 +2509,7 @@ export default function BookDetailPage() {
                       </div>
                       {coverEditorSrc ? (
                         <div style={{ marginTop: 8 }}>
-                          <div
-                            className="om-cover-slot"
-                            style={{
-                              position: "relative",
-                              width: "100%",
-                              height: 260,
-                              padding: 0,
-                              filter: `brightness(${coverBrightness}) contrast(${coverContrast})`
-                            }}
-                          >
-                            <Cropper
-                              image={coverEditorSrc}
-                              crop={coverCrop}
-                              zoom={coverZoom}
-                              rotation={coverRotation}
-                              aspect={coverAspect}
-                              onCropChange={setCoverCrop}
-                              onZoomChange={setCoverZoom}
-                              onRotationChange={setCoverRotation}
-                              onCropComplete={(_area, pixels) => setCoverCroppedAreaPixels(pixels)}
-                              showGrid={false}
-                            />
-                          </div>
-
-                          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                             {/* Book size — crop-local state; syncs to metadata when unit is set */}
                             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                               <div className="row" style={{ gap: 6, alignItems: "center", justifyContent: "space-between" }}>
