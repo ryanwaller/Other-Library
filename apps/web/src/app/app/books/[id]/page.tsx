@@ -926,58 +926,16 @@ export default function BookDetailPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [book]);
 
-  const updatesCount = useMemo(() => {
-    if (!book || mergeAllSources.length === 0) return 0;
-    let n = 0;
-    const hasCover = book.media.some((m) => m.kind === "cover");
-    const hasImg   = book.media.some((m) => m.kind === "image");
-    if (!hasCover && mergeAllSources.some((s) => s.media.some((m) => m.kind === "cover"))) n++;
-    if (!hasImg   && mergeAllSources.some((s) => s.media.some((m) => m.kind === "image"))) n++;
-    const strFields: Array<[keyof MergeSource, string | null | undefined]> = [
-      ["title_override",        book.title_override],
-      ["publisher_override",    book.publisher_override],
-      ["printer_override",      book.printer_override],
-      ["materials_override",    book.materials_override],
-      ["edition_override",      book.edition_override],
-      ["publish_date_override", book.publish_date_override],
-      ["description_override",  book.description_override],
-    ];
-    for (const [key, local] of strFields) {
-      const editionFallback =
-        key === "publish_date_override" ? book.edition?.publish_date :
-        key === "publisher_override"    ? book.edition?.publisher :
-        key === "description_override"  ? book.edition?.description :
-        "";
-      const blank = !(local ?? "").trim() && !(editionFallback ?? "").trim();
-      if (blank && mergeAllSources.some((s) => (s[key] as string | null)?.trim())) n++;
-    }
-    const arrFields: Array<[keyof MergeSource, string[] | null | undefined]> = [
-      ["authors_override",   book.authors_override],
-      ["editors_override",   book.editors_override],
-      ["designers_override", book.designers_override],
-      ["subjects_override",  book.subjects_override],
-    ];
-    for (const [key, local] of arrFields) {
-      const editionFallbackArr =
-        key === "authors_override"  ? book.edition?.authors :
-        key === "subjects_override" ? book.edition?.subjects :
-        null;
-      const blank = (!local || local.length === 0) && (!editionFallbackArr || editionFallbackArr.length === 0);
-      if (blank && mergeAllSources.some((s) => Array.isArray(s[key]) && (s[key] as string[]).length > 0)) n++;
-    }
-    if (!book.pages && mergeAllSources.some((s) => s.pages)) n++;
-    if ((!book.trim_width || !book.trim_height) && mergeAllSources.some((s) => s.trim_width && s.trim_height)) n++;
-    return n;
-  }, [book, mergeAllSources]);
-
   const mergeFieldGroups = useMemo((): MergeFieldGroup[] => {
     if (!book || mergeAllSources.length === 0) return [];
 
     function aggregateStr(key: keyof MergeSource, localVal: string | null | undefined): MergeFieldGroup | null {
+      const localNorm = (localVal ?? "").trim().toLowerCase();
       const counts: Record<string, number> = {};
       for (const s of mergeAllSources) {
         const v = (s[key] as string | null)?.trim();
         if (!v) continue;
+        if (localNorm && v.toLowerCase() === localNorm) continue;
         counts[v] = (counts[v] ?? 0) + 1;
       }
       const candidates: FieldCandidate[] = Object.entries(counts)
@@ -989,12 +947,15 @@ export default function BookDetailPage() {
     }
 
     function aggregateArr(key: keyof MergeSource, localVal: string[] | null | undefined): MergeFieldGroup | null {
+      const localJoined = (localVal ?? []).filter(Boolean).join(", ");
+      const localNorm = localJoined.toLowerCase();
       const counts: Record<string, number> = {};
       for (const s of mergeAllSources) {
         const arr = s[key] as string[] | null;
         if (!Array.isArray(arr) || arr.length === 0) continue;
         const joined = arr.filter(Boolean).join(", ");
         if (!joined) continue;
+        if (localNorm && joined.toLowerCase() === localNorm) continue;
         counts[joined] = (counts[joined] ?? 0) + 1;
       }
       const candidates: FieldCandidate[] = Object.entries(counts)
@@ -1002,83 +963,81 @@ export default function BookDetailPage() {
         .slice(0, 4)
         .map(([value, count]) => ({ value, count }));
       if (candidates.length === 0) return null;
-      const localJoined = (localVal ?? []).filter(Boolean).join(", ") || null;
-      return { key: String(key), label: "", localValue: localJoined, candidates, isArray: true };
+      return { key: String(key), label: "", localValue: localJoined || null, candidates, isArray: true };
     }
 
     const groups: MergeFieldGroup[] = [];
 
-    const hasCover = book.media.some((m) => m.kind === "cover");
-    const hasImg   = book.media.some((m) => m.kind === "image");
-    const coverVariants = mergeAllSources.filter((s) => s.media.some((m) => m.kind === "cover")).length;
-    const imgVariants   = mergeAllSources.filter((s) => s.media.some((m) => m.kind === "image")).length;
-    if (!hasCover && coverVariants > 0) {
-      groups.push({ key: "cover", label: "Cover", localValue: null, candidates: [{ value: `${coverVariants} variant${coverVariants !== 1 ? "s" : ""}`, count: coverVariants }], isArray: false });
-    }
-    if (!hasImg && imgVariants > 0) {
-      groups.push({ key: "images", label: "Images", localValue: null, candidates: [{ value: `${imgVariants} variant${imgVariants !== 1 ? "s" : ""}`, count: imgVariants }], isArray: false });
-    }
-
-    const strDefs: Array<[keyof MergeSource, string, string | null | undefined]> = [
-      ["title_override",        "Title",       book.title_override],
-      ["publisher_override",    "Publisher",   book.publisher_override ?? book.edition?.publisher],
-      ["publish_date_override", "Publish date",book.publish_date_override ?? book.edition?.publish_date],
-      ["description_override",  "Description", book.description_override ?? book.edition?.description],
-      ["printer_override",      "Printer",     book.printer_override],
-      ["materials_override",    "Materials",   book.materials_override],
-      ["edition_override",      "Edition",     book.edition_override],
-    ];
-    for (const [key, label, localVal] of strDefs) {
+    function pushStr(key: keyof MergeSource, label: string, localVal: string | null | undefined) {
       const g = aggregateStr(key, localVal);
       if (g) groups.push({ ...g, label });
     }
-
-    const arrDefs: Array<[keyof MergeSource, string, string[] | null | undefined]> = [
-      ["authors_override",   "Authors",   book.authors_override ?? book.edition?.authors],
-      ["editors_override",   "Editors",   book.editors_override],
-      ["designers_override", "Designers", book.designers_override],
-      ["subjects_override",  "Subjects",  book.subjects_override ?? book.edition?.subjects],
-    ];
-    for (const [key, label, localVal] of arrDefs) {
+    function pushArr(key: keyof MergeSource, label: string, localVal: string[] | null | undefined) {
       const g = aggregateArr(key, localVal);
       if (g) groups.push({ ...g, label });
     }
 
-    // Pages
-    if (!book.pages) {
-      const pageCounts: Record<string, number> = {};
-      for (const s of mergeAllSources) {
-        if (s.pages) { const v = String(s.pages); pageCounts[v] = (pageCounts[v] ?? 0) + 1; }
-      }
-      const pageCandidates = Object.entries(pageCounts)
-        .sort(([a, ca], [b, cb]) => cb - ca || Number(a) - Number(b))
-        .slice(0, 4)
-        .map(([value, count]) => ({ value, count }));
-      if (pageCandidates.length > 0) {
-        groups.push({ key: "pages", label: "Pages", localValue: null, candidates: pageCandidates, isArray: false });
-      }
+    // Cover — shown first, only when community has variants we don't have
+    const hasCover = book.media.some((m) => m.kind === "cover");
+    const coverVariants = mergeAllSources.filter((s) => s.media.some((m) => m.kind === "cover")).length;
+    if (!hasCover && coverVariants > 0) {
+      groups.push({ key: "cover", label: "Cover", localValue: null, candidates: [{ value: `${coverVariants} variant${coverVariants !== 1 ? "s" : ""}`, count: coverVariants }], isArray: false });
     }
 
-    // Trim
-    if (!book.trim_width || !book.trim_height) {
-      const trimCounts: Record<string, number> = {};
-      for (const s of mergeAllSources) {
-        if (s.trim_width && s.trim_height) {
-          const v = `${s.trim_width} × ${s.trim_height}${s.trim_unit ? ` ${s.trim_unit}` : ""}`;
-          trimCounts[v] = (trimCounts[v] ?? 0) + 1;
-        }
-      }
-      const trimCandidates = Object.entries(trimCounts)
-        .sort(([a, ca], [b, cb]) => cb - ca || a.localeCompare(b))
-        .slice(0, 4)
-        .map(([value, count]) => ({ value, count }));
-      if (trimCandidates.length > 0) {
-        groups.push({ key: "trim", label: "Trim size", localValue: null, candidates: trimCandidates, isArray: false });
-      }
+    // Metadata fields in page order
+    pushStr("title_override",        "Title",        book.title_override);
+    pushArr("authors_override",       "Authors",      book.authors_override ?? book.edition?.authors);
+    pushArr("editors_override",       "Editors",      book.editors_override);
+    pushArr("designers_override",     "Designers",    book.designers_override);
+    pushStr("printer_override",       "Printer",      book.printer_override);
+    pushStr("materials_override",     "Materials",    book.materials_override);
+    pushStr("edition_override",       "Edition",      book.edition_override);
+    pushStr("publisher_override",     "Publisher",    book.publisher_override ?? book.edition?.publisher);
+    pushStr("publish_date_override",  "Publish date", book.publish_date_override ?? book.edition?.publish_date);
+
+    // Pages
+    const localPages = book.pages ? String(book.pages) : null;
+    const pageCounts: Record<string, number> = {};
+    for (const s of mergeAllSources) {
+      if (!s.pages) continue;
+      const v = String(s.pages);
+      if (localPages && v === localPages) continue;
+      pageCounts[v] = (pageCounts[v] ?? 0) + 1;
     }
+    const pageCandidates = Object.entries(pageCounts)
+      .sort(([, ca], [, cb]) => cb - ca)
+      .slice(0, 4)
+      .map(([value, count]) => ({ value, count }));
+    if (pageCandidates.length > 0) {
+      groups.push({ key: "pages", label: "Pages", localValue: localPages, candidates: pageCandidates, isArray: false });
+    }
+
+    // Trim size
+    const localTrim = (book.trim_width && book.trim_height)
+      ? `${book.trim_width} × ${book.trim_height}${book.trim_unit ? ` ${book.trim_unit}` : ""}`
+      : null;
+    const trimCounts: Record<string, number> = {};
+    for (const s of mergeAllSources) {
+      if (!s.trim_width || !s.trim_height) continue;
+      const v = `${s.trim_width} × ${s.trim_height}${s.trim_unit ? ` ${s.trim_unit}` : ""}`;
+      if (localTrim && v === localTrim) continue;
+      trimCounts[v] = (trimCounts[v] ?? 0) + 1;
+    }
+    const trimCandidates = Object.entries(trimCounts)
+      .sort(([, ca], [, cb]) => cb - ca)
+      .slice(0, 4)
+      .map(([value, count]) => ({ value, count }));
+    if (trimCandidates.length > 0) {
+      groups.push({ key: "trim", label: "Trim size", localValue: localTrim, candidates: trimCandidates, isArray: false });
+    }
+
+    pushArr("subjects_override",     "Subjects",     book.subjects_override ?? book.edition?.subjects);
+    pushStr("description_override",  "Description",  book.description_override ?? book.edition?.description);
 
     return groups;
   }, [book, mergeAllSources]);
+
+  const updatesCount = useMemo(() => mergeFieldGroups.length, [mergeFieldGroups]);
 
   const categories = useMemo(() => {
     const all = ((book?.book_tags ?? []).map((bt) => bt.tag).filter(Boolean) as any[]).filter((t) => t?.id && t?.name);
@@ -2274,9 +2233,9 @@ export default function BookDetailPage() {
                           <button
                             onClick={() => setMergePanelOpen((v) => !v)}
                             className="muted"
-                            style={{ fontSize: "0.85em", whiteSpace: "nowrap" }}
+                            style={{ whiteSpace: "nowrap" }}
                           >
-                            Updates available {updatesCount}
+                            {mergePanelOpen ? "Close" : `Updates available ${updatesCount}`}
                           </button>
                         ) : null}
                       </>
@@ -2297,69 +2256,50 @@ export default function BookDetailPage() {
               </div>
 
               {isOwner && mergePanelOpen && mergeAllSources.length > 0 ? (
-                <div style={{ marginTop: 14, padding: "12px 14px", border: "1px solid var(--color-border, #ddd)", borderRadius: 6 }}>
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-                    <strong>Updates available</strong>
-                    <button className="muted" onClick={() => setMergePanelOpen(false)} style={{ padding: 0, fontSize: "1em" }}>×</button>
-                  </div>
-                  <div className="muted" style={{ marginBottom: 12, fontSize: "0.9em" }}>
+                <div style={{ marginTop: 14 }}>
+                  <div className="muted" style={{ marginBottom: 10 }}>
                     Add missing fields from the community.
                   </div>
                   <div>
                     {mergeFieldGroups.map((group) => {
+                      const topCandidate = group.candidates[0];
+                      if (!topCandidate) return null;
                       const isBlank = !group.localValue;
-                      const defaultVal = isBlank ? (group.candidates[0]?.value ?? null) : null;
-                      const currentSel = mergeSelections[group.key] !== undefined ? mergeSelections[group.key] : defaultVal;
+                      const defaultChecked = isBlank;
+                      const stored = mergeSelections[group.key];
+                      const isChecked = stored !== undefined ? (stored != null && stored !== "") : defaultChecked;
                       return (
-                        <div key={group.key} style={{ marginBottom: 10 }}>
-                          <div className="row" style={{ alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-                            <div style={{ minWidth: 90, flexShrink: 0 }} className="muted">{group.label}</div>
-                            <div style={{ flex: "1 1 auto" }}>
-                              {!isBlank ? (
-                                <div className="muted" style={{ fontSize: "0.85em", marginBottom: 4 }}>
-                                  Current: {group.localValue}
-                                </div>
-                              ) : null}
-                              {group.candidates.map((c) => (
-                                <label key={c.value} style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 2, cursor: "pointer" }}>
-                                  <input
-                                    type="radio"
-                                    name={`merge-${group.key}`}
-                                    value={c.value}
-                                    checked={currentSel === c.value}
-                                    onChange={() => setMergeSelections((s) => ({ ...s, [group.key]: c.value }))}
-                                  />
-                                  <span style={{ flex: "1 1 auto" }}>{c.value}</span>
-                                  <span className="muted" style={{ fontSize: "0.8em" }}>{c.count}</span>
-                                </label>
-                              ))}
-                              {currentSel != null ? (
-                                <label style={{ display: "flex", alignItems: "baseline", gap: 6, cursor: "pointer" }}>
-                                  <input
-                                    type="radio"
-                                    name={`merge-${group.key}`}
-                                    value=""
-                                    checked={currentSel === null || currentSel === ""}
-                                    onChange={() => setMergeSelections((s) => ({ ...s, [group.key]: null }))}
-                                  />
-                                  <span className="muted">Skip</span>
-                                </label>
-                              ) : null}
-                            </div>
-                          </div>
+                        <div key={group.key} className="row om-row-baseline" style={{ marginBottom: 6, gap: 8 }}>
+                          <label style={{ display: "flex", alignItems: "baseline", gap: 6, cursor: "pointer", flex: "1 1 auto" }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setMergeSelections((s) => ({
+                                  ...s,
+                                  [group.key]: isChecked ? null : topCandidate.value
+                                }));
+                              }}
+                            />
+                            <span style={{ minWidth: 90, flexShrink: 0 }} className="muted">{group.label}</span>
+                            <span style={{ flex: "1 1 auto" }}>{topCandidate.value}</span>
+                            <span className="muted">{topCandidate.count} sources</span>
+                          </label>
                         </div>
                       );
                     })}
                   </div>
-                  <div className="row" style={{ marginTop: 12, gap: 10 }}>
+                  <div className="row" style={{ marginTop: 10, gap: 10 }}>
                     <button
                       onClick={() => {
                         const effectiveSels: Record<string, string | null> = {};
                         for (const group of mergeFieldGroups) {
+                          const topCandidate = group.candidates[0];
+                          if (!topCandidate) continue;
                           const isBlank = !group.localValue;
-                          const defaultVal = isBlank ? (group.candidates[0]?.value ?? null) : null;
-                          const v = mergeSelections[group.key] !== undefined ? mergeSelections[group.key] : defaultVal;
-                          if (v != null && v !== "") effectiveSels[group.key] = v;
+                          const stored = mergeSelections[group.key];
+                          const isChecked = stored !== undefined ? (stored != null && stored !== "") : isBlank;
+                          if (isChecked) effectiveSels[group.key] = stored != null && stored !== "" ? stored : topCandidate.value;
                         }
                         void applyMerge(effectiveSels);
                       }}
@@ -2367,11 +2307,8 @@ export default function BookDetailPage() {
                     >
                       {mergeState.busy ? "Merging…" : "Apply merge"}
                     </button>
-                    <button className="muted" onClick={() => setMergePanelOpen(false)} disabled={mergeState.busy}>
-                      Cancel
-                    </button>
                     {mergeState.message ? (
-                      <div className="muted" style={{ fontSize: "0.9em" }}>
+                      <div className="muted">
                         {mergeState.error ? `${mergeState.message} (${mergeState.error})` : mergeState.message}
                       </div>
                     ) : null}
