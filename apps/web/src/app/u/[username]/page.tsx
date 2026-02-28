@@ -185,21 +185,23 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           </div>
           <div className="muted">{profile.visibility}</div>
         </div>
-        <div className="row muted" style={{ marginTop: 6, gap: 16, flexWrap: "wrap" }}>
-          <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
-            Followers <span style={{ marginLeft: 6 }}>{followersCount ?? "—"}</span>
-          </Link>
-          <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
-            Following <span style={{ marginLeft: 6 }}>{followingCount ?? "—"}</span>
-          </Link>
-        </div>
         {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
+        <div className="row muted" style={{ marginTop: 6, justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div className="row muted" style={{ gap: 16, flexWrap: "wrap" }}>
+            <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
+              Followers <span style={{ marginLeft: 6 }}>{followersCount ?? "—"}</span>
+            </Link>
+            <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
+              Following <span style={{ marginLeft: 6 }}>{followingCount ?? "—"}</span>
+            </Link>
+          </div>
+          <FollowControls profileId={profile.id} profileUsername={profile.username} inline />
+        </div>
         {profile.bio ? (
           <div className="muted" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
             {profile.bio}
           </div>
         ) : null}
-        <FollowControls profileId={profile.id} profileUsername={profile.username} />
       </div>
 
       <AddToLibraryProvider editionIds={editionIds}>

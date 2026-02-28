@@ -9,14 +9,17 @@ type FollowStatus = "pending" | "approved" | "rejected";
 export default function FollowControls({
   profileId,
   profileUsername,
-  compact
+  compact,
+  inline
 }: {
   profileId: string;
   profileUsername: string;
   compact?: boolean;
+  inline?: boolean;
 }) {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [row, setRow] = useState<{ status: FollowStatus } | null>(null);
+  const [followsYou, setFollowsYou] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,14 +38,20 @@ export default function FollowControls({
   async function refresh() {
     if (!supabase || !sessionUserId) return;
     if (sessionUserId === profileId) return;
-    const res = await supabase.from("follows").select("status").eq("follower_id", sessionUserId).eq("followee_id", profileId).maybeSingle();
+    const [res, reverse] = await Promise.all([
+      supabase.from("follows").select("status").eq("follower_id", sessionUserId).eq("followee_id", profileId).maybeSingle(),
+      supabase.from("follows").select("status").eq("follower_id", profileId).eq("followee_id", sessionUserId).eq("status", "approved").maybeSingle(),
+    ]);
+
     if (res.error) {
       setRow(null);
+      setFollowsYou(false);
       setError(res.error.message);
       return;
     }
     setError(null);
     setRow((res.data as any) ?? null);
+    setFollowsYou(Boolean(reverse.data));
   }
 
   useEffect(() => {
@@ -86,7 +95,7 @@ export default function FollowControls({
   if (!sessionUserId) {
     if (compact) return null;
     return (
-      <div style={{ marginTop: compact ? 0 : 10 }} className="muted">
+      <div style={{ marginTop: compact || inline ? 0 : 10 }} className="muted">
         <Link href="/app">Sign in</Link> to follow.
       </div>
     );
@@ -95,10 +104,10 @@ export default function FollowControls({
   const status = row?.status ?? null;
 
   return (
-    <div style={{ marginTop: compact ? 0 : 10 }} className="row">
+    <div style={{ marginTop: compact || inline ? 0 : 10 }} className="row">
       {status === "approved" ? (
         <>
-          {!compact ? <span className="muted">Following {profileUsername}</span> : null}
+          {!compact ? <span className="muted">You follow</span> : null}
           <button onClick={cancelOrUnfollow} disabled={busy} style={{ marginLeft: compact ? 0 : 10 }}>
             {busy ? "Working…" : "Unfollow"}
           </button>
@@ -119,7 +128,7 @@ export default function FollowControls({
         </>
       ) : (
         <button onClick={requestFollow} disabled={busy}>
-          {busy ? "Requesting…" : "Request follow"}
+          {busy ? "Requesting…" : followsYou ? "Follow back" : "Request follow"}
         </button>
       )}
       {error ? (

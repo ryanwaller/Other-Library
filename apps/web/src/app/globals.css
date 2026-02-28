@@ -112,13 +112,13 @@ a:focus-visible {
 .om-avatar-lockup {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: nowrap;
   min-width: 0;
 }
 
 .om-avatar-lockup-tight {
-  gap: 4px;
+  gap: 6px;
 }
 
 .om-avatar-link {

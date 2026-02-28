@@ -211,22 +211,22 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           <div className="muted">public</div>
         </div>
         {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
-        <div className="row muted" style={{ marginTop: 6, gap: 16, flexWrap: "wrap" }}>
-          <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
-            Followers <span style={{ marginLeft: 6 }}>{followersCount ?? "—"}</span>
-          </Link>
-          <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
-            Following <span style={{ marginLeft: 6 }}>{followingCount ?? "—"}</span>
-          </Link>
+        <div className="row muted" style={{ marginTop: 6, justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div className="row muted" style={{ gap: 16, flexWrap: "wrap" }}>
+            <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
+              Followers <span style={{ marginLeft: 6 }}>{followersCount ?? "—"}</span>
+            </Link>
+            <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
+              Following <span style={{ marginLeft: 6 }}>{followingCount ?? "—"}</span>
+            </Link>
+          </div>
+          <FollowControls profileId={profile.id} profileUsername={profile.username} inline />
         </div>
         {profile.bio ? (
           <div className="muted" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
             {profile.bio}
           </div>
         ) : null}
-        <div style={{ marginTop: 8 }}>
-          <FollowControls profileId={profile.id} profileUsername={profile.username} />
-        </div>
       </div>
 
       <div style={{ marginTop: 14 }} className="card">
