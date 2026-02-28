@@ -308,7 +308,7 @@ export default function GlobalNav() {
                 {avatarUrl ? (
                   <Link href={me?.username ? `/u/${me.username}` : "/app"} aria-label="Open your public profile" className="om-avatar-link">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img alt="" src={avatarUrl} className="om-avatar-img" style={{ width: NAV_AVATAR_SIZE, height: NAV_AVATAR_SIZE }} />
+                    <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-nav" style={{ width: NAV_AVATAR_SIZE, height: NAV_AVATAR_SIZE }} />
                   </Link>
                 ) : null}
 

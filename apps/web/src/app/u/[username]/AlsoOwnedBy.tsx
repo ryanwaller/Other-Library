@@ -114,7 +114,7 @@ export default function AlsoOwnedBy({
             const avatarPath = r.owner?.avatar_path ?? null;
             const avatarUrl = avatarPath ? avatarUrlsByPath[avatarPath] ?? null : null;
             return (
-              <Link key={r.owner_id} href={`/u/${username}`} className="card om-avatar-lockup" style={{ textDecoration: "none", gap: 8 }}>
+              <Link key={r.owner_id} href={`/u/${username}`} className="card om-avatar-lockup" style={{ textDecoration: "none" }}>
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img alt="" src={avatarUrl} className="om-avatar-img" />

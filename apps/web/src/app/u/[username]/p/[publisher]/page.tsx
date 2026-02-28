@@ -112,11 +112,11 @@ export default async function PublicPublisherPage({ params }: { params: Promise<
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <div>
-            <div className="om-avatar-lockup">
+            <div className="om-avatar-lockup om-avatar-lockup-tight">
               {avatarUrl ? (
                 <Link href={`/u/${profile.username}`} className="om-avatar-link" aria-label="Open profile">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt="" src={avatarUrl} className="om-avatar-img" />
+                  <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-public" />
                 </Link>
               ) : null}
               <Link href={`/u/${profile.username}`}>{profile.username}</Link>

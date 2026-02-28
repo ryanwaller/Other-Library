@@ -174,11 +174,11 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     <main className="container">
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <div className="om-avatar-lockup">
+          <div className="om-avatar-lockup om-avatar-lockup-tight">
             {avatarUrl ? (
               <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar" className="om-avatar-link">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img alt="" src={avatarUrl} className="om-avatar-img" />
+                <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-public" />
               </a>
             ) : null}
             <div>{profile.username}</div>
