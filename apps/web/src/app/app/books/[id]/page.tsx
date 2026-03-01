@@ -1368,6 +1368,13 @@ export default function BookDetailPage() {
   function enterEditMode() {
     if (!isOwner) return;
     if (editMode) return;
+
+    // Pre-populate formTitle if it's currently empty (no override)
+    // so it's selectable/copyable in the input field.
+    if (!formTitle.trim()) {
+      setFormTitle(effectiveTitle);
+    }
+
     setFindMoreOpen(false);
     setMergePanelOpen(false);
     setMergeUndoSnapshot(null);
@@ -3209,7 +3216,7 @@ export default function BookDetailPage() {
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
                     onKeyDown={(e) => onEnter(e, () => void saveEdits())}
-                    placeholder="Add title"
+                    placeholder={effectiveTitle}
                     autoFocus
                   />
                 ) : (
