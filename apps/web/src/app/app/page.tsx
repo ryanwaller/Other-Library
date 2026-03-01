@@ -1815,7 +1815,7 @@ function AppShell({
         const oldId = Number((r as any).id);
         if (Number.isFinite(oldId) && Number.isFinite(newId) && newId > 0) idMap.set(oldId, newId);
         const tagIds = (tagsByBookId[oldId] ?? []).filter((t) => Number.isFinite(t) && t > 0);
-        if (Number.isFinite(newId) && newId > 0 && tagIds.length > 0) {
+        if (Number.isFinite(newId) && Number.isFinite(newId) && newId > 0 && tagIds.length > 0) {
           const rows = tagIds.map((tagId) => ({ user_book_id: newId, tag_id: tagId }));
           const insTags = await supabase.from("user_book_tags").insert(rows as any);
           if (insTags.error) { }
@@ -2083,83 +2083,7 @@ function AppShell({
         </div>
       </div>
 
-      <div style={{ marginTop: 24 }} />
-
-      {libraries.map((lib, idx) => {
-        const groups = displayGroupsByLibraryId[lib.id] ?? [];
-        const isEditing = editingLibraryId === lib.id;
-        return (
-          <div key={lib.id}>
-            <LibraryBlock
-              libraryId={lib.id}
-              libraryName={lib.name}
-              bookCount={groups.length}
-              index={idx}
-              total={libraries.length}
-              busy={libraryState.busy}
-              isEditing={isEditing}
-              nameDraft={libraryNameDraft}
-              reorderMode={reorderMode}
-              manageMode={bulkMode}
-              onStartEdit={beginEditLibrary}
-              onNameDraftChange={setLibraryNameDraft}
-              onSaveName={saveLibraryName}
-              onCancelEdit={cancelEditLibrary}
-              onDelete={deleteLibrary}
-              collapsed={!!collapsedByLibraryId[lib.id]}
-              onToggleCollapsed={(id) => {
-                setCollapsedByLibraryId((prev) => {
-                  const next = { ...prev };
-                  if (next[id]) delete next[id];
-                  else next[id] = true;
-                  return next;
-                });
-              }}
-              onMoveUp={(id) => moveLibrary(id, -1)}
-              onMoveDown={(id) => moveLibrary(id, 1)}
-            >
-              {groups.length === 0 ? (
-                <div className="muted" style={{ marginTop: 10 }}>
-                  No books yet.
-                </div>
-              ) : (
-                <div style={{ marginTop: 10, ...booksContainerStyle }}>{groups.map(renderGroup)}</div>
-              )}
-            </LibraryBlock>
-            {idx < libraries.length - 1 ? <hr className="om-hr" /> : null}
-          </div>
-        );
-      })}
-
-      <hr className="om-hr" />
-
-      <div style={{ marginTop: 24 }} className="card">
-        <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, width: "100%", alignItems: "baseline" }}>
-          <input
-            placeholder="Add another catalog (e.g. Home, Office)"
-            value={newLibraryName}
-            onChange={(e) => setNewLibraryName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              createLibrary(newLibraryName);
-            }}
-            style={{ minWidth: 0, flex: 1 }}
-          />
-          {newLibraryName.trim() ? (
-            <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy} style={{ marginLeft: "auto" }}>
-              Add
-            </button>
-          ) : null}
-        </div>
-        <div className="muted" style={{ marginTop: 4 }}>
-          {libraryState.message ? (libraryState.error ? `${libraryState.message} (${libraryState.error})` : libraryState.message) : libraryState.error ?? ""}
-        </div>
-      </div>
-
-      <div style={{ marginTop: 24 }} />
-
-      <div className="row" style={{ marginTop: 10, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+      <div className="row" style={{ marginTop: 6, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
         <div className="row" style={{ gap: 12, alignItems: "baseline", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
           <button
             type="button"
@@ -2574,7 +2498,6 @@ function AppShell({
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <button
                 onClick={() => {
-                  setTagMode("all");
                   setUrlFilters({ tag: null });
                   closeTagMenu();
                 }}
@@ -2589,7 +2512,6 @@ function AppShell({
                   <button
                     key={t}
                     onClick={() => {
-                      setTagMode(t);
                       setUrlFilters({ tag: t });
                       closeTagMenu();
                     }}
@@ -2618,7 +2540,6 @@ function AppShell({
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <button
                 onClick={() => {
-                  setCategoryMode("all");
                   setUrlFilters({ category: null });
                   closeCategoryMenu();
                 }}
@@ -2633,7 +2554,6 @@ function AppShell({
                   <button
                     key={c}
                     onClick={() => {
-                      setCategoryMode(c);
                       setUrlFilters({ category: c });
                       closeCategoryMenu();
                     }}
@@ -2665,8 +2585,82 @@ function AppShell({
             closeCategoryMenu();
           }}
         />
-        <div style={{ height: 24 }} />
       </div>
+
+      <div style={{ marginTop: 24 }} />
+
+      {libraries.map((lib, idx) => {
+        const groups = displayGroupsByLibraryId[lib.id] ?? [];
+        const isEditing = editingLibraryId === lib.id;
+        return (
+          <div key={lib.id}>
+            <LibraryBlock
+              libraryId={lib.id}
+              libraryName={lib.name}
+              bookCount={groups.length}
+              index={idx}
+              total={libraries.length}
+              busy={libraryState.busy}
+              isEditing={isEditing}
+              nameDraft={libraryNameDraft}
+              reorderMode={reorderMode}
+              manageMode={bulkMode}
+              onStartEdit={beginEditLibrary}
+              onNameDraftChange={setLibraryNameDraft}
+              onSaveName={saveLibraryName}
+              onCancelEdit={cancelEditLibrary}
+              onDelete={deleteLibrary}
+              collapsed={!!collapsedByLibraryId[lib.id]}
+              onToggleCollapsed={(id) => {
+                setCollapsedByLibraryId((prev) => {
+                  const next = { ...prev };
+                  if (next[id]) delete next[id];
+                  else next[id] = true;
+                  return next;
+                });
+              }}
+              onMoveUp={(id) => moveLibrary(id, -1)}
+              onMoveDown={(id) => moveLibrary(id, 1)}
+            >
+              {groups.length === 0 ? (
+                <div className="muted" style={{ marginTop: 10 }}>
+                  No books yet.
+                </div>
+              ) : (
+                <div style={{ marginTop: 10, ...booksContainerStyle }}>{groups.map(renderGroup)}</div>
+              )}
+            </LibraryBlock>
+            {idx < libraries.length - 1 ? <hr className="om-hr" /> : null}
+          </div>
+        );
+      })}
+
+      <hr className="om-hr" />
+
+      <div style={{ marginTop: 24 }} className="card">
+        <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, width: "100%", alignItems: "baseline" }}>
+          <input
+            placeholder="Add another catalog (e.g. Home, Office)"
+            value={newLibraryName}
+            onChange={(e) => setNewLibraryName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              createLibrary(newLibraryName);
+            }}
+            style={{ minWidth: 0, flex: 1 }}
+          />
+          {newLibraryName.trim() ? (
+            <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy} style={{ marginLeft: "auto" }}>
+              Add
+            </button>
+          ) : null}
+        </div>
+        <div className="muted" style={{ marginTop: 4 }}>
+          {libraryState.message ? (libraryState.error ? `${libraryState.message} (${libraryState.error})` : libraryState.message) : libraryState.error ?? ""}
+        </div>
+      </div>
+      <div style={{ height: 24 }} />
     </div>
   );
 }
