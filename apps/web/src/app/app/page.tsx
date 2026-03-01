@@ -1081,87 +1081,103 @@ function AppShell({
     };
 
     let done = 0;
+    let successCount = 0;
+    let skipCount = 0;
+
     try {
       for (const r of csvRows) {
-        const copies = Math.max(1, Math.floor(Number(r.copies) || 1));
-        for (let c = 0; c < copies; c += 1) {
-          const id = r.isbn ? await createUserBookByIsbnNoRefresh(r.isbn) : await createManualUserBookNoRefresh(r);
+        try {
+          const copies = Math.max(1, Math.floor(Number(r.copies) || 1));
+          for (let c = 0; c < copies; c += 1) {
+            const id = r.isbn ? await createUserBookByIsbnNoRefresh(r.isbn) : await createManualUserBookNoRefresh(r);
 
-          const { data: parsed, remainingNotes } = parseStructuredNotes(r.notes);
-          const updatePayload: any = {
-            notes: remainingNotes
-          };
-          if (!remainingNotes && r.notes) updatePayload.notes = null;
+            const { data: parsed, remainingNotes } = parseStructuredNotes(r.notes);
+            const updatePayload: any = {
+              notes: remainingNotes
+            };
+            if (!remainingNotes && r.notes) updatePayload.notes = null;
 
-          if (r.group_label) updatePayload.group_label = r.group_label;
-          updatePayload.object_type = r.object_type || parsed.object_type || null;
+            if (r.group_label) updatePayload.group_label = r.group_label;
+            updatePayload.object_type = r.object_type || parsed.object_type || null;
 
-          if (parsed.subjects_override) {
-            updatePayload.subjects_override = Array.from(new Set(parsed.subjects_override.split(",").map((s) => s.trim()).filter(Boolean)));
-          }
-          if (parsed.designers_override) {
-            updatePayload.designers_override = Array.from(new Set(parsed.designers_override.split(",").map((s) => s.trim()).filter(Boolean)));
-          }
-          if (parsed.editors_override) {
-            updatePayload.editors_override = Array.from(new Set(parsed.editors_override.split(",").map((s) => s.trim()).filter(Boolean)));
-          }
-          if (parsed.publisher_override && !r.publisher) {
-            updatePayload.publisher_override = parsed.publisher_override;
-          }
-          if (parsed.printer_override) {
-            updatePayload.printer_override = parsed.printer_override;
-          }
-          if (parsed.materials_override) {
-            updatePayload.materials_override = parsed.materials_override;
-          }
-          if (parsed.decade) {
-            updatePayload.decade = parsed.decade;
-          }
-          if (parsed.pages) {
-            const p = Number(parsed.pages);
-            if (Number.isFinite(p)) updatePayload.pages = Math.max(1, Math.floor(p));
-          }
+            if (parsed.subjects_override) {
+              updatePayload.subjects_override = Array.from(new Set(parsed.subjects_override.split(",").map((s) => s.trim()).filter(Boolean)));
+            }
+            if (parsed.designers_override) {
+              updatePayload.designers_override = Array.from(new Set(parsed.designers_override.split(",").map((s) => s.trim()).filter(Boolean)));
+            }
+            if (parsed.editors_override) {
+              updatePayload.editors_override = Array.from(new Set(parsed.editors_override.split(",").map((s) => s.trim()).filter(Boolean)));
+            }
+            if (parsed.publisher_override && !r.publisher) {
+              updatePayload.publisher_override = parsed.publisher_override;
+            }
+            if (parsed.printer_override) {
+              updatePayload.printer_override = parsed.printer_override;
+            }
+            if (parsed.materials_override) {
+              updatePayload.materials_override = parsed.materials_override;
+            }
+            if (parsed.decade) {
+              updatePayload.decade = parsed.decade;
+            }
+            if (parsed.pages) {
+              const p = Number(parsed.pages);
+              if (Number.isFinite(p)) updatePayload.pages = Math.max(1, Math.floor(p));
+            }
 
-          if (csvApplyOverrides && r.isbn) {
-            if (r.title) updatePayload.title_override = r.title;
-            if (r.authors.length > 0) updatePayload.authors_override = r.authors;
-            if (r.publisher) updatePayload.publisher_override = r.publisher;
-            if (r.publish_date) updatePayload.publish_date_override = r.publish_date;
-            if (r.description) updatePayload.description_override = r.description;
-          }
-          if (Object.keys(updatePayload).length > 0) {
-            let up = await supabase.from("user_books").update(updatePayload).eq("id", id);
-            if (up.error) {
-              const msg = (up.error.message ?? "").toLowerCase();
-              if (msg.includes("trim_width") || msg.includes("group_label")) {
-                delete updatePayload.decade;
-                delete updatePayload.pages;
-                delete updatePayload.group_label;
-                delete updatePayload.object_type;
-                up = await supabase.from("user_books").update(updatePayload).eq("id", id);
+            if (csvApplyOverrides && r.isbn) {
+              if (r.title) updatePayload.title_override = r.title;
+              if (r.authors.length > 0) updatePayload.authors_override = r.authors;
+              if (r.publisher) updatePayload.publisher_override = r.publisher;
+              if (r.publish_date) updatePayload.publish_date_override = r.publish_date;
+              if (r.description) updatePayload.description_override = r.description;
+            }
+            if (Object.keys(updatePayload).length > 0) {
+              let up = await supabase.from("user_books").update(updatePayload).eq("id", id);
+              if (up.error) {
+                const msg = (up.error.message ?? "").toLowerCase();
+                if (msg.includes("trim_width") || msg.includes("group_label")) {
+                  delete updatePayload.decade;
+                  delete updatePayload.pages;
+                  delete updatePayload.group_label;
+                  delete updatePayload.object_type;
+                  up = await supabase.from("user_books").update(updatePayload).eq("id", id);
+                }
+              }
+            }
+
+            const rows: Array<{ user_book_id: number; tag_id: number }> = [];
+            if (r.category) rows.push({ user_book_id: id, tag_id: await getTagIdCached(r.category, "category") });
+            for (const t of r.tags) rows.push({ user_book_id: id, tag_id: await getTagIdCached(t, "tag") });
+            if (rows.length > 0) {
+              const upTags = await supabase.from("user_book_tags").upsert(rows as any, { onConflict: "user_book_id,tag_id" });
+              if (upTags.error) {
+                // ignore; tags optional
               }
             }
           }
-
-          const rows: Array<{ user_book_id: number; tag_id: number }> = [];
-          if (r.category) rows.push({ user_book_id: id, tag_id: await getTagIdCached(r.category, "category") });
-          for (const t of r.tags) rows.push({ user_book_id: id, tag_id: await getTagIdCached(t, "tag") });
-          if (rows.length > 0) {
-            const upTags = await supabase.from("user_book_tags").upsert(rows as any, { onConflict: "user_book_id,tag_id" });
-            if (upTags.error) {
-              // ignore; tags optional
-            }
-          }
+          successCount += 1;
+        } catch (e: any) {
+          console.error("CSV import row failed:", e, r);
+          skipCount += 1;
         }
         done += 1;
         setCsvImportState((s) => ({ ...s, done, message: `Importing… ${done}/${csvRows.length}` }));
+        // Brief delay to mitigate rate limiting and allow UI updates
+        await new Promise(res => setTimeout(res, 20));
       }
 
       await refreshAllBooks();
       const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
       setUserBooksCount(count ?? 0);
-      setCsvImportState({ busy: false, error: null, message: `Imported ${csvRows.length} row(s)`, done: csvRows.length, total: csvRows.length });
-      window.setTimeout(() => setCsvImportState((s) => ({ ...s, message: null })), 1500);
+      
+      const finalMsg = skipCount > 0 
+        ? `Imported ${successCount} / ${csvRows.length}. ${skipCount} skipped.`
+        : `Imported all ${csvRows.length} rows.`;
+
+      setCsvImportState({ busy: false, error: null, message: finalMsg, done: csvRows.length, total: csvRows.length });
+      window.setTimeout(() => setCsvImportState((s) => ({ ...s, message: null })), 5000);
       setCsvFileName(null);
       setCsvRows([]);
     } catch (e: any) {
