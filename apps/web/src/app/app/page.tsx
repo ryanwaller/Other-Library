@@ -388,6 +388,19 @@ function AppShell({
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, true | undefined>>({});
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
+  const [stagedCsvData, setStagedCsvData] = useState<string | null>(null);
+  const [stagedCsvFilename, setStagedCsvFilename] = useState<string | null>(null);
+
+  useEffect(() => {
+    const data = window.sessionStorage.getItem("om_staged_csv_data");
+    const filename = window.sessionStorage.getItem("om_staged_csv_filename");
+    if (data && filename) {
+      setStagedCsvData(data);
+      setStagedCsvFilename(filename);
+      setAddOpen(true);
+    }
+  }, []);
+
   useEffect(() => {
     if (!openAddPanel) return;
     setAddOpen(true);
@@ -2296,31 +2309,101 @@ function AppShell({
       {showAddPanel ? (
         <>
           <div className="row" style={{ marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%", alignItems: "baseline" }}>
-            <input
-              placeholder="Add by ISBN, URL, or title"
-              value={addInput}
-              onFocus={() => setAddInputFocused(true)}
-              onBlur={() => setAddInputFocused(false)}
-              onChange={(e) => setAddInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                smartAddOrSearch();
-              }}
-              style={{ minWidth: 0, flex: 1 }}
-            />
-            <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
-              {(addInput.trim() || addInputFocused) ? (
-                <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
-                  {addState.busy ? "Working…" : "Go"}
-                </button>
-              ) : null}
-              {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
-                <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
-                  Cancel
-                </button>
-              ) : null}
-            </div>
+            {stagedCsvData ? (
+              <div className="row" style={{ flex: 1, gap: 12, alignItems: "baseline" }}>
+                <span style={{ fontWeight: 600 }}>{stagedCsvFilename}</span>
+                <div className="row" style={{ gap: 12, marginLeft: "auto" }}>
+                  <button
+                    onClick={() => {
+                      const objects = parseCsvToObjects(stagedCsvData);
+                      const normalized: any[] = objects
+                        .map((o) => {
+                          const title = (o.title ?? o.Title ?? "").trim();
+                          const isbn13 = (o.ean_isbn13 ?? o.isbn13 ?? o.ISBN13 ?? "").trim();
+                          const isbn10 = (o.upc_isbn10 ?? o.isbn10 ?? o.ISBN10 ?? "").trim();
+                          const isbn = isbn13 || isbn10 || "";
+                          const creators = (o.creators ?? o.creators_name ?? o.author ?? o.authors ?? "").trim();
+                          const authors = creators ? splitListField(creators) : [];
+                          const publisher = (o.publisher ?? "").trim() || null;
+                          const publish_date = (o.publish_date ?? "").trim() || null;
+                          const description = (o.description ?? "").trim() || null;
+                          const category = (o.collection ?? o.category ?? "").trim() || null;
+                          const tags = splitListField((o.tags ?? "").trim());
+                          const notes = (o.notes ?? "").trim() || null;
+                          const group_label = (o.group ?? "").trim() || null;
+                          const object_type = (o.item_type ?? o.object_type ?? "").trim() || null;
+                          const copiesRaw = (o.copies ?? "").trim();
+                          const copiesNum = copiesRaw ? Number(copiesRaw) : 1;
+                          const copies = Number.isFinite(copiesNum) && copiesNum > 1 ? Math.floor(copiesNum) : 1;
+                          return {
+                            title,
+                            isbn: isbn ? isbn : null,
+                            authors,
+                            publisher,
+                            publish_date,
+                            description,
+                            category,
+                            tags,
+                            notes,
+                            group_label,
+                            object_type,
+                            copies
+                          };
+                        })
+                        .filter((r) => Boolean(r.title || r.isbn));
+                      setCsvRows(normalized);
+                      setStagedCsvData(null);
+                      setStagedCsvFilename(null);
+                      window.sessionStorage.removeItem("om_staged_csv_data");
+                      window.sessionStorage.removeItem("om_staged_csv_filename");
+                    }}
+                    disabled={csvImportState.busy}
+                  >
+                    Add CSV
+                  </button>
+                  <button
+                    className="muted"
+                    onClick={() => {
+                      setStagedCsvData(null);
+                      setStagedCsvFilename(null);
+                      window.sessionStorage.removeItem("om_staged_csv_data");
+                      window.sessionStorage.removeItem("om_staged_csv_filename");
+                    }}
+                    disabled={csvImportState.busy}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <input
+                  placeholder="Add by ISBN, URL, or title"
+                  value={addInput}
+                  onFocus={() => setAddInputFocused(true)}
+                  onBlur={() => setAddInputFocused(false)}
+                  onChange={(e) => setAddInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();
+                    smartAddOrSearch();
+                  }}
+                  style={{ minWidth: 0, flex: 1 }}
+                />
+                <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
+                  {(addInput.trim() || addInputFocused) ? (
+                    <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
+                      {addState.busy ? "Working…" : "Go"}
+                    </button>
+                  ) : null}
+                  {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
+                    <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
+                      Cancel
+                    </button>
+                  ) : null}
+                </div>
+              </>
+            )}
           </div>
           <div className="muted" style={{ marginTop: 4 }}>
             {addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}
@@ -2498,7 +2581,7 @@ function AppShell({
         </div>
       ) : null}
 
-      {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message) && libraries.length > 0 ? (
+      {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || csvRows.length > 0) && libraries.length > 0 ? (
         <div className="row" style={{ marginTop: 6, alignItems: "baseline", gap: 10 }}>
           <span className="muted">Add to catalog</span>
           {libraries.length > 1 ? (

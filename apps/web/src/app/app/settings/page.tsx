@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, useRef } from "react";
 import type { Session } from "@supabase/supabase-js";
 import Cropper, { type Area } from "react-easy-crop";
 import { supabase } from "../../../lib/supabaseClient";
@@ -91,9 +92,12 @@ async function cropToBlob(imageSrc: string, crop: Area, outputSize = 512): Promi
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
   const sessionEmail = session?.user?.email ?? null;
+
+  const csvInputRef = useRef<HTMLInputElement | null>(null);
 
   const [profile, setProfile] = useState<{
     username: string;
@@ -763,7 +767,31 @@ export default function SettingsPage() {
               Upload CSV files from your catalog workspace.
             </div>
             <div style={{ marginTop: 10 }}>
-              <Link href="/app?add=1&csv=1">Add CSV</Link>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: "none" }}
+                onChange={async (e) => {
+                  const f = (e.target.files ?? [])[0];
+                  if (!f) return;
+                  try {
+                    const text = await f.text();
+                    window.sessionStorage.setItem("om_staged_csv_data", text);
+                    window.sessionStorage.setItem("om_staged_csv_filename", f.name);
+                    router.push("/app?add=1");
+                  } catch (err) {
+                    console.error("Failed to read CSV", err);
+                    window.alert("Failed to read CSV file.");
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => csvInputRef.current?.click()}
+              >
+                Add CSV
+              </button>
             </div>
           </div>
 
