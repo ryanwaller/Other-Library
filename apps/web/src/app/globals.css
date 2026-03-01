@@ -794,6 +794,7 @@ select.om-filter-control::-ms-expand {
 }
 
 .om-token-field {
+  display: inline-block;
   position: relative;
   max-width: 100%;
 }
@@ -815,7 +816,7 @@ select.om-filter-control::-ms-expand {
 .om-token-x {
   border: 0;
   padding: 0;
-  margin: 0;
+  margin: 0 0 0 0.3em;
   background: transparent;
   color: inherit;
   opacity: var(--tone-light);

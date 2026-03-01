@@ -432,6 +432,11 @@ export default function BookDetailPage() {
   const [mergePanelOpen, setMergePanelOpen] = useState(false);
   const [mergeSelections, setMergeSelections] = useState<Record<string, string | null>>({});
   const [mergeCoverUrls, setMergeCoverUrls] = useState<Record<string, string>>({});
+  const [mergeUndoSnapshot, setMergeUndoSnapshot] = useState<{
+    fields: Record<string, unknown>;
+    coverMedia: Array<{ storage_path: string; caption: string | null }>;
+    hadCoverMerge: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1296,6 +1301,7 @@ export default function BookDetailPage() {
     if (editMode) return;
     setFindMoreOpen(false);
     setMergePanelOpen(false);
+    setMergeUndoSnapshot(null);
     editSnapshotRef.current = {
       formTitle,
       formAuthors,
@@ -2133,6 +2139,26 @@ export default function BookDetailPage() {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
 
+    setMergeUndoSnapshot(null);
+    const preFields: Record<string, unknown> = {
+      title_override: book.title_override,
+      publisher_override: book.publisher_override,
+      printer_override: book.printer_override,
+      materials_override: book.materials_override,
+      edition_override: book.edition_override,
+      publish_date_override: book.publish_date_override,
+      description_override: book.description_override,
+      authors_override: book.authors_override ? [...book.authors_override] : null,
+      editors_override: book.editors_override ? [...book.editors_override] : null,
+      designers_override: book.designers_override ? [...book.designers_override] : null,
+      subjects_override: book.subjects_override ? [...book.subjects_override] : null,
+      pages: book.pages,
+      trim_width: book.trim_width,
+      trim_height: book.trim_height,
+      trim_unit: book.trim_unit,
+    };
+    const preCoverMedia = book.media.filter((m) => m.kind === "cover").map((m) => ({ storage_path: m.storage_path, caption: m.caption }));
+
     setMergeState({ busy: true, error: null, message: "Merging…" });
     try {
       const updates: any = {};
@@ -2239,11 +2265,50 @@ export default function BookDetailPage() {
 
       setMergePanelOpen(false);
       setMergeSelections({});
+      setMergeUndoSnapshot({ fields: preFields, coverMedia: preCoverMedia, hadCoverMerge: !!selectedCoverPath });
       await refresh();
       setMergeState({ busy: false, error: null, message: "Merged" });
       window.setTimeout(() => setMergeState({ busy: false, error: null, message: null }), 1500);
     } catch (e: any) {
       setMergeState({ busy: false, error: e?.message ?? "Merge failed", message: "Merge failed" });
+    }
+  }
+
+  async function undoMerge() {
+    if (!supabase || !book || !userId || !mergeUndoSnapshot) return;
+    if (book.owner_id !== userId) return;
+    setMergeState({ busy: true, error: null, message: "Undoing…" });
+    try {
+      const { fields, coverMedia, hadCoverMerge } = mergeUndoSnapshot;
+      const upd = await supabase.from("user_books").update(fields).eq("id", book.id);
+      if (upd.error) throw new Error(upd.error.message);
+      // Sync entities for restored array fields (best-effort)
+      try {
+        const roleSyncs: Array<[FacetRole, string[]]> = [];
+        if (fields.authors_override != null) roleSyncs.push(["author", fields.authors_override as string[]]);
+        if (fields.editors_override != null) roleSyncs.push(["editor", fields.editors_override as string[]]);
+        if (fields.designers_override != null) roleSyncs.push(["designer", fields.designers_override as string[]]);
+        if (fields.subjects_override != null) roleSyncs.push(["subject", fields.subjects_override as string[]]);
+        if (fields.publisher_override != null) roleSyncs.push(["publisher", [fields.publisher_override as string]]);
+        if (fields.printer_override != null) roleSyncs.push(["printer", [fields.printer_override as string]]);
+        if (fields.materials_override != null) roleSyncs.push(["material", [fields.materials_override as string]]);
+        for (const [role, names] of roleSyncs) {
+          await supabase.rpc("set_book_entities", { p_user_book_id: book.id, p_role: role, p_names: names });
+        }
+      } catch { /* ignore */ }
+      // Restore cover media
+      if (hadCoverMerge) {
+        await supabase.from("user_book_media").delete().eq("user_book_id", book.id).eq("kind", "cover");
+        for (const m of coverMedia) {
+          await supabase.from("user_book_media").insert({ user_book_id: book.id, kind: "cover", storage_path: m.storage_path, caption: m.caption });
+        }
+      }
+      setMergeUndoSnapshot(null);
+      await refresh();
+      setMergeState({ busy: false, error: null, message: "Undone" });
+      window.setTimeout(() => setMergeState({ busy: false, error: null, message: null }), 1500);
+    } catch (e: any) {
+      setMergeState({ busy: false, error: e?.message ?? "Undo failed", message: "Undo failed" });
     }
   }
 
@@ -2271,7 +2336,7 @@ export default function BookDetailPage() {
       ) : (
         <div className="card">
           <div className="om-book-detail-grid" style={{ marginTop: 10, rowGap: 24, columnGap: 14, alignItems: "start" }}>
-            <div style={{ gridColumn: "1 / -1" }}>
+            <div style={{ gridColumn: "1 / -1", marginBottom: 16 }}>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: 10 }}>
                 {/* Left group: primary action + updates indicator */}
                 {isOwner ? (
@@ -2348,15 +2413,17 @@ export default function BookDetailPage() {
                   ? mergeState.error
                     ? `${mergeState.message} (${mergeState.error})`
                     : mergeState.message
-                  : saveState.message
-                    ? saveState.error
-                      ? `${saveState.message} (${saveState.error})`
-                      : saveState.message
-                    : busy
-                      ? "Loading…"
-                      : error
-                        ? error
-                        : ""}
+                  : mergeUndoSnapshot
+                    ? <button onClick={() => void undoMerge()} disabled={mergeState.busy} className="muted">Undo merge</button>
+                    : saveState.message
+                      ? saveState.error
+                        ? `${saveState.message} (${saveState.error})`
+                        : saveState.message
+                      : busy
+                        ? "Loading…"
+                        : error
+                          ? error
+                          : ""}
               </div>
 
               {isOwner && mergePanelOpen && mergeAllSources.length > 0 ? (
