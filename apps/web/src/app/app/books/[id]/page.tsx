@@ -995,10 +995,24 @@ export default function BookDetailPage() {
     // Cover — one candidate per unique storage_path from community; always shown when community has covers.
     // Pre-selected only when user has no cover (never auto-replace an existing cover).
     const hasCover = book.media.some((m) => m.kind === "cover");
+    // Build a set of "original filenames" already present in the user's covers.
+    // Merged covers are stored as merge-<timestamp>-<originalFilename>, so we
+    // strip that prefix to recover the source filename for deduplication.
+    const userCoverPaths = book.media.filter((m) => m.kind === "cover").map((m) => m.storage_path);
+    const userCoverSourceFilenames = new Set<string>();
+    for (const p of userCoverPaths) {
+      const filename = p.split("/").pop() ?? "";
+      const m = filename.match(/^merge-\d+-(.+)$/);
+      userCoverSourceFilenames.add(m ? m[1] : filename);
+    }
     const coverPathCounts: Record<string, number> = {};
     for (const s of mergeAllSources) {
       for (const m of s.media) {
-        if (m.kind === "cover") coverPathCounts[m.storage_path] = (coverPathCounts[m.storage_path] ?? 0) + 1;
+        if (m.kind !== "cover") continue;
+        const communityFilename = m.storage_path.split("/").pop() ?? "";
+        if (userCoverSourceFilenames.has(communityFilename)) continue; // already merged this image
+        if (userCoverPaths.includes(m.storage_path)) continue; // exact path match
+        coverPathCounts[m.storage_path] = (coverPathCounts[m.storage_path] ?? 0) + 1;
       }
     }
     const coverCandidates = Object.entries(coverPathCounts)
@@ -2256,7 +2270,7 @@ export default function BookDetailPage() {
         </div>
       ) : (
         <div className="card">
-          <div className="om-book-detail-grid" style={{ marginTop: 10, gap: 14 }}>
+          <div className="om-book-detail-grid" style={{ marginTop: 10, rowGap: 24, columnGap: 14, alignItems: "start" }}>
             <div style={{ gridColumn: "1 / -1" }}>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: 10 }}>
                 {/* Left group: primary action + updates indicator */}
@@ -2361,7 +2375,7 @@ export default function BookDetailPage() {
                         const userHasCover = (book?.media ?? []).some((m) => m.kind === "cover");
                         return [(
                           <div key="cover-row" style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 8, marginTop: 8, alignItems: "start" }}>
-                            <span className="muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", paddingTop: 2 }}>Cover</span>
+                            <span className="muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>Cover</span>
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                               {group.candidates.map((cand) => {
                                 const selKey = `cover::${cand.value}`;
@@ -3611,8 +3625,6 @@ export default function BookDetailPage() {
               ) : null}
             </div>
           </div>
-
-          {publicBookUrl ? <hr className="om-hr" style={{ marginTop: 10, width: "100%" }} /> : null}
 
           {(isOwner && editMode) || imageMedia.length > 0 ? (
             <div style={{ gridColumn: "1 / -1", marginTop: 16 }}>
