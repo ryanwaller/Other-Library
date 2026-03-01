@@ -98,7 +98,12 @@ export default function LibraryBlock({
                   onSaveName(libraryId, nameDraft);
                 }}
                 autoFocus
-                style={{ minWidth: 220, flex: 1, transform: "translateY(-2px)" }}
+                style={{
+                  minWidth: 220,
+                  flex: 1,
+                  transform: "translateY(-6px)",
+                  paddingBottom: 0
+                }}
               />
               {hasNameChanges ? (
                 <div className="row" style={{ gap: 24, alignItems: "baseline" }}>
@@ -126,11 +131,9 @@ export default function LibraryBlock({
           ) : (
             <span>{libraryName}</span>
           )}
-          {!isEditing ? (
-            <span className="muted">
-              {bookCount} book{bookCount === 1 ? "" : "s"}
-            </span>
-          ) : null}
+          <span className="muted">
+            {bookCount}&nbsp;&nbsp;book{bookCount === 1 ? "" : "s"}
+          </span>
         </div>
         {reorderMode ? (
           <div className="row" style={{ gap: 10 }}>
