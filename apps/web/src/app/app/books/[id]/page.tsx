@@ -2259,9 +2259,17 @@ export default function BookDetailPage() {
           <div className="om-book-detail-grid" style={{ marginTop: 10, gap: 14 }}>
             <div style={{ gridColumn: "1 / -1" }}>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: 10 }}>
-                {/* Left side — shown when editing or merge panel is open */}
-                {isOwner && (editMode || mergePanelOpen) ? (
-                  <div className="row" style={{ gap: 16, alignItems: "baseline", flexWrap: "nowrap" }}>
+                {/* Left group: primary action + updates indicator */}
+                {isOwner ? (
+                  <div className="row" style={{ gap: 12, alignItems: "baseline", flexWrap: "nowrap" }}>
+                    {editMode ? (
+                      <>
+                        <button onClick={doneEditMode} disabled={busy || saveState.busy}>Save</button>
+                        <button onClick={cancelEditMode} disabled={busy || saveState.busy} className="muted">Cancel</button>
+                      </>
+                    ) : (
+                      <button onClick={enterEditMode} disabled={busy}>Edit</button>
+                    )}
                     {updatesCount > 0 ? (
                       <button
                         onClick={() => { cancelEditMode(); setFindMoreOpen(false); setMergePanelOpen((v) => !v); }}
@@ -2271,31 +2279,13 @@ export default function BookDetailPage() {
                         <span>Updates available</span><span style={{ marginLeft: "0.5em" }}>{updatesCount}</span>
                       </button>
                     ) : null}
-                    <button
-                      onClick={() => { if (!findMoreOpen) { cancelEditMode(); setMergePanelOpen(false); } setFindMoreOpen((v) => !v); }}
-                      className="muted"
-                      style={{ whiteSpace: "nowrap" }}
-                    >
-                      Find more info
-                    </button>
                   </div>
-                ) : (
-                  <span />
-                )}
+                ) : null}
 
-                {/* Right side */}
+                {/* Right group: merge controls + Find more info / Cancel */}
                 {isOwner ? (
-                  <div className="row" style={{ gap: 20, alignItems: "baseline", flexWrap: "nowrap", justifyContent: "flex-end" }}>
-                    {editMode ? (
-                      <>
-                        <button onClick={doneEditMode} disabled={busy || saveState.busy}>
-                          Save
-                        </button>
-                        <button onClick={cancelEditMode} disabled={busy || saveState.busy} className="muted">
-                          Cancel
-                        </button>
-                      </>
-                    ) : mergePanelOpen ? (
+                  <div className="row" style={{ gap: 16, alignItems: "baseline", flexWrap: "nowrap", justifyContent: "flex-end" }}>
+                    {mergePanelOpen ? (
                       <>
                         <button
                           onClick={() => {
@@ -2328,22 +2318,14 @@ export default function BookDetailPage() {
                           Close
                         </button>
                       </>
-                    ) : (
-                      <>
-                        {updatesCount > 0 ? (
-                          <span
-                            onClick={() => { setFindMoreOpen(false); setMergePanelOpen(true); }}
-                            className="muted"
-                            style={{ cursor: "pointer", whiteSpace: "nowrap" }}
-                          >
-                            {updatesCount}
-                          </span>
-                        ) : null}
-                        <button onClick={enterEditMode} disabled={busy}>
-                          Edit
-                        </button>
-                      </>
-                    )}
+                    ) : null}
+                    <button
+                      onClick={() => { if (!findMoreOpen) { cancelEditMode(); setMergePanelOpen(false); } setFindMoreOpen((v) => !v); }}
+                      className="muted"
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      {findMoreOpen ? "Cancel" : "Find more info"}
+                    </button>
                   </div>
                 ) : null}
               </div>
@@ -2926,8 +2908,8 @@ export default function BookDetailPage() {
               ) : null}
             </div>
 
-            <div>
-              <div style={{ marginTop: 10 }}>
+            <div style={{ alignSelf: "start" }}>
+              <div>
                 {editMode ? (
                   <input
                     className="om-inline-control"
