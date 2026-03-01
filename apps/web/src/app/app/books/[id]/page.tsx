@@ -2995,9 +2995,9 @@ export default function BookDetailPage() {
                       }
                     }
                   }}
-                  style={{ marginTop: 10 }}
+                  style={{ marginTop: 10, border: "none", outline: "none", boxShadow: "none" }}
                 >
-                  <summary className="om-disclosure-summary" style={{ listStyle: "none" }}>
+                  <summary className="om-disclosure-summary" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none" }}>
                     <span className="muted" style={{ cursor: "pointer" }}>{coverUrl ? "Edit cover" : "Add cover"}</span>
                   </summary>
                   <div style={{ marginTop: 8 }}>
@@ -3017,7 +3017,7 @@ export default function BookDetailPage() {
                         <div style={{ marginTop: 0 }}>
                           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                             {/* Book size — crop-local state; syncs to metadata when a real unit is selected */}
-                            <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                            <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
                               <div className="muted" style={{ minWidth: 110 }}>Book size</div>
                               <div className="row" style={{ gap: 6, alignItems: "center" }}>
                                 <input
@@ -3050,7 +3050,7 @@ export default function BookDetailPage() {
                                 </select>
                               </div>
                             </div>
-                            <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                            <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
                               <div className="muted" style={{ minWidth: 110 }}>
                                 Zoom
                               </div>
@@ -3064,7 +3064,7 @@ export default function BookDetailPage() {
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
-                            <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                            <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
                               <div className="muted" style={{ minWidth: 110 }}>
                                 Rotate
                               </div>
@@ -3078,7 +3078,7 @@ export default function BookDetailPage() {
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
-                            <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                            <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
                               <div className="muted" style={{ minWidth: 110 }}>
                                 Bright
                               </div>
@@ -3092,7 +3092,7 @@ export default function BookDetailPage() {
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
-                            <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                            <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
                               <div className="muted" style={{ minWidth: 110 }}>
                                 Contrast
                               </div>
@@ -3882,8 +3882,8 @@ export default function BookDetailPage() {
           {(isOwner && editMode) || imageMedia.length > 0 ? (
             <div style={{ gridColumn: "1 / -1", marginTop: 16 }}>
               {isOwner && editMode ? (
-                <details style={{ marginTop: 8 }}>
-                  <summary className="muted">Add images…</summary>
+                <details style={{ marginTop: 8, border: "none", outline: "none", boxShadow: "none" }}>
+                  <summary className="muted" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none", cursor: "pointer" }}>Add images…</summary>
                   <div style={{ marginTop: 8 }}>
                     <input key={imagesInputKey} type="file" accept="image/*" multiple onChange={(ev) => selectPendingImages(ev.target.files)} />
 
