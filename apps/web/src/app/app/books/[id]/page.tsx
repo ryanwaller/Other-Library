@@ -1348,6 +1348,8 @@ export default function BookDetailPage() {
       cropTrimHeight,
       cropTrimUnit
     };
+    setDeleteConfirm(false);
+    setDeleteState({ busy: false, error: null, message: null });
     setEditMode(true);
   }
 
@@ -2456,7 +2458,7 @@ export default function BookDetailPage() {
                       deleteConfirm ? (
                         <div className="row" style={{ gap: 12, alignItems: "baseline", flexWrap: "nowrap" }}>
                           <span className="muted">Are you sure?</span>
-                          <button onClick={() => void deleteBook()} disabled={deleteState.busy}>Yes</button>
+                          <button onClick={() => deleteBook()} disabled={deleteState.busy}>Yes</button>
                           <button onClick={() => setDeleteConfirm(false)} disabled={deleteState.busy} className="muted">No</button>
                         </div>
                       ) : (
