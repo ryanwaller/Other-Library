@@ -2541,4 +2541,31 @@ export default function AppPage() {
           <AppWithFilters session={session} />
         </Suspense>
       ) : (
-        <SignInCard note="Followers-only by default;
+        <SignInCard note="Followers-only by default; public is optional later." />
+      )}
+    </main>
+  );
+}
+
+function AppWithFilters({ session }: { session: Session }) {
+  const searchParams = useSearchParams();
+  const filterTag = searchParams.get("tag");
+  const filterAuthor = searchParams.get("author");
+  const filterSubject = searchParams.get("subject");
+  const filterPublisher = searchParams.get("publisher");
+  const filterCategory = searchParams.get("category");
+  const openAddPanel = searchParams.get("add") === "1";
+  const openCsvPicker = searchParams.get("csv") === "1";
+  return (
+    <AppShell
+      session={session}
+      filterTag={filterTag}
+      filterAuthor={filterAuthor}
+      filterSubject={filterSubject}
+      filterPublisher={filterPublisher}
+      filterCategory={filterCategory}
+      openAddPanel={openAddPanel}
+      openCsvPicker={openCsvPicker}
+    />
+  );
+}
