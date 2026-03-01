@@ -2024,6 +2024,15 @@ function AppShell({
             <>
               <span className="muted">Selected</span>
               <span>{bulkSelectedCount}</span>
+              {bulkSelectedCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setBulkSelectedKeys({})}
+                  style={{ background: "transparent", border: 0, padding: 0, font: "inherit", color: "inherit", textDecoration: "underline", cursor: "pointer" }}
+                >
+                  clear
+                </button>
+              ) : null}
             </>
           ) : null}
           {libraryState.message ? <span className="muted">{libraryState.message}</span> : libraryState.error ? <span className="muted">{libraryState.error}</span> : null}
@@ -2085,18 +2094,41 @@ function AppShell({
 
       <div className="row" style={{ marginTop: 6, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
         <div className="row" style={{ gap: 12, alignItems: "baseline", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
-          <button
-            type="button"
-            className={showAddPanel ? "text-primary" : "muted"}
-            onClick={() => {
-              setAddOpen((prev) => !prev);
-              setSortOpen(false);
-              closeTagMenu();
-              closeCategoryMenu();
-            }}
-          >
-            Add
-          </button>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <button
+              type="button"
+              className={showAddPanel ? "text-primary" : "muted"}
+              onClick={() => {
+                setAddOpen((prev) => !prev);
+                setSortOpen(false);
+                closeTagMenu();
+                closeCategoryMenu();
+              }}
+            >
+              Add
+            </button>
+            {bulkMode ? (
+              <button
+                type="button"
+                className={reorderMode ? "text-primary" : "muted"}
+                style={{ marginTop: 4, textAlign: "left" }}
+                onClick={() => {
+                  setReorderMode((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setBulkSelectedKeys({});
+                      setBulkState({ busy: false, error: null, message: null });
+                      setSortOpen(false);
+                      setAddOpen(false);
+                    }
+                    return next;
+                  });
+                }}
+              >
+                Reorder
+              </button>
+            ) : null}
+          </div>
           <button
             type="button"
             className={sortOpen ? "text-primary" : "muted"}
@@ -2126,26 +2158,6 @@ function AppShell({
           >
             {bulkMode ? "Done" : "Edit"}
           </button>
-          {bulkMode ? (
-            <button
-              type="button"
-              className={reorderMode ? "text-primary" : "muted"}
-              onClick={() => {
-                setReorderMode((prev) => {
-                  const next = !prev;
-                  if (next) {
-                    setBulkSelectedKeys({});
-                    setBulkState({ busy: false, error: null, message: null });
-                    setSortOpen(false);
-                    setAddOpen(false);
-                  }
-                  return next;
-                });
-              }}
-            >
-              Reorder
-            </button>
-          ) : null}
           <input
             className="om-inline-search-input"
             placeholder="Search your catalog"

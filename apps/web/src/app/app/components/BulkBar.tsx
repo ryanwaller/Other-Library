@@ -76,17 +76,7 @@ export default function BulkBar({
 
   return (
     <div className="om-bulkbar" style={{ marginTop: 10 }}>
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-        <div className="row" style={{ gap: 10, alignItems: "baseline" }}>
-          <span>{selectedGroupsCount} selected</span>
-          <button onClick={onClearSelected} className="muted" type="button">
-            Clear
-          </button>
-          {bulkState.message ? (
-            <span className="muted">{bulkState.error ? `${bulkState.message} (${bulkState.error})` : bulkState.message}</span>
-          ) : null}
-        </div>
-
+      <div className="row" style={{ justifyContent: "flex-end", alignItems: "baseline", gap: 10 }}>
         <div className="row" style={{ gap: 14, alignItems: "baseline" }}>
           <details
             ref={visibilityRef}
