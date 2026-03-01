@@ -122,6 +122,19 @@ a:focus-visible {
   box-shadow: none !important;
 }
 
+.om-cropper-container {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute !important;
+  top: 0;
+  left: 0;
+}
+
+.om-cropper-image {
+  max-width: none !important;
+  max-height: none !important;
+}
+
 .om-book-card:hover .om-cover-slot {
   filter: brightness(1.03);
 }

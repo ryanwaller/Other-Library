@@ -166,6 +166,53 @@ function toProxyImageUrl(url: string): string {
   return `/api/image-proxy?url=${encodeURIComponent(raw)}`;
 }
 
+function toFullSizeImageUrl(url: string): string {
+  let raw = (url ?? "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("blob:")) return raw;
+
+  try {
+    const u = new URL(raw);
+    // Strip common resizing parameters
+    u.searchParams.delete("h");
+    u.searchParams.delete("w");
+    u.searchParams.delete("fit");
+    u.searchParams.delete("compress");
+    u.searchParams.delete("resize");
+    u.searchParams.delete("width");
+    u.searchParams.delete("height");
+    u.searchParams.delete("scale");
+    u.searchParams.delete("quality");
+    u.searchParams.delete("format");
+
+    // Google Books
+    if (u.hostname.includes("googleusercontent.com") || u.hostname.includes("books.google.com")) {
+      u.searchParams.set("zoom", "0"); // zoom=0 is often the highest resolution
+      u.searchParams.delete("edge");
+    }
+
+    // OpenLibrary
+    if (u.hostname.includes("covers.openlibrary.org")) {
+      // replace -S.jpg or -M.jpg with -L.jpg
+      u.pathname = u.pathname.replace(/-(S|M)\.jpg$/, "-L.jpg");
+    }
+
+    // Amazon
+    if (u.hostname.includes("amazon.com") || u.hostname.includes("ssl-images-amazon.com")) {
+      // Amazon URLs often have patterns like _SX_ or _SY_ or _SL_ followed by numbers.
+      // e.g. https://m.media-amazon.com/images/I/51abc.jpg._SL100_.jpg
+      // Removing everything between the last dot and the file extension can help.
+      u.pathname = u.pathname.replace(/\._[A-Z0-9,_-]+\./i, ".");
+    }
+
+    raw = u.toString();
+  } catch {
+    // ignore invalid URLs
+  }
+
+  return toProxyImageUrl(raw);
+}
+
 function onEnter(e: KeyboardEvent<HTMLInputElement>, fn: () => void) {
   if (e.key !== "Enter") return;
   e.preventDefault();
@@ -805,7 +852,7 @@ export default function BookDetailPage() {
         }
         setMediaUrlsByPath(next);
         if (origStoragePath && next[origStoragePath]) {
-          setCoverOriginalSrc(toProxyImageUrl(next[origStoragePath]));
+          setCoverOriginalSrc(toFullSizeImageUrl(next[origStoragePath]));
         }
       }
 
@@ -1722,7 +1769,7 @@ export default function BookDetailPage() {
         await supabase.from("user_books").update({ cover_original_url: path }).eq("id", book.id);
         try {
           const { data: sd } = await supabase.storage.from("user-book-media").createSignedUrl(path, 3600);
-          if (sd?.signedUrl) setCoverOriginalSrc(toProxyImageUrl(sd.signedUrl));
+          if (sd?.signedUrl) setCoverOriginalSrc(toFullSizeImageUrl(sd.signedUrl));
         } catch { /* best-effort */ }
       }
 
@@ -2901,8 +2948,14 @@ export default function BookDetailPage() {
                     onRotationChange={setCoverRotation}
                     onCropComplete={(area, _pixels) => setCoverCroppedArea(area)}
                     showGrid={false}
+                    minZoom={0.1}
+                    objectFit="contain"
+                    classes={{
+                      containerClassName: "om-cropper-container",
+                      mediaClassName: "om-cropper-image"
+                    }}
                     style={{
-                      containerStyle: { width: "100%", height: "100%" }
+                      containerStyle: { width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }
                     }}
                   />
                 ) : (
@@ -2942,7 +2995,7 @@ export default function BookDetailPage() {
                             onClick={() => {
                               if (!coverUrl) return;
                               setPendingCover(null);
-                              const origSrc = coverOriginalSrc ?? toProxyImageUrl(coverUrl);
+                              const origSrc = toFullSizeImageUrl(coverOriginalSrc ?? coverUrl);
                               setCoverEditorSrc(origSrc);
                               if (book?.cover_crop) {
                                 const c = book.cover_crop;
