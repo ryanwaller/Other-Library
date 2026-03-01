@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import Cropper, { type Area } from "react-easy-crop";
@@ -253,6 +253,7 @@ function parseTitleAndAuthor(input: string): { title: string; author: string | n
 }
 
 export default function BookDetailPage() {
+  const router = useRouter();
   const params = useParams();
   const idParam = (params as any)?.id;
   const bookId = Number(Array.isArray(idParam) ? idParam[0] : idParam);

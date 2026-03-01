@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { MouseEvent } from "react";
+import { useMemo, type MouseEvent } from "react";
 import CoverImage, { type CoverCrop } from "../../../components/CoverImage";
 
 export type BookCardViewMode = "grid" | "list";
@@ -25,7 +25,8 @@ export default function BookCard({
   onDeleteCopy,
   deleteState,
   hideCopyCount,
-  showDeleteCopy = true
+  showDeleteCopy = true,
+  gridCols
 }: {
   viewMode: BookCardViewMode;
   bulkMode: boolean;
@@ -45,6 +46,7 @@ export default function BookCard({
   deleteState: { busy: boolean; error: string | null; message: string | null } | undefined;
   hideCopyCount?: boolean;
   showDeleteCopy?: boolean;
+  gridCols?: number;
 }) {
   const router = useRouter();
   const openAuthorFilter = (event: MouseEvent, author: string) => {
@@ -53,6 +55,15 @@ export default function BookCard({
     router.push(`/app?author=${encodeURIComponent(author)}`);
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "auto" }));
   };
+
+  const truncatedAuthors = useMemo(() => {
+    if (gridCols === 8 && authors.length > 1) {
+      return [`${authors[0]} + more`];
+    }
+    return authors;
+  }, [gridCols, authors]);
+
+  const authorLine = truncatedAuthors.length > 0 ? truncatedAuthors.join(", ") : "";
 
   const coverEl = (
     <div className="om-cover-slot" style={{ height: coverHeight }}>
@@ -125,8 +136,6 @@ export default function BookCard({
     );
   }
 
-  const authorLine = authors.length > 0 ? authors.join(", ") : "";
-
   return (
     <div className="card om-book-card">
       {bulkMode ? (
@@ -186,16 +195,20 @@ export default function BookCard({
             </div>
             {authorLine ? (
               <div className="om-book-secondary">
-                {authors.map((author, index) => (
+                {truncatedAuthors.map((author, index) => (
                   <span key={author}>
-                    <Link
-                      href={`/app?author=${encodeURIComponent(author)}`}
-                      onClick={(e) => openAuthorFilter(e, author)}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    >
-                      {author}
-                    </Link>
-                    {index < authors.length - 1 ? <span>, </span> : null}
+                    {gridCols === 8 && authors.length > 1 ? (
+                      <span>{author}</span>
+                    ) : (
+                      <Link
+                        href={`/app?author=${encodeURIComponent(author)}`}
+                        onClick={(e) => openAuthorFilter(e, author)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        {author}
+                      </Link>
+                    )}
+                    {index < truncatedAuthors.length - 1 ? <span>, </span> : null}
                   </span>
                 ))}
               </div>

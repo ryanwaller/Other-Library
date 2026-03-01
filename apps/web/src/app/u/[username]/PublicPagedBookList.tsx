@@ -13,7 +13,14 @@ type PublicBook = {
   authors_override: string[] | null;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
-  edition: { isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null; subjects: string[] | null } | null;
+  edition: {
+    isbn13?: string | null;
+    title?: string | null;
+    authors?: string[] | null;
+    cover_url?: string | null;
+    subjects?: string[] | null;
+    publisher?: string | null;
+  } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
 
