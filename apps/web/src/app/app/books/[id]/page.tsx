@@ -2871,6 +2871,7 @@ export default function BookDetailPage() {
                   width: "100%",
                   height: isNarrow ? 360 : 280,
                   padding: 0,
+                  display: coverEditorSrc ? "block" : "flex",
                   filter: coverEditorSrc
                     ? `brightness(${coverBrightness}) contrast(${coverContrast})`
                     : undefined
@@ -2888,6 +2889,9 @@ export default function BookDetailPage() {
                     onRotationChange={setCoverRotation}
                     onCropComplete={(area, _pixels) => setCoverCroppedArea(area)}
                     showGrid={false}
+                    style={{
+                      containerStyle: { width: "100%", height: "100%" }
+                    }}
                   />
                 ) : (
                   <CoverImage
