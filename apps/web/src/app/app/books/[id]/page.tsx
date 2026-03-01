@@ -2265,10 +2265,13 @@ export default function BookDetailPage() {
 
       setMergePanelOpen(false);
       setMergeSelections({});
-      setMergeUndoSnapshot({ fields: preFields, coverMedia: preCoverMedia, hadCoverMerge: !!selectedCoverPath });
       await refresh();
       setMergeState({ busy: false, error: null, message: "Merged" });
-      window.setTimeout(() => setMergeState({ busy: false, error: null, message: null }), 1500);
+      const undoData = { fields: preFields, coverMedia: preCoverMedia, hadCoverMerge: !!selectedCoverPath };
+      window.setTimeout(() => {
+        setMergeState({ busy: false, error: null, message: null });
+        setMergeUndoSnapshot(undoData);
+      }, 1500);
     } catch (e: any) {
       setMergeState({ busy: false, error: e?.message ?? "Merge failed", message: "Merge failed" });
     }

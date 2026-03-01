@@ -707,7 +707,7 @@ select.om-filter-control::-ms-expand {
   min-width: 0;
   border: 0 !important;
   border-bottom: 0 !important;
-  padding: 0;
+  padding: 0 !important;
   margin: 0;
   background: transparent;
   color: inherit;
@@ -833,7 +833,7 @@ select.om-filter-control::-ms-expand {
   min-width: 8ch;
   border: 0 !important;
   border-bottom: 0 !important;
-  padding: 0;
+  padding: 0 !important;
   margin: 0;
   background: transparent;
   color: inherit;
