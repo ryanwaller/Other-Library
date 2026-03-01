@@ -2891,12 +2891,24 @@ function AppShell({
 
 export default function AppPage() {
   const [session, setSession] = useState<Session | null>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+
   useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSession(newSession));
+    if (!supabase) {
+      setSessionLoaded(true);
+      return;
+    }
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setSessionLoaded(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      setSessionLoaded(true);
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
+
   return (
     <main className="container">
       {!supabase ? (
@@ -2906,6 +2918,8 @@ export default function AppPage() {
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
+      ) : !sessionLoaded ? (
+        <div className="card">Loading…</div>
       ) : session ? (
         <Suspense fallback={<div className="card">Loading…</div>}>
           <AppWithFilters session={session} />

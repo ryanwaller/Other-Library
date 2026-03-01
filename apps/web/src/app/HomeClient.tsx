@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import SignInCard from "./components/SignInCard";
+import { supabase } from "../lib/supabaseClient";
 
 export default function HomeClient() {
   const router = useRouter();
   const params = useSearchParams();
   const tokenFromUrl = (params.get("token") ?? "").trim();
 
+  const [sessionLoaded, setSessionLoaded] = useState(false);
   const [inviteToken, setInviteToken] = useState(tokenFromUrl);
   const [waitEmail, setWaitEmail] = useState("");
   const [waitNote, setWaitNote] = useState("");
@@ -17,6 +19,22 @@ export default function HomeClient() {
     error: null,
     message: null
   });
+
+  useEffect(() => {
+    if (!supabase) {
+      setSessionLoaded(true);
+      return;
+    }
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        router.replace("/app");
+      } else {
+        setSessionLoaded(true);
+      }
+    });
+  }, [router]);
+
+  if (!sessionLoaded) return null;
 
   return (
     <main className="container">
