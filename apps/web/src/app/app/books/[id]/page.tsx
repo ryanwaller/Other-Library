@@ -3000,9 +3000,9 @@ export default function BookDetailPage() {
                   <summary className="om-disclosure-summary" style={{ listStyle: "none" }}>
                     <span className="muted" style={{ cursor: "pointer" }}>{coverUrl ? "Edit cover" : "Add cover"}</span>
                   </summary>
-                  <div style={{ marginTop: 10 }}>
+                  <div style={{ marginTop: 8 }}>
                       <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                        <label style={{ cursor: "pointer", textDecoration: "underline" }} className="muted">
+                        <label style={{ cursor: "pointer", textDecoration: "underline", minWidth: 110 }} className="muted">
                           {coverUrl ? "Replace cover" : "Choose file"}
                           <input
                             key={coverInputKey}
@@ -3014,11 +3014,11 @@ export default function BookDetailPage() {
                         </label>
                       </div>
                       {coverEditorSrc ? (
-                        <div style={{ marginTop: 12 }}>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        <div style={{ marginTop: 0 }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                             {/* Book size — crop-local state; syncs to metadata when a real unit is selected */}
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                              <div className="muted">Book size</div>
+                            <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                              <div className="muted" style={{ minWidth: 110 }}>Book size</div>
                               <div className="row" style={{ gap: 6, alignItems: "center" }}>
                                 <input
                                   type="number"
@@ -3050,8 +3050,8 @@ export default function BookDetailPage() {
                                 </select>
                               </div>
                             </div>
-                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                              <div className="muted" style={{ width: 72 }}>
+                            <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                              <div className="muted" style={{ minWidth: 110 }}>
                                 Zoom
                               </div>
                               <input
@@ -3064,8 +3064,8 @@ export default function BookDetailPage() {
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
-                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                              <div className="muted" style={{ width: 72 }}>
+                            <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                              <div className="muted" style={{ minWidth: 110 }}>
                                 Rotate
                               </div>
                               <input
@@ -3078,8 +3078,8 @@ export default function BookDetailPage() {
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
-                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                              <div className="muted" style={{ width: 72 }}>
+                            <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                              <div className="muted" style={{ minWidth: 110 }}>
                                 Bright
                               </div>
                               <input
@@ -3092,8 +3092,8 @@ export default function BookDetailPage() {
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
-                            <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                              <div className="muted" style={{ width: 72 }}>
+                            <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                              <div className="muted" style={{ minWidth: 110 }}>
                                 Contrast
                               </div>
                               <input
