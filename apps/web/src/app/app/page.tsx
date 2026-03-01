@@ -1692,6 +1692,14 @@ function AppShell({
     });
   }
 
+  function selectAll() {
+    const next: Record<string, true> = {};
+    for (const g of displayGroups) {
+      next[g.key] = true;
+    }
+    setBulkSelectedKeys(next);
+  }
+
   async function getOrCreateTagId(name: string, kind: "tag" | "category"): Promise<number> {
     if (!supabase || !userId) throw new Error("Not signed in");
     const normalized = name.trim().replace(/\s+/g, " ");
@@ -2036,6 +2044,15 @@ function AppShell({
             <>
               <span className="muted">Selected</span>
               <span>{bulkSelectedCount}</span>
+              {displayGroups.length > 0 && bulkSelectedCount < displayGroups.length ? (
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  style={{ background: "transparent", border: 0, padding: 0, font: "inherit", color: "inherit", textDecoration: "underline", cursor: "pointer" }}
+                >
+                  Select all
+                </button>
+              ) : null}
               {bulkSelectedCount > 0 ? (
                 <button
                   type="button"
