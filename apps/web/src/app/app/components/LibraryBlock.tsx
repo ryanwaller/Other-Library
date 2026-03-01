@@ -48,8 +48,8 @@ export default function LibraryBlock({
   const hasNameChanges = nameDraft.trim() !== libraryName.trim();
   return (
     <div className="card" style={{ marginTop: 14 }}>
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-        <div className="row" style={{ gap: 10, flex: 1, alignItems: "baseline" }}>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap" }}>
+        <div className="row" style={{ gap: 10, flex: 1, alignItems: "baseline", flexWrap: "nowrap", minWidth: 0 }}>
           <button
             onClick={() => {
               if (reorderMode) return;
@@ -64,15 +64,17 @@ export default function LibraryBlock({
               minWidth: 16,
               display: "inline-flex",
               justifyContent: "center",
+              alignItems: "center",
               border: "none",
               background: "transparent",
               textDecoration: "none",
               cursor: busy || reorderMode ? "default" : "pointer",
-              transform: "translateY(2px)"
+              transform: "translateY(1px)"
             }}
           >
             <span className="om-catalog-caret" data-collapsed={collapsed ? "true" : "false"} aria-hidden="true" />
           </button>
+
           {manageMode && isEditing ? (
             <span
               className="row"
@@ -81,7 +83,9 @@ export default function LibraryBlock({
                 flex: 1,
                 minWidth: 0,
                 flexWrap: "nowrap",
-                alignItems: "baseline"
+                alignItems: "baseline",
+                borderBottom: "1px solid var(--border)",
+                paddingBottom: 9
               }}
             >
               <input
@@ -99,9 +103,9 @@ export default function LibraryBlock({
                 }}
                 autoFocus
                 style={{
-                  minWidth: 220,
+                  minWidth: 180,
                   flex: 1,
-                  transform: "translateY(-6px)",
+                  borderBottom: "none",
                   paddingBottom: 0
                 }}
               />
@@ -119,24 +123,29 @@ export default function LibraryBlock({
                 Delete
               </button>
             </span>
-          ) : manageMode && !reorderMode ? (
-            <button
-              onClick={() => onStartEdit(libraryId, libraryName)}
-              className="om-library-edit-trigger"
-              style={{ padding: 0, border: "none", background: "transparent", textDecoration: "none" }}
-              aria-label="Rename catalog"
-            >
-              {libraryName}
-            </button>
           ) : (
-            <span>{libraryName}</span>
+            <div className="row" style={{ flex: 1, justifyContent: "space-between", alignItems: "baseline", minWidth: 0 }}>
+              {manageMode && !reorderMode ? (
+                <button
+                  onClick={() => onStartEdit(libraryId, libraryName)}
+                  className="om-library-edit-trigger"
+                  style={{ padding: 0, border: "none", background: "transparent", textDecoration: "none", textAlign: "left" }}
+                  aria-label="Rename catalog"
+                >
+                  {libraryName}
+                </button>
+              ) : (
+                <span>{libraryName}</span>
+              )}
+              <span className="muted" style={{ marginLeft: 12, whiteSpace: "nowrap" }}>
+                {bookCount}&nbsp;&nbsp;book{bookCount === 1 ? "" : "s"}
+              </span>
+            </div>
           )}
-          <span className="muted">
-            {bookCount}&nbsp;&nbsp;book{bookCount === 1 ? "" : "s"}
-          </span>
         </div>
+
         {reorderMode ? (
-          <div className="row" style={{ gap: 10 }}>
+          <div className="row" style={{ gap: 10, marginLeft: 12 }}>
             {index > 0 ? (
               <button
                 onClick={() => onMoveUp(libraryId)}
