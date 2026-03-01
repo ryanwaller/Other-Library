@@ -168,7 +168,15 @@ function parseStructuredNotes(notes: string | null): {
     }
 
     if (value && mappings[lowerKey]) {
-      const targetKey = mappings[lowerKey];
+      let targetKey = mappings[lowerKey];
+      const lowerValue = value.toLowerCase();
+      const materialKeywords = ["paper", "cloth", "linen", "cardboard", "fabric", "foil", "wood"];
+      const isMaterialValue = materialKeywords.some(kw => lowerValue.includes(kw));
+
+      if (targetKey === "printer_override" && isMaterialValue) {
+        targetKey = "materials_override";
+      }
+
       if (data[targetKey]) {
         data[targetKey] += `, ${value}`;
       } else {

@@ -2695,7 +2695,7 @@ export default function BookDetailPage() {
                   <div className="om-lookup-controls" style={{ marginTop: 8 }}>
                     <input
                       className="om-inline-control"
-                      placeholder='Lookup by ISBN, URL, or "Title by Author"'
+                      placeholder="Find by ISBN, URL, or title."
                       value={lookupInput}
                       onChange={(e) => setLookupInput(e.target.value)}
                       onKeyDown={(e) => onEnter(e, smartLookup)}
@@ -3202,14 +3202,15 @@ export default function BookDetailPage() {
             </div>
 
             <div style={{ alignSelf: "start" }}>
-              <div>
+              <div style={{ minHeight: "1.4em" }}>
                 {editMode ? (
                   <input
                     className="om-inline-control"
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
                     onKeyDown={(e) => onEnter(e, () => void saveEdits())}
-                    placeholder={effectiveTitle}
+                    placeholder="Add title"
+                    autoFocus
                   />
                 ) : (
                   <div>{effectiveTitle}</div>
@@ -3706,6 +3707,30 @@ export default function BookDetailPage() {
                         </div>
                       </div>
                     ) : null}
+
+                    {editMode || Boolean((formNotes ?? "").trim()) ? (
+                      <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                        <div style={{ minWidth: 110 }} className="muted">
+                          Notes
+                        </div>
+                        <div style={{ flex: "1 1 auto" }} className="muted">
+                          {editMode ? (
+                            <textarea
+                              className="om-inline-control muted"
+                              value={formNotes}
+                              onChange={(e) => setFormNotes(e.target.value)}
+                              rows={1}
+                              style={{ width: "100%", resize: "none" }}
+                              placeholder="Add notes"
+                            />
+                          ) : (
+                            <div style={{ whiteSpace: "pre-wrap" }}>
+                              {(formNotes ?? "").trim()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div style={{ marginTop: 16 }} className="om-edit-label">
@@ -3805,14 +3830,14 @@ export default function BookDetailPage() {
                     {publicBookUrl ? (
                       <div style={{ marginTop: 16 }}>
                         <div className="om-edit-label">URL</div>
-                        <div className="row om-row-baseline" style={{ marginTop: 6, gap: 10, flexWrap: "nowrap", alignItems: "center" }}>
+                        <div className="row" style={{ marginTop: 6, gap: 10, flexWrap: "nowrap", alignItems: "flex-end" }}>
                           <a
                             href={publicBookUrl}
                             target="_blank"
                             rel="noreferrer"
                             style={{ flex: "1 1 auto", minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}
                           >
-                            {publicBookUrl}
+                            {publicBookUrl.replace(/^https?:\/\//, "")}
                           </a>
                           <button onClick={copyPublicLink} style={{ flex: "0 0 auto", marginLeft: 2 }}>
                             Copy
@@ -3827,72 +3852,48 @@ export default function BookDetailPage() {
                     ) : null}
                   </div>
 
-                  {editMode || Boolean((formLocation ?? "").trim()) || Boolean((formShelf ?? "").trim()) || Boolean((formNotes ?? "").trim()) ? (
-                    <>
-                      <div style={{ marginTop: 16 }} className="om-edit-label">
-                        Location
-                      </div>
-                      <div style={{ marginTop: 8 }}>
-                        {editMode || Boolean((formLocation ?? "").trim()) ? (
-                          <div className="row om-row-baseline">
-                            <div style={{ minWidth: 110 }} className="muted">
-                              Location
-                            </div>
-                            <div style={{ flex: "1 1 auto" }}>
-                              {editMode ? (
-                                <input
-                                  className="om-inline-control"
-                                  value={formLocation}
-                                  onChange={(e) => setFormLocation(e.target.value)}
-                                  placeholder="Home, Studio…"
-                                />
-                              ) : (
-                                (formLocation ?? "").trim()
-                              )}
-                            </div>
+                  {editMode || Boolean((formLocation ?? "").trim()) || Boolean((formShelf ?? "").trim()) ? (
+                    <div style={{ marginTop: 8 }}>
+                      {editMode || Boolean((formLocation ?? "").trim()) ? (
+                        <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                          <div style={{ minWidth: 110 }} className="muted">
+                            Location
                           </div>
-                        ) : null}
-
-                        {editMode || Boolean((formShelf ?? "").trim()) ? (
-                          <div className="row om-row-baseline" style={{ marginTop: 8 }}>
-                            <div style={{ minWidth: 110 }} className="muted">
-                              Shelf
-                            </div>
-                            <div style={{ flex: "1 1 auto" }}>
-                              {editMode ? (
-                                <input
-                                  className="om-inline-control"
-                                  value={formShelf}
-                                  onChange={(e) => setFormShelf(e.target.value)}
-                                  placeholder="Shelf #"
-                                />
-                              ) : (
-                                (formShelf ?? "").trim()
-                              )}
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {editMode || Boolean((formNotes ?? "").trim()) ? (
-                          <div style={{ marginTop: 8 }}>
-                            <div className="om-edit-label">Notes</div>
+                          <div style={{ flex: "1 1 auto" }}>
                             {editMode ? (
-                              <textarea
+                              <input
                                 className="om-inline-control"
-                                value={formNotes}
-                                onChange={(e) => setFormNotes(e.target.value)}
-                                rows={4}
-                                style={{ width: "100%", marginTop: 6, resize: "vertical" }}
+                                value={formLocation}
+                                onChange={(e) => setFormLocation(e.target.value)}
+                                placeholder="Home, Studio…"
                               />
                             ) : (
-                              <div style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-                                {(formNotes ?? "").trim()}
-                              </div>
+                              (formLocation ?? "").trim()
                             )}
                           </div>
-                        ) : null}
-                      </div>
-                    </>
+                        </div>
+                      ) : null}
+
+                      {editMode || Boolean((formShelf ?? "").trim()) ? (
+                        <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                          <div style={{ minWidth: 110 }} className="muted">
+                            Shelf
+                          </div>
+                          <div style={{ flex: "1 1 auto" }}>
+                            {editMode ? (
+                              <input
+                                className="om-inline-control"
+                                value={formShelf}
+                                onChange={(e) => setFormShelf(e.target.value)}
+                                placeholder="Shelf #"
+                              />
+                            ) : (
+                              (formShelf ?? "").trim()
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   ) : null}
 
                 </>
@@ -3977,7 +3978,6 @@ export default function BookDetailPage() {
             </div>
           ) : null}
         <div style={{ marginTop: 16 }}>
-          <hr className="om-hr" />
           {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} /> : null}
         </div>
         </div>

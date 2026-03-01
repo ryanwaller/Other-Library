@@ -182,7 +182,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               <div style={{ width: 48, height: 48, borderRadius: 999, border: "1px solid var(--border)", background: "var(--bg-muted)" }} />
             )}
             <div>
-              <div style={{ fontSize: "1.1em", fontWeight: 600 }}>{profile.display_name || `@${profile.username}`}</div>
+              <div style={{ fontSize: "1em" }}>{profile.display_name || `@${profile.username}`}</div>
               {profile.display_name ? <div className="muted">@{profile.username}</div> : null}
             </div>
           </div>

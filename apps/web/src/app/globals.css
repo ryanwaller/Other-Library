@@ -1045,3 +1045,10 @@ summary::-webkit-details-marker {
     justify-content: flex-end;
   }
 }
+
+@media (max-width: 768px) {
+  .container * {
+    font-size: 13.5px !important;
+    font-weight: 500 !important;
+  }
+}

@@ -249,7 +249,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
           <div>
             <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-              <div style={{ fontWeight: 600 }}>{effectiveTitle}</div>
+              <div>{effectiveTitle}</div>
               <AddToLibraryButton
                 editionId={editionId}
                 titleFallback={effectiveTitle}
