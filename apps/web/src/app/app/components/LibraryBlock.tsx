@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, type ReactNode, useEffect } from "react";
+import { useMemo, type ReactNode } from "react";
+import { usePagination } from "../hooks/usePagination";
 
 export default function LibraryBlock({
   libraryId,
@@ -53,20 +54,7 @@ export default function LibraryBlock({
 }) {
   const hasNameChanges = nameDraft.trim() !== libraryName.trim();
 
-  // Calculate the initial visible limit based on the layout
-  const initialLimit = useMemo(() => {
-    if (viewMode === "list") return 24;
-    if (gridCols === 2) return 24; // 12 rows * 2
-    if (gridCols === 8) return 32; // 4 rows * 8
-    return 16; // Default (grid of 4): 4 rows * 4
-  }, [viewMode, gridCols]);
-
-  const [limit, setLimit] = useState(initialLimit);
-
-  // Reset limit when layout changes or search query changes
-  useEffect(() => {
-    setLimit(initialLimit);
-  }, [initialLimit, searchQuery]);
+  const { limit, loadMore } = usePagination(viewMode, gridCols, searchQuery);
 
   return (
     <div className="card" style={{ marginTop: 14 }}>
@@ -205,7 +193,7 @@ export default function LibraryBlock({
           {renderBooks(limit)}
           {bookCount > limit && (
             <div className="row" style={{ marginTop: 12, justifyContent: "center" }}>
-              <button onClick={() => setLimit((prev) => prev + initialLimit)} className="muted">
+              <button onClick={loadMore} className="muted">
                 Load more
               </button>
             </div>
