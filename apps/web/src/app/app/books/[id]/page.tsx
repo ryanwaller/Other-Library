@@ -2997,7 +2997,7 @@ export default function BookDetailPage() {
                   }}
                   style={{ marginTop: 10, border: "none", outline: "none", boxShadow: "none" }}
                 >
-                  <summary className="om-disclosure-summary" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none" }}>
+                  <summary className="om-disclosure-summary" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none", display: "flex", width: "100%" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
                       <span className="muted" style={{ cursor: "pointer" }}>
                         {coverToolsOpen ? "Close" : (coverUrl ? "Edit cover" : "Add cover")}
@@ -3022,7 +3022,7 @@ export default function BookDetailPage() {
                       )}
                     </div>
                   </summary>
-                  <div style={{ marginTop: 8 }}>
+                  <div style={{ marginTop: 0 }}>
                       {coverEditorSrc ? (
                         <div style={{ marginTop: 0 }}>
                           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
