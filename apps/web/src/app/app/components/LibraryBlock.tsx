@@ -69,7 +69,7 @@ export default function LibraryBlock({
               background: "transparent",
               textDecoration: "none",
               cursor: busy || reorderMode ? "default" : "pointer",
-              transform: "translateY(1px)"
+              transform: "translateY(-2px)"
             }}
           >
             <span className="om-catalog-caret" data-collapsed={collapsed ? "true" : "false"} aria-hidden="true" />
@@ -83,9 +83,7 @@ export default function LibraryBlock({
                 flex: 1,
                 minWidth: 0,
                 flexWrap: "nowrap",
-                alignItems: "baseline",
-                borderBottom: "1px solid var(--border)",
-                paddingBottom: 9
+                alignItems: "baseline"
               }}
             >
               <input
@@ -105,8 +103,10 @@ export default function LibraryBlock({
                 style={{
                   minWidth: 180,
                   flex: 1,
-                  borderBottom: "none",
-                  paddingBottom: 0
+                  margin: 0,
+                  padding: "0 0 9px",
+                  border: "none",
+                  borderBottom: "1px solid var(--border)"
                 }}
               />
               {hasNameChanges ? (
@@ -119,7 +119,11 @@ export default function LibraryBlock({
                   </button>
                 </div>
               ) : null}
-              <button onClick={() => onDelete(libraryId)} disabled={busy} style={{ marginLeft: "auto" }}>
+              <button
+                onClick={() => onDelete(libraryId)}
+                disabled={busy}
+                style={{ marginLeft: "auto", paddingBottom: 9, borderBottom: "1px solid transparent" }}
+              >
                 Delete
               </button>
             </span>
@@ -129,15 +133,22 @@ export default function LibraryBlock({
                 <button
                   onClick={() => onStartEdit(libraryId, libraryName)}
                   className="om-library-edit-trigger"
-                  style={{ padding: 0, border: "none", background: "transparent", textDecoration: "none", textAlign: "left" }}
+                  style={{
+                    padding: "0 0 9px",
+                    border: "none",
+                    borderBottom: "1px solid transparent",
+                    background: "transparent",
+                    textDecoration: "none",
+                    textAlign: "left"
+                  }}
                   aria-label="Rename catalog"
                 >
                   {libraryName}
                 </button>
               ) : (
-                <span>{libraryName}</span>
+                <span style={{ paddingBottom: 9, borderBottom: "1px solid transparent" }}>{libraryName}</span>
               )}
-              <span className="muted" style={{ marginLeft: 12, whiteSpace: "nowrap" }}>
+              <span className="muted" style={{ marginLeft: 12, whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
                 {bookCount}&nbsp;&nbsp;book{bookCount === 1 ? "" : "s"}
               </span>
             </div>
@@ -145,12 +156,12 @@ export default function LibraryBlock({
         </div>
 
         {reorderMode ? (
-          <div className="row" style={{ gap: 10, marginLeft: 12 }}>
+          <div className="row" style={{ gap: 10, marginLeft: 12, alignItems: "baseline" }}>
             {index > 0 ? (
               <button
                 onClick={() => onMoveUp(libraryId)}
                 disabled={busy}
-                style={{ padding: 0, border: "none", background: "transparent", textDecoration: "underline" }}
+                style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", textDecoration: "underline" }}
               >
                 Move up
               </button>
@@ -159,7 +170,7 @@ export default function LibraryBlock({
               <button
                 onClick={() => onMoveDown(libraryId)}
                 disabled={busy}
-                style={{ padding: 0, border: "none", background: "transparent", textDecoration: "underline" }}
+                style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", textDecoration: "underline" }}
               >
                 Move down
               </button>
