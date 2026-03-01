@@ -2211,6 +2211,7 @@ export default function BookDetailPage() {
       }
 
       setMergePanelOpen(false);
+      setMergeSelections({});
       await refresh();
       setMergeState({ busy: false, error: null, message: "Merged" });
       window.setTimeout(() => setMergeState({ busy: false, error: null, message: null }), 1500);
@@ -2245,15 +2246,34 @@ export default function BookDetailPage() {
           <div className="om-book-detail-grid" style={{ marginTop: 10, gap: 14 }}>
             <div style={{ gridColumn: "1 / -1" }}>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: 10 }}>
-                {isOwner && mergePanelOpen ? (
-                  <span className="muted">Add missing fields from the community.</span>
+                {/* Left side — shown when editing or merge panel is open */}
+                {isOwner && (editMode || mergePanelOpen) ? (
+                  <div className="row" style={{ gap: 16, alignItems: "baseline", flexWrap: "nowrap" }}>
+                    {updatesCount > 0 ? (
+                      <button
+                        onClick={() => { cancelEditMode(); setFindMoreOpen(false); setMergePanelOpen((v) => !v); }}
+                        className={mergePanelOpen ? "" : "muted"}
+                        style={{ whiteSpace: "nowrap" }}
+                      >
+                        <span>Updates available</span><span style={{ marginLeft: "0.5em" }}>{updatesCount}</span>
+                      </button>
+                    ) : null}
+                    <button
+                      onClick={() => { if (!findMoreOpen) { cancelEditMode(); setMergePanelOpen(false); } setFindMoreOpen((v) => !v); }}
+                      className="muted"
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      Find more info
+                    </button>
+                  </div>
                 ) : (
                   <span />
                 )}
 
-                <div className="row" style={{ gap: 20, alignItems: "baseline", flexWrap: "nowrap", justifyContent: "flex-end", marginLeft: "auto" }}>
-                  {isOwner ? (
-                    editMode ? (
+                {/* Right side */}
+                {isOwner ? (
+                  <div className="row" style={{ gap: 20, alignItems: "baseline", flexWrap: "nowrap", justifyContent: "flex-end" }}>
+                    {editMode ? (
                       <>
                         <button onClick={doneEditMode} disabled={busy || saveState.busy}>
                           Save
@@ -2261,28 +2281,9 @@ export default function BookDetailPage() {
                         <button onClick={cancelEditMode} disabled={busy || saveState.busy} className="muted">
                           Cancel
                         </button>
-                        {updatesCount > 0 ? (
-                          <button
-                            onClick={() => { cancelEditMode(); setFindMoreOpen(false); setMergePanelOpen(true); }}
-                            className="muted"
-                            style={{ whiteSpace: "nowrap" }}
-                          >
-                            <span>Updates available</span><span style={{ marginLeft: "0.5em" }}>{updatesCount}</span>
-                          </button>
-                        ) : null}
-                        <button
-                          onClick={() => { if (!findMoreOpen) { cancelEditMode(); setMergePanelOpen(false); } setFindMoreOpen((v) => !v); }}
-                          className="muted"
-                          style={{ whiteSpace: "nowrap" }}
-                        >
-                          Find more info
-                        </button>
                       </>
                     ) : mergePanelOpen ? (
                       <>
-                        <button onClick={enterEditMode} disabled={busy}>
-                          Edit
-                        </button>
                         <button
                           onClick={() => {
                             const sels: Record<string, string | null> = {};
@@ -2311,39 +2312,25 @@ export default function BookDetailPage() {
                         <button onClick={() => setMergePanelOpen(false)} className="muted" style={{ whiteSpace: "nowrap" }}>
                           Close
                         </button>
-                        <button
-                          onClick={() => { if (!findMoreOpen) setMergePanelOpen(false); setFindMoreOpen((v) => !v); }}
-                          className="muted"
-                          style={{ whiteSpace: "nowrap" }}
-                        >
-                          Find more info
-                        </button>
                       </>
                     ) : (
                       <>
+                        {updatesCount > 0 ? (
+                          <span
+                            onClick={() => { setFindMoreOpen(false); setMergePanelOpen(true); }}
+                            className="muted"
+                            style={{ cursor: "pointer", whiteSpace: "nowrap" }}
+                          >
+                            {updatesCount}
+                          </span>
+                        ) : null}
                         <button onClick={enterEditMode} disabled={busy}>
                           Edit
                         </button>
-                        {updatesCount > 0 ? (
-                          <button
-                            onClick={() => { cancelEditMode(); setFindMoreOpen(false); setMergePanelOpen(true); }}
-                            className="muted"
-                            style={{ whiteSpace: "nowrap" }}
-                          >
-                            <span>Updates available</span><span style={{ marginLeft: "0.5em" }}>{updatesCount}</span>
-                          </button>
-                        ) : null}
-                        <button
-                          onClick={() => { if (!findMoreOpen) { cancelEditMode(); setMergePanelOpen(false); } setFindMoreOpen((v) => !v); }}
-                          className="muted"
-                          style={{ whiteSpace: "nowrap" }}
-                        >
-                          Find more info
-                        </button>
                       </>
-                    )
-                  ) : null}
-                </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
               <div className="muted" style={{ marginTop: 6, textAlign: "right" }}>
                 {mergeState.message
