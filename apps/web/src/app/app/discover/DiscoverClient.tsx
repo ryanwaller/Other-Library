@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
-import PagedBookList from "../../components/PagedBookList";
+import PagedBookList from "../components/PagedBookList";
 
 type ResultRow = {
   user_book_id: number;
@@ -196,29 +196,4 @@ export default function DiscoverClient() {
               </div>
             ) : null}
 
-            {grouped.pub.length > 0 ? (
-              <div className="card" style={{ marginTop: 10 }}>
-                <div className="muted" style={{ marginBottom: 8 }}>Public</div>
-                <PagedBookList
-                  items={grouped.pub}
-                  viewMode="list"
-                  gridCols={4}
-                  searchQuery={q}
-                  renderItem={(r) => (
-                    <div key={`p-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
-                      <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
-                      <div className="muted">
-                        <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
-                        {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
-                      </div>
-                    </div>
-                  )}
-                />
-              </div>
-            ) : null}
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
+            {grouped.pub.len

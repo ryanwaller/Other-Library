@@ -352,6 +352,12 @@ export default function BookDetailPage() {
     error: null,
     message: null
   });
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
 
   const [facetDraft, setFacetDraft] = useState<Record<FacetRole, string[]>>({
     author: [],
@@ -1384,6 +1390,7 @@ export default function BookDetailPage() {
     setCoverCroppedArea(null);
     setSaveState({ busy: false, error: null, message: null });
     setEditMode(false);
+    setDeleteConfirm(false);
   }
 
   async function saveEdits(): Promise<boolean> {
@@ -1493,6 +1500,29 @@ export default function BookDetailPage() {
     await refresh();
     setSaveState({ busy: false, error: null, message: "Saved" });
     return true;
+  }
+
+  async function deleteBook() {
+    if (!supabase || !book || !userId) return;
+    if (book.owner_id !== userId) return;
+    setDeleteState({ busy: true, error: null, message: "Deleting…" });
+    try {
+      const paths = (book.media ?? [])
+        .map((m) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
+        .filter(Boolean);
+
+      if (paths.length > 0) {
+        await supabase.storage.from("user-book-media").remove(paths);
+      }
+
+      const { error: delErr } = await supabase.from("user_books").delete().eq("id", book.id);
+      if (delErr) throw new Error(delErr.message);
+
+      router.push("/app");
+    } catch (e: any) {
+      setDeleteState({ busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" });
+      setDeleteConfirm(false);
+    }
   }
 
   async function doneEditMode() {
@@ -2423,10 +2453,19 @@ export default function BookDetailPage() {
                 {isOwner ? (
                   <div className="row" style={{ gap: 12, alignItems: "baseline", flexWrap: "nowrap" }}>
                     {editMode ? (
-                      <>
-                        <button onClick={doneEditMode} disabled={busy || saveState.busy}>Save</button>
-                        <button onClick={cancelEditMode} disabled={busy || saveState.busy} className="muted">Cancel</button>
-                      </>
+                      deleteConfirm ? (
+                        <div className="row" style={{ gap: 12, alignItems: "baseline", flexWrap: "nowrap" }}>
+                          <span className="muted">Are you sure?</span>
+                          <button onClick={() => void deleteBook()} disabled={deleteState.busy}>Yes</button>
+                          <button onClick={() => setDeleteConfirm(false)} disabled={deleteState.busy} className="muted">No</button>
+                        </div>
+                      ) : (
+                        <>
+                          <button onClick={doneEditMode} disabled={busy || saveState.busy}>Save</button>
+                          <button onClick={cancelEditMode} disabled={busy || saveState.busy} className="muted">Cancel</button>
+                          <button onClick={() => setDeleteConfirm(true)} disabled={busy || saveState.busy} className="muted">Delete</button>
+                        </>
+                      )
                     ) : (
                       <button onClick={enterEditMode} disabled={busy}>Edit</button>
                     )}
