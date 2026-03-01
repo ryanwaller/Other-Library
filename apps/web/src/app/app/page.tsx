@@ -2121,7 +2121,7 @@ function AppShell({
             ) : null}
             <input
               className="om-inline-search-input"
-              placeholder="Search your catalog…"
+              placeholder="Search your catalog"
               value={searchQuery}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
@@ -2139,7 +2139,7 @@ function AppShell({
             </Link>
           ) : null}
         </div>
-        <div style={{ marginTop: 10 }} />
+        <div style={{ marginTop: 24 }} />
 
         {showAddPanel ? (
           <>
@@ -2173,7 +2173,7 @@ function AppShell({
         ) : null}
 
         {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || csvRows.length > 0) && libraries.length > 0 ? (
-          <div className="row" style={{ marginTop: 8, alignItems: "baseline", gap: 10 }}>
+          <div className="row" style={{ marginTop: 24, alignItems: "baseline", gap: 10 }}>
             <span className="muted">Add to catalog</span>
             {libraries.length > 1 ? (
               <select
@@ -2654,6 +2654,8 @@ function AppShell({
           }}
         />
 
+        <div style={{ marginTop: 24 }} />
+
         {libraries.map((lib, idx) => {
           const groups = displayGroupsByLibraryId[lib.id] ?? [];
           const isEditing = editingLibraryId === lib.id;
@@ -2702,7 +2704,7 @@ function AppShell({
 
         <hr className="om-hr" />
 
-        <div style={{ marginTop: 14 }} className="card">
+        <div style={{ marginTop: 24 }} className="card">
           <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, width: "100%", alignItems: "baseline" }}>
             <input
               placeholder="Add another catalog (e.g. Home, Office)"
@@ -2715,15 +2717,17 @@ function AppShell({
               }}
               style={{ minWidth: 0, flex: 1 }}
             />
-            <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy || !newLibraryName.trim()} style={{ marginLeft: "auto" }}>
-              Add
-            </button>
+            {newLibraryName.trim() ? (
+              <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy} style={{ marginLeft: "auto" }}>
+                Add
+              </button>
+            ) : null}
           </div>
           <div className="muted" style={{ marginTop: 4 }}>
             {libraryState.message ? (libraryState.error ? `${libraryState.message} (${libraryState.error})` : libraryState.message) : libraryState.error ?? ""}
           </div>
         </div>
-        <div style={{ height: 22 }} />
+        <div style={{ height: 24 }} />
       </div>
     </div>
   );
