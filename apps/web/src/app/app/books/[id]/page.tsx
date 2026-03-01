@@ -3002,7 +3002,7 @@ export default function BookDetailPage() {
                       <span className="muted" style={{ cursor: "pointer" }}>
                         {coverToolsOpen ? "Close" : (coverUrl ? "Edit cover" : "Add cover")}
                       </span>
-                      {coverUrl && (
+                      {coverToolsOpen && coverUrl && (
                         <label 
                           className="muted" 
                           style={{ cursor: "pointer", textDecoration: "underline" }}
@@ -3015,7 +3015,6 @@ export default function BookDetailPage() {
                             accept="image/*"
                             onChange={(ev) => {
                               setPendingCover((ev.target.files ?? [])[0] ?? null);
-                              if (!coverToolsOpen) setCoverToolsOpen(true);
                             }}
                             style={{ display: "none" }}
                           />
@@ -3038,7 +3037,7 @@ export default function BookDetailPage() {
                                   step={0.01}
                                   onChange={(e) => handleCropTrimWidthChange(e.target.value)}
                                   placeholder="W"
-                                  style={{ width: 48 }}
+                                  style={{ width: 68 }}
                                 />
                                 <span className="muted">×</span>
                                 <input
@@ -3048,7 +3047,7 @@ export default function BookDetailPage() {
                                   step={0.01}
                                   onChange={(e) => handleCropTrimHeightChange(e.target.value)}
                                   placeholder="H"
-                                  style={{ width: 48 }}
+                                  style={{ width: 68 }}
                                 />
                                 <select
                                   value={cropTrimUnit}
