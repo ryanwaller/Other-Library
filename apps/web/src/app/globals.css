@@ -529,6 +529,20 @@ input[type="range"] {
   border-bottom: none !important;
   outline: none !important;
   box-shadow: none !important;
+  margin-top: 2px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input[type="range"]::-moz-focus-outer {
+  border: 0;
+}
+
+input[type="range"]:focus,
+input[type="range"]:active,
+input[type="range"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
@@ -549,10 +563,12 @@ input[type="range"]::-webkit-slider-thumb {
   border: none;
   transition: background 0.1s ease;
   box-shadow: none !important;
+  outline: none !important;
 }
 
 input[type="range"]:active::-webkit-slider-thumb,
-input[type="range"]:focus::-webkit-slider-thumb {
+input[type="range"]:focus::-webkit-slider-thumb,
+input[type="range"]:focus-visible::-webkit-slider-thumb {
   background: #fff !important;
   outline: none !important;
   box-shadow: none !important;
@@ -573,10 +589,12 @@ input[type="range"]::-moz-range-thumb {
   border: none;
   transition: background 0.1s ease;
   box-shadow: none !important;
+  outline: none !important;
 }
 
 input[type="range"]:active::-moz-range-thumb,
-input[type="range"]:focus::-moz-range-thumb {
+input[type="range"]:focus::-moz-range-thumb,
+input[type="range"]:focus-visible::-moz-range-thumb {
   background: #fff !important;
   outline: none !important;
   box-shadow: none !important;
