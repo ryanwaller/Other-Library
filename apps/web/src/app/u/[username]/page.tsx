@@ -6,6 +6,7 @@ import FollowControls from "./FollowControls";
 import AddToLibraryButton from "./AddToLibraryButton";
 import AddToLibraryProvider from "./AddToLibraryProvider";
 import CoverImage, { type CoverCrop } from "../../../components/CoverImage";
+import PublicBookList from "./PublicBookList";
 
 export const dynamic = "force-dynamic";
 
@@ -98,105 +99,100 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     avatarUrl = signed.data?.signedUrl ?? null;
   }
 
-  const countsRes = await supabase.rpc("get_follow_counts", { target_username: usernameNorm });
-  const countsRow = Array.isArray(countsRes.data) ? (countsRes.data[0] as any) : ((countsRes.data as any) ?? null);
-  const followersCount = typeof countsRow?.followers_count === "number" ? (countsRow.followers_count as number) : null;
-  const followingCount = typeof countsRow?.following_count === "number" ? (countsRow.following_count as number) : null;
+  const followersCountRes = await supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("followee_id", profile.id).eq("status", "approved");
+  const followingCountRes = await supabase.from("follows").select("followee_id", { count: "exact", head: true }).eq("follower_id", profile.id).eq("status", "approved");
+  const followersCount = followersCountRes.count;
+  const followingCount = followingCountRes.count;
+
+  const librariesRes = await supabase.from("libraries").select("id,name").eq("owner_id", profile.id).order("created_at", { ascending: true });
+  const libraries = (librariesRes.data ?? []) as Array<{ id: number; name: string }>;
 
   const booksRes = await supabase
     .from("user_books")
-    .select(
-      "id,library_id,visibility,title_override,authors_override,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)"
-    )
+    .select("id,library_id,visibility,title_override,authors_override,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)")
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(1000);
 
-  const books = (booksRes.data ?? []) as unknown as PublicBook[];
+  const books = (booksRes.data ?? []) as any as PublicBook[];
+  const visibleBooks = books.filter((b) => {
+    if (b.visibility === "public") return true;
+    if (b.visibility === "followers_only") return false;
+    return profile.visibility === "public";
+  });
 
-  // Try to load visible libraries so we can group public books by catalog.
-  // Note: this requires a libraries select policy that allows viewing libraries
-  // when the viewer can see at least one book in that library.
-  const librariesRes = await supabase
-    .from("libraries")
-    .select("id,name,created_at")
-    .eq("owner_id", profile.id)
-    .order("created_at", { ascending: true });
+  const mediaPaths = Array.from(new Set([
+    ...visibleBooks.flatMap(b => b.media.map(m => m.storage_path)),
+    ...visibleBooks.filter(b => b.cover_crop && b.cover_original_url).map(b => b.cover_original_url as string)
+  ]));
 
-  const librariesRaw = (librariesRes.data ?? []) as Array<{ id: number; name: string; created_at: string }>;
-  const fallbackLibraries = Array.from(new Set(books.map((b) => Number(b.library_id)).filter((n) => Number.isFinite(n) && n > 0)))
-    .sort((a, b) => a - b)
-    .map((id) => ({ id, name: `Catalog ${id}`, created_at: new Date(0).toISOString() }));
-
-  const libraries = librariesRaw.length > 0 ? librariesRaw : fallbackLibraries;
-
-  const paths = Array.from(
-    new Set([
-      ...books
-        .flatMap((b) => (Array.isArray(b.media) ? b.media : []))
-        .filter((m) => m?.kind === "cover")
-        .filter((m) => typeof m.storage_path === "string" && m.storage_path.length > 0)
-        .map((m) => m.storage_path),
-      ...books
-        .filter((b) => b.cover_crop && typeof b.cover_original_url === "string" && b.cover_original_url)
-        .map((b) => b.cover_original_url as string)
-    ])
-  );
-
-  const signedMap: Record<string, string> = {};
-  if (paths.length > 0) {
-    const signedRes = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 30);
-    for (const s of signedRes.data ?? []) {
-      if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;
+  let signedMap: Record<string, string> = {};
+  if (mediaPaths.length > 0) {
+    const signed = await supabase.storage.from("user-book-media").createSignedUrls(mediaPaths, 60 * 60);
+    if (signed.data) {
+      for (const s of signed.data) {
+        if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;
+      }
     }
   }
 
-  const groupedMap = new Map<string, { copies: PublicBook[] }>();
-  for (const b of books) {
-    // Keep libraries separate: the same edition can exist in multiple libraries.
-    const key = `${b.library_id}:${groupKeyFor(b)}`;
-    const cur = groupedMap.get(key);
-    if (!cur) groupedMap.set(key, { copies: [b] });
-    else cur.copies.push(b);
+  const byKey = new Map<string, PublicBook[]>();
+  for (const b of visibleBooks) {
+    const key = groupKeyFor(b);
+    const cur = byKey.get(key);
+    if (!cur) byKey.set(key, [b]);
+    else cur.push(b);
   }
-  const groupedBooks = Array.from(groupedMap.values()).map((g) => {
-    const primary = g.copies[0];
-    return { primary, copies: g.copies };
-  });
-  const editionIds = Array.from(new Set(groupedBooks.map((g) => g.primary.edition?.id).filter(Boolean))) as number[];
 
-  const groupsByLibraryId = new Map<number, typeof groupedBooks>();
+  type CatalogGroup = { key: string; libraryId: number; primary: PublicBook; copies: PublicBook[] };
+  const groupedBooks: CatalogGroup[] = Array.from(byKey.entries()).map(([key, copies]) => {
+    const primary = copies.slice().sort((a, b) => {
+      const score = (x: PublicBook) => {
+        let s = 0;
+        if (x.media.some(m => m.kind === 'cover')) s += 1000;
+        if (x.edition?.cover_url) s += 150;
+        return s;
+      };
+      return score(b) - score(a);
+    })[0]!;
+    return { key, libraryId: primary.library_id, primary, copies };
+  });
+
+  const groupsByLibraryId = new Map<number, CatalogGroup[]>();
   for (const g of groupedBooks) {
-    const libId = Number(g.primary.library_id);
-    if (!Number.isFinite(libId) || libId <= 0) continue;
-    const cur = groupsByLibraryId.get(libId);
-    if (!cur) groupsByLibraryId.set(libId, [g]);
-    else cur.push(g);
+    const list = groupsByLibraryId.get(g.libraryId) ?? [];
+    list.push(g);
+    groupsByLibraryId.set(g.libraryId, list);
   }
 
   const showLibraryBlocks = libraries.length > 1;
+  const editionIds = Array.from(new Set(visibleBooks.map(b => b.edition?.id).filter(Boolean))) as number[];
 
   return (
     <main className="container">
       <div className="card">
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <div className="om-avatar-lockup">
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+          <div className="row" style={{ gap: 12, alignItems: "center" }}>
             {avatarUrl ? (
-              <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar" className="om-avatar-link">
+              <div style={{ width: 48, height: 48, borderRadius: 999, overflow: "hidden", border: "1px solid var(--border)" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-public" />
-              </a>
-            ) : null}
-            <div>{profile.username}</div>
+                <img alt="" src={avatarUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+            ) : (
+              <div style={{ width: 48, height: 48, borderRadius: 999, border: "1px solid var(--border)", background: "var(--bg-muted)" }} />
+            )}
+            <div>
+              <div style={{ fontSize: "1.1em", fontWeight: 600 }}>{profile.display_name || `@${profile.username}`}</div>
+              {profile.display_name ? <div className="muted">@{profile.username}</div> : null}
+            </div>
           </div>
-          <div className="muted">{profile.visibility}</div>
         </div>
-        {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
-        <div className="row muted" style={{ marginTop: 8, justifyContent: "flex-start", alignItems: "baseline", gap: 18, flexWrap: "wrap" }}>
-          <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
+
+        <div className="row muted" style={{ marginTop: 12, gap: 16 }}>
+          <Link href={`/u/${profile.username}/followers`} className="muted">
             Followers <span style={{ marginInline: 10 }}>{followersCount ?? "—"}</span>
           </Link>
-          <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
+          <Link href={`/u/${profile.username}/following`} className="muted">
             Following <span style={{ marginInline: 10 }}>{followingCount ?? "—"}</span>
           </Link>
           <FollowControls profileId={profile.id} profileUsername={profile.username} inline />
@@ -216,116 +212,30 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               if (groups.length === 0) return null;
               return (
                 <div key={lib.id} className="card">
-                  <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
                     <div>{lib.name}</div>
                     <div className="muted">
                       {groups.length} book{groups.length === 1 ? "" : "s"}
                     </div>
                   </div>
-                  <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                    {groups.map((g) => {
-                      const b = g.primary;
-                      const e = b.edition;
-                      const title = effectiveTitleFor(b);
-                      const effectiveAuthors = effectiveAuthorsFor(b);
-                      const coverUrl =
-                        g.copies
-                          .map((c) => {
-                            const cover = (c.media ?? []).find((m) => m.kind === "cover");
-                            if (!cover) return null;
-                            return signedMap[cover.storage_path] ?? null;
-                          })
-                          .find(Boolean) ?? e?.cover_url ?? null;
-                      const cropData = b.cover_crop ?? null;
-                      const imageSrc = cropData && b.cover_original_url ? (signedMap[b.cover_original_url] ?? coverUrl) : coverUrl;
-                      const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
-                      return (
-                        <div key={b.id} className="om-book-card">
-                          <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                            <span className="muted">{g.copies.length > 1 ? `(${g.copies.length})` : ""}</span>
-                            <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "nowrap" }}>
-                              <AddToLibraryButton
-                                editionId={e?.id ?? null}
-                                titleFallback={title}
-                                authorsFallback={effectiveAuthors}
-                                sourceOwnerId={profile.id}
-                                compact
-                              />
-                            </div>
-                          </div>
-                          <Link href={href} style={{ display: "block", marginTop: 6 }} className="om-book-card-link">
-                            <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
-                              <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
-                            </div>
-                          </Link>
-                          <div style={{ marginTop: 8 }}>
-                            <Link href={href}>{title}</Link>
-                          </div>
-                          <div className="om-book-secondary">
-                            {effectiveAuthors.length > 0 ? (
-                              effectiveAuthors.map((a, idx) => (
-                                <span key={a}>
-                                  <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                                  {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                                </span>
-                              ))
-                            ) : "—"}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <PublicBookList
+                    groups={groups}
+                    username={profile.username}
+                    profileId={profile.id}
+                    signedMap={signedMap}
+                  />
                 </div>
               );
             })}
           </div>
         ) : (
-          <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-            {groupedBooks.map((g) => {
-              const b = g.primary;
-              const e = b.edition;
-              const title = effectiveTitleFor(b);
-              const effectiveAuthors = effectiveAuthorsFor(b);
-              const coverUrl =
-                g.copies
-                  .map((c) => {
-                    const cover = (c.media ?? []).find((m) => m.kind === "cover");
-                    if (!cover) return null;
-                    return signedMap[cover.storage_path] ?? null;
-                  })
-                  .find(Boolean) ?? e?.cover_url ?? null;
-              const cropData = b.cover_crop ?? null;
-              const imageSrc = cropData && b.cover_original_url ? (signedMap[b.cover_original_url] ?? coverUrl) : coverUrl;
-              const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
-              return (
-                <div key={b.id} className="om-book-card">
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                    <span className="muted">{g.copies.length > 1 ? `(${g.copies.length})` : ""}</span>
-                    <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "nowrap" }}>
-                      <AddToLibraryButton editionId={e?.id ?? null} titleFallback={title} authorsFallback={effectiveAuthors} sourceOwnerId={profile.id} compact />
-                    </div>
-                  </div>
-                  <Link href={href} style={{ display: "block", marginTop: 6 }} className="om-book-card-link">
-                    <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
-                      <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
-                    </div>
-                  </Link>
-                  <div style={{ marginTop: 8 }}>
-                    <Link href={href}>{title}</Link>
-                  </div>
-                  <div className="om-book-secondary">
-                    {effectiveAuthors.length > 0 ? (
-                      effectiveAuthors.map((a, idx) => (
-                        <span key={a}>
-                          <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                          {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                        </span>
-                      ))
-                    ) : "—"}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="card" style={{ marginTop: 14 }}>
+            <PublicBookList
+              groups={groupedBooks}
+              username={profile.username}
+              profileId={profile.id}
+              signedMap={signedMap}
+            />
           </div>
         )}
       </AddToLibraryProvider>

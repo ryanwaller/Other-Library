@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
+import PagedBookList from "../../components/PagedBookList";
 
 type ResultRow = {
   user_book_id: number;
@@ -131,64 +132,88 @@ export default function DiscoverClient() {
           </div>
 
           <div style={{ marginTop: 12 }}>
-            {rows.length === 0 && q.trim() ? <div className="muted">No results.</div> : null}
+            {rows.length === 0 && q.trim() && !busy ? <div className="muted">No results.</div> : null}
 
             {grouped.mine.length > 0 ? (
               <div className="card" style={{ marginTop: 10 }}>
-                <div className="muted">Your catalog</div>
-                {grouped.mine.map((r) => (
-                  <div key={`mine-${r.user_book_id}`} style={{ marginTop: 8 }}>
-                    <Link href={`/app/books/${r.user_book_id}`}>{r.title}</Link>
-                    <div className="muted">
-                      {r.authors?.length ? r.authors.join(", ") : ""} {r.isbn13 ? `· ${r.isbn13}` : ""}
+                <div className="muted" style={{ marginBottom: 8 }}>Your catalog</div>
+                <PagedBookList
+                  items={grouped.mine}
+                  viewMode="list"
+                  gridCols={4}
+                  searchQuery={q}
+                  renderItem={(r) => (
+                    <div key={`mine-${r.user_book_id}`} style={{ marginTop: 8 }}>
+                      <Link href={`/app/books/${r.user_book_id}`}>{r.title}</Link>
+                      <div className="muted">
+                        {r.authors?.length ? r.authors.join(", ") : ""} {r.isbn13 ? `· ${r.isbn13}` : ""}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )}
+                />
               </div>
             ) : null}
 
             {grouped.following.length > 0 ? (
               <div className="card" style={{ marginTop: 10 }}>
-                <div className="muted">People you follow</div>
-                {grouped.following.map((r) => (
-                  <div key={`f-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
-                    <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
-                    <div className="muted">
-                      <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
-                      {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
+                <div className="muted" style={{ marginBottom: 8 }}>People you follow</div>
+                <PagedBookList
+                  items={grouped.following}
+                  viewMode="list"
+                  gridCols={4}
+                  searchQuery={q}
+                  renderItem={(r) => (
+                    <div key={`f-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
+                      <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
+                      <div className="muted">
+                        <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
+                        {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )}
+                />
               </div>
             ) : null}
 
             {grouped.second.length > 0 ? (
               <div className="card" style={{ marginTop: 10 }}>
-                <div className="muted">2nd-degree (public)</div>
-                {grouped.second.map((r) => (
-                  <div key={`s-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
-                    <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
-                    <div className="muted">
-                      <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
-                      {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
+                <div className="muted" style={{ marginBottom: 8 }}>2nd-degree (public)</div>
+                <PagedBookList
+                  items={grouped.second}
+                  viewMode="list"
+                  gridCols={4}
+                  searchQuery={q}
+                  renderItem={(r) => (
+                    <div key={`s-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
+                      <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
+                      <div className="muted">
+                        <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
+                        {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )}
+                />
               </div>
             ) : null}
 
             {grouped.pub.length > 0 ? (
               <div className="card" style={{ marginTop: 10 }}>
-                <div className="muted">Public</div>
-                {grouped.pub.map((r) => (
-                  <div key={`p-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
-                    <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
-                    <div className="muted">
-                      <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
-                      {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
+                <div className="muted" style={{ marginBottom: 8 }}>Public</div>
+                <PagedBookList
+                  items={grouped.pub}
+                  viewMode="list"
+                  gridCols={4}
+                  searchQuery={q}
+                  renderItem={(r) => (
+                    <div key={`p-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
+                      <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
+                      <div className="muted">
+                        <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
+                        {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )}
+                />
               </div>
             ) : null}
           </div>

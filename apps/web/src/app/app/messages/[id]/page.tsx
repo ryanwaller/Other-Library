@@ -71,6 +71,7 @@ export default function MessageThreadPage() {
   const [sendState, setSendState] = useState<{ busy: boolean; error: string | null; message: string | null }>({ busy: false, error: null, message: null });
   const [statusState, setStatusState] = useState<{ busy: boolean; error: string | null; message: string | null }>({ busy: false, error: null, message: null });
   const [markedReadForId, setMarkedReadForId] = useState<number | null>(null);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -173,7 +174,10 @@ export default function MessageThreadPage() {
   }
 
   useEffect(() => {
-    refresh();
+    (async () => {
+      await refresh();
+      setInitialLoadDone(true);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, requestId]);
 
@@ -260,6 +264,8 @@ export default function MessageThreadPage() {
       </main>
     );
   }
+
+  if (!initialLoadDone) return null;
 
   const other = otherUserId ? profilesById[otherUserId] : null;
   const otherAvatarUrl = otherUserId ? avatarUrlByUserId[otherUserId] ?? null : null;
