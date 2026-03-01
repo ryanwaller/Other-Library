@@ -28,6 +28,8 @@ export default function HomeClient() {
         <div className="row" style={{ alignItems: "flex-start" }}>
           <div style={{ flex: "1 1 320px" }}>
             <SignInCard note="Existing users: sign in." redirectTo="/app" />
+          </div>
+
           <div style={{ flex: "1 1 320px" }} className="card">
             <div style={{ marginBottom: 8 }}>I have an invite</div>
             <div className="row" style={{ marginTop: 8, alignItems: "baseline" }}>
@@ -59,13 +61,11 @@ export default function HomeClient() {
               <input value={waitNote} onChange={(e) => setWaitNote(e.target.value)} placeholder="Note (optional)" style={{ flex: 1 }} />
               <button
                 onClick={async () => {
-          ...
-              }}
-                disabled={waitState.busy || !waitEmail.trim()}
-              >
-                {waitState.busy ? "Submitting…" : "Submit"}
-              </button>
-            </div>
+                  const email = waitEmail.trim();
+                  if (!email) return;
+                  setWaitState({ busy: true, error: null, message: null });
+                  try {
+                    const res = await fetch("/api/waitlist", {
                       method: "POST",
                       headers: { "content-type": "application/json" },
                       body: JSON.stringify({ email, note: waitNote })
