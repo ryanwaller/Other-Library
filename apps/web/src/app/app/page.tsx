@@ -124,7 +124,8 @@ function AppShell({
   filterSubject,
   filterPublisher,
   filterCategory,
-  openCsvPicker
+  openCsvPicker,
+  openAddPanel
 }: {
   session: Session;
   filterTag: string | null;
@@ -133,6 +134,7 @@ function AppShell({
   filterPublisher: string | null;
   filterCategory: string | null;
   openCsvPicker: boolean;
+  openAddPanel: boolean;
 }) {
   const router = useRouter();
   const tagButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -318,13 +320,18 @@ function AppShell({
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   useEffect(() => {
+    if (!openAddPanel) return;
+    setAddOpen(true);
+  }, [openAddPanel]);
+
+  useEffect(() => {
     if (!openCsvPicker) return;
     if (csvAutoOpenDoneRef.current) return;
     csvAutoOpenDoneRef.current = true;
     setAddOpen(true);
     window.setTimeout(() => {
       csvInputRef.current?.click();
-    }, 0);
+    }, 40);
   }, [openCsvPicker]);
 
   useEffect(() => {
@@ -2177,7 +2184,15 @@ function AppShell({
               }}
               style={{ minWidth: 0, flex: 1 }}
             />
-            <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
+          <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="muted"
+                onClick={() => csvInputRef.current?.click()}
+                disabled={csvImportState.busy || addState.busy || addSearchState.busy}
+              >
+                Add CSV
+              </button>
               {(addInput.trim() || addInputFocused) ? (
                 <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
                   {addState.busy ? "Working…" : "Go"}
@@ -2449,15 +2464,24 @@ function AppShell({
               }}
               onMoveUp={(id) => moveLibrary(id, -1)}
               onMoveDown={(id) => moveLibrary(id, 1)}
-            >
-              {groups.length === 0 ? (
-                <div className="muted" style={{ marginTop: 10 }}>
-                  No books yet.
-                </div>
-              ) : (
-                <div style={{ marginTop: 10, ...booksContainerStyle }}>{groups.map(renderGroup)}</div>
-              )}
-            </LibraryBlock>
+              viewMode={viewMode}
+              gridCols={gridCols}
+              searchQuery={searchQuery}
+              renderBooks={(limit) => {
+                if (groups.length === 0) {
+                  return (
+                    <div className="muted" style={{ marginTop: 10 }}>
+                      No books yet.
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{ marginTop: 10, ...booksContainerStyle }}>
+                    {groups.slice(0, limit).map(renderGroup)}
+                  </div>
+                );
+              }}
+            />
             {idx < libraries.length - 1 ? <hr className="om-hr" /> : null}
           </div>
         );
@@ -2530,6 +2554,7 @@ function AppWithFilters({ session }: { session: Session }) {
   const filterSubject = searchParams.get("subject");
   const filterPublisher = searchParams.get("publisher");
   const filterCategory = searchParams.get("category");
+  const openAddPanel = searchParams.get("add") === "1";
   const openCsvPicker = searchParams.get("csv") === "1";
   return (
     <AppShell
@@ -2539,6 +2564,7 @@ function AppWithFilters({ session }: { session: Session }) {
       filterSubject={filterSubject}
       filterPublisher={filterPublisher}
       filterCategory={filterCategory}
+      openAddPanel={openAddPanel}
       openCsvPicker={openCsvPicker}
     />
   );

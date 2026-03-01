@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, useMemo, type ReactNode, useEffect } from "react";
 
 export default function LibraryBlock({
   libraryId,
@@ -22,7 +22,10 @@ export default function LibraryBlock({
   onToggleCollapsed,
   onMoveUp,
   onMoveDown,
-  children
+  viewMode,
+  gridCols,
+  searchQuery,
+  renderBooks
 }: {
   libraryId: number;
   libraryName: string;
@@ -43,9 +46,28 @@ export default function LibraryBlock({
   onToggleCollapsed: (libraryId: number) => void;
   onMoveUp: (libraryId: number) => void;
   onMoveDown: (libraryId: number) => void;
-  children: ReactNode;
+  viewMode: "grid" | "list";
+  gridCols: number;
+  searchQuery: string;
+  renderBooks: (limit: number) => ReactNode;
 }) {
   const hasNameChanges = nameDraft.trim() !== libraryName.trim();
+
+  // Calculate the initial visible limit based on the layout
+  const initialLimit = useMemo(() => {
+    if (viewMode === "list") return 24;
+    if (gridCols === 2) return 24; // 12 rows * 2
+    if (gridCols === 8) return 32; // 4 rows * 8
+    return 16; // Default (grid of 4): 4 rows * 4
+  }, [viewMode, gridCols]);
+
+  const [limit, setLimit] = useState(initialLimit);
+
+  // Reset limit when layout changes or search query changes
+  useEffect(() => {
+    setLimit(initialLimit);
+  }, [initialLimit, searchQuery]);
+
   return (
     <div className="card" style={{ marginTop: 14 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap" }}>
@@ -178,7 +200,18 @@ export default function LibraryBlock({
           </div>
         ) : null}
       </div>
-      {collapsed ? null : children}
+      {!collapsed && (
+        <>
+          {renderBooks(limit)}
+          {bookCount > limit && (
+            <div className="row" style={{ marginTop: 12, justifyContent: "center" }}>
+              <button onClick={() => setLimit((prev) => prev + initialLimit)} className="muted">
+                Load more
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
