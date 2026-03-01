@@ -2998,27 +2998,38 @@ export default function BookDetailPage() {
                   style={{ marginTop: 10, border: "none", outline: "none", boxShadow: "none" }}
                 >
                   <summary className="om-disclosure-summary" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none" }}>
-                    <span className="muted" style={{ cursor: "pointer" }}>{coverUrl ? "Edit cover" : "Add cover"}</span>
-                  </summary>
-                  <div style={{ marginTop: 8 }}>
-                      <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                        <label style={{ cursor: "pointer", textDecoration: "underline", minWidth: 110 }} className="muted">
-                          {coverUrl ? "Replace cover" : "Choose file"}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                      <span className="muted" style={{ cursor: "pointer" }}>
+                        {coverToolsOpen ? "Close" : (coverUrl ? "Edit cover" : "Add cover")}
+                      </span>
+                      {coverUrl && (
+                        <label 
+                          className="muted" 
+                          style={{ cursor: "pointer", textDecoration: "underline" }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Replace
                           <input
                             key={coverInputKey}
                             type="file"
                             accept="image/*"
-                            onChange={(ev) => setPendingCover((ev.target.files ?? [])[0] ?? null)}
+                            onChange={(ev) => {
+                              setPendingCover((ev.target.files ?? [])[0] ?? null);
+                              if (!coverToolsOpen) setCoverToolsOpen(true);
+                            }}
                             style={{ display: "none" }}
                           />
                         </label>
-                      </div>
+                      )}
+                    </div>
+                  </summary>
+                  <div style={{ marginTop: 8 }}>
                       {coverEditorSrc ? (
                         <div style={{ marginTop: 0 }}>
                           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                            {/* Book size — crop-local state; syncs to metadata when a real unit is selected */}
-                            <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
-                              <div className="muted" style={{ minWidth: 110 }}>Book size</div>
+                            {/* Trim size — crop-local state; syncs to metadata when a real unit is selected */}
+                            <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                              <div className="muted" style={{ minWidth: 110 }}>Trim size</div>
                               <div className="row" style={{ gap: 6, alignItems: "center" }}>
                                 <input
                                   type="number"

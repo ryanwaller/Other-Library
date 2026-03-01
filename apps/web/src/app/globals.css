@@ -526,6 +526,9 @@ input[type="range"] {
   display: flex;
   align-items: center;
   width: 100%;
+  border-bottom: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
