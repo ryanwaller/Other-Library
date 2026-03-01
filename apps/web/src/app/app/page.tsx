@@ -144,6 +144,7 @@ function AppShell({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userBooksCount, setUserBooksCount] = useState<number | null>(null);
   const [addInput, setAddInput] = useState("");
+  const [addInputFocused, setAddInputFocused] = useState(false);
   const [addState, setAddState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -291,6 +292,7 @@ function AppShell({
   const [editingLibraryId, setEditingLibraryId] = useState<number | null>(null);
   const [libraryNameDraft, setLibraryNameDraft] = useState("");
   const [newLibraryName, setNewLibraryName] = useState("");
+  const [newLibraryFocused, setNewLibraryFocused] = useState(false);
   const [libraryState, setLibraryState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -1078,7 +1080,7 @@ function AppShell({
         domain: typeof json.domain === "string" ? json.domain : null,
         domain_kind: typeof json.domain_kind === "string" ? json.domain_kind : null
       });
-      setAddState({ busy: false, error: null, message: "Preview ready" });
+      setAddState({ busy: false, error: null, message: null });
     } catch (e: any) {
       setAddState({ busy: false, error: e?.message ?? "Import failed", message: "Import failed" });
     }
@@ -1107,7 +1109,7 @@ function AppShell({
         cover_url: typeof edition.cover_url === "string" ? edition.cover_url.trim() || null : null,
         sources: Array.from(new Set(["isbn", ...((edition.sources ?? []) as any[]).map((s: any) => String(s))])).filter(Boolean)
       });
-      setAddState({ busy: false, error: null, message: "Preview ready" });
+      setAddState({ busy: false, error: null, message: null });
     } catch (e: any) {
       setAddState({ busy: false, error: e?.message ?? "ISBN lookup failed", message: "ISBN lookup failed" });
     }
@@ -1121,7 +1123,7 @@ function AppShell({
       const json = await res.json();
       if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Search failed");
       setAddSearchResults((json.results ?? []) as any[]);
-      setAddSearchState({ busy: false, error: null, message: (json.results ?? []).length ? "Done" : "No results" });
+      setAddSearchState({ busy: false, error: null, message: null });
     } catch (e: any) {
       setAddSearchState({ busy: false, error: e?.message ?? "Search failed", message: "Search failed" });
     }
@@ -2094,41 +2096,18 @@ function AppShell({
 
       <div className="row" style={{ marginTop: 6, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
         <div className="row" style={{ gap: 12, alignItems: "baseline", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <button
-              type="button"
-              className={showAddPanel ? "text-primary" : "muted"}
-              onClick={() => {
-                setAddOpen((prev) => !prev);
-                setSortOpen(false);
-                closeTagMenu();
-                closeCategoryMenu();
-              }}
-            >
-              Add
-            </button>
-            {bulkMode ? (
-              <button
-                type="button"
-                className={reorderMode ? "text-primary" : "muted"}
-                style={{ marginTop: 4, textAlign: "left" }}
-                onClick={() => {
-                  setReorderMode((prev) => {
-                    const next = !prev;
-                    if (next) {
-                      setBulkSelectedKeys({});
-                      setBulkState({ busy: false, error: null, message: null });
-                      setSortOpen(false);
-                      setAddOpen(false);
-                    }
-                    return next;
-                  });
-                }}
-              >
-                Reorder
-              </button>
-            ) : null}
-          </div>
+          <button
+            type="button"
+            className={showAddPanel ? "text-primary" : "muted"}
+            onClick={() => {
+              setAddOpen((prev) => !prev);
+              setSortOpen(false);
+              closeTagMenu();
+              closeCategoryMenu();
+            }}
+          >
+            Add
+          </button>
           <button
             type="button"
             className={sortOpen ? "text-primary" : "muted"}
@@ -2185,6 +2164,8 @@ function AppShell({
             <input
               placeholder="Add by ISBN, URL, or title (optional: “by Author”)"
               value={addInput}
+              onFocus={() => setAddInputFocused(true)}
+              onBlur={() => setAddInputFocused(false)}
               onChange={(e) => setAddInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key !== "Enter") return;
@@ -2194,9 +2175,11 @@ function AppShell({
               style={{ minWidth: 0, flex: 1 }}
             />
             <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
-              <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
-                {addState.busy ? "Working…" : "Go"}
-              </button>
+              {(addInput.trim() || addInputFocused) ? (
+                <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
+                  {addState.busy ? "Working…" : "Go"}
+                </button>
+              ) : null}
               {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
                 <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
                   Cancel
@@ -2615,7 +2598,7 @@ function AppShell({
               busy={libraryState.busy}
               isEditing={isEditing}
               nameDraft={libraryNameDraft}
-              reorderMode={reorderMode}
+              reorderMode={bulkMode}
               manageMode={bulkMode}
               onStartEdit={beginEditLibrary}
               onNameDraftChange={setLibraryNameDraft}
@@ -2654,6 +2637,8 @@ function AppShell({
           <input
             placeholder="Add another catalog (e.g. Home, Office)"
             value={newLibraryName}
+            onFocus={() => setNewLibraryFocused(true)}
+            onBlur={() => setNewLibraryFocused(false)}
             onChange={(e) => setNewLibraryName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key !== "Enter") return;
@@ -2662,7 +2647,7 @@ function AppShell({
             }}
             style={{ minWidth: 0, flex: 1 }}
           />
-          {newLibraryName.trim() ? (
+          {(newLibraryName.trim() || newLibraryFocused) ? (
             <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy} style={{ marginLeft: "auto" }}>
               Add
             </button>
