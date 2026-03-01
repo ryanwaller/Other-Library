@@ -2156,6 +2156,25 @@ export default function BookDetailPage() {
         if (upd.error) throw new Error(upd.error.message);
       }
 
+      // Sync entity facets for merged fields — mirrors saveEdits (best-effort)
+      try {
+        const roleSyncs: Array<[FacetRole, string[]]> = [];
+        if (updates.authors_override) roleSyncs.push(["author", updates.authors_override]);
+        if (updates.editors_override) roleSyncs.push(["editor", updates.editors_override]);
+        if (updates.designers_override) roleSyncs.push(["designer", updates.designers_override]);
+        if (updates.subjects_override) roleSyncs.push(["subject", updates.subjects_override]);
+        if (updates.publisher_override) roleSyncs.push(["publisher", [updates.publisher_override]]);
+        if (updates.printer_override) roleSyncs.push(["printer", [updates.printer_override]]);
+        if (updates.materials_override) roleSyncs.push(["material", [updates.materials_override]]);
+        for (const [role, names] of roleSyncs) {
+          const rpc = await supabase.rpc("set_book_entities", { p_user_book_id: book.id, p_role: role, p_names: names });
+          if (rpc.error) {
+            const msg = (rpc.error.message ?? "").toLowerCase();
+            if (msg.includes("does not exist") || msg.includes("function") || msg.includes("unknown")) break;
+          }
+        }
+      } catch { /* ignore */ }
+
       // Media copy — driven by panel selections
       const includeCover  = selections["cover"]  != null;
       const includeImages = selections["images"] != null;

@@ -30,7 +30,8 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  async function ensureDefaultLibraryId(): Promise<number | null> {
+  async function ensureDefaultLibraryId(opts?: { forceFresh?: boolean }): Promise<number | null> {
+    const forceFresh = opts?.forceFresh === true;
     if (!supabase || !sessionUserId) {
       setDefaultLibraryId(null);
       return null;
@@ -38,19 +39,21 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
 
     const seen = new Set<number>();
     const candidateIds: number[] = [];
-    if (Number.isFinite(defaultLibraryId as number) && (defaultLibraryId as number) > 0) {
+    if (!forceFresh && Number.isFinite(defaultLibraryId as number) && (defaultLibraryId as number) > 0) {
       candidateIds.push(defaultLibraryId as number);
       seen.add(defaultLibraryId as number);
     }
-    try {
-      const raw = typeof window !== "undefined" ? window.localStorage.getItem("om_currentLibraryId") : null;
-      const parsed = raw ? Number(raw) : NaN;
-      if (Number.isFinite(parsed) && parsed > 0 && !seen.has(parsed)) {
-        candidateIds.push(parsed);
-        seen.add(parsed);
+    if (!forceFresh) {
+      try {
+        const raw = typeof window !== "undefined" ? window.localStorage.getItem("om_currentLibraryId") : null;
+        const parsed = raw ? Number(raw) : NaN;
+        if (Number.isFinite(parsed) && parsed > 0 && !seen.has(parsed)) {
+          candidateIds.push(parsed);
+          seen.add(parsed);
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
 
     for (const candidateId of candidateIds) {
@@ -164,7 +167,19 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
         payload.authors_override = (authorsFallback ?? []).filter(Boolean).length > 0 ? (authorsFallback ?? []).filter(Boolean) : null;
       }
 
-      const ins = await supabase.from("user_books").insert(payload).select("id").single();
+      let ins = await supabase.from("user_books").insert(payload).select("id").single();
+      if (ins.error) {
+        const isLibraryFk =
+          ((ins.error as any)?.code === "23503" || (ins.error as any)?.code === "P2003") &&
+          String((ins.error as any)?.message ?? "").includes("user_books_library_id_fkey");
+        if (isLibraryFk) {
+          const freshLibraryId = await ensureDefaultLibraryId({ forceFresh: true });
+          if (freshLibraryId) {
+            payload.library_id = freshLibraryId;
+            ins = await supabase.from("user_books").insert(payload).select("id").single();
+          }
+        }
+      }
       if (ins.error) throw new Error(ins.error.message);
       const id = (ins.data as any)?.id as number | undefined;
       if (!id) throw new Error("Add failed");
