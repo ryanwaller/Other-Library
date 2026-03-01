@@ -173,41 +173,41 @@ function toFullSizeImageUrl(url: string): string {
 
   try {
     const u = new URL(raw);
+    
     // Strip common resizing parameters
-    u.searchParams.delete("h");
-    u.searchParams.delete("w");
-    u.searchParams.delete("fit");
-    u.searchParams.delete("compress");
-    u.searchParams.delete("resize");
-    u.searchParams.delete("width");
-    u.searchParams.delete("height");
-    u.searchParams.delete("scale");
-    u.searchParams.delete("quality");
-    u.searchParams.delete("format");
+    const paramsToStrip = ["h", "w", "fit", "compress", "resize", "width", "height", "scale", "quality", "format", "op"];
+    paramsToStrip.forEach(p => u.searchParams.delete(p));
+
+    // Specific service handling
+    const host = u.hostname.toLowerCase();
 
     // Google Books
-    if (u.hostname.includes("googleusercontent.com") || u.hostname.includes("books.google.com")) {
-      u.searchParams.set("zoom", "0"); // zoom=0 is often the highest resolution
+    if (host.includes("googleusercontent.com") || host.includes("books.google.com")) {
+      u.searchParams.set("zoom", "0"); 
       u.searchParams.delete("edge");
     }
 
     // OpenLibrary
-    if (u.hostname.includes("covers.openlibrary.org")) {
-      // replace -S.jpg or -M.jpg with -L.jpg
-      u.pathname = u.pathname.replace(/-(S|M)\.jpg$/, "-L.jpg");
+    if (host.includes("covers.openlibrary.org")) {
+      u.pathname = u.pathname.replace(/-(S|M|small|medium)\.jpg$/i, "-L.jpg");
     }
 
     // Amazon
-    if (u.hostname.includes("amazon.com") || u.hostname.includes("ssl-images-amazon.com")) {
-      // Amazon URLs often have patterns like _SX_ or _SY_ or _SL_ followed by numbers.
-      // e.g. https://m.media-amazon.com/images/I/51abc.jpg._SL100_.jpg
-      // Removing everything between the last dot and the file extension can help.
-      u.pathname = u.pathname.replace(/\._[A-Z0-9,_-]+\./i, ".");
+    if (host.includes("amazon.com") || host.includes("ssl-images-amazon.com")) {
+      // Amazon thumbnails often have specific tags in the filename like ._SL160_ or ._SX100_
+      // We want to strip the entire ._... section before the extension
+      u.pathname = u.pathname.replace(/\._[A-Z0-9,_-]+\.(jpg|jpeg|png|gif|webp)$/i, ".$1");
+    }
+
+    // CloudFront / generic CDN thumbnails
+    if (u.searchParams.has("width") || u.searchParams.has("height")) {
+       u.searchParams.delete("width");
+       u.searchParams.delete("height");
     }
 
     raw = u.toString();
   } catch {
-    // ignore invalid URLs
+    // ignore
   }
 
   return toProxyImageUrl(raw);
@@ -2948,8 +2948,8 @@ export default function BookDetailPage() {
                     onRotationChange={setCoverRotation}
                     onCropComplete={(area, _pixels) => setCoverCroppedArea(area)}
                     showGrid={false}
-                    minZoom={0.1}
-                    objectFit="contain"
+                    minZoom={0.5}
+                    objectFit="cover"
                     classes={{
                       containerClassName: "om-cropper-container",
                       mediaClassName: "om-cropper-image"
