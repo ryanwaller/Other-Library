@@ -81,9 +81,7 @@ export default function LibraryBlock({
                 flex: 1,
                 minWidth: 0,
                 flexWrap: "nowrap",
-                alignItems: "baseline",
-                borderBottom: "1px solid var(--border)",
-                paddingBottom: 9
+                alignItems: "baseline"
               }}
             >
               <input
@@ -100,7 +98,7 @@ export default function LibraryBlock({
                   onSaveName(libraryId, nameDraft);
                 }}
                 autoFocus
-                style={{ minWidth: 220, flex: 1, borderBottom: "none", paddingBottom: 0 }}
+                style={{ minWidth: 220, flex: 1, transform: "translateY(-2px)" }}
               />
               {hasNameChanges ? (
                 <div className="row" style={{ gap: 24, alignItems: "baseline" }}>
