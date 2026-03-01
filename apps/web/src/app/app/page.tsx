@@ -1419,8 +1419,6 @@ function AppShell({
     };
     window.addEventListener("pointerdown", onPointerDownCapture, true);
 
-    // On mobile, focusing the search field can trigger viewport resize/scroll,
-    // which would immediately close the menu if we listened to those events.
     if (!isMobile) {
       const onScrollOrResize = () => closeTagMenu();
       window.addEventListener("scroll", onScrollOrResize);
@@ -1486,7 +1484,6 @@ function AppShell({
 
     const byKey = new Map<string, CatalogItem[]>();
     for (const it of filteredItems) {
-      // Keep each catalog ("library") independent: the same book can appear in multiple libraries.
       const key = `${it.library_id}:${groupKeyFor(it)}`;
       const cur = byKey.get(key);
       if (!cur) byKey.set(key, [it]);
@@ -1495,8 +1492,6 @@ function AppShell({
 
     let groups: CatalogGroup[] = Array.from(byKey.entries()).map(([key, copies]) => {
       const sorted = copies.slice().sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
-
-      // Pick a "primary" copy that best represents the group (prefer the one that actually has a cover/media).
       const primary = sorted
         .slice()
         .sort((a, b) => {
@@ -1577,21 +1572,11 @@ function AppShell({
       };
     });
 
-    if (tag) {
-      groups = groups.filter((g) => g.tagNames.some((t) => t.toLowerCase() === tag));
-    }
-    if (author) {
-      groups = groups.filter((g) => g.filterAuthors.some((a) => a.toLowerCase() === author));
-    }
-    if (subject) {
-      groups = groups.filter((g) => g.filterSubjects.some((s) => String(s).toLowerCase() === subject));
-    }
-    if (publisher) {
-      groups = groups.filter((g) => g.filterPublishers.some((p) => p.toLowerCase() === publisher));
-    }
-    if (categoryTag) {
-      groups = groups.filter((g) => g.categoryNames.some((t) => t.toLowerCase() === categoryTag));
-    }
+    if (tag) groups = groups.filter((g) => g.tagNames.some((t) => t.toLowerCase() === tag));
+    if (author) groups = groups.filter((g) => g.filterAuthors.some((a) => a.toLowerCase() === author));
+    if (subject) groups = groups.filter((g) => g.filterSubjects.some((s) => String(s).toLowerCase() === subject));
+    if (publisher) groups = groups.filter((g) => g.filterPublishers.some((p) => p.toLowerCase() === publisher));
+    if (categoryTag) groups = groups.filter((g) => g.categoryNames.some((t) => t.toLowerCase() === categoryTag));
     if (visibilityMode !== "all") {
       groups = groups.filter((g) => {
         const eff = g.effectiveVisibility;
@@ -1767,12 +1752,9 @@ function AppShell({
     setBulkState({ busy: true, error: null, message: "Copying…" });
     try {
       const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
-
       const srcRes = await supabase
         .from("user_books")
-        .select(
-          "id,edition_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes"
-        )
+        .select("id,edition_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes")
         .in("id", ids);
       if (srcRes.error) throw new Error(srcRes.error.message);
       const srcRows = (srcRes.data ?? []) as any[];
@@ -1804,35 +1786,30 @@ function AppShell({
       const idMap = new Map<number, number>();
       let copied = 0;
       for (const r of srcRows) {
-        const inserted = await supabase
-          .from("user_books")
-          .insert({
-            owner_id: userId,
-            library_id: targetLibraryId,
-            edition_id: (r as any).edition_id ?? null,
-            visibility: (r as any).visibility ?? "inherit",
-            status: (r as any).status ?? "owned",
-            borrowable_override: (r as any).borrowable_override ?? null,
-            borrow_request_scope_override: (r as any).borrow_request_scope_override ?? null,
-            title_override: (r as any).title_override ?? null,
-            authors_override: (r as any).authors_override ?? null,
-            editors_override: (r as any).editors_override ?? null,
-            designers_override: (r as any).designers_override ?? null,
-            subjects_override: (r as any).subjects_override ?? null,
-            publisher_override: (r as any).publisher_override ?? null,
-            printer_override: (r as any).printer_override ?? null,
-            materials_override: (r as any).materials_override ?? null,
-            edition_override: (r as any).edition_override ?? null,
-            publish_date_override: (r as any).publish_date_override ?? null,
-            description_override: (r as any).description_override ?? null,
-            location: (r as any).location ?? null,
-            shelf: (r as any).shelf ?? null,
-            notes: (r as any).notes ?? null
-          })
-          .select("id")
-          .single();
+        const inserted = await supabase.from("user_books").insert({
+          owner_id: userId,
+          library_id: targetLibraryId,
+          edition_id: (r as any).edition_id ?? null,
+          visibility: (r as any).visibility ?? "inherit",
+          status: (r as any).status ?? "owned",
+          borrowable_override: (r as any).borrowable_override ?? null,
+          borrow_request_scope_override: (r as any).borrow_request_scope_override ?? null,
+          title_override: (r as any).title_override ?? null,
+          authors_override: (r as any).authors_override ?? null,
+          editors_override: (r as any).editors_override ?? null,
+          designers_override: (r as any).designers_override ?? null,
+          subjects_override: (r as any).subjects_override ?? null,
+          publisher_override: (r as any).publisher_override ?? null,
+          printer_override: (r as any).printer_override ?? null,
+          materials_override: (r as any).materials_override ?? null,
+          edition_override: (r as any).edition_override ?? null,
+          publish_date_override: (r as any).publish_date_override ?? null,
+          description_override: (r as any).description_override ?? null,
+          location: (r as any).location ?? null,
+          shelf: (r as any).shelf ?? null,
+          notes: (r as any).notes ?? null
+        }).select("id").single();
         if (inserted.error) throw new Error(inserted.error.message);
-
         copied += 1;
         const newId = Number((inserted.data as any)?.id);
         const oldId = Number((r as any).id);
@@ -1841,37 +1818,26 @@ function AppShell({
         if (Number.isFinite(newId) && newId > 0 && tagIds.length > 0) {
           const rows = tagIds.map((tagId) => ({ user_book_id: newId, tag_id: tagId }));
           const insTags = await supabase.from("user_book_tags").insert(rows as any);
-          if (insTags.error) {
-            // continue; tags are optional
-          }
+          if (insTags.error) { }
         }
       }
 
-      // Copy media objects into the new user_book ids (server-side storage copy; avoids browser CORS).
       for (const [oldId, newId] of idMap.entries()) {
         const media = (mediaByBookId[oldId] ?? []).slice();
         if (media.length === 0) continue;
         media.sort((a, b) => (a.kind === "cover" ? -1 : 1) - (b.kind === "cover" ? -1 : 1));
-
         let coverCopied = false;
         for (const m of media) {
           try {
             const base = safeFileName(String(m.storage_path.split("/").pop() ?? "image"));
             const destPath = `${userId}/${newId}/${Date.now()}-${base}`;
-
             const copiedObj = await supabase.storage.from("user-book-media").copy(m.storage_path, destPath);
             if (copiedObj.error) continue;
-
             const kind: "cover" | "image" = m.kind === "cover" && !coverCopied ? "cover" : "image";
             if (kind === "cover") coverCopied = true;
-
             const ins = await supabase.from("user_book_media").insert({ user_book_id: newId, kind, storage_path: destPath, caption: m.caption ?? null });
-            if (ins.error) {
-              // ignore; still uploaded
-            }
-          } catch {
-            // ignore per-file errors
-          }
+            if (ins.error) { }
+          } catch { }
         }
       }
 
@@ -1896,16 +1862,8 @@ function AppShell({
       const [moved] = next.splice(idx, 1);
       next.splice(nextIdx, 0, moved);
       try {
-        window.localStorage.setItem(
-          "om_libraryOrder",
-          next
-            .map((l) => l.id)
-            .filter((n) => Number.isFinite(n) && n > 0)
-            .join(",")
-        );
-      } catch {
-        // ignore
-      }
+        window.localStorage.setItem("om_libraryOrder", next.map((l) => l.id).filter((n) => Number.isFinite(n) && n > 0).join(","));
+      } catch { }
       return next;
     });
   }
@@ -2040,600 +1998,654 @@ function AppShell({
 
   return (
     <div style={{ marginTop: 16 }}>
-        <input
-          ref={csvInputRef}
-          type="file"
-          accept=".csv,text/csv"
-          style={{ display: "none" }}
-          onChange={(e) => {
-            const f = (e.target.files ?? [])[0];
-            if (!f) return;
-            setCsvImportState({ busy: true, error: null, message: "Loading CSV…", done: 0, total: 0 });
-            loadCsvFile(f).catch((err: any) => {
-              setCsvImportState({ busy: false, error: err?.message ?? "CSV load failed", message: "CSV load failed", done: 0, total: 0 });
-            });
-          }}
-          disabled={csvImportState.busy || addState.busy || addSearchState.busy}
-        />
+      <input
+        ref={csvInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = (e.target.files ?? [])[0];
+          if (!f) return;
+          setCsvImportState({ busy: true, error: null, message: "Loading CSV…", done: 0, total: 0 });
+          loadCsvFile(f).catch((err: any) => {
+            setCsvImportState({ busy: false, error: err?.message ?? "CSV load failed", message: "CSV load failed", done: 0, total: 0 });
+          });
+        }}
+        disabled={csvImportState.busy || addState.busy || addSearchState.busy}
+      />
 
-        <div className="row" style={{ marginTop: 10, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-          <div className="row" style={{ gap: 12, alignItems: "baseline", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
-            <button
-              type="button"
-              className={showAddPanel ? "text-primary" : "muted"}
-              onClick={() => {
-                setAddOpen((prev) => !prev);
-                setSortOpen(false);
-                closeTagMenu();
-                closeCategoryMenu();
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <span className="muted">Catalogs</span>
+          <span>{libraries.length}</span>
+          <span className="muted">Books</span>
+          <span>{displayGroups.length}</span>
+          {bulkMode ? (
+            <>
+              <span className="muted">Selected</span>
+              <span>{bulkSelectedCount}</span>
+            </>
+          ) : null}
+          {libraryState.message ? <span className="muted">{libraryState.message}</span> : libraryState.error ? <span className="muted">{libraryState.error}</span> : null}
+        </div>
+        <div className="row muted" style={{ gap: 10, justifyContent: "flex-end" }}>
+          {(filterTag ?? tagMode) !== "all" || filterAuthor || filterSubject || filterPublisher || (filterCategory ?? categoryMode) !== "all" ? (
+            <>
+              {(() => {
+                const activeCategory = (filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : null;
+                const activeTag = (filterTag ?? tagMode) !== "all" ? String(filterTag ?? tagMode) : null;
+                const pairs: Array<{ label: string; value: string }> = [];
+                if (activeCategory) pairs.push({ label: "Category", value: activeCategory });
+                if (activeTag) pairs.push({ label: "Tag", value: activeTag });
+                if (filterAuthor) pairs.push({ label: "Author", value: filterAuthor });
+                if (filterSubject) pairs.push({ label: "Subject", value: filterSubject });
+                if (filterPublisher) pairs.push({ label: "Publisher", value: filterPublisher });
+                return pairs.length ? (
+                  <span style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
+                    {pairs.map((p) => (
+                      <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 6, alignItems: "baseline" }}>
+                        <span className="muted">{p.label}</span>
+                        <span style={{ color: "var(--fg)" }}>{p.value}</span>
+                      </span>
+                    ))}
+                  </span>
+                ) : null;
+              })()}{" "}
+              (
+              <button
+                type="button"
+                onClick={() => {
+                  setTagMode("all");
+                  setCategoryMode("all");
+                  setTagSearch("");
+                  setCategorySearch("");
+                  setSearchQuery("");
+                  setVisibilityMode("all");
+                  closeTagMenu();
+                  closeCategoryMenu();
+                  router.push("/app");
+                }}
+                style={{
+                  background: "transparent",
+                  border: 0,
+                  padding: 0,
+                  font: "inherit",
+                  color: "inherit",
+                  textDecoration: "underline",
+                  cursor: "pointer"
+                }}
+              >
+                clear
+              </button>
+              )
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 24 }} />
+
+      {libraries.map((lib, idx) => {
+        const groups = displayGroupsByLibraryId[lib.id] ?? [];
+        const isEditing = editingLibraryId === lib.id;
+        return (
+          <div key={lib.id}>
+            <LibraryBlock
+              libraryId={lib.id}
+              libraryName={lib.name}
+              bookCount={groups.length}
+              index={idx}
+              total={libraries.length}
+              busy={libraryState.busy}
+              isEditing={isEditing}
+              nameDraft={libraryNameDraft}
+              reorderMode={reorderMode}
+              manageMode={bulkMode}
+              onStartEdit={beginEditLibrary}
+              onNameDraftChange={setLibraryNameDraft}
+              onSaveName={saveLibraryName}
+              onCancelEdit={cancelEditLibrary}
+              onDelete={deleteLibrary}
+              collapsed={!!collapsedByLibraryId[lib.id]}
+              onToggleCollapsed={(id) => {
+                setCollapsedByLibraryId((prev) => {
+                  const next = { ...prev };
+                  if (next[id]) delete next[id];
+                  else next[id] = true;
+                  return next;
+                });
               }}
+              onMoveUp={(id) => moveLibrary(id, -1)}
+              onMoveDown={(id) => moveLibrary(id, 1)}
             >
+              {groups.length === 0 ? (
+                <div className="muted" style={{ marginTop: 10 }}>
+                  No books yet.
+                </div>
+              ) : (
+                <div style={{ marginTop: 10, ...booksContainerStyle }}>{groups.map(renderGroup)}</div>
+              )}
+            </LibraryBlock>
+            {idx < libraries.length - 1 ? <hr className="om-hr" /> : null}
+          </div>
+        );
+      })}
+
+      <hr className="om-hr" />
+
+      <div style={{ marginTop: 24 }} className="card">
+        <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, width: "100%", alignItems: "baseline" }}>
+          <input
+            placeholder="Add another catalog (e.g. Home, Office)"
+            value={newLibraryName}
+            onChange={(e) => setNewLibraryName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              createLibrary(newLibraryName);
+            }}
+            style={{ minWidth: 0, flex: 1 }}
+          />
+          {newLibraryName.trim() ? (
+            <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy} style={{ marginLeft: "auto" }}>
               Add
             </button>
-            <button
-              type="button"
-              className={sortOpen ? "text-primary" : "muted"}
-              onClick={() => {
-                setSortOpen((v) => !v);
+          ) : null}
+        </div>
+        <div className="muted" style={{ marginTop: 4 }}>
+          {libraryState.message ? (libraryState.error ? `${libraryState.message} (${libraryState.error})` : libraryState.message) : libraryState.error ?? ""}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 24 }} />
+
+      <div className="row" style={{ marginTop: 10, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+        <div className="row" style={{ gap: 12, alignItems: "baseline", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
+          <button
+            type="button"
+            className={showAddPanel ? "text-primary" : "muted"}
+            onClick={() => {
+              setAddOpen((prev) => !prev);
+              setSortOpen(false);
+              closeTagMenu();
+              closeCategoryMenu();
+            }}
+          >
+            Add
+          </button>
+          <button
+            type="button"
+            className={sortOpen ? "text-primary" : "muted"}
+            onClick={() => {
+              setSortOpen((v) => !v);
+              setAddOpen(false);
+              closeTagMenu();
+              closeCategoryMenu();
+            }}
+          >
+            Sort
+          </button>
+          <button
+            onClick={() => {
+              setBulkMode((prev) => {
+                const next = !prev;
+                if (!next) setBulkSelectedKeys({});
+                setBulkState({ busy: false, error: null, message: null });
+                setReorderMode(false);
+                setSortOpen(false);
                 setAddOpen(false);
                 closeTagMenu();
                 closeCategoryMenu();
-              }}
-            >
-              Sort
-            </button>
+                return next;
+              });
+            }}
+          >
+            {bulkMode ? "Done" : "Edit"}
+          </button>
+          {bulkMode ? (
             <button
+              type="button"
+              className={reorderMode ? "text-primary" : "muted"}
               onClick={() => {
-                setBulkMode((prev) => {
+                setReorderMode((prev) => {
                   const next = !prev;
-                  if (!next) setBulkSelectedKeys({});
-                  setBulkState({ busy: false, error: null, message: null });
-                  setReorderMode(false);
-                  setSortOpen(false);
-                  setAddOpen(false);
-                  closeTagMenu();
-                  closeCategoryMenu();
+                  if (next) {
+                    setBulkSelectedKeys({});
+                    setBulkState({ busy: false, error: null, message: null });
+                    setSortOpen(false);
+                    setAddOpen(false);
+                  }
                   return next;
                 });
               }}
             >
-              {bulkMode ? "Done" : "Edit"}
+              Reorder
             </button>
-            {bulkMode ? (
-              <button
-                type="button"
-                className={reorderMode ? "text-primary" : "muted"}
-                onClick={() => {
-                  setReorderMode((prev) => {
-                    const next = !prev;
-                    if (next) {
-                      setBulkSelectedKeys({});
-                      setBulkState({ busy: false, error: null, message: null });
-                      setSortOpen(false);
-                      setAddOpen(false);
-                    }
-                    return next;
-                  });
-                }}
-              >
-                Reorder
-              </button>
-            ) : null}
-            <input
-              className="om-inline-search-input"
-              placeholder="Search your catalog"
-              value={searchQuery}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
-            />
-          </div>
-          {(searchFocused || searchQuery.trim()) ? (
-            <Link
-              href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
-              className="muted"
-              style={{ whiteSpace: "nowrap", flex: "0 0 auto", marginTop: isMobile ? 6 : 0 }}
-            >
-              Search others
-            </Link>
           ) : null}
+          <input
+            className="om-inline-search-input"
+            placeholder="Search your catalog"
+            value={searchQuery}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
+          />
         </div>
-        <div style={{ marginTop: 24 }} />
+        {(searchFocused || searchQuery.trim()) ? (
+          <Link
+            href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
+            className="muted"
+            style={{ whiteSpace: "nowrap", flex: "0 0 auto", marginTop: isMobile ? 6 : 0 }}
+          >
+            Search others
+          </Link>
+        ) : null}
+      </div>
 
-        {showAddPanel ? (
-          <>
-            <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%", alignItems: "baseline" }}>
-              <input
-                placeholder="Add by ISBN, URL, or title (optional: “by Author”)"
-                value={addInput}
-                onChange={(e) => setAddInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
-                  smartAddOrSearch();
-                }}
-                style={{ minWidth: 0, flex: 1 }}
-              />
-              <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
-                <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
-                  {addState.busy ? "Working…" : "Go"}
+      {showAddPanel ? (
+        <>
+          <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%", alignItems: "baseline" }}>
+            <input
+              placeholder="Add by ISBN, URL, or title (optional: “by Author”)"
+              value={addInput}
+              onChange={(e) => setAddInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                smartAddOrSearch();
+              }}
+              style={{ minWidth: 0, flex: 1 }}
+            />
+            <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
+              <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
+                {addState.busy ? "Working…" : "Go"}
+              </button>
+              {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
+                <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
+                  Cancel
                 </button>
-                {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
-                  <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
-                    Cancel
-                  </button>
+              ) : null}
+            </div>
+          </div>
+          <div className="muted" style={{ marginTop: 4 }}>
+            {addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}
+          </div>
+        </>
+      ) : null}
+
+      {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || csvRows.length > 0) && libraries.length > 0 ? (
+        <div className="row" style={{ marginTop: 24, alignItems: "baseline", gap: 10 }}>
+          <span className="muted">Add to catalog</span>
+          {libraries.length > 1 ? (
+            <select
+              value={addLibraryId ?? ""}
+              onChange={(e) => {
+                const id = Number(e.target.value);
+                setAddLibraryId(id);
+                try {
+                  window.localStorage.setItem("om_addLibraryId", String(id));
+                } catch { }
+              }}
+              disabled={libraryState.busy || !addLibraryId}
+            >
+              {libraries.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="muted">{libraries[0]?.name}</span>
+          )}
+        </div>
+      ) : null}
+
+      {csvRows.length > 0 || csvImportState.message || csvImportState.error ? (
+        <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+          {csvRows.length > 0 ? (
+            <>
+              <label className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <input type="checkbox" checked={csvApplyOverrides} onChange={(e) => setCsvApplyOverrides(e.target.checked)} />
+                use CSV metadata as overrides
+              </label>
+              <button onClick={importCsvRows} disabled={csvImportState.busy || !addLibraryId}>
+                {csvImportState.busy ? "Importing…" : `Import ${csvRows.length}`}
+              </button>
+              <button onClick={clearCsvImport} disabled={csvImportState.busy}>
+                Clear
+              </button>
+            </>
+          ) : null}
+          {csvImportState.message ? <span className="muted">{csvImportState.message}</span> : csvImportState.error ? <span className="muted">{csvImportState.error}</span> : null}
+        </div>
+      ) : null}
+
+      {addUrlPreview ? (
+        <div style={{ marginTop: 10 }} className="card">
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+            <div style={{ width: 62, flex: "0 0 auto" }}>
+              {addUrlPreview.cover_url && !addPreviewCoverFailed ? (
+                <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
+                  <img
+                    src={`/api/image-proxy?url=${encodeURIComponent(addUrlPreview.cover_url)}`}
+                    alt=""
+                    width={60}
+                    height={90}
+                    style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                    onError={() => setAddPreviewCoverFailed(true)}
+                  />
+                </div>
+              ) : (
+                <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
+              )}
+            </div>
+            <div style={{ flex: "1 1 auto" }}>
+              <div>{(addUrlPreview.title ?? "").trim() || "—"}</div>
+              <div className="muted" style={{ marginTop: 4 }}>
+                {(addUrlPreview.authors ?? []).filter(Boolean).join(", ") || "—"}
+              </div>
+              <div className="muted" style={{ marginTop: 4 }}>
+                {[addUrlPreview.publisher ?? "", addUrlPreview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
+              </div>
+              <div className="muted" style={{ marginTop: 4 }}>
+                {addUrlPreview.isbn13 || addUrlPreview.isbn10 ? `ISBN: ${addUrlPreview.isbn13 ?? addUrlPreview.isbn10}` : "No ISBN found"}
+                {" "}
+                · sources: {(addUrlPreview.sources ?? []).join(", ") || "—"}
+              </div>
+              <div className="muted" style={{ marginTop: 4 }}>
+                {addUrlMeta.domain ? `${addUrlMeta.domain_kind ?? "generic"} · ${addUrlMeta.domain}` : ""}
+                {addUrlMeta.final_url ? (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <a href={addUrlMeta.final_url} target="_blank" rel="noreferrer">
+                      open
+                    </a>
+                  </>
                 ) : null}
               </div>
             </div>
-            <div className="muted" style={{ marginTop: 4 }}>
-              {addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}
-            </div>
-          </>
-        ) : null}
-
-        {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || csvRows.length > 0) && libraries.length > 0 ? (
-          <div className="row" style={{ marginTop: 24, alignItems: "baseline", gap: 10 }}>
-            <span className="muted">Add to catalog</span>
-            {libraries.length > 1 ? (
-              <select
-                value={addLibraryId ?? ""}
-                onChange={(e) => {
-                  const id = Number(e.target.value);
-                  setAddLibraryId(id);
-                  try {
-                    window.localStorage.setItem("om_addLibraryId", String(id));
-                  } catch {
-                    // ignore
-                  }
-                }}
-                disabled={libraryState.busy || !addLibraryId}
-              >
-                {libraries.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="muted">{libraries[0]?.name}</span>
-            )}
-          </div>
-        ) : null}
-
-        {csvRows.length > 0 || csvImportState.message || csvImportState.error ? (
-          <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-            {csvRows.length > 0 ? (
-              <>
-                <label className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <input type="checkbox" checked={csvApplyOverrides} onChange={(e) => setCsvApplyOverrides(e.target.checked)} />
-                  use CSV metadata as overrides
-                </label>
-                <button onClick={importCsvRows} disabled={csvImportState.busy || !addLibraryId}>
-                  {csvImportState.busy ? "Importing…" : `Import ${csvRows.length}`}
-                </button>
-                <button onClick={clearCsvImport} disabled={csvImportState.busy}>
-                  Clear
-                </button>
-              </>
-            ) : null}
-            {csvImportState.message ? <span className="muted">{csvImportState.message}</span> : csvImportState.error ? <span className="muted">{csvImportState.error}</span> : null}
-          </div>
-        ) : null}
-
-        {addUrlPreview ? (
-          <div style={{ marginTop: 10 }} className="card">
-            <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-              <div style={{ width: 62, flex: "0 0 auto" }}>
-                {addUrlPreview.cover_url && !addPreviewCoverFailed ? (
-                  <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`/api/image-proxy?url=${encodeURIComponent(addUrlPreview.cover_url)}`}
-                      alt=""
-                      width={60}
-                      height={90}
-                      style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
-                      onError={() => setAddPreviewCoverFailed(true)}
-                    />
-                  </div>
-                ) : (
-                  <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
-                )}
-              </div>
-              <div style={{ flex: "1 1 auto" }}>
-                <div>{(addUrlPreview.title ?? "").trim() || "—"}</div>
-                <div className="muted" style={{ marginTop: 4 }}>
-                  {(addUrlPreview.authors ?? []).filter(Boolean).join(", ") || "—"}
-                </div>
-                <div className="muted" style={{ marginTop: 4 }}>
-                  {[addUrlPreview.publisher ?? "", addUrlPreview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
-                </div>
-                <div className="muted" style={{ marginTop: 4 }}>
-                  {addUrlPreview.isbn13 || addUrlPreview.isbn10 ? `ISBN: ${addUrlPreview.isbn13 ?? addUrlPreview.isbn10}` : "No ISBN found"}
-                  {" "}
-                  · sources: {(addUrlPreview.sources ?? []).join(", ") || "—"}
-                </div>
-                <div className="muted" style={{ marginTop: 4 }}>
-                  {addUrlMeta.domain ? `${addUrlMeta.domain_kind ?? "generic"} · ${addUrlMeta.domain}` : ""}
-                  {addUrlMeta.final_url ? (
-                    <>
-                      {" "}
-                      ·{" "}
-                      <a href={addUrlMeta.final_url} target="_blank" rel="noreferrer">
-                        open
-                      </a>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-              <div style={{ flex: "0 0 auto" }}>
-                <div className="row" style={{ gap: 8 }}>
-                  <button
-                    onClick={async () => {
-                      if (!addUrlPreview) return;
-                      setAddState({ busy: true, error: null, message: "Adding…" });
-                      try {
-                        const isbn = String(addUrlPreview.isbn13 ?? addUrlPreview.isbn10 ?? "").trim();
-                        let id: number;
-                        if (isbn) id = await addByIsbnValue(isbn);
-                        else
-                          id = await addManualValue({
-                            title: (addUrlPreview.title ?? "").trim() || addInput.trim(),
-                            authors: (addUrlPreview.authors ?? []).filter(Boolean),
-                            publisher: addUrlPreview.publisher ?? null,
-                            publish_date: addUrlPreview.publish_date ?? null,
-                            description: addUrlPreview.description ?? null
-                          });
-
-                        if (addUrlPreview.cover_url) {
-                          await importCoverForBook(id, addUrlPreview.cover_url);
-                          await refreshAllBooks();
-                        }
-
-                        setAddInput("");
-                        cancelAddPreview();
-                        setAddState({ busy: false, error: null, message: "Added" });
-                        window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
-                      } catch (e: any) {
-                        setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
-                      }
-                    }}
-                    disabled={addState.busy}
-                  >
-                    Add
-                  </button>
-                  <button onClick={cancelAddPreview} disabled={addState.busy}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {addSearchResults.length > 0 ? (
-          <div style={{ marginTop: 10 }}>
-            {addSearchResults.map((r, idx) => {
-              const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
-              const title = (r.title ?? "").trim() || "—";
-              const authors = (r.authors ?? []).filter(Boolean).join(", ");
-              const pub = [r.publisher ?? "", r.publish_date ?? (r.publish_year ? String(r.publish_year) : "")].filter(Boolean).join(" · ");
-              return (
-                <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="card" style={{ marginTop: 8 }}>
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                    <div style={{ width: 62, flex: "0 0 auto" }}>
-                      {r.cover_url ? (
-                        <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={`/api/image-proxy?url=${encodeURIComponent(String(r.cover_url))}`}
-                            alt=""
-                            width={60}
-                            height={90}
-                            style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
-                      )}
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      <div>{title}</div>
-                      <div className="muted" style={{ marginTop: 4 }}>
-                        {authors || "—"}
-                        {pub ? ` · ${pub}` : ""}
-                      </div>
-                      <div className="muted" style={{ marginTop: 4 }}>
-                        {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"} · {r.source}
-                      </div>
-                    </div>
-                    <div style={{ flex: "0 0 auto" }}>
-                      <button
-                        onClick={async () => {
-                          setAddState({ busy: true, error: null, message: "Adding…" });
-                          try {
-                            let id: number;
-                            if (bestIsbn) id = await addByIsbnValue(bestIsbn);
-                            else
-                              id = await addManualValue({
-                                title: (r.title ?? addInput).trim() || addInput.trim(),
-                                authors: (r.authors ?? []).filter(Boolean),
-                                publisher: r.publisher ?? null,
-                                publish_date: r.publish_date ?? null,
-                                description: null
-                              });
-                            if (r.cover_url) {
-                              await importCoverForBook(id, r.cover_url);
-                              await refreshAllBooks();
-                            }
-                            setAddState({ busy: false, error: null, message: "Added" });
-                            window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
-                          } catch (e: any) {
-                            setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
-                          }
-                        }}
-                        disabled={addState.busy}
-                      >
-                        Add
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            <div className="muted" style={{ marginTop: 6 }}>
-              {addSearchState.message ? (addSearchState.error ? `${addSearchState.message} (${addSearchState.error})` : addSearchState.message) : ""}
-            </div>
-          </div>
-        ) : addSearchState.message ? (
-          <div className="muted" style={{ marginTop: 8 }}>
-            {addSearchState.error ? `${addSearchState.message} (${addSearchState.error})` : addSearchState.message}
-          </div>
-        ) : null}
-
-        <div style={{ marginTop: 16 }}>
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <span className="muted">Catalogs</span>
-            <span>{libraries.length}</span>
-            <span className="muted">Books</span>
-            <span>{displayGroups.length}</span>
-            {bulkMode ? (
-              <>
-                <span className="muted">Selected</span>
-                <span>{bulkSelectedCount}</span>
-              </>
-            ) : null}
-            {libraryState.message ? <span className="muted">{libraryState.message}</span> : libraryState.error ? <span className="muted">{libraryState.error}</span> : null}
-          </div>
-          <div className="row muted" style={{ gap: 10, justifyContent: "flex-end" }}>
-            {(filterTag ?? tagMode) !== "all" || filterAuthor || filterSubject || filterPublisher || (filterCategory ?? categoryMode) !== "all" ? (
-              <>
-                {(() => {
-                  const activeCategory = (filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : null;
-                  const activeTag = (filterTag ?? tagMode) !== "all" ? String(filterTag ?? tagMode) : null;
-                  const pairs: Array<{ label: string; value: string }> = [];
-                  if (activeCategory) pairs.push({ label: "Category", value: activeCategory });
-                  if (activeTag) pairs.push({ label: "Tag", value: activeTag });
-                  if (filterAuthor) pairs.push({ label: "Author", value: filterAuthor });
-                  if (filterSubject) pairs.push({ label: "Subject", value: filterSubject });
-                  if (filterPublisher) pairs.push({ label: "Publisher", value: filterPublisher });
-                  return pairs.length ? (
-                    <span style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
-                      {pairs.map((p) => (
-                        <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 6, alignItems: "baseline" }}>
-                          <span className="muted">{p.label}</span>
-                          <span style={{ color: "var(--fg)" }}>{p.value}</span>
-                        </span>
-                      ))}
-                    </span>
-                  ) : null;
-                })()}{" "}
-                (
+            <div style={{ flex: "0 0 auto" }}>
+              <div className="row" style={{ gap: 8 }}>
                 <button
-                  type="button"
-                  onClick={() => {
-                    setTagMode("all");
-                    setCategoryMode("all");
-                    setTagSearch("");
-                    setCategorySearch("");
-                    setSearchQuery("");
-                    setVisibilityMode("all");
-                    closeTagMenu();
-                    closeCategoryMenu();
-                    router.push("/app");
+                  onClick={async () => {
+                    if (!addUrlPreview) return;
+                    setAddState({ busy: true, error: null, message: "Adding…" });
+                    try {
+                      const isbn = String(addUrlPreview.isbn13 ?? addUrlPreview.isbn10 ?? "").trim();
+                      let id: number;
+                      if (isbn) id = await addByIsbnValue(isbn);
+                      else
+                        id = await addManualValue({
+                          title: (addUrlPreview.title ?? "").trim() || addInput.trim(),
+                          authors: (addUrlPreview.authors ?? []).filter(Boolean),
+                          publisher: addUrlPreview.publisher ?? null,
+                          publish_date: addUrlPreview.publish_date ?? null,
+                          description: addUrlPreview.description ?? null
+                        });
+                      if (addUrlPreview.cover_url) {
+                        await importCoverForBook(id, addUrlPreview.cover_url);
+                        await refreshAllBooks();
+                      }
+                      setAddInput("");
+                      cancelAddPreview();
+                      setAddState({ busy: false, error: null, message: "Added" });
+                      window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
+                    } catch (e: any) {
+                      setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
+                    }
                   }}
-                  style={{
-                    background: "transparent",
-                    border: 0,
-                    padding: 0,
-                    font: "inherit",
-                    color: "inherit",
-                    textDecoration: "underline",
-                    cursor: "pointer"
-                  }}
+                  disabled={addState.busy}
                 >
-                  clear
+                  Add
                 </button>
-                )
-              </>
-            ) : null}
+                <button onClick={cancelAddPreview} disabled={addState.busy}>
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+      ) : null}
+
+      {addSearchResults.length > 0 ? (
+        <div style={{ marginTop: 10 }}>
+          {addSearchResults.map((r, idx) => {
+            const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
+            const title = (r.title ?? "").trim() || "—";
+            const authors = (r.authors ?? []).filter(Boolean).join(", ");
+            const pub = [r.publisher ?? "", r.publish_date ?? (r.publish_year ? String(r.publish_year) : "")].filter(Boolean).join(" · ");
+            return (
+              <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="card" style={{ marginTop: 8 }}>
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                  <div style={{ width: 62, flex: "0 0 auto" }}>
+                    {r.cover_url ? (
+                      <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
+                        <img
+                          src={`/api/image-proxy?url=${encodeURIComponent(String(r.cover_url))}`}
+                          alt=""
+                          width={60}
+                          height={90}
+                          style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
+                    )}
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    <div>{title}</div>
+                    <div className="muted" style={{ marginTop: 4 }}>
+                      {authors || "—"}
+                      {pub ? ` · ${pub}` : ""}
+                    </div>
+                    <div className="muted" style={{ marginTop: 4 }}>
+                      {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"} · {r.source}
+                    </div>
+                  </div>
+                  <div style={{ flex: "0 0 auto" }}>
+                    <button
+                      onClick={async () => {
+                        setAddState({ busy: true, error: null, message: "Adding…" });
+                        try {
+                          let id: number;
+                          if (bestIsbn) id = await addByIsbnValue(bestIsbn);
+                          else
+                            id = await addManualValue({
+                              title: (r.title ?? addInput).trim() || addInput.trim(),
+                              authors: (r.authors ?? []).filter(Boolean),
+                              publisher: r.publisher ?? null,
+                              publish_date: r.publish_date ?? null,
+                              description: null
+                            });
+                          if (r.cover_url) {
+                            await importCoverForBook(id, r.cover_url);
+                            await refreshAllBooks();
+                          }
+                          setAddState({ busy: false, error: null, message: "Added" });
+                          window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
+                        } catch (e: any) {
+                          setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
+                        }
+                      }}
+                      disabled={addState.busy}
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div className="muted" style={{ marginTop: 6 }}>
+            {addSearchState.message ? (addSearchState.error ? `${addSearchState.message} (${addSearchState.error})` : addSearchState.message) : ""}
+          </div>
+        </div>
+      ) : addSearchState.message ? (
+        <div className="muted" style={{ marginTop: 8 }}>
+          {addSearchState.error ? `${addSearchState.message} (${addSearchState.error})` : addSearchState.message}
+        </div>
+      ) : null}
+
+      <div style={{ marginTop: 16 }}>
         {sortOpen ? (
-        <div
-          className="om-filter-row"
-          style={{
-            marginTop: 16,
-            marginBottom: 14,
-            flexWrap: isMobile ? "wrap" : "nowrap",
-            gap: 10,
-            alignItems: "center",
-            overflowX: isMobile ? ("visible" as const) : "auto",
-            paddingBottom: 4
-          }}
-        >
-          <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
-            <option value="grid">grid</option>
-            <option value="list">list</option>
-          </select>
-          {viewMode === "grid" ? (
-            <>
+          <div
+            className="om-filter-row"
+            style={{
+              marginTop: 16,
+              marginBottom: 14,
+              flexWrap: isMobile ? "wrap" : "nowrap",
+              gap: 10,
+              alignItems: "center",
+              overflowX: isMobile ? ("visible" as const) : "auto",
+              paddingBottom: 4
+            }}
+          >
+            <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
+              <option value="grid">grid</option>
+              <option value="list">list</option>
+            </select>
+            {viewMode === "grid" ? (
               <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
                 {isMobile ? <option value={1}>1</option> : null}
                 <option value={2}>2</option>
                 {!isMobile ? <option value={4}>4</option> : null}
                 {!isMobile ? <option value={8}>8</option> : null}
               </select>
-            </>
-          ) : null}
-          <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
-            <option value="latest">latest</option>
-            <option value="earliest">earliest</option>
-            <option value="title_asc">title A-Z</option>
-            <option value="title_desc">title Z-A</option>
-          </select>
-          <button
-            ref={tagButtonRef}
-            onClick={() => (tagMenu.open ? closeTagMenu() : openTagMenu())}
-            className={`om-filter-control${tagMenu.open ? " is-open" : ""}`}
-            style={{ minWidth: 120 }}
-            aria-haspopup="menu"
-            aria-expanded={tagMenu.open}
-          >
-            <span>
-              {(() => {
-                const active = (filterTag ?? tagMode ?? "all").trim();
-                return `${active && active !== "all" ? active : "tag"}`;
-              })()}
-            </span>
-            <span className="om-filter-caret" aria-hidden="true" />
-          </button>
-
-          <button
-            ref={categoryButtonRef}
-            onClick={() => (categoryMenu.open ? closeCategoryMenu() : openCategoryMenu())}
-            className={`om-filter-control${categoryMenu.open ? " is-open" : ""}`}
-            style={{ minWidth: 160 }}
-            aria-haspopup="menu"
-            aria-expanded={categoryMenu.open}
-          >
-            <span>{(filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : "category"}</span>
-            <span className="om-filter-caret" aria-hidden="true" />
-          </button>
-          <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
-            <option value="all">all</option>
-            <option value="public">public</option>
-            <option value="private">private</option>
-          </select>
-        </div>
+            ) : null}
+            <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
+              <option value="latest">latest</option>
+              <option value="earliest">earliest</option>
+              <option value="title_asc">title A-Z</option>
+              <option value="title_desc">title Z-A</option>
+            </select>
+            <button
+              ref={tagButtonRef}
+              onClick={() => (tagMenu.open ? closeTagMenu() : openTagMenu())}
+              className={`om-filter-control${tagMenu.open ? " is-open" : ""}`}
+              style={{ minWidth: 120 }}
+              aria-haspopup="menu"
+              aria-expanded={tagMenu.open}
+            >
+              <span>
+                {(() => {
+                  const active = (filterTag ?? tagMode ?? "all").trim();
+                  return `${active && active !== "all" ? active : "tag"}`;
+                })()}
+              </span>
+              <span className="om-filter-caret" aria-hidden="true" />
+            </button>
+            <button
+              ref={categoryButtonRef}
+              onClick={() => (categoryMenu.open ? closeCategoryMenu() : openCategoryMenu())}
+              className={`om-filter-control${categoryMenu.open ? " is-open" : ""}`}
+              style={{ minWidth: 160 }}
+              aria-haspopup="menu"
+              aria-expanded={categoryMenu.open}
+            >
+              <span>{(filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : "category"}</span>
+              <span className="om-filter-caret" aria-hidden="true" />
+            </button>
+            <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
+              <option value="all">all</option>
+              <option value="public">public</option>
+              <option value="private">private</option>
+            </select>
+          </div>
         ) : null}
+
         {tagMenu.open ? (
           <div
             ref={tagMenuRef}
             className="om-popover"
-            style={{
-              position: "fixed",
-              top: tagMenu.top,
-              left: tagMenu.left,
-              minWidth: tagMenu.minWidth,
-              maxHeight: 320,
-              overflow: "auto",
-              zIndex: 1001
-            }}
+            style={{ position: "fixed", top: tagMenu.top, left: tagMenu.left, minWidth: tagMenu.minWidth, maxHeight: 320, overflow: "auto", zIndex: 1001 }}
           >
-              <input
-                placeholder="Search…"
-                value={tagSearch}
-                onChange={(e) => setTagSearch(e.target.value)}
-                style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }}
-                autoFocus={!isMobile}
-              />
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <button
-                  onClick={() => {
-                    setTagMode("all");
-                    setUrlFilters({ tag: null });
-                    closeTagMenu();
-                  }}
-                  style={{ textAlign: "left" }}
-                >
-                  all
-                </button>
-                {availableTags
-                  .filter((t) => t.toLowerCase().includes(tagSearch.trim().toLowerCase()))
-                  .slice(0, 400)
-                  .map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => {
-                        setTagMode(t);
-                        setUrlFilters({ tag: t });
-                        closeTagMenu();
-                      }}
-                      style={{ textAlign: "left" }}
-                    >
-                      {t}
-                    </button>
-                  ))}
-              </div>
+            <input
+              placeholder="Search…"
+              value={tagSearch}
+              onChange={(e) => setTagSearch(e.target.value)}
+              style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }}
+              autoFocus={!isMobile}
+            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <button
+                onClick={() => {
+                  setTagMode("all");
+                  setUrlFilters({ tag: null });
+                  closeTagMenu();
+                }}
+                style={{ textAlign: "left" }}
+              >
+                all
+              </button>
+              {availableTags
+                .filter((t) => t.toLowerCase().includes(tagSearch.trim().toLowerCase()))
+                .slice(0, 400)
+                .map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      setTagMode(t);
+                      setUrlFilters({ tag: t });
+                      closeTagMenu();
+                    }}
+                    style={{ textAlign: "left" }}
+                  >
+                    {t}
+                  </button>
+                ))}
+            </div>
           </div>
         ) : null}
+
         {categoryMenu.open ? (
           <div
             ref={categoryMenuRef}
             className="om-popover"
-            style={{
-              position: "fixed",
-              top: categoryMenu.top,
-              left: categoryMenu.left,
-              minWidth: categoryMenu.minWidth,
-              maxHeight: 320,
-              overflow: "auto",
-              zIndex: 1001
-            }}
+            style={{ position: "fixed", top: categoryMenu.top, left: categoryMenu.left, minWidth: categoryMenu.minWidth, maxHeight: 320, overflow: "auto", zIndex: 1001 }}
           >
-              <input
-                placeholder="Search…"
-                value={categorySearch}
-                onChange={(e) => setCategorySearch(e.target.value)}
-                style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }}
-                autoFocus={!isMobile}
-              />
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <button
-                  onClick={() => {
-                    setCategoryMode("all");
-                    setUrlFilters({ category: null });
-                    closeCategoryMenu();
-                  }}
-                  style={{ textAlign: "left" }}
-                >
-                  all
-                </button>
-                {availableCategories
-                  .filter((c) => c.toLowerCase().includes(categorySearch.trim().toLowerCase()))
-                  .slice(0, 400)
-                  .map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => {
-                        setCategoryMode(c);
-                        setUrlFilters({ category: c });
-                        closeCategoryMenu();
-                      }}
-                      style={{ textAlign: "left" }}
-                    >
-                      {c}
-                    </button>
-                  ))}
-              </div>
+            <input
+              placeholder="Search…"
+              value={categorySearch}
+              onChange={(e) => setCategorySearch(e.target.value)}
+              style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }}
+              autoFocus={!isMobile}
+            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <button
+                onClick={() => {
+                  setCategoryMode("all");
+                  setUrlFilters({ category: null });
+                  closeCategoryMenu();
+                }}
+                style={{ textAlign: "left" }}
+              >
+                all
+              </button>
+              {availableCategories
+                .filter((c) => c.toLowerCase().includes(categorySearch.trim().toLowerCase()))
+                .slice(0, 400)
+                .map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => {
+                      setCategoryMode(c);
+                      setUrlFilters({ category: c });
+                      closeCategoryMenu();
+                    }}
+                    style={{ textAlign: "left" }}
+                  >
+                    {c}
+                  </button>
+                ))}
+            </div>
           </div>
         ) : null}
+
         <BulkBar
           bulkMode={bulkMode}
           bulkState={bulkState}
@@ -2653,80 +2665,6 @@ function AppShell({
             closeCategoryMenu();
           }}
         />
-
-        <div style={{ marginTop: 24 }} />
-
-        {libraries.map((lib, idx) => {
-          const groups = displayGroupsByLibraryId[lib.id] ?? [];
-          const isEditing = editingLibraryId === lib.id;
-          return (
-            <div key={lib.id}>
-              <LibraryBlock
-                libraryId={lib.id}
-                libraryName={lib.name}
-                bookCount={groups.length}
-                index={idx}
-                total={libraries.length}
-                busy={libraryState.busy}
-                isEditing={isEditing}
-                nameDraft={libraryNameDraft}
-                reorderMode={reorderMode}
-                manageMode={bulkMode}
-                onStartEdit={beginEditLibrary}
-                onNameDraftChange={setLibraryNameDraft}
-                onSaveName={saveLibraryName}
-                onCancelEdit={cancelEditLibrary}
-                onDelete={deleteLibrary}
-                collapsed={!!collapsedByLibraryId[lib.id]}
-                onToggleCollapsed={(id) => {
-                  setCollapsedByLibraryId((prev) => {
-                    const next = { ...prev };
-                    if (next[id]) delete next[id];
-                    else next[id] = true;
-                    return next;
-                  });
-                }}
-                onMoveUp={(id) => moveLibrary(id, -1)}
-                onMoveDown={(id) => moveLibrary(id, 1)}
-              >
-                {groups.length === 0 ? (
-                  <div className="muted" style={{ marginTop: 10 }}>
-                    No books yet.
-                  </div>
-                ) : (
-                  <div style={{ marginTop: 10, ...booksContainerStyle }}>{groups.map(renderGroup)}</div>
-                )}
-              </LibraryBlock>
-              {idx < libraries.length - 1 ? <hr className="om-hr" /> : null}
-            </div>
-          );
-        })}
-
-        <hr className="om-hr" />
-
-        <div style={{ marginTop: 24 }} className="card">
-          <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, width: "100%", alignItems: "baseline" }}>
-            <input
-              placeholder="Add another catalog (e.g. Home, Office)"
-              value={newLibraryName}
-              onChange={(e) => setNewLibraryName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                e.preventDefault();
-                createLibrary(newLibraryName);
-              }}
-              style={{ minWidth: 0, flex: 1 }}
-            />
-            {newLibraryName.trim() ? (
-              <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy} style={{ marginLeft: "auto" }}>
-                Add
-              </button>
-            ) : null}
-          </div>
-          <div className="muted" style={{ marginTop: 4 }}>
-            {libraryState.message ? (libraryState.error ? `${libraryState.message} (${libraryState.error})` : libraryState.message) : libraryState.error ?? ""}
-          </div>
-        </div>
         <div style={{ height: 24 }} />
       </div>
     </div>
@@ -2735,14 +2673,12 @@ function AppShell({
 
 export default function AppPage() {
   const [session, setSession] = useState<Session | null>(null);
-
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSession(newSession));
     return () => sub.subscription.unsubscribe();
   }, []);
-
   return (
     <main className="container">
       {!supabase ? (

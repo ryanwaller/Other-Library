@@ -99,8 +99,9 @@ export default function BulkBar({
               onAnyMenuOpen?.();
             }}
           >
-            <summary className="om-menu-summary" tabIndex={0}>
-              Visibility <span aria-hidden="true">▾</span>
+            <summary className="om-filter-control om-menu-summary" tabIndex={0} style={{ minWidth: 120 }}>
+              <span>Visibility</span>
+              <span className="om-filter-caret" aria-hidden="true" />
             </summary>
             <div
               className="om-menu-panel"
@@ -145,8 +146,9 @@ export default function BulkBar({
               onAnyMenuOpen?.();
             }}
           >
-            <summary className="om-menu-summary" tabIndex={0}>
-              Move <span aria-hidden="true">▾</span>
+            <summary className="om-filter-control om-menu-summary" tabIndex={0} style={{ minWidth: 100 }}>
+              <span>Move</span>
+              <span className="om-filter-caret" aria-hidden="true" />
             </summary>
             <div
               className="om-menu-panel"
@@ -192,8 +194,9 @@ export default function BulkBar({
               onAnyMenuOpen?.();
             }}
           >
-            <summary className="om-menu-summary" tabIndex={0}>
-              More <span aria-hidden="true">▾</span>
+            <summary className="om-filter-control om-menu-summary" tabIndex={0} style={{ minWidth: 100 }}>
+              <span>More</span>
+              <span className="om-filter-caret" aria-hidden="true" />
             </summary>
             <div
               className="om-menu-panel"
@@ -205,7 +208,7 @@ export default function BulkBar({
               <div className="muted" style={{ marginBottom: 6 }}>
                 Add category
               </div>
-              <div className="row" style={{ gap: 10, alignItems: "baseline" }}>
+              <div className="row" style={{ gap: 10, alignItems: "baseline", marginBottom: 12 }}>
                 <input
                   value={bulkCategoryName}
                   onChange={(e) => setBulkCategoryName(e.target.value)}
@@ -217,20 +220,18 @@ export default function BulkBar({
                   }}
                 />
               </div>
-              <div style={{ borderTop: "1px solid var(--border)", marginTop: 12, paddingTop: 10 }}>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    close(moreRef);
-                    onBulkDeleteSelected();
-                  }}
-                  disabled={!canAct}
-                  style={{ textAlign: "left" }}
-                >
-                  Delete
-                </button>
-              </div>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  close(moreRef);
+                  onBulkDeleteSelected();
+                }}
+                disabled={!canAct}
+                style={{ textAlign: "left" }}
+              >
+                Delete book(s)
+              </button>
             </div>
           </details>
         </div>
