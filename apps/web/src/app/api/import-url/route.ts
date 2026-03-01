@@ -2,9 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 
+type TrimUnit = "in" | "mm";
+
 type ImportMetadata = {
   title: string | null;
   authors: string[];
+  editors: string[];
+  designers: string[];
+  printers: string[];
   publisher: string | null;
   publish_date: string | null; // ISO YYYY-MM-DD when confidently parsed, else null
   description: string | null;
@@ -13,6 +18,9 @@ type ImportMetadata = {
   isbn13: string | null;
   cover_url: string | null;
   cover_candidates: string[];
+  trim_width: number | null;
+  trim_height: number | null;
+  trim_unit: TrimUnit | null;
   sources: string[];
   raw: Record<string, unknown>;
 };
@@ -112,6 +120,41 @@ function pickBestIsbn(candidates: string[]): { isbn10: string | null; isbn13: st
   return { isbn10, isbn13 };
 }
 
+function parseDimensions(s: string): { trim_width: number | null; trim_height: number | null; trim_unit: TrimUnit | null } {
+  const m = s.match(/([\d.]+)\s*[×x]\s*([\d.]+)\s*(cm|mm|in|")?/i);
+  if (!m) return { trim_width: null, trim_height: null, trim_unit: null };
+  let a = parseFloat(m[1]!);
+  let b = parseFloat(m[2]!);
+  const unitRaw = (m[3] ?? "").toLowerCase().trim();
+  if (isNaN(a) || isNaN(b) || a <= 0 || b <= 0) return { trim_width: null, trim_height: null, trim_unit: null };
+
+  let unit: TrimUnit;
+  if (unitRaw === "in" || unitRaw === '"') {
+    unit = "in";
+  } else {
+    // cm → convert to mm; mm → keep as-is; default → assume mm
+    if (unitRaw === "cm") {
+      a = Math.round(a * 10 * 10) / 10;
+      b = Math.round(b * 10 * 10) / 10;
+    }
+    unit = "mm";
+  }
+
+  return { trim_width: Math.min(a, b), trim_height: Math.max(a, b), trim_unit: unit };
+}
+
+function extractRolesFromText(text: string | null, pattern: RegExp): string[] {
+  if (!text) return [];
+  const m = pattern.exec(text);
+  if (!m) return [];
+  return uniqStrings(
+    m[1]!
+      .split(/\s*,\s*|\s+and\s+/i)
+      .map((s) => s.replace(/\.$/, "").trim())
+      .filter(Boolean)
+  );
+}
+
 function decodeEntities(input: string): string {
   return input
     .replace(/&amp;/g, "&")
@@ -190,7 +233,6 @@ function normalizeDescription(value: string | null, allowBoilerplate: boolean): 
   const s = raw.replace(/\s+/g, " ").trim();
   if (!s) return null;
   if (!allowBoilerplate && looksLikeBoilerplateDescription(s)) return null;
-  // Avoid extremely long blobs from store pages.
   if (s.length > 2000) return s.slice(0, 2000);
   return s;
 }
@@ -364,6 +406,165 @@ function extractLikelyIsbnsFromHtml(html: string): string[] {
   return uniqStrings(out);
 }
 
+// --- Printed Matter scraper ---
+
+function scrapePrintedMatter(html: string): Partial<ImportMetadata> {
+  // Title: first <h1>
+  const h1Match = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(html);
+  const title = h1Match ? decodeEntities(h1Match[1]!.replace(/<[^>]+>/g, "").trim()) : null;
+
+  // Authors: linked names appearing before the <h1> in the DOM
+  const h1Pos = h1Match?.index ?? html.length;
+  const beforeH1 = html.slice(0, h1Pos);
+  // Look for a cluster of <a> tags near the h1, strip nav/header noise
+  // Try to find a wrapper element containing artist links
+  const artistBlockRe = /<(?:p|div|ul|span|h2|h3)[^>]*>((?:\s*(?:<li[^>]*>)?\s*<a\b[^>]*>[^<]+<\/a>\s*(?:<\/li>)?\s*,?\s*(?:and\s*)?)+)<\/(?:p|div|ul|span|h2|h3)>/gi;
+  let artistBlockMatch: RegExpExecArray | null = null;
+  let bestBlock = "";
+  let m: RegExpExecArray | null;
+  // Find the last matching block before h1 — closest to the title
+  const aBlockRe = new RegExp(artistBlockRe.source, "gi");
+  while ((m = aBlockRe.exec(beforeH1))) {
+    bestBlock = m[1]!;
+    artistBlockMatch = m;
+  }
+  let authors: string[] = [];
+  if (bestBlock) {
+    const aRe = /<a\b[^>]*>([\s\S]*?)<\/a>/gi;
+    let aM: RegExpExecArray | null;
+    while ((aM = aRe.exec(bestBlock))) {
+      const name = decodeEntities(aM[1]!.replace(/<[^>]+>/g, "").trim());
+      if (name && name.length < 80) authors.push(name);
+    }
+  }
+  // Fallback: if no block found, find the last few <a> tags immediately before h1
+  if (authors.length === 0) {
+    const tailLinks = beforeH1.match(/<a\b[^>]*>([^<]{2,60})<\/a>/gi) ?? [];
+    // Take the last 1–4 links as likely artist credits
+    const lastLinks = tailLinks.slice(-4);
+    for (const link of lastLinks) {
+      const aM = /<a\b[^>]*>([\s\S]*?)<\/a>/i.exec(link);
+      if (aM) {
+        const name = decodeEntities(aM[1]!.replace(/<[^>]+>/g, "").trim());
+        if (name && name.length < 80) authors.push(name);
+      }
+    }
+  }
+  authors = uniqStrings(authors);
+
+  // Metadata from definition list (<dt>/<dd>) or labeled list items
+  const listItems: Record<string, string> = {};
+
+  // Try <dt>/<dd> pairs first
+  const dtddRe = /<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi;
+  let dtM: RegExpExecArray | null;
+  while ((dtM = dtddRe.exec(html))) {
+    const key = decodeEntities(dtM[1]!.replace(/<[^>]+>/g, "").trim()).toLowerCase().replace(/\s+/g, " ");
+    const val = decodeEntities(dtM[2]!.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+    if (key && val) listItems[key] = val;
+  }
+
+  // Fallback: <li><strong>Label</strong>: Value</li> or <li><span>Label</span>Value</li>
+  if (Object.keys(listItems).length === 0) {
+    const liRe = /<li[^>]*>\s*<(?:strong|b|span)[^>]*>([\s\S]*?)<\/(?:strong|b|span)>:?\s*([\s\S]*?)\s*<\/li>/gi;
+    let liM: RegExpExecArray | null;
+    while ((liM = liRe.exec(html))) {
+      const key = decodeEntities(liM[1]!.replace(/<[^>]+>/g, "").trim()).toLowerCase();
+      const val = decodeEntities(liM[2]!.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+      if (key && val) listItems[key] = val;
+    }
+  }
+
+  // Also try "Label: Value" text patterns in the page if still empty
+  if (Object.keys(listItems).length === 0) {
+    const labeledRe = /\b(Publisher|Year|Pages?|Dimensions?|ISBN(?:-?1[03])?|Edition)\s*:?\s*([^\n<]{2,100})/gi;
+    let lM: RegExpExecArray | null;
+    const stripped = html.replace(/<[^>]+>/g, " ");
+    while ((lM = labeledRe.exec(stripped))) {
+      const key = lM[1]!.trim().toLowerCase();
+      const val = lM[2]!.trim();
+      if (key && val && !listItems[key]) listItems[key] = val;
+    }
+  }
+
+  const publisher = listItems["publisher"] ?? null;
+
+  // Year: can be "year", "date", "publish date"
+  const yearStr = (listItems["year"] ?? listItems["date"] ?? listItems["publish date"] ?? "").trim();
+  const publish_date = yearStr ? parseDateToIso(yearStr) : null;
+
+  // Pages: strip " p." or "pages" suffix
+  const pagesStr = (listItems["pages"] ?? listItems["page"] ?? "").replace(/\s*pp?\.?/i, "").trim();
+  const pagesNum = pagesStr ? parseInt(pagesStr, 10) : null;
+  void pagesNum; // available but not in ImportMetadata currently
+
+  // Dimensions
+  const dimsStr = listItems["dimensions"] ?? listItems["dimension"] ?? listItems["size"] ?? listItems["format"] ?? "";
+  const dims = dimsStr ? parseDimensions(dimsStr) : { trim_width: null, trim_height: null, trim_unit: null as TrimUnit | null };
+
+  // ISBN: try several label variants
+  const isbnStr = listItems["isbn"] ?? listItems["isbn-13"] ?? listItems["isbn-10"] ?? listItems["isbn13"] ?? listItems["isbn10"] ?? "";
+  const pickedIsbn = pickBestIsbn([isbnStr, ...extractLikelyIsbnsFromHtml(html.slice(0, 10000))]);
+
+  // Cover image: prefer cloudfront.net (Printed Matter's CDN), then any product image
+  const cloudfrontMatch = /<img\b[^>]+src="(https:\/\/[^"]*cloudfront\.net[^"]*)"[^>]*>/i.exec(html);
+  const anyImgMatch = !cloudfrontMatch
+    ? /<img\b[^>]+src="([^"]*\.(?:jpg|jpeg|png|webp))(?:\?[^"]*)?"/i.exec(html)
+    : null;
+  const cover_url = normalizeHttpsUrl(cloudfrontMatch?.[1] ?? anyImgMatch?.[1] ?? null);
+
+  // Description: text block after the last <hr> near the bottom of the page
+  const hrIdx = html.lastIndexOf("<hr");
+  let description: string | null = null;
+  if (hrIdx !== -1) {
+    const afterHr = html.slice(hrIdx);
+    // Try <p> first, then <div>
+    const paraRe = /<(?:p|div)[^>]*>([\s\S]{20,2000}?)<\/(?:p|div)>/i.exec(afterHr);
+    if (paraRe) {
+      const cleaned = decodeEntities(paraRe[1]!.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+      if (cleaned.length > 20) description = cleaned.slice(0, 2000);
+    }
+  }
+
+  // Extract credited roles from description text
+  const editors = extractRolesFromText(description, /[Ee]dited\s+by\s+([^.;\n]+)/);
+  const designers = extractRolesFromText(description, /[Dd]esigned?\s+by\s+([^.;\n]+)/);
+  const printers = extractRolesFromText(description, /[Pp]rinted\s+by\s+([^.;\n]+)/);
+
+  return {
+    title,
+    authors,
+    editors,
+    designers,
+    printers,
+    publisher,
+    publish_date,
+    description,
+    isbn10: pickedIsbn.isbn10,
+    isbn13: pickedIsbn.isbn13,
+    cover_url,
+    cover_candidates: cover_url ? [cover_url] : [],
+    trim_width: dims.trim_width,
+    trim_height: dims.trim_height,
+    trim_unit: dims.trim_unit,
+    raw: { printedMatter: { listItems, dimsStr, yearStr, isbnStr } }
+  };
+}
+
+// --- AbeBooks ISBN extraction ---
+
+function extractIsbnFromAbeUrl(url: URL): string | null {
+  // Pattern: /book-search/isbn/9781234567890/ or /9781234567890/title
+  const pathMatch = url.pathname.match(/\/(\d{13}|\d{10})\b/);
+  if (pathMatch) return pathMatch[1]!;
+  // Query param fallback
+  const qIsbn = url.searchParams.get("isbn");
+  if (qIsbn) return qIsbn;
+  return null;
+}
+
+// --- Generic helpers ---
+
 function mergePreferBase(base: ImportMetadata, next: Partial<ImportMetadata>, sourceName: string): ImportMetadata {
   const merged: ImportMetadata = { ...base };
   merged.sources = [...new Set([...(base.sources ?? []), sourceName, ...((next.sources as any) ?? [])])];
@@ -387,8 +588,14 @@ function mergePreferBase(base: ImportMetadata, next: Partial<ImportMetadata>, so
   pick("isbn10");
   pick("isbn13");
   pick("cover_url");
+  pick("trim_width");
+  pick("trim_height");
+  pick("trim_unit");
 
   merged.authors = uniqStrings([...(base.authors ?? []), ...(((next.authors as any) ?? []) as string[])]);
+  merged.editors = uniqStrings([...(base.editors ?? []), ...(((next.editors as any) ?? []) as string[])]);
+  merged.designers = uniqStrings([...(base.designers ?? []), ...(((next.designers as any) ?? []) as string[])]);
+  merged.printers = uniqStrings([...(base.printers ?? []), ...(((next.printers as any) ?? []) as string[])]);
   merged.subjects = uniqStrings([...(base.subjects ?? []), ...(((next.subjects as any) ?? []) as string[])]);
   merged.cover_candidates = uniqStrings([...(base.cover_candidates ?? []), ...(((next.cover_candidates as any) ?? []) as string[])]);
 
@@ -401,6 +608,8 @@ function detectDomainKind(hostname: string): string {
   if (h === "bookshop.org" || h.endsWith(".bookshop.org")) return "bookshop";
   if (h.endsWith(".myshopify.com") || h.includes("shopify")) return "shopify";
   if (h === "books.google.com") return "googlebooks";
+  if (h === "printedmatter.org" || h.endsWith(".printedmatter.org")) return "printedmatter";
+  if (h === "abebooks.com" || h.endsWith(".abebooks.com")) return "abebooks";
   return "generic";
 }
 
@@ -408,7 +617,6 @@ function isBlockedHostname(hostname: string): boolean {
   const h = hostname.toLowerCase();
   if (h === "localhost" || h.endsWith(".localhost")) return true;
   if (h === "127.0.0.1" || h === "0.0.0.0" || h === "::1") return true;
-  // Reject obvious private IP literals.
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) {
     const [a, b] = h.split(".").map((x) => Number(x));
     if (a === 10) return true;
@@ -461,6 +669,29 @@ async function tryIsbnEnrichment(req: NextRequest, isbn13Or10: string | null): P
   }
 }
 
+function makeEmpty(): ImportMetadata {
+  return {
+    title: null,
+    authors: [],
+    editors: [],
+    designers: [],
+    printers: [],
+    publisher: null,
+    publish_date: null,
+    description: null,
+    subjects: [],
+    isbn10: null,
+    isbn13: null,
+    cover_url: null,
+    cover_candidates: [],
+    trim_width: null,
+    trim_height: null,
+    trim_unit: null,
+    sources: [],
+    raw: {}
+  };
+}
+
 export async function POST(req: NextRequest) {
   let urlValue = "";
   try {
@@ -495,6 +726,39 @@ export async function POST(req: NextRequest) {
 
   const domainKind = detectDomainKind(parsed.hostname);
 
+  // AbeBooks: try ISBN from URL before fetching (fetch often fails due to bot protection)
+  if (domainKind === "abebooks") {
+    const isbnFromUrl = extractIsbnFromAbeUrl(parsed);
+    if (isbnFromUrl) {
+      const edition = await tryIsbnEnrichment(req, isbnFromUrl);
+      if (edition && typeof edition === "object") {
+        const preview: ImportMetadata = mergePreferBase(makeEmpty(), {
+          title: typeof edition.title === "string" ? edition.title : null,
+          authors: Array.isArray(edition.authors) ? edition.authors : [],
+          publisher: typeof edition.publisher === "string" ? edition.publisher : null,
+          publish_date: typeof edition.publish_date === "string" ? edition.publish_date : null,
+          description: typeof edition.description === "string" ? edition.description : null,
+          subjects: Array.isArray(edition.subjects) ? edition.subjects : [],
+          isbn10: typeof edition.isbn10 === "string" ? edition.isbn10 : null,
+          isbn13: typeof edition.isbn13 === "string" ? edition.isbn13 : null,
+          cover_url: normalizeHttpsUrl(edition.cover_url),
+          cover_candidates: [normalizeHttpsUrl(edition.cover_url)].filter(Boolean) as string[],
+          raw: { isbnEdition: edition }
+        }, "isbn");
+        return NextResponse.json({
+          ok: true,
+          domain: parsed.hostname,
+          domain_kind: domainKind,
+          final_url: urlValue,
+          scraped: preview,
+          isbn_edition: edition,
+          preview
+        });
+      }
+    }
+    // Try fetching, but if it fails fall through to the message
+  }
+
   let html = "";
   let finalUrl = urlValue;
   try {
@@ -502,8 +766,108 @@ export async function POST(req: NextRequest) {
     html = fetched.html;
     finalUrl = fetched.finalUrl;
   } catch (e: any) {
+    // AbeBooks fetch failure: return helpful message
+    if (domainKind === "abebooks") {
+      return NextResponse.json(
+        { ok: false, error: "AbeBooks pages can't be scraped directly — paste the ISBN instead" },
+        { status: 400 }
+      );
+    }
     return NextResponse.json({ ok: false, error: e?.message ?? "Fetch failed" }, { status: 400 });
   }
+
+  // --- Domain-specific scraping ---
+
+  if (domainKind === "printedmatter") {
+    const pmScraped = scrapePrintedMatter(html);
+    let scraped = mergePreferBase(makeEmpty(), pmScraped, "printedmatter");
+
+    // If ISBN found, enrich with authoritative sources
+    const isbnForLookup = scraped.isbn13 ?? scraped.isbn10 ?? null;
+    const isbnEdition = await tryIsbnEnrichment(req, isbnForLookup);
+
+    let merged = scraped;
+    if (isbnEdition && typeof isbnEdition === "object") {
+      const editionAsImport: Partial<ImportMetadata> = {
+        title: typeof (isbnEdition as any).title === "string" ? String((isbnEdition as any).title) : null,
+        authors: Array.isArray((isbnEdition as any).authors) ? (isbnEdition as any).authors : [],
+        publisher: typeof (isbnEdition as any).publisher === "string" ? String((isbnEdition as any).publisher) : null,
+        publish_date: typeof (isbnEdition as any).publish_date === "string" ? String((isbnEdition as any).publish_date) : null,
+        description: typeof (isbnEdition as any).description === "string" ? String((isbnEdition as any).description) : null,
+        subjects: Array.isArray((isbnEdition as any).subjects) ? (isbnEdition as any).subjects : [],
+        isbn10: typeof (isbnEdition as any).isbn10 === "string" ? String((isbnEdition as any).isbn10) : null,
+        isbn13: typeof (isbnEdition as any).isbn13 === "string" ? String((isbnEdition as any).isbn13) : null,
+        cover_url: normalizeHttpsUrl((isbnEdition as any).cover_url),
+        cover_candidates: [normalizeHttpsUrl((isbnEdition as any).cover_url), ...scraped.cover_candidates].filter(Boolean) as string[],
+        raw: { isbnEdition }
+      };
+      // Prefer scraped (Printed Matter data is more authoritative for PM-specific fields);
+      // fill any missing values from ISBN lookup
+      merged = mergePreferBase(makeEmpty(), scraped, "printedmatter");
+      merged = mergePreferBase(merged, editionAsImport, "isbn");
+      // Prefer Printed Matter's own cover
+      if (scraped.cover_url) {
+        merged.cover_url = scraped.cover_url;
+        merged.cover_candidates = uniqStrings([scraped.cover_url, ...((isbnEdition as any).cover_url ? [normalizeHttpsUrl((isbnEdition as any).cover_url)!] : [])]);
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      domain: parsed.hostname,
+      domain_kind: domainKind,
+      final_url: finalUrl,
+      scraped,
+      isbn_edition: isbnEdition,
+      preview: merged
+    });
+  }
+
+  // --- AbeBooks: try ISBN from fetched HTML ---
+  if (domainKind === "abebooks") {
+    const meta = extractMeta(html);
+    const isbnCandidates = uniqStrings([
+      meta["isbn"],
+      meta["product:isbn"],
+      meta["books:isbn"],
+      ...extractLikelyIsbnsFromHtml(html)
+    ]);
+    const picked = pickBestIsbn(isbnCandidates);
+    const isbnFound = picked.isbn13 ?? picked.isbn10 ?? null;
+    if (isbnFound) {
+      const edition = await tryIsbnEnrichment(req, isbnFound);
+      if (edition && typeof edition === "object") {
+        const preview: ImportMetadata = mergePreferBase(makeEmpty(), {
+          title: typeof edition.title === "string" ? edition.title : null,
+          authors: Array.isArray(edition.authors) ? edition.authors : [],
+          publisher: typeof edition.publisher === "string" ? edition.publisher : null,
+          publish_date: typeof edition.publish_date === "string" ? edition.publish_date : null,
+          description: typeof edition.description === "string" ? edition.description : null,
+          subjects: Array.isArray(edition.subjects) ? edition.subjects : [],
+          isbn10: typeof edition.isbn10 === "string" ? edition.isbn10 : null,
+          isbn13: typeof edition.isbn13 === "string" ? edition.isbn13 : null,
+          cover_url: normalizeHttpsUrl(edition.cover_url),
+          cover_candidates: [normalizeHttpsUrl(edition.cover_url)].filter(Boolean) as string[],
+          raw: { isbnEdition: edition }
+        }, "isbn");
+        return NextResponse.json({
+          ok: true,
+          domain: parsed.hostname,
+          domain_kind: domainKind,
+          final_url: finalUrl,
+          scraped: preview,
+          isbn_edition: edition,
+          preview
+        });
+      }
+    }
+    return NextResponse.json(
+      { ok: false, error: "AbeBooks pages can't be scraped directly — paste the ISBN instead" },
+      { status: 400 }
+    );
+  }
+
+  // --- Generic scraping (all other domains) ---
 
   const meta = extractMeta(html);
   const jsonldNodes = extractJsonLdObjects(html);
@@ -524,6 +888,16 @@ export async function POST(req: NextRequest) {
     ? uniqStrings([...normalizeKeywords(jsonld?.keywords), ...normalizeKeywords(jsonld?.about), ...normalizeKeywords(jsonld?.genre)])
     : [];
   const jsonldImages = normalizeImage(jsonld?.image);
+
+  // Dimensions from JSON-LD (some stores include these)
+  const jsonldDims = bookish && typeof jsonld?.bookEdition !== "undefined"
+    ? { trim_width: null, trim_height: null, trim_unit: null as TrimUnit | null }
+    : { trim_width: null, trim_height: null, trim_unit: null as TrimUnit | null };
+  // Check numberOfPages from JSON-LD
+  // Extract dimension string from JSON-LD if present
+  const jsonldDimsStr = typeof jsonld?.size === "string" ? jsonld.size
+    : typeof jsonld?.dimensions === "string" ? jsonld.dimensions : null;
+  const jsonldParsedDims = jsonldDimsStr ? parseDimensions(jsonldDimsStr) : jsonldDims;
 
   const ogTitle = meta["og:title"] ? stripTitleSuffix(String(meta["og:title"]), parsed.hostname) : null;
   const ogDescription = normalizeDescription(
@@ -548,22 +922,7 @@ export async function POST(req: NextRequest) {
 
   const covers = uniqStrings([...(jsonldImages ?? []), normalizeHttpsUrl(ogImage), normalizeHttpsUrl(twitterImage)].filter(Boolean) as string[]);
 
-  const empty: ImportMetadata = {
-    title: null,
-    authors: [],
-    publisher: null,
-    publish_date: null,
-    description: null,
-    subjects: [],
-    isbn10: null,
-    isbn13: null,
-    cover_url: null,
-    cover_candidates: [],
-    sources: [],
-    raw: {}
-  };
-
-  let scraped = empty;
+  let scraped = makeEmpty();
   scraped = mergePreferBase(
     scraped,
     {
@@ -577,6 +936,9 @@ export async function POST(req: NextRequest) {
       isbn13: picked.isbn13,
       cover_candidates: covers,
       cover_url: covers[0] ?? null,
+      trim_width: jsonldParsedDims.trim_width,
+      trim_height: jsonldParsedDims.trim_height,
+      trim_unit: jsonldParsedDims.trim_unit,
       raw: { jsonld, jsonldNodesCount: jsonldNodes.length }
     },
     "jsonld"
@@ -625,7 +987,7 @@ export async function POST(req: NextRequest) {
       raw: { isbnEdition }
     };
     // Prefer edition metadata; fill any missing values from scrape.
-    merged = mergePreferBase(empty, editionAsImport, "isbn");
+    merged = mergePreferBase(makeEmpty(), editionAsImport, "isbn");
     merged = mergePreferBase(merged, scraped, "scrape");
     // Prefer the best available cover (edition first, then scrape).
     merged.cover_candidates = uniqStrings([

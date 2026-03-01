@@ -92,6 +92,9 @@ type MetadataSearchResult = {
 type ImportPreview = {
   title: string | null;
   authors: string[];
+  editors: string[];
+  designers: string[];
+  printers: string[];
   publisher: string | null;
   publish_date: string | null;
   description: string | null;
@@ -100,6 +103,9 @@ type ImportPreview = {
   isbn13: string | null;
   cover_url: string | null;
   cover_candidates: string[];
+  trim_width: number | null;
+  trim_height: number | null;
+  trim_unit: TrimUnit | null;
   sources: string[];
 };
 
@@ -1907,7 +1913,28 @@ export default function BookDetailPage() {
       });
       const json = await res.json();
       if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Import failed");
-      const preview = (json.preview ?? null) as ImportPreview | null;
+      const rawPreview = json.preview ?? null;
+      const preview: ImportPreview | null = rawPreview
+        ? {
+            title: rawPreview.title ?? null,
+            authors: Array.isArray(rawPreview.authors) ? rawPreview.authors : [],
+            editors: Array.isArray(rawPreview.editors) ? rawPreview.editors : [],
+            designers: Array.isArray(rawPreview.designers) ? rawPreview.designers : [],
+            printers: Array.isArray(rawPreview.printers) ? rawPreview.printers : [],
+            publisher: rawPreview.publisher ?? null,
+            publish_date: rawPreview.publish_date ?? null,
+            description: rawPreview.description ?? null,
+            subjects: Array.isArray(rawPreview.subjects) ? rawPreview.subjects : [],
+            isbn10: rawPreview.isbn10 ?? null,
+            isbn13: rawPreview.isbn13 ?? null,
+            cover_url: rawPreview.cover_url ?? null,
+            cover_candidates: Array.isArray(rawPreview.cover_candidates) ? rawPreview.cover_candidates : [],
+            trim_width: typeof rawPreview.trim_width === "number" ? rawPreview.trim_width : null,
+            trim_height: typeof rawPreview.trim_height === "number" ? rawPreview.trim_height : null,
+            trim_unit: rawPreview.trim_unit ?? null,
+            sources: Array.isArray(rawPreview.sources) ? rawPreview.sources : [],
+          }
+        : null;
       setImportPreview(preview);
       setImportMeta({
         final_url: typeof json.final_url === "string" ? json.final_url : null,
@@ -1936,6 +1963,9 @@ export default function BookDetailPage() {
       const preview: ImportPreview = {
         title: typeof edition.title === "string" ? edition.title : null,
         authors: Array.isArray(edition.authors) ? edition.authors.filter(Boolean) : [],
+        editors: [],
+        designers: [],
+        printers: [],
         publisher: typeof edition.publisher === "string" ? edition.publisher : null,
         publish_date: typeof edition.publish_date === "string" ? edition.publish_date : null,
         description: typeof edition.description === "string" ? edition.description : null,
@@ -1944,6 +1974,9 @@ export default function BookDetailPage() {
         isbn13: typeof edition.isbn13 === "string" ? edition.isbn13 : null,
         cover_url: typeof edition.cover_url === "string" ? edition.cover_url : null,
         cover_candidates: uniqStrings([typeof edition.cover_url === "string" ? edition.cover_url : null]),
+        trim_width: null,
+        trim_height: null,
+        trim_unit: null,
         sources: Array.from(new Set(["isbn", ...(((edition.sources ?? []) as any[]) ?? []).map((s: any) => String(s))])).filter(Boolean)
       };
       setImportPreview(preview);
@@ -1990,11 +2023,17 @@ export default function BookDetailPage() {
   function fillFieldsAdditive(input: {
     title?: string | null;
     authors?: string[] | null;
+    editors?: string[] | null;
+    designers?: string[] | null;
+    printers?: string[] | null;
     publisher?: string | null;
     publish_date?: string | null;
     description?: string | null;
     subjects?: string[] | null;
     cover_url?: string | null;
+    trim_width?: number | null;
+    trim_height?: number | null;
+    trim_unit?: TrimUnit | null;
   }) {
     const nextTitle = String(input.title ?? "").trim();
     const nextPublisher = String(input.publisher ?? "").trim();
@@ -2028,6 +2067,39 @@ export default function BookDetailPage() {
     const mergedSubjects = uniqStrings([...(effectiveSubjects ?? []), ...nextSubjects]);
     if (mergedSubjects.length > 0) {
       setFacetDraft((s) => ({ ...s, subject: mergedSubjects }));
+    }
+
+    // Editors (additive)
+    const nextEditors = (input.editors ?? []).map((e) => String(e ?? "").trim()).filter(Boolean);
+    if (nextEditors.length > 0) {
+      const mergedEditors = uniqStrings([...(facetDraft.editor ?? []), ...nextEditors]);
+      setFacetDraft((s) => ({ ...s, editor: mergedEditors }));
+      setFormEditors(mergedEditors.join(", "));
+    }
+
+    // Designers (additive)
+    const nextDesigners = (input.designers ?? []).map((d) => String(d ?? "").trim()).filter(Boolean);
+    if (nextDesigners.length > 0) {
+      const mergedDesigners = uniqStrings([...(facetDraft.designer ?? []), ...nextDesigners]);
+      setFacetDraft((s) => ({ ...s, designer: mergedDesigners }));
+      setFormDesigners(mergedDesigners.join(", "));
+    }
+
+    // Printer (single; only fill if empty)
+    const nextPrinters = (input.printers ?? []).map((p) => String(p ?? "").trim()).filter(Boolean);
+    if (nextPrinters.length > 0 && !formPrinter.trim()) {
+      const only = nextPrinters.slice(0, 1);
+      setFacetDraft((s) => ({ ...s, printer: only }));
+      setFormPrinter(only[0] ?? "");
+    }
+
+    // Trim size (only fill if both dimensions are absent)
+    if (input.trim_width && input.trim_height && input.trim_unit) {
+      if (!formTrimWidth.trim() && !formTrimHeight.trim()) {
+        setFormTrimWidth(String(input.trim_width));
+        setFormTrimHeight(String(input.trim_height));
+        setFormTrimUnit(input.trim_unit);
+      }
     }
 
     setSearchState((s) => ({ ...s, message: "Filled missing fields (not saved)" }));
@@ -2654,37 +2726,40 @@ export default function BookDetailPage() {
                                     <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
                                   )}
                                 </div>
-                                <div className="om-lookup-main">
-                                  <div>{(preview.title ?? "").trim() || "—"}</div>
-                                  <div className="muted" style={{ marginTop: 4 }}>
+                                <div className="om-lookup-main" style={{ minWidth: 0 }}>
+                                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(preview.title ?? "").trim() || "—"}</div>
+                                  <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     {(preview.authors ?? []).filter(Boolean).join(", ") || "—"}
                                   </div>
-                                  <div className="muted" style={{ marginTop: 4 }}>
+                                  {(preview.editors ?? []).length > 0 ? (
+                                    <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      ed. {preview.editors!.join(", ")}
+                                    </div>
+                                  ) : null}
+                                  {(preview.designers ?? []).length > 0 ? (
+                                    <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      design: {preview.designers!.join(", ")}
+                                    </div>
+                                  ) : null}
+                                  {(preview.printers ?? []).length > 0 ? (
+                                    <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      print: {preview.printers!.join(", ")}
+                                    </div>
+                                  ) : null}
+                                  <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     {[preview.publisher ?? "", preview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
+                                    {preview.trim_width && preview.trim_height ? ` · ${preview.trim_width} × ${preview.trim_height} ${preview.trim_unit ?? ""}`.trim() : ""}
                                   </div>
-                                  <div className="muted" style={{ marginTop: 4 }}>
-                                    {preview.isbn13 || preview.isbn10 ? `ISBN: ${preview.isbn13 ?? preview.isbn10}` : "No ISBN found"} · sources:{" "}
-                                    {(preview.sources ?? []).join(", ") || "—"}
+                                  <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {preview.isbn13 || preview.isbn10 ? `ISBN: ${preview.isbn13 ?? preview.isbn10}` : "No ISBN found"} · {(preview.sources ?? []).join(", ") || "—"}
                                   </div>
-                                  <div className="muted" style={{ marginTop: 4 }}>
+                                  <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     {importMeta.domain ? `${importMeta.domain_kind ?? "generic"} · ${importMeta.domain}` : importMeta.domain_kind ?? ""}
                                     {previewFinalUrl ? (
-                                      <>
-                                        {" "}
-                                        ·{" "}
-                                        <a href={previewFinalUrl} target="_blank" rel="noreferrer">
-                                          open page
-                                        </a>
-                                      </>
+                                      <>{" "}· <a href={previewFinalUrl} target="_blank" rel="noreferrer">open page</a></>
                                     ) : null}
                                     {previewCoverUrl ? (
-                                      <>
-                                        {" "}
-                                        ·{" "}
-                                        <a href={previewCoverUrl} target="_blank" rel="noreferrer">
-                                          open cover
-                                        </a>
-                                      </>
+                                      <>{" "}· <a href={previewCoverUrl} target="_blank" rel="noreferrer">open cover</a></>
                                     ) : null}
                                   </div>
                                 </div>
@@ -2710,11 +2785,17 @@ export default function BookDetailPage() {
                                             fillFieldsAdditive({
                                               title: preview.title,
                                               authors: preview.authors,
+                                              editors: preview.editors,
+                                              designers: preview.designers,
+                                              printers: preview.printers,
                                               publisher: preview.publisher,
                                               publish_date: preview.publish_date,
                                               description: preview.description,
                                               subjects: preview.subjects,
-                                              cover_url: preview.cover_url
+                                              cover_url: preview.cover_url,
+                                              trim_width: preview.trim_width,
+                                              trim_height: preview.trim_height,
+                                              trim_unit: preview.trim_unit,
                                             });
                                           }}
                                           disabled={

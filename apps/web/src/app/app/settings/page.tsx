@@ -763,7 +763,7 @@ export default function SettingsPage() {
               Upload CSV files from your catalog workspace.
             </div>
             <div style={{ marginTop: 10 }}>
-              <Link href="/app?csv=1">Add CSV</Link>
+              <Link href="/app?add=1&csv=1">Add CSV</Link>
             </div>
           </div>
 

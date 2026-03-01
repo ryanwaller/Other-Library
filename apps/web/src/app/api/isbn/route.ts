@@ -176,16 +176,40 @@ async function openLibraryLookup(isbn13: string, isbn10: string | null): Promise
   const authors = Array.isArray(data.authors) ? data.authors.map((a: any) => a?.name).filter(Boolean) : [];
   const publisher = Array.isArray(data.publishers) ? data.publishers[0]?.name ?? null : null;
   const publish_date = parseDateToIso(data.publish_date);
-  const description =
+  let description: string | null =
     typeof data.description === "string"
       ? data.description
       : typeof data.description?.value === "string"
         ? data.description.value
         : null;
-  const subjects = Array.isArray(data.subjects) ? data.subjects.map((s: any) => s?.name).filter(Boolean) : [];
+  let subjects: string[] = Array.isArray(data.subjects) ? data.subjects.map((s: any) => s?.name).filter(Boolean) : [];
   const cover_url = normalizeHttpsUrl(
     data.cover?.large ?? data.cover?.medium ?? data.cover?.small ?? `https://covers.openlibrary.org/b/isbn/${isbn13}-L.jpg`
   );
+
+  // If description or subjects are thin, try the Works API for richer data
+  const workKey = Array.isArray(data.works) && data.works.length > 0 ? (data.works[0]?.key as string | undefined) : undefined;
+  if (workKey && typeof workKey === "string" && (!description || subjects.length === 0)) {
+    try {
+      const workJson = await fetchJson(`https://openlibrary.org${workKey}.json`);
+      if (workJson && typeof workJson === "object") {
+        const w = workJson as any;
+        if (!description) {
+          description =
+            typeof w.description === "string"
+              ? w.description
+              : typeof w.description?.value === "string"
+                ? w.description.value
+                : null;
+        }
+        if (subjects.length === 0 && Array.isArray(w.subjects)) {
+          subjects = uniqStrings([...subjects, ...w.subjects.filter((s: any) => typeof s === "string")]);
+        }
+      }
+    } catch {
+      // best-effort; ignore failures
+    }
+  }
 
   return {
     title,
