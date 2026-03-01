@@ -421,6 +421,7 @@ export default function BookDetailPage() {
     message: null
   });
   const [imagesInputKey, setImagesInputKey] = useState(0);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const [mergeSource, setMergeSource] = useState<MergeSource | null>(null);
   const [mergeState, setMergeState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
@@ -882,7 +883,10 @@ export default function BookDetailPage() {
   }
 
   useEffect(() => {
-    refresh();
+    (async () => {
+      await refresh();
+      setInitialLoadDone(true);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId, userId]);
 
@@ -2327,6 +2331,8 @@ export default function BookDetailPage() {
       </main>
     );
   }
+
+  if (!initialLoadDone) return null;
 
   return (
     <main className="container">

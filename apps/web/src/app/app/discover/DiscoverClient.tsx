@@ -29,6 +29,7 @@ export default function DiscoverClient() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ResultRow[]>([]);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -57,10 +58,16 @@ export default function DiscoverClient() {
   }
 
   useEffect(() => {
-    if (!userId) return;
-    if (initialQ) runSearch(initialQ);
+    if (!userId) {
+      if (session) setInitialLoadDone(true);
+      return;
+    }
+    (async () => {
+      if (initialQ) await runSearch(initialQ);
+      setInitialLoadDone(true);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, session]);
 
   const grouped = useMemo(() => {
     const mine: ResultRow[] = [];
@@ -88,6 +95,8 @@ export default function DiscoverClient() {
       </main>
     );
   }
+
+  if (!initialLoadDone) return null;
 
   return (
     <main className="container">
