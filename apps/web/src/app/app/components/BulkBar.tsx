@@ -75,156 +75,154 @@ export default function BulkBar({
   const filteredMoveTargets = libraries.filter((l) => l.name.toLowerCase().includes(moveQuery.trim().toLowerCase()));
 
   return (
-    <div className="om-bulkbar" style={{ marginTop: 10 }}>
-      <div className="row" style={{ justifyContent: "flex-end", alignItems: "baseline", gap: 10 }}>
-        <div className="row" style={{ gap: 14, alignItems: "baseline" }}>
-          <details
-            ref={visibilityRef}
-            className="om-menu"
-            onToggle={(e) => {
-              const open = (e.currentTarget as HTMLDetailsElement).open;
-              if (!open) return;
-              close(moveRef);
-              close(moreRef);
-              onAnyMenuOpen?.();
+    <div className="om-bulkbar" style={{ marginTop: 6 }}>
+      <div className="row" style={{ justifyContent: "flex-start", alignItems: "baseline", gap: 14 }}>
+        <details
+          ref={visibilityRef}
+          className="om-menu"
+          onToggle={(e) => {
+            const open = (e.currentTarget as HTMLDetailsElement).open;
+            if (!open) return;
+            close(moveRef);
+            close(moreRef);
+            onAnyMenuOpen?.();
+          }}
+        >
+          <summary className="om-filter-control om-menu-summary" tabIndex={0} style={{ minWidth: 120 }}>
+            <span>Visibility</span>
+            <span className="om-filter-caret" aria-hidden="true" />
+          </summary>
+          <div
+            className="om-menu-panel"
+            role="menu"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") close(visibilityRef);
             }}
           >
-            <summary className="om-filter-control om-menu-summary" tabIndex={0} style={{ minWidth: 120 }}>
-              <span>Visibility</span>
-              <span className="om-filter-caret" aria-hidden="true" />
-            </summary>
-            <div
-              className="om-menu-panel"
-              role="menu"
-              onKeyDown={(e) => {
-                if (e.key === "Escape") close(visibilityRef);
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                close(visibilityRef);
+                onBulkMakePublic();
               }}
+              disabled={!canAct}
             >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  close(visibilityRef);
-                  onBulkMakePublic();
-                }}
-                disabled={!canAct}
-              >
-                Public
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  close(visibilityRef);
-                  onBulkMakePrivate();
-                }}
-                disabled={!canAct}
-              >
-                Private
-              </button>
-            </div>
-          </details>
+              Public
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                close(visibilityRef);
+                onBulkMakePrivate();
+              }}
+              disabled={!canAct}
+            >
+              Private
+            </button>
+          </div>
+        </details>
 
-          <details
-            ref={moveRef}
-            className="om-menu"
-            onToggle={(e) => {
-              const open = (e.currentTarget as HTMLDetailsElement).open;
-              if (!open) return;
-              close(visibilityRef);
-              close(moreRef);
-              onAnyMenuOpen?.();
+        <details
+          ref={moveRef}
+          className="om-menu"
+          onToggle={(e) => {
+            const open = (e.currentTarget as HTMLDetailsElement).open;
+            if (!open) return;
+            close(visibilityRef);
+            close(moreRef);
+            onAnyMenuOpen?.();
+          }}
+        >
+          <summary className="om-filter-control om-menu-summary" tabIndex={0} style={{ minWidth: 100 }}>
+            <span>Move</span>
+            <span className="om-filter-caret" aria-hidden="true" />
+          </summary>
+          <div
+            className="om-menu-panel"
+            role="menu"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") close(moveRef);
             }}
           >
-            <summary className="om-filter-control om-menu-summary" tabIndex={0} style={{ minWidth: 100 }}>
-              <span>Move</span>
-              <span className="om-filter-caret" aria-hidden="true" />
-            </summary>
-            <div
-              className="om-menu-panel"
-              role="menu"
-              onKeyDown={(e) => {
-                if (e.key === "Escape") close(moveRef);
-              }}
-            >
-              <input
-                value={moveQuery}
-                onChange={(e) => setMoveQuery(e.target.value)}
-                placeholder="Search"
-              />
-              <div className="om-menu-list">
-                {filteredMoveTargets.map((l) => (
-                  <button
-                    key={l.id}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      close(moveRef);
-                      onBulkMoveSelected(l.id);
-                    }}
-                    disabled={!canAct}
-                    style={{ textAlign: "left" }}
-                  >
-                    {l.name}
-                  </button>
-                ))}
-                {filteredMoveTargets.length === 0 ? <div className="muted">No matches.</div> : null}
-              </div>
-            </div>
-          </details>
-
-          <details
-            ref={moreRef}
-            className="om-menu"
-            onToggle={(e) => {
-              const open = (e.currentTarget as HTMLDetailsElement).open;
-              if (!open) return;
-              close(visibilityRef);
-              close(moveRef);
-              onAnyMenuOpen?.();
-            }}
-          >
-            <summary className="om-filter-control om-menu-summary" tabIndex={0} style={{ minWidth: 100 }}>
-              <span>More</span>
-              <span className="om-filter-caret" aria-hidden="true" />
-            </summary>
-            <div
-              className="om-menu-panel"
-              role="menu"
-              onKeyDown={(e) => {
-                if (e.key === "Escape") close(moreRef);
-              }}
-            >
-              <div className="muted" style={{ marginBottom: 6 }}>
-                Add category
-              </div>
-              <div className="row" style={{ gap: 10, alignItems: "baseline", marginBottom: 12 }}>
-                <input
-                  value={bulkCategoryName}
-                  onChange={(e) => setBulkCategoryName(e.target.value)}
-                  placeholder="Category…"
-                  onKeyDown={(e) => {
-                    if (e.key !== "Enter") return;
-                    e.preventDefault();
-                    onBulkAssignCategory();
+            <input
+              value={moveQuery}
+              onChange={(e) => setMoveQuery(e.target.value)}
+              placeholder="Search"
+            />
+            <div className="om-menu-list">
+              {filteredMoveTargets.map((l) => (
+                <button
+                  key={l.id}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    close(moveRef);
+                    onBulkMoveSelected(l.id);
                   }}
-                />
-              </div>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  close(moreRef);
-                  onBulkDeleteSelected();
-                }}
-                disabled={!canAct}
-                style={{ textAlign: "left" }}
-              >
-                Delete book(s)
-              </button>
+                  disabled={!canAct}
+                  style={{ textAlign: "left" }}
+                >
+                  {l.name}
+                </button>
+              ))}
+              {filteredMoveTargets.length === 0 ? <div className="muted">No matches.</div> : null}
             </div>
-          </details>
-        </div>
+          </div>
+        </details>
+
+        <details
+          ref={moreRef}
+          className="om-menu"
+          onToggle={(e) => {
+            const open = (e.currentTarget as HTMLDetailsElement).open;
+            if (!open) return;
+            close(visibilityRef);
+            close(moveRef);
+            onAnyMenuOpen?.();
+          }}
+        >
+          <summary className="om-filter-control om-menu-summary" tabIndex={0} style={{ minWidth: 100 }}>
+            <span>More</span>
+            <span className="om-filter-caret" aria-hidden="true" />
+          </summary>
+          <div
+            className="om-menu-panel"
+            role="menu"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") close(moreRef);
+            }}
+          >
+            <div className="muted" style={{ marginBottom: 6 }}>
+              Add category
+            </div>
+            <div className="row" style={{ gap: 10, alignItems: "baseline", marginBottom: 12 }}>
+              <input
+                value={bulkCategoryName}
+                onChange={(e) => setBulkCategoryName(e.target.value)}
+                placeholder="Category…"
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  onBulkAssignCategory();
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                close(moreRef);
+                onBulkDeleteSelected();
+              }}
+              disabled={!canAct}
+              style={{ textAlign: "left" }}
+            >
+              Delete book(s)
+            </button>
+          </div>
+        </details>
       </div>
     </div>
   );

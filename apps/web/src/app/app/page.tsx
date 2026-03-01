@@ -2126,7 +2126,7 @@ function AppShell({
                 const next = !prev;
                 if (!next) setBulkSelectedKeys({});
                 setBulkState({ busy: false, error: null, message: null });
-                setReorderMode(false);
+                setReorderMode(next);
                 setSortOpen(false);
                 setAddOpen(false);
                 closeTagMenu();
@@ -2160,7 +2160,7 @@ function AppShell({
 
       {showAddPanel ? (
         <>
-          <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%", alignItems: "baseline" }}>
+          <div className="row" style={{ marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%", alignItems: "baseline" }}>
             <input
               placeholder="Add by ISBN, URL, or title (optional: “by Author”)"
               value={addInput}
@@ -2237,176 +2237,6 @@ function AppShell({
             </>
           ) : null}
           {csvImportState.message ? <span className="muted">{csvImportState.message}</span> : csvImportState.error ? <span className="muted">{csvImportState.error}</span> : null}
-        </div>
-      ) : null}
-
-      {addUrlPreview ? (
-        <div style={{ marginTop: 10 }} className="card">
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-            <div style={{ width: 62, flex: "0 0 auto" }}>
-              {addUrlPreview.cover_url && !addPreviewCoverFailed ? (
-                <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
-                  <img
-                    src={`/api/image-proxy?url=${encodeURIComponent(addUrlPreview.cover_url)}`}
-                    alt=""
-                    width={60}
-                    height={90}
-                    style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
-                    onError={() => setAddPreviewCoverFailed(true)}
-                  />
-                </div>
-              ) : (
-                <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
-              )}
-            </div>
-            <div style={{ flex: "1 1 auto" }}>
-              <div>{(addUrlPreview.title ?? "").trim() || "—"}</div>
-              <div className="muted" style={{ marginTop: 4 }}>
-                {(addUrlPreview.authors ?? []).filter(Boolean).join(", ") || "—"}
-              </div>
-              <div className="muted" style={{ marginTop: 4 }}>
-                {[addUrlPreview.publisher ?? "", addUrlPreview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
-              </div>
-              <div className="muted" style={{ marginTop: 4 }}>
-                {addUrlPreview.isbn13 || addUrlPreview.isbn10 ? `ISBN: ${addUrlPreview.isbn13 ?? addUrlPreview.isbn10}` : "No ISBN found"}
-                {" "}
-                · sources: {(addUrlPreview.sources ?? []).join(", ") || "—"}
-              </div>
-              <div className="muted" style={{ marginTop: 4 }}>
-                {addUrlMeta.domain ? `${addUrlMeta.domain_kind ?? "generic"} · ${addUrlMeta.domain}` : ""}
-                {addUrlMeta.final_url ? (
-                  <>
-                    {" "}
-                    ·{" "}
-                    <a href={addUrlMeta.final_url} target="_blank" rel="noreferrer">
-                      open
-                    </a>
-                  </>
-                ) : null}
-              </div>
-            </div>
-            <div style={{ flex: "0 0 auto" }}>
-              <div className="row" style={{ gap: 8 }}>
-                <button
-                  onClick={async () => {
-                    if (!addUrlPreview) return;
-                    setAddState({ busy: true, error: null, message: "Adding…" });
-                    try {
-                      const isbn = String(addUrlPreview.isbn13 ?? addUrlPreview.isbn10 ?? "").trim();
-                      let id: number;
-                      if (isbn) id = await addByIsbnValue(isbn);
-                      else
-                        id = await addManualValue({
-                          title: (addUrlPreview.title ?? "").trim() || addInput.trim(),
-                          authors: (addUrlPreview.authors ?? []).filter(Boolean),
-                          publisher: addUrlPreview.publisher ?? null,
-                          publish_date: addUrlPreview.publish_date ?? null,
-                          description: addUrlPreview.description ?? null
-                        });
-                      if (addUrlPreview.cover_url) {
-                        await importCoverForBook(id, addUrlPreview.cover_url);
-                        await refreshAllBooks();
-                      }
-                      setAddInput("");
-                      cancelAddPreview();
-                      setAddState({ busy: false, error: null, message: "Added" });
-                      window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
-                    } catch (e: any) {
-                      setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
-                    }
-                  }}
-                  disabled={addState.busy}
-                >
-                  Add
-                </button>
-                <button onClick={cancelAddPreview} disabled={addState.busy}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {addSearchResults.length > 0 ? (
-        <div style={{ marginTop: 10 }}>
-          {addSearchResults.map((r, idx) => {
-            const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
-            const title = (r.title ?? "").trim() || "—";
-            const authors = (r.authors ?? []).filter(Boolean).join(", ");
-            const pub = [r.publisher ?? "", r.publish_date ?? (r.publish_year ? String(r.publish_year) : "")].filter(Boolean).join(" · ");
-            return (
-              <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="card" style={{ marginTop: 8 }}>
-                <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                  <div style={{ width: 62, flex: "0 0 auto" }}>
-                    {r.cover_url ? (
-                      <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
-                        <img
-                          src={`/api/image-proxy?url=${encodeURIComponent(String(r.cover_url))}`}
-                          alt=""
-                          width={60}
-                          height={90}
-                          style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
-                    )}
-                  </div>
-                  <div style={{ flex: "1 1 auto" }}>
-                    <div>{title}</div>
-                    <div className="muted" style={{ marginTop: 4 }}>
-                      {authors || "—"}
-                      {pub ? ` · ${pub}` : ""}
-                    </div>
-                    <div className="muted" style={{ marginTop: 4 }}>
-                      {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"} · {r.source}
-                    </div>
-                  </div>
-                  <div style={{ flex: "0 0 auto" }}>
-                    <button
-                      onClick={async () => {
-                        setAddState({ busy: true, error: null, message: "Adding…" });
-                        try {
-                          let id: number;
-                          if (bestIsbn) id = await addByIsbnValue(bestIsbn);
-                          else
-                            id = await addManualValue({
-                              title: (r.title ?? addInput).trim() || addInput.trim(),
-                              authors: (r.authors ?? []).filter(Boolean),
-                              publisher: r.publisher ?? null,
-                              publish_date: r.publish_date ?? null,
-                              description: null
-                            });
-                          if (r.cover_url) {
-                            await importCoverForBook(id, r.cover_url);
-                            await refreshAllBooks();
-                          }
-                          setAddState({ busy: false, error: null, message: "Added" });
-                          window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
-                        } catch (e: any) {
-                          setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
-                        }
-                      }}
-                      disabled={addState.busy}
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          <div className="muted" style={{ marginTop: 6 }}>
-            {addSearchState.message ? (addSearchState.error ? `${addSearchState.message} (${addSearchState.error})` : addSearchState.message) : ""}
-          </div>
-        </div>
-      ) : addSearchState.message ? (
-        <div className="muted" style={{ marginTop: 8 }}>
-          {addSearchState.error ? `${addSearchState.message} (${addSearchState.error})` : addSearchState.message}
         </div>
       ) : null}
 
@@ -2633,7 +2463,7 @@ function AppShell({
       <hr className="om-hr" />
 
       <div style={{ marginTop: 24 }} className="card">
-        <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, width: "100%", alignItems: "baseline" }}>
+        <div className="row" style={{ marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, width: "100%", alignItems: "baseline" }}>
           <input
             placeholder="Add another catalog (e.g. Home, Office)"
             value={newLibraryName}
