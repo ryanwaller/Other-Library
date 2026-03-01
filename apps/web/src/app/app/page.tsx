@@ -315,6 +315,7 @@ function AppShell({
 
   const [isMobile, setIsMobile] = useState(false);
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, true | undefined>>({});
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   useEffect(() => {
     if (!openCsvPicker) return;
@@ -693,8 +694,8 @@ function AppShell({
       if (!alive) return;
       setUserBooksCount(count ?? 0);
 
-      await refreshLibraries();
-      await refreshAllBooks();
+      await Promise.all([refreshLibraries(), refreshAllBooks()]);
+      if (alive) setInitialLoadDone(true);
     })();
     return () => {
       alive = false;
@@ -1997,6 +1998,8 @@ function AppShell({
     csvRows.length > 0 ||
     Boolean(csvImportState.message) ||
     Boolean(csvImportState.error);
+
+  if (!initialLoadDone) return null;
 
   return (
     <div style={{ marginTop: 16 }}>
