@@ -136,7 +136,7 @@ function parseStructuredNotes(notes: string | null): {
     design: "designers_override",
     designer: "designers_override",
     designers: "designers_override",
-    production: "printer_override",
+    production: "materials_override",
     tags: "subjects_override",
     tag: "subjects_override",
     editor: "editors_override",
@@ -168,15 +168,7 @@ function parseStructuredNotes(notes: string | null): {
     }
 
     if (value && mappings[lowerKey]) {
-      let targetKey = mappings[lowerKey];
-      const lowerValue = value.toLowerCase();
-      const materialKeywords = ["paper", "cloth", "linen", "cardboard", "fabric", "foil", "wood"];
-      const isMaterialValue = materialKeywords.some(kw => lowerValue.includes(kw));
-
-      if (targetKey === "printer_override" && isMaterialValue) {
-        targetKey = "materials_override";
-      }
-
+      const targetKey = mappings[lowerKey];
       if (data[targetKey]) {
         data[targetKey] += `, ${value}`;
       } else {
