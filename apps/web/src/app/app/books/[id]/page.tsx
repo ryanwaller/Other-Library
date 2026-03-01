@@ -1805,6 +1805,10 @@ export default function BookDetailPage() {
       setCoverInputKey((k) => k + 1);
       await refresh();
       setCoverState({ busy: false, error: null, message: "Saved" });
+      setCoverToolsOpen(false);
+      setTimeout(() => {
+        setCoverState(s => s.message === "Saved" ? { ...s, message: null } : s);
+      }, 1000);
     } catch (e: any) {
       setCoverState({ busy: false, error: e?.message ?? "Save failed", message: "Save failed" });
     }
@@ -2973,6 +2977,12 @@ export default function BookDetailPage() {
                   open={coverToolsOpen}
                   onToggle={(e) => {
                     const open = (e.currentTarget as HTMLDetailsElement).open;
+                    
+                    // If it was open and we're closing it, auto-save if we have something to save
+                    if (!open && coverToolsOpen && coverEditorSrc && !coverState.busy) {
+                      void uploadCover();
+                    }
+
                     setCoverToolsOpen(open);
                     if (open && coverUrl && !coverEditorSrc && !pendingCover) {
                       const origSrc = toFullSizeImageUrl(coverOriginalSrc ?? coverUrl);
@@ -3133,6 +3143,7 @@ export default function BookDetailPage() {
                               setPendingCover(null);
                               setCoverEditorSrc(null);
                               setCoverInputKey((k) => k + 1);
+                              setCoverToolsOpen(false);
                             }}
                             disabled={coverState.busy}
                           >
