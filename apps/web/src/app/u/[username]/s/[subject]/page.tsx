@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
-import { bookIdSlug } from "../../../../../lib/slug";
-import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
+import PublicPagedBookList from "../../PublicPagedBookList";
+import type { CoverCrop } from "../../../../../components/CoverImage";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +84,7 @@ export default async function PublicSubjectPage({ params }: { params: Promise<{ 
     .select("id,library_id,visibility,title_override,authors_override,subjects_override,cover_original_url,cover_crop,edition:editions(isbn13,title,authors,cover_url,subjects),media:user_book_media(kind,storage_path)")
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(1000);
 
   const books = (booksRes.data ?? []) as unknown as PublicBook[];
 
@@ -112,8 +112,10 @@ export default async function PublicSubjectPage({ params }: { params: Promise<{ 
   const signedMap: Record<string, string> = {};
   if (paths.length > 0) {
     const signedRes = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 30);
-    for (const s of signedRes.data ?? []) {
-      if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;
+    if (signedRes.data) {
+      for (const s of signedRes.data) {
+        if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;
+      }
     }
   }
 
@@ -188,44 +190,11 @@ export default async function PublicSubjectPage({ params }: { params: Promise<{ 
                   {libraryBooks.length} book{libraryBooks.length === 1 ? "" : "s"}
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                {libraryBooks.map((b) => {
-                  const e = b.edition;
-                  const title = ((b.title_override ?? "").trim() || e?.title || "(untitled)") as string;
-                  const authors = ((b.authors_override ?? []).filter(Boolean).length > 0
-                    ? (b.authors_override ?? []).filter(Boolean)
-                    : (e?.authors ?? []).filter(Boolean)) as string[];
-                  const cover = (b.media ?? []).find((m) => m.kind === "cover");
-                  const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
-                  const cropData = b.cover_crop ?? null;
-                  const imageSrc = cropData && b.cover_original_url ? (signedMap[b.cover_original_url] ?? coverUrl) : coverUrl;
-                  const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
-                  return (
-                    <div key={b.id} className="om-book-card">
-                      <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
-                        <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
-                          <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
-                        </div>
-                      </Link>
-                      <div style={{ marginTop: 8 }}>
-                        <Link href={href} className="om-book-title">
-                          {title}
-                        </Link>
-                      </div>
-                      <div className="om-book-secondary">
-                        {authors.length > 0
-                          ? authors.map((a, idx) => (
-                              <span key={a}>
-                                <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                                {idx < authors.length - 1 ? <span>, </span> : null}
-                              </span>
-                            ))
-                          : "—"}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <PublicPagedBookList
+                books={libraryBooks}
+                username={profile.username}
+                signedMap={signedMap}
+              />
             </div>
           );
         })}

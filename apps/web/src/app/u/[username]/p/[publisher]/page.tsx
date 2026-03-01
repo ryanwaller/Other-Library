@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
-import { bookIdSlug } from "../../../../../lib/slug";
-import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
+import PublicPagedBookList from "../../PublicPagedBookList";
+import type { CoverCrop } from "../../../../../components/CoverImage";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +12,9 @@ type PublicBook = {
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
   authors_override: string[] | null;
-  publisher_override: string | null;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
-  edition: { isbn13: string | null; title: string | null; authors: string[] | null; publisher: string | null; cover_url: string | null } | null;
+  edition: { isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null; publisher: string | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
 
@@ -25,10 +24,6 @@ function safeDecode(input: string): string {
   } catch {
     return input;
   }
-}
-
-function effectivePublisherFor(b: PublicBook): string {
-  return (b.publisher_override ?? "").trim() || (b.edition?.publisher ?? "").trim();
 }
 
 export default async function PublicPublisherPage({ params }: { params: Promise<{ username: string; publisher: string }> }) {
@@ -85,15 +80,20 @@ export default async function PublicPublisherPage({ params }: { params: Promise<
 
   const booksRes = await supabase
     .from("user_books")
-    .select("id,library_id,visibility,title_override,authors_override,publisher_override,cover_original_url,cover_crop,edition:editions(isbn13,title,authors,publisher,cover_url),media:user_book_media(kind,storage_path)")
+    .select(
+      "id,library_id,visibility,title_override,authors_override,publisher_override,cover_original_url,cover_crop,edition:editions(isbn13,title,authors,cover_url,publisher),media:user_book_media(kind,storage_path)"
+    )
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(1000);
 
   const books = (booksRes.data ?? []) as unknown as PublicBook[];
 
   const needle = publisherName.toLowerCase();
-  const filtered = books.filter((b) => effectivePublisherFor(b).toLowerCase() === needle);
+  const filtered = books.filter((b) => {
+    const pub = (b as any).publisher_override?.trim() || b.edition?.publisher?.trim() || "";
+    return pub.toLowerCase() === needle;
+  });
 
   const paths = Array.from(
     new Set([
@@ -110,8 +110,10 @@ export default async function PublicPublisherPage({ params }: { params: Promise<
   const signedMap: Record<string, string> = {};
   if (paths.length > 0) {
     const signedRes = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 30);
-    for (const s of signedRes.data ?? []) {
-      if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;
+    if (signedRes.data) {
+      for (const s of signedRes.data) {
+        if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;
+      }
     }
   }
 
@@ -186,44 +188,11 @@ export default async function PublicPublisherPage({ params }: { params: Promise<
                   {libraryBooks.length} book{libraryBooks.length === 1 ? "" : "s"}
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                {libraryBooks.map((b) => {
-                  const e = b.edition;
-                  const title = ((b.title_override ?? "").trim() || e?.title || "(untitled)") as string;
-                  const authors = ((b.authors_override ?? []).filter(Boolean).length > 0
-                    ? (b.authors_override ?? []).filter(Boolean)
-                    : (e?.authors ?? []).filter(Boolean)) as string[];
-                  const cover = (b.media ?? []).find((m) => m.kind === "cover");
-                  const coverUrl = cover ? signedMap[cover.storage_path] : e?.cover_url ?? null;
-                  const cropData = b.cover_crop ?? null;
-                  const imageSrc = cropData && b.cover_original_url ? (signedMap[b.cover_original_url] ?? coverUrl) : coverUrl;
-                  const href = `/u/${profile.username}/b/${bookIdSlug(b.id, title)}`;
-                  return (
-                    <div key={b.id} className="om-book-card">
-                      <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
-                        <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
-                          <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
-                        </div>
-                      </Link>
-                      <div style={{ marginTop: 8 }}>
-                        <Link href={href} className="om-book-title">
-                          {title}
-                        </Link>
-                      </div>
-                      <div className="om-book-secondary">
-                        {authors.length > 0
-                          ? authors.map((a, idx) => (
-                              <span key={a}>
-                                <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                                {idx < authors.length - 1 ? <span>, </span> : null}
-                              </span>
-                            ))
-                          : "—"}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <PublicPagedBookList
+                books={libraryBooks}
+                username={profile.username}
+                signedMap={signedMap}
+              />
             </div>
           );
         })}
