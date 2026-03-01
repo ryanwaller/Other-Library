@@ -117,6 +117,75 @@ function parseAuthorsInput(input: string): string[] {
   return out;
 }
 
+function parseStructuredNotes(notes: string | null): {
+  data: Record<string, string>;
+  remainingNotes: string | null;
+} {
+  if (!notes) return { data: {}, remainingNotes: null };
+
+  const pairs = notes.split(";");
+  const data: Record<string, string> = {};
+  const unmapped: string[] = [];
+
+  const mappings: Record<string, string> = {
+    objecttype: "object_type",
+    "object type": "object_type",
+    subject: "subjects_override",
+    subjects: "subjects_override",
+    decade: "decade",
+    design: "designers_override",
+    designer: "designers_override",
+    designers: "designers_override",
+    production: "printer_override",
+    tags: "subjects_override",
+    tag: "subjects_override",
+    editor: "editors_override",
+    editors: "editors_override",
+    printer: "printer_override",
+    materials: "materials_override",
+    material: "materials_override",
+    pages: "pages",
+    publisher: "publisher_override"
+  };
+
+  for (const p of pairs) {
+    const trimmedPair = p.trim();
+    if (!trimmedPair) continue;
+
+    const colonIdx = trimmedPair.indexOf(":");
+    if (colonIdx === -1) {
+      unmapped.push(trimmedPair);
+      continue;
+    }
+
+    const key = trimmedPair.slice(0, colonIdx).trim();
+    const value = trimmedPair.slice(colonIdx + 1).trim();
+    const lowerKey = key.toLowerCase();
+
+    if (lowerKey === "id") {
+      unmapped.push(trimmedPair);
+      continue;
+    }
+
+    if (value && mappings[lowerKey]) {
+      const targetKey = mappings[lowerKey];
+      if (data[targetKey]) {
+        data[targetKey] += `, ${value}`;
+      } else {
+        data[targetKey] = value;
+      }
+    } else {
+      unmapped.push(trimmedPair);
+    }
+  }
+
+  const remaining = unmapped.join("; ").trim();
+  return {
+    data,
+    remainingNotes: remaining || null
+  };
+}
+
 function AppShell({
   session,
   filterTag,
@@ -997,10 +1066,41 @@ function AppShell({
         for (let c = 0; c < copies; c += 1) {
           const id = r.isbn ? await createUserBookByIsbnNoRefresh(r.isbn) : await createManualUserBookNoRefresh(r);
 
-          const updatePayload: any = {};
-          if (r.notes) updatePayload.notes = r.notes;
+          const { data: parsed, remainingNotes } = parseStructuredNotes(r.notes);
+          const updatePayload: any = {
+            notes: remainingNotes
+          };
+          if (!remainingNotes && r.notes) updatePayload.notes = null;
+
           if (r.group_label) updatePayload.group_label = r.group_label;
-          if (r.object_type) updatePayload.object_type = r.object_type;
+          updatePayload.object_type = r.object_type || parsed.object_type || null;
+
+          if (parsed.subjects_override) {
+            updatePayload.subjects_override = Array.from(new Set(parsed.subjects_override.split(",").map((s) => s.trim()).filter(Boolean)));
+          }
+          if (parsed.designers_override) {
+            updatePayload.designers_override = Array.from(new Set(parsed.designers_override.split(",").map((s) => s.trim()).filter(Boolean)));
+          }
+          if (parsed.editors_override) {
+            updatePayload.editors_override = Array.from(new Set(parsed.editors_override.split(",").map((s) => s.trim()).filter(Boolean)));
+          }
+          if (parsed.publisher_override && !r.publisher) {
+            updatePayload.publisher_override = parsed.publisher_override;
+          }
+          if (parsed.printer_override) {
+            updatePayload.printer_override = parsed.printer_override;
+          }
+          if (parsed.materials_override) {
+            updatePayload.materials_override = parsed.materials_override;
+          }
+          if (parsed.decade) {
+            updatePayload.decade = parsed.decade;
+          }
+          if (parsed.pages) {
+            const p = Number(parsed.pages);
+            if (Number.isFinite(p)) updatePayload.pages = Math.max(1, Math.floor(p));
+          }
+
           if (csvApplyOverrides && r.isbn) {
             if (r.title) updatePayload.title_override = r.title;
             if (r.authors.length > 0) updatePayload.authors_override = r.authors;
@@ -1009,9 +1109,16 @@ function AppShell({
             if (r.description) updatePayload.description_override = r.description;
           }
           if (Object.keys(updatePayload).length > 0) {
-            const up = await supabase.from("user_books").update(updatePayload).eq("id", id);
+            let up = await supabase.from("user_books").update(updatePayload).eq("id", id);
             if (up.error) {
-              // ignore per-row; import should continue
+              const msg = (up.error.message ?? "").toLowerCase();
+              if (msg.includes("trim_width") || msg.includes("group_label")) {
+                delete updatePayload.decade;
+                delete updatePayload.pages;
+                delete updatePayload.group_label;
+                delete updatePayload.object_type;
+                up = await supabase.from("user_books").update(updatePayload).eq("id", id);
+              }
             }
           }
 
