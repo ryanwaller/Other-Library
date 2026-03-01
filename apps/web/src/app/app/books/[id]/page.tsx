@@ -385,6 +385,11 @@ export default function BookDetailPage() {
     message: null
   });
   const [searchResults, setSearchResults] = useState<MetadataSearchResult[]>([]);
+  const [lookupLimit, setLookupLimit] = useState(10);
+
+  useEffect(() => {
+    setLookupLimit(10);
+  }, [searchResults]);
 
   const [importState, setImportState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
@@ -2667,7 +2672,7 @@ export default function BookDetailPage() {
                     <div style={{ marginTop: 10 }}>
                       <div className="muted">Title/author results</div>
                       <div style={{ marginTop: 6 }}>
-                        {searchResults.map((r, idx) => {
+                        {searchResults.slice(0, lookupLimit).map((r, idx) => {
                           const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
                           const hasIsbn = Boolean(bestIsbn);
                           const title = (r.title ?? "").trim() || "—";
@@ -2740,6 +2745,13 @@ export default function BookDetailPage() {
                           );
                         })}
                       </div>
+                      {searchResults.length > lookupLimit ? (
+                        <div className="row" style={{ marginTop: 12, justifyContent: "center" }}>
+                          <button onClick={() => setLookupLimit((prev) => prev + 10)} className="muted">
+                            Load more
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
 

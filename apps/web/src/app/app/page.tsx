@@ -2245,30 +2245,6 @@ function AppShell({
       <div className="row" style={{ marginTop: 6, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
         <div className="row" style={{ gap: 12, alignItems: "baseline", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
           <button
-            type="button"
-            className={showAddPanel ? "text-primary" : "muted"}
-            onClick={() => {
-              setAddOpen((prev) => !prev);
-              setSortOpen(false);
-              closeTagMenu();
-              closeCategoryMenu();
-            }}
-          >
-            Add
-          </button>
-          <button
-            type="button"
-            className={sortOpen ? "text-primary" : "muted"}
-            onClick={() => {
-              setSortOpen((v) => !v);
-              setAddOpen(false);
-              closeTagMenu();
-              closeCategoryMenu();
-            }}
-          >
-            Sort
-          </button>
-          <button
             onClick={() => {
               setBulkMode((prev) => {
                 const next = !prev;
@@ -2284,6 +2260,30 @@ function AppShell({
             }}
           >
             {bulkMode ? "Done" : "Edit"}
+          </button>
+          <button
+            type="button"
+            className={sortOpen ? "text-primary" : "muted"}
+            onClick={() => {
+              setSortOpen((v) => !v);
+              setAddOpen(false);
+              closeTagMenu();
+              closeCategoryMenu();
+            }}
+          >
+            View by
+          </button>
+          <button
+            type="button"
+            className={showAddPanel ? "text-primary" : "muted"}
+            onClick={() => {
+              setAddOpen((prev) => !prev);
+              setSortOpen(false);
+              closeTagMenu();
+              closeCategoryMenu();
+            }}
+          >
+            Add to catalog
           </button>
           <input
             className="om-inline-search-input"
