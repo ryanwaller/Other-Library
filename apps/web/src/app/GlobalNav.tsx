@@ -243,26 +243,25 @@ export default function GlobalNav() {
   }, [unreadThreads, unreadLatestStatus]);
 
   if (!supabase) return null;
-  if (!sessionUserId) return null;
 
   return (
     <div className="container">
       <div style={{ padding: "8px 0 6px" }}>
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div>
-            <Link href="/app" style={{ textDecoration: "none" }}>
+            <Link href={sessionUserId ? "/app" : "/"} style={{ textDecoration: "none" }}>
               Other Library
             </Link>
           </div>
 
           <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-            {editInAppHref ? (
+            {sessionUserId && editInAppHref ? (
               <Link href={editInAppHref} aria-label="Edit this page in the app">
                 Edit in app
               </Link>
             ) : null}
 
-            {messagesBadge ? (
+            {sessionUserId && messagesBadge ? (
               <Link href={messagesHref} aria-label={`${unreadThreads} unread conversations`} style={{ textDecoration: "none" }}>
                 <span className="om-nav-badge om-nav-badge--square" style={{ background: messagesBadge.bg }}>
                   {messagesBadge.text}
@@ -270,7 +269,7 @@ export default function GlobalNav() {
               </Link>
             ) : null}
 
-            {pendingRequests > 0 ? (
+            {sessionUserId && pendingRequests > 0 ? (
               <Link href="/app/follows" aria-label={`${pendingRequests} pending follow requests`} style={{ textDecoration: "none" }}>
                 <span className="om-nav-badge om-nav-badge--circle" style={{ background: "#b00020" }}>
                   {pendingRequests}
@@ -278,7 +277,7 @@ export default function GlobalNav() {
               </Link>
             ) : null}
 
-            {avatarUrl || me?.username ? (
+            {sessionUserId && (avatarUrl || me?.username) ? (
               <div className="om-avatar-lockup">
                 {avatarUrl ? (
                   <Link href={me?.username ? `/u/${me.username}` : "/app"} aria-label="Open your public profile" className="om-avatar-link">
@@ -295,9 +294,10 @@ export default function GlobalNav() {
               </div>
             ) : null}
 
-            {isAdmin ? <Link href="/admin">Admin</Link> : null}
-            <Link href="/app/settings">Settings</Link>
-            <button onClick={signOut}>Sign out</button>
+            {sessionUserId && isAdmin ? <Link href="/admin">Admin</Link> : null}
+            {sessionUserId && <Link href="/app/settings">Settings</Link>}
+            {sessionUserId && <button onClick={signOut}>Sign out</button>}
+            {!sessionUserId && <Link href="/">Sign in</Link>}
           </div>
         </div>
       </div>
