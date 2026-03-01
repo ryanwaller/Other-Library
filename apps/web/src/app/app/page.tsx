@@ -2126,7 +2126,7 @@ function AppShell({
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ minWidth: 0, flex: "1 1 auto", width: isMobile ? "100%" : 280, maxWidth: "100%" }}
+              style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
             />
           </div>
           {(searchFocused || searchQuery.trim()) ? (
@@ -2143,7 +2143,7 @@ function AppShell({
 
         {showAddPanel ? (
           <>
-            <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%" }}>
+            <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%", alignItems: "baseline" }}>
               <input
                 placeholder="Add by ISBN, URL, or title (optional: “by Author”)"
                 value={addInput}
@@ -2153,7 +2153,7 @@ function AppShell({
                   e.preventDefault();
                   smartAddOrSearch();
                 }}
-                style={{ minWidth: 0, flex: "1 1 0%" }}
+                style={{ minWidth: 0, flex: 1 }}
               />
               <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
                 <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
@@ -2703,7 +2703,7 @@ function AppShell({
         <hr className="om-hr" />
 
         <div style={{ marginTop: 14 }} className="card">
-          <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, width: "100%" }}>
+          <div className="row" style={{ marginTop: 10, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, width: "100%", alignItems: "baseline" }}>
             <input
               placeholder="Add another catalog (e.g. Home, Office)"
               value={newLibraryName}
@@ -2713,7 +2713,7 @@ function AppShell({
                 e.preventDefault();
                 createLibrary(newLibraryName);
               }}
-              style={{ minWidth: 0, flex: "1 1 0%" }}
+              style={{ minWidth: 0, flex: 1 }}
             />
             <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy || !newLibraryName.trim()} style={{ marginLeft: "auto" }}>
               Add

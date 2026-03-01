@@ -48,8 +48,8 @@ export default function LibraryBlock({
   const hasNameChanges = nameDraft.trim() !== libraryName.trim();
   return (
     <div className="card" style={{ marginTop: 14 }}>
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-        <div className="row" style={{ gap: 10 }}>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+        <div className="row" style={{ gap: 10, flex: 1, alignItems: "baseline" }}>
           <button
             onClick={() => {
               if (reorderMode) return;
@@ -67,13 +67,25 @@ export default function LibraryBlock({
               border: "none",
               background: "transparent",
               textDecoration: "none",
-              cursor: busy || reorderMode ? "default" : "pointer"
+              cursor: busy || reorderMode ? "default" : "pointer",
+              transform: "translateY(2px)"
             }}
           >
             <span className="om-catalog-caret" data-collapsed={collapsed ? "true" : "false"} aria-hidden="true" />
           </button>
           {manageMode && isEditing ? (
-            <span className="row" style={{ gap: 8, flex: "1 1 auto", minWidth: 0, flexWrap: "nowrap" }}>
+            <span
+              className="row"
+              style={{
+                gap: 24,
+                flex: 1,
+                minWidth: 0,
+                flexWrap: "nowrap",
+                alignItems: "baseline",
+                borderBottom: "1px solid var(--border)",
+                paddingBottom: 9
+              }}
+            >
               <input
                 value={nameDraft}
                 onChange={(e) => onNameDraftChange(e.target.value)}
@@ -88,17 +100,17 @@ export default function LibraryBlock({
                   onSaveName(libraryId, nameDraft);
                 }}
                 autoFocus
-                style={{ minWidth: 220, flex: "1 1 auto" }}
+                style={{ minWidth: 220, flex: 1, borderBottom: "none", paddingBottom: 0 }}
               />
               {hasNameChanges ? (
-                <>
+                <div className="row" style={{ gap: 24, alignItems: "baseline" }}>
                   <button onClick={() => onSaveName(libraryId, nameDraft)} disabled={busy || !nameDraft.trim()}>
                     Save
                   </button>
                   <button onClick={onCancelEdit} disabled={busy}>
                     Cancel
                   </button>
-                </>
+                </div>
               ) : null}
               <button onClick={() => onDelete(libraryId)} disabled={busy} style={{ marginLeft: "auto" }}>
                 Delete

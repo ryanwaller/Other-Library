@@ -28,12 +28,10 @@ export default function HomeClient() {
         <div className="row" style={{ alignItems: "flex-start" }}>
           <div style={{ flex: "1 1 320px" }}>
             <SignInCard note="Existing users: sign in." redirectTo="/app" />
-          </div>
-
           <div style={{ flex: "1 1 320px" }} className="card">
             <div style={{ marginBottom: 8 }}>I have an invite</div>
-            <div className="row" style={{ marginTop: 8 }}>
-              <input value={inviteToken} onChange={(e) => setInviteToken(e.target.value)} placeholder="Invite token" />
+            <div className="row" style={{ marginTop: 8, alignItems: "baseline" }}>
+              <input value={inviteToken} onChange={(e) => setInviteToken(e.target.value)} placeholder="Invite token" style={{ flex: 1 }} />
               <button
                 onClick={() => {
                   const t = inviteToken.trim();
@@ -54,18 +52,20 @@ export default function HomeClient() {
 
           <div style={{ flex: "1 1 320px" }} className="card">
             <div style={{ marginBottom: 8 }}>Request access</div>
-            <div className="row" style={{ marginTop: 8 }}>
-              <input value={waitEmail} onChange={(e) => setWaitEmail(e.target.value)} placeholder="Email" />
+            <div className="row" style={{ marginTop: 8, alignItems: "baseline" }}>
+              <input value={waitEmail} onChange={(e) => setWaitEmail(e.target.value)} placeholder="Email" style={{ flex: 1 }} />
             </div>
-            <div className="row" style={{ marginTop: 8 }}>
-              <input value={waitNote} onChange={(e) => setWaitNote(e.target.value)} placeholder="Note (optional)" />
+            <div className="row" style={{ marginTop: 8, alignItems: "baseline" }}>
+              <input value={waitNote} onChange={(e) => setWaitNote(e.target.value)} placeholder="Note (optional)" style={{ flex: 1 }} />
               <button
                 onClick={async () => {
-                  const email = waitEmail.trim();
-                  if (!email) return;
-                  setWaitState({ busy: true, error: null, message: "Submitting…" });
-                  try {
-                    const res = await fetch("/api/waitlist", {
+          ...
+              }}
+                disabled={waitState.busy || !waitEmail.trim()}
+              >
+                {waitState.busy ? "Submitting…" : "Submit"}
+              </button>
+            </div>
                       method: "POST",
                       headers: { "content-type": "application/json" },
                       body: JSON.stringify({ email, note: waitNote })
