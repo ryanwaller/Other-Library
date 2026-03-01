@@ -431,6 +431,7 @@ export default function BookDetailPage() {
   const [mergeAllSources, setMergeAllSources] = useState<MergeSource[]>([]);
   const [mergePanelOpen, setMergePanelOpen] = useState(false);
   const [mergeSelections, setMergeSelections] = useState<Record<string, string | null>>({});
+  const [mergeCoverUrls, setMergeCoverUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -849,6 +850,18 @@ export default function BookDetailPage() {
               if (allSources.length > 0) {
                 setMergeAllSources(allSources);
                 setMergeSource(allSources[0] ?? null);
+                // Sign URLs for community cover media so panel can render images
+                const coverPaths = [...new Set(
+                  allSources.flatMap((s) => s.media.filter((m) => m.kind === "cover").map((m) => m.storage_path))
+                )];
+                if (coverPaths.length > 0) {
+                  const sigs = await supabase.storage.from("user-book-media").createSignedUrls(coverPaths, 60 * 60);
+                  const coverUrlMap: Record<string, string> = {};
+                  for (const d of sigs.data ?? []) {
+                    if (d.path && d.signedUrl) coverUrlMap[d.path] = d.signedUrl;
+                  }
+                  setMergeCoverUrls(coverUrlMap);
+                }
               }
             }
           }
@@ -979,11 +992,21 @@ export default function BookDetailPage() {
       if (g) groups.push({ ...g, label });
     }
 
-    // Cover — shown first, only when community has variants we don't have
+    // Cover — one candidate per unique storage_path from community; always shown when community has covers.
+    // Pre-selected only when user has no cover (never auto-replace an existing cover).
     const hasCover = book.media.some((m) => m.kind === "cover");
-    const coverVariants = mergeAllSources.filter((s) => s.media.some((m) => m.kind === "cover")).length;
-    if (!hasCover && coverVariants > 0) {
-      groups.push({ key: "cover", label: "Cover", localValue: null, candidates: [{ value: `${coverVariants} variant${coverVariants !== 1 ? "s" : ""}`, count: coverVariants }], isArray: false });
+    const coverPathCounts: Record<string, number> = {};
+    for (const s of mergeAllSources) {
+      for (const m of s.media) {
+        if (m.kind === "cover") coverPathCounts[m.storage_path] = (coverPathCounts[m.storage_path] ?? 0) + 1;
+      }
+    }
+    const coverCandidates = Object.entries(coverPathCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 6)
+      .map(([value, count]) => ({ value, count }));
+    if (coverCandidates.length > 0) {
+      groups.push({ key: "cover", label: "Cover", localValue: hasCover ? "exists" : null, candidates: coverCandidates, isArray: true });
     }
 
     // Metadata fields in page order
@@ -2175,38 +2198,28 @@ export default function BookDetailPage() {
         }
       } catch { /* ignore */ }
 
-      // Media copy — driven by panel selections
-      const includeCover  = selections["cover"]  != null;
-      const includeImages = selections["images"] != null;
-      if (includeCover || includeImages) {
-        const existingCover  = (book.media ?? []).some((m) => m.kind === "cover");
-        const existingImages = (book.media ?? []).some((m) => m.kind === "image");
-        // Collect all candidate media from all sources
-        const allMedia: Array<{ kind: "cover" | "image"; storage_path: string }> = [];
-        for (const s of mergeAllSources) {
-          for (const m of s.media) {
-            if (m.kind === "cover" && includeCover && !existingCover) allMedia.push(m);
-            if (m.kind === "image" && includeImages && !existingImages) allMedia.push(m);
-          }
-        }
-        // Deduplicate by storage_path, keep first (highest-scoring source)
-        const seen = new Set<string>();
-        const toCopy = allMedia.filter((m) => { if (seen.has(m.storage_path)) return false; seen.add(m.storage_path); return true; }).slice(0, 1);
-        for (const m of toCopy) {
-          const signed = await supabase.storage.from("user-book-media").createSignedUrl(m.storage_path, 60 * 15);
-          if (signed.error || !signed.data?.signedUrl) continue;
+      // Cover — copy the specifically selected cover storage_path
+      const selectedCoverEntry = Object.entries(selections).find(([k, v]) => k.startsWith("cover::") && v != null);
+      const selectedCoverPath = selectedCoverEntry ? selectedCoverEntry[0].slice("cover::".length) : null;
+      if (selectedCoverPath) {
+        const signed = await supabase.storage.from("user-book-media").createSignedUrl(selectedCoverPath, 60 * 15);
+        if (!signed.error && signed.data?.signedUrl) {
           const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(signed.data.signedUrl)}`);
-          if (!resp.ok) continue;
-          const blob = await resp.blob();
-          const fileName = safeFileName(String(m.storage_path.split("/").pop() ?? "image"));
-          const destPath = `${userId}/${book.id}/merge-${Date.now()}-${fileName}`;
-          const up = await supabase.storage.from("user-book-media").upload(destPath, blob, {
-            cacheControl: "3600",
-            upsert: false,
-            contentType: resp.headers.get("content-type") || "application/octet-stream"
-          });
-          if (up.error) continue;
-          await supabase.from("user_book_media").insert({ user_book_id: book.id, kind: m.kind, storage_path: destPath, caption: null });
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const fileName = safeFileName(String(selectedCoverPath.split("/").pop() ?? "image"));
+            const destPath = `${userId}/${book.id}/merge-${Date.now()}-${fileName}`;
+            const up = await supabase.storage.from("user-book-media").upload(destPath, blob, {
+              cacheControl: "3600",
+              upsert: false,
+              contentType: resp.headers.get("content-type") || "application/octet-stream"
+            });
+            if (!up.error) {
+              // Replace any existing cover entries with the new one
+              await supabase.from("user_book_media").delete().eq("user_book_id", book.id).eq("kind", "cover");
+              await supabase.from("user_book_media").insert({ user_book_id: book.id, kind: "cover", storage_path: destPath, caption: null });
+            }
+          }
         }
       }
 
@@ -2287,12 +2300,14 @@ export default function BookDetailPage() {
                         <button
                           onClick={() => {
                             const sels: Record<string, string | null> = {};
+                            const userHasCoverForApply = (book?.media ?? []).some((m) => m.kind === "cover");
                             for (const group of mergeFieldGroups) {
                               if (group.isArray) {
+                                const defaultChecked = group.key === "cover" ? !userHasCoverForApply : true;
                                 for (const cand of group.candidates) {
                                   const selKey = `${group.key}::${cand.value}`;
                                   const stored = mergeSelections[selKey];
-                                  const isChecked = stored !== undefined ? stored != null : true;
+                                  const isChecked = stored !== undefined ? stored != null : defaultChecked;
                                   if (isChecked) sels[selKey] = cand.value;
                                 }
                               } else {
@@ -2359,6 +2374,37 @@ export default function BookDetailPage() {
                   {/* Field rows — spacing matches metadata list (marginTop: 8) */}
                   {mergeFieldGroups.flatMap((group): ReactNode[] => {
                     if (group.isArray) {
+                      // Cover gets a special image-grid row
+                      if (group.key === "cover") {
+                        const userHasCover = (book?.media ?? []).some((m) => m.kind === "cover");
+                        return [(
+                          <div key="cover-row" style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 8, marginTop: 8, alignItems: "start" }}>
+                            <span className="muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", paddingTop: 2 }}>Cover</span>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                              {group.candidates.map((cand) => {
+                                const selKey = `cover::${cand.value}`;
+                                const stored = mergeSelections[selKey];
+                                const isChecked = stored !== undefined ? stored != null : !userHasCover;
+                                const imgUrl = mergeCoverUrls[cand.value];
+                                return (
+                                  <div
+                                    key={selKey}
+                                    onClick={() => setMergeSelections((s) => ({ ...s, [selKey]: isChecked ? null : cand.value }))}
+                                    style={{ cursor: "pointer", opacity: isChecked ? 1 : 0.4, outline: isChecked ? "2px solid currentColor" : "2px solid transparent", outlineOffset: 2, borderRadius: 2 }}
+                                  >
+                                    {imgUrl
+                                      ? <img src={imgUrl} alt="Cover variant" style={{ width: 48, height: 72, objectFit: "cover", display: "block", borderRadius: 2 }} />
+                                      : <div style={{ width: 48, height: 72, background: "var(--muted, #888)", opacity: 0.3, borderRadius: 2 }} />
+                                    }
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <span className="muted" style={{ textAlign: "right", paddingTop: 2 }}>{group.candidates.length}</span>
+                          </div>
+                        )];
+                      }
+
                       return group.candidates.map((cand, i) => {
                         const selKey = `${group.key}::${cand.value}`;
                         const stored = mergeSelections[selKey];
