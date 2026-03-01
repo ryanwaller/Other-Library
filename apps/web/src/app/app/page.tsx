@@ -2160,7 +2160,7 @@ function AppShell({
 
       {showAddPanel ? (
         <>
-          <div className="row" style={{ marginTop: 12, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%", alignItems: "baseline" }}>
+          <div className="row" style={{ marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%", alignItems: "baseline" }}>
             <input
               placeholder="Add by ISBN, URL, or title"
               value={addInput}
@@ -2194,7 +2194,7 @@ function AppShell({
       ) : null}
 
       {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || csvRows.length > 0) && libraries.length > 0 ? (
-        <div className="row" style={{ marginTop: 24, alignItems: "baseline", gap: 10 }}>
+        <div className="row" style={{ marginTop: 6, alignItems: "baseline", gap: 10 }}>
           <span className="muted">Add to catalog</span>
           {libraries.length > 1 ? (
             <select
@@ -2221,7 +2221,7 @@ function AppShell({
       ) : null}
 
       {csvRows.length > 0 || csvImportState.message || csvImportState.error ? (
-        <div className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+        <div className="row" style={{ marginTop: 6, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
           {csvRows.length > 0 ? (
             <>
               <label className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
