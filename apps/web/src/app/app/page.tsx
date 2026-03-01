@@ -2160,9 +2160,9 @@ function AppShell({
 
       {showAddPanel ? (
         <>
-          <div className="row" style={{ marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%", alignItems: "baseline" }}>
+          <div className="row" style={{ marginTop: 12, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%", alignItems: "baseline" }}>
             <input
-              placeholder="Add by ISBN, URL, or title (optional: “by Author”)"
+              placeholder="Add by ISBN, URL, or title"
               value={addInput}
               onFocus={() => setAddInputFocused(true)}
               onBlur={() => setAddInputFocused(false)}
