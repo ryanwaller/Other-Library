@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
-import PublicPagedBookList from "../../PublicPagedBookList";
+import PublicPagedBookList from "../../../PublicPagedBookList";
 import type { CoverCrop } from "../../../../../components/CoverImage";
 
 export const dynamic = "force-dynamic";
