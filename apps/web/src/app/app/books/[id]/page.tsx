@@ -2974,91 +2974,81 @@ export default function BookDetailPage() {
                   onToggle={(e) => {
                     const open = (e.currentTarget as HTMLDetailsElement).open;
                     setCoverToolsOpen(open);
+                    if (open && coverUrl && !coverEditorSrc && !pendingCover) {
+                      const origSrc = toFullSizeImageUrl(coverOriginalSrc ?? coverUrl);
+                      setCoverEditorSrc(origSrc);
+                      if (book?.cover_crop) {
+                        const c = book.cover_crop;
+                        setCoverZoom(c.zoom);
+                        setCoverCrop({ x: c.cropX, y: c.cropY });
+                        setCoverRotation(c.rotation);
+                        setCoverBrightness(c.brightness);
+                        setCoverContrast(c.contrast);
+                        setCoverCroppedArea({ x: c.x * 100, y: c.y * 100, width: c.width * 100, height: c.height * 100 });
+                      } else {
+                        setCoverZoom(1);
+                        setCoverCrop({ x: 0, y: 0 });
+                        setCoverRotation(0);
+                        setCoverBrightness(1);
+                        setCoverContrast(1);
+                        setCoverCroppedArea(null);
+                      }
+                    }
                   }}
                   style={{ marginTop: 10 }}
                 >
-                  <summary className="om-disclosure-summary">
-                    <span className="om-disclosure-caret" data-open={coverToolsOpen ? "true" : "false"} aria-hidden="true" />
-                    <span>{coverUrl ? "Change cover…" : "Add cover…"}</span>
+                  <summary className="om-disclosure-summary" style={{ listStyle: "none" }}>
+                    <span className="muted" style={{ cursor: "pointer" }}>{coverUrl ? "Edit cover" : "Add cover"}</span>
                   </summary>
                   <div style={{ marginTop: 10 }}>
                       <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                        <input
-                          key={coverInputKey}
-                          type="file"
-                          accept="image/*"
-                          onChange={(ev) => setPendingCover((ev.target.files ?? [])[0] ?? null)}
-                          style={{ marginTop: 0 }}
-                        />
-                        {coverUrl ? (
-                          <button
-                            onClick={() => {
-                              if (!coverUrl) return;
-                              setPendingCover(null);
-                              const origSrc = toFullSizeImageUrl(coverOriginalSrc ?? coverUrl);
-                              setCoverEditorSrc(origSrc);
-                              if (book?.cover_crop) {
-                                const c = book.cover_crop;
-                                setCoverZoom(c.zoom);
-                                setCoverCrop({ x: c.cropX, y: c.cropY });
-                                setCoverRotation(c.rotation);
-                                setCoverBrightness(c.brightness);
-                                setCoverContrast(c.contrast);
-                                setCoverCroppedArea({ x: c.x * 100, y: c.y * 100, width: c.width * 100, height: c.height * 100 });
-                              } else {
-                                setCoverZoom(1);
-                                setCoverCrop({ x: 0, y: 0 });
-                                setCoverRotation(0);
-                                setCoverBrightness(1);
-                                setCoverContrast(1);
-                                setCoverCroppedArea(null);
-                              }
-                            }}
-                            disabled={coverState.busy}
-                          >
-                            Edit
-                          </button>
-                        ) : null}
+                        <label style={{ cursor: "pointer", textDecoration: "underline" }} className="muted">
+                          {coverUrl ? "Replace cover" : "Choose file"}
+                          <input
+                            key={coverInputKey}
+                            type="file"
+                            accept="image/*"
+                            onChange={(ev) => setPendingCover((ev.target.files ?? [])[0] ?? null)}
+                            style={{ display: "none" }}
+                          />
+                        </label>
                       </div>
                       {coverEditorSrc ? (
-                        <div style={{ marginTop: 8 }}>
+                        <div style={{ marginTop: 12 }}>
                           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                             {/* Book size — crop-local state; syncs to metadata when a real unit is selected */}
-                            <div className="row" style={{ gap: 6, alignItems: "center" }}>
-                              <span className="muted" style={{ fontSize: "0.85em", whiteSpace: "nowrap" }}>Book size</span>
-                              <input
-                                type="number"
-                                value={cropTrimWidth}
-                                min={0.01}
-                                step={0.01}
-                                onChange={(e) => handleCropTrimWidthChange(e.target.value)}
-                                placeholder="W"
-                                style={{ width: 48 }}
-                              />
-                              <span className="muted">×</span>
-                              <input
-                                type="number"
-                                value={cropTrimHeight}
-                                min={0.01}
-                                step={0.01}
-                                onChange={(e) => handleCropTrimHeightChange(e.target.value)}
-                                placeholder="H"
-                                style={{ width: 48 }}
-                              />
-                              <select
-                                value={cropTrimUnit}
-                                onChange={(e) => handleCropTrimUnitChange(e.target.value as TrimUnit | "ratio")}
-                                style={{ width: 60 }}
-                              >
-                                <option value="ratio">ratio</option>
-                                <option value="in">in</option>
-                                <option value="mm">mm</option>
-                              </select>
-                              {cropTrimSizeValid && cropTrimUnit !== "ratio" ? (
-                                <span className="muted" style={{ fontSize: "0.8em" }}>
-                                  {formatTrimRatio(cropTrimWidth, cropTrimHeight)}
-                                </span>
-                              ) : null}
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              <div className="muted">Book size</div>
+                              <div className="row" style={{ gap: 6, alignItems: "center" }}>
+                                <input
+                                  type="number"
+                                  value={cropTrimWidth}
+                                  min={0.01}
+                                  step={0.01}
+                                  onChange={(e) => handleCropTrimWidthChange(e.target.value)}
+                                  placeholder="W"
+                                  style={{ width: 48 }}
+                                />
+                                <span className="muted">×</span>
+                                <input
+                                  type="number"
+                                  value={cropTrimHeight}
+                                  min={0.01}
+                                  step={0.01}
+                                  onChange={(e) => handleCropTrimHeightChange(e.target.value)}
+                                  placeholder="H"
+                                  style={{ width: 48 }}
+                                />
+                                <select
+                                  value={cropTrimUnit}
+                                  onChange={(e) => handleCropTrimUnitChange(e.target.value as TrimUnit | "ratio")}
+                                  style={{ width: "auto", minWidth: 0 }}
+                                >
+                                  <option value="ratio">ratio</option>
+                                  <option value="in">in</option>
+                                  <option value="mm">mm</option>
+                                </select>
+                              </div>
                             </div>
                             <div className="row" style={{ gap: 8, alignItems: "center" }}>
                               <div className="muted" style={{ width: 72 }}>
@@ -3448,16 +3438,11 @@ export default function BookDetailPage() {
                             className="om-inline-control"
                             value={formTrimUnit}
                             onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)}
-                            style={{ width: 56 }}
+                            style={{ width: "auto", minWidth: 0 }}
                           >
                             <option value="in">in</option>
                             <option value="mm">mm</option>
                           </select>
-                          {trimSizeValid ? (
-                            <span className="muted" style={{ fontSize: "0.8em" }}>
-                              {formatTrimRatio(formTrimWidth, formTrimHeight)}
-                            </span>
-                          ) : null}
                         </div>
                       ) : (book as any)?.trim_width && (book as any)?.trim_height ? (
                         `${(book as any).trim_width} × ${(book as any).trim_height} ${(book as any).trim_unit ?? "in"}`
