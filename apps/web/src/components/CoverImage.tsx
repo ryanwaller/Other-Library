@@ -53,7 +53,8 @@ export default function CoverImage({
     width: `${(1 / width) * 100}%`,
     height: `${(1 / height) * 100}%`,
     left: `${-(x / width) * 100}%`,
-    top: `${-(y / height) * 100}%`
+    top: `${-(y / height) * 100}%`,
+    objectFit: "cover"
   };
 
   if (rotation !== 0) {
