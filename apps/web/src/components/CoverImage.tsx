@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, type CSSProperties } from "react";
 
 export type CoverCrop = {
