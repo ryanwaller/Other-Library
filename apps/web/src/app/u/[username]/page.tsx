@@ -237,7 +237,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             })}
           </div>
         ) : (
-          <div className="card" style={{ marginTop: "var(--space-sm)" }}>
+          <div style={{ marginTop: "var(--space-sm)" }}>
             <PublicBookList
               groups={groupedBooks}
               username={profile.username}
