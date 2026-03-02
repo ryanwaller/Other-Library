@@ -2143,8 +2143,9 @@ function AppShell({
       display: viewMode === "grid" ? "grid" : "flex",
       flexDirection: viewMode === "list" ? ("column" as const) : undefined,
       gridTemplateColumns: viewMode === "grid" ? `repeat(${gridCols}, minmax(0, 1fr))` : undefined,
-      gap: viewMode === "grid" ? 18 : 12
-    }),
+      gap: viewMode === "grid" ? 12 : 12
+      }),
+
     [viewMode, gridCols]
   );
 
@@ -2202,24 +2203,25 @@ function AppShell({
   if (!initialLoadDone) return null;
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <input
-        ref={csvInputRef}
-        type="file"
-        accept=".csv,text/csv"
-        style={{ display: "none" }}
-        onChange={(e) => {
-          const f = (e.target.files ?? [])[0];
-          if (!f) return;
-          setCsvImportState({ busy: true, error: null, message: "Loading CSV…", done: 0, total: 0 });
-          loadCsvFile(f).catch((err: any) => {
-            setCsvImportState({ busy: false, error: err?.message ?? "CSV load failed", message: "CSV load failed", done: 0, total: 0 });
-          });
-        }}
-        disabled={csvImportState.busy || addState.busy || addSearchState.busy}
-      />
+    <>
+      <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
+        <input
+          ref={csvInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = (e.target.files ?? [])[0];
+            if (!f) return;
+            setCsvImportState({ busy: true, error: null, message: "Loading CSV…", done: 0, total: 0 });
+            loadCsvFile(f).catch((err: any) => {
+              setCsvImportState({ busy: false, error: err?.message ?? "CSV load failed", message: "CSV load failed", done: 0, total: 0 });
+            });
+          }}
+          disabled={csvImportState.busy || addState.busy || addSearchState.busy}
+        />
 
-      <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
         <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <span className="muted">Catalogs</span>
           <span>{libraries.length}</span>
@@ -2302,7 +2304,7 @@ function AppShell({
         </div>
       </div>
 
-      <div className="row" style={{ marginTop: "var(--space-sm)", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+      <div className="row" style={{ margin: 0, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
         <div className="row" style={{ gap: 12, alignItems: "baseline", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
           <button
             onClick={() => {
@@ -2365,6 +2367,7 @@ function AppShell({
           </Link>
         ) : null}
       </div>
+    </div>
 
       {showAddPanel ? (
         <>
@@ -2954,7 +2957,7 @@ function AppShell({
         </div>
       </div>
       <div style={{ height: 24 }} />
-    </div>
+    </>
   );
 }
 

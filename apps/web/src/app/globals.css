@@ -38,6 +38,7 @@
   --placeholder-bg: #e8e8e8;
 
   --space-sm: 6px;
+  --space-md: 12px;
 }
 
 @media (prefers-color-scheme: dark) {

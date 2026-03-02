@@ -206,7 +206,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       </div>
 
       <AddToLibraryProvider editionIds={editionIds}>
-        <div className="row" style={{ marginTop: 16, gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginTop: 16 }}>
+          <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center", margin: 0 }}>
           <span className="muted">Catalogs</span>
           <span>{libraries.length}</span>
           <span className="muted">Books</span>
@@ -214,7 +215,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
         </div>
 
         {showLibraryBlocks ? (
-          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {libraries.map((lib) => {
               const groups = groupsByLibraryId.get(lib.id) ?? [];
               if (groups.length === 0) return null;
@@ -237,7 +238,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             })}
           </div>
         ) : (
-          <div style={{ marginTop: "var(--space-sm)" }}>
+          <div>
             <PublicBookList
               groups={groupedBooks}
               username={profile.username}
@@ -246,7 +247,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             />
           </div>
         )}
-      </AddToLibraryProvider>
+      </div>
+    </AddToLibraryProvider>
     </main>
   );
 }
