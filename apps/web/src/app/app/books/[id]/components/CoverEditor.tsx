@@ -16,11 +16,12 @@ type Props = {
   state: EditorState;
   aspectRatio: number; // width / height
   onChange: (state: Partial<EditorState>) => void;
+  onLoad?: (info: { minZoom: number }) => void;
   style?: React.CSSProperties;
   className?: string;
 };
 
-export default function CoverEditor({ src, state, aspectRatio, onChange, style, className }: Props) {
+export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad, style, className }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -32,7 +33,7 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, style, 
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
 
   // Dimensions
-  const [dims, setDims] = useState({ cw: 0, ch: 0, iw: 0, ih: 0, baseScale: 1 });
+  const [dims, setDims] = useState({ cw: 0, ch: 0, iw: 0, ih: 0, minZoom: 1 });
 
   // Initialize dimensions
   useLayoutEffect(() => {
@@ -46,50 +47,73 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, style, 
       const nh = imgRef.current.naturalHeight;
       if (!nw || !nh) return;
 
-      // Calculate base scale (cover)
-      const scaleW = cw / nw;
-      const scaleH = ch / nh;
-      const baseScale = Math.max(scaleW, scaleH);
+      // Calculate minZoom (cover scale)
+      // Account for rotation swaps
+      const isRotated = (rotation / 90) % 2 !== 0;
+      const effectiveNw = isRotated ? nh : nw;
+      const effectiveNh = isRotated ? nw : nh;
 
-      setDims({ cw, ch, iw: nw, ih: nh, baseScale });
+      const scaleW = cw / effectiveNw;
+      const scaleH = ch / effectiveNh;
+      const minZoom = Math.max(scaleW, scaleH);
+
+      setDims({ cw, ch, iw: nw, ih: nh, minZoom });
+      if (onLoad) onLoad({ minZoom });
+
+      // If current zoom is 1 (uninitialized) or below minZoom, reset to minZoom and center
+      if (zoom <= 1 || zoom < minZoom) {
+        onChange({ zoom: minZoom, x: 0, y: 0 });
+      }
     };
 
     updateDims();
     const obs = new ResizeObserver(updateDims);
     obs.observe(containerRef.current);
     
-    // Also listen to image load
     const img = imgRef.current;
     if (img.complete) updateDims();
     else img.onload = updateDims;
 
     return () => obs.disconnect();
-  }, [src, aspectRatio]);
+  }, [src, aspectRatio, rotation, onLoad]); // Recalculate on rotation as well
 
-  // Clamp position
+  // Clamp position and zoom
   useEffect(() => {
-    if (!dims.baseScale) return;
+    if (!dims.minZoom) return;
     
-    const currentScale = dims.baseScale * zoom;
-    const rw = dims.iw * currentScale;
-    const rh = dims.ih * currentScale;
+    let nextZoom = zoom;
+    let nextX = x;
+    let nextY = y;
+    let changed = false;
 
+    // 1. Clamp Zoom
+    const maxZoom = dims.minZoom * 4;
+    if (nextZoom < dims.minZoom) {
+      nextZoom = dims.minZoom;
+      changed = true;
+    } else if (nextZoom > maxZoom) {
+      nextZoom = maxZoom;
+      changed = true;
+    }
+
+    // 2. Clamp Translation
+    const isRotated = (rotation / 90) % 2 !== 0;
+    const rw = (isRotated ? dims.ih : dims.iw) * nextZoom;
+    const rh = (isRotated ? dims.iw : dims.ih) * nextZoom;
+
+    // Max offset from center (positive)
     const maxX = Math.max(0, (rw - dims.cw) / 2);
     const maxY = Math.max(0, (rh - dims.ch) / 2);
 
-    let nextX = x;
-    let nextY = y;
-    let clamped = false;
+    if (nextX > maxX) { nextX = maxX; changed = true; }
+    if (nextX < -maxX) { nextX = -maxX; changed = true; }
+    if (nextY > maxY) { nextY = maxY; changed = true; }
+    if (nextY < -maxY) { nextY = -maxY; changed = true; }
 
-    if (nextX > maxX) { nextX = maxX; clamped = true; }
-    if (nextX < -maxX) { nextX = -maxX; clamped = true; }
-    if (nextY > maxY) { nextY = maxY; clamped = true; }
-    if (nextY < -maxY) { nextY = -maxY; clamped = true; }
-
-    if (clamped) {
-      onChange({ x: nextX, y: nextY });
+    if (changed) {
+      onChange({ zoom: nextZoom, x: nextX, y: nextY });
     }
-  }, [zoom, dims, aspectRatio, x, y, onChange]);
+  }, [zoom, x, y, rotation, dims, onChange]);
 
   // Drag handlers
   const handleDragStart = (cx: number, cy: number) => {
@@ -139,8 +163,6 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, style, 
     window.addEventListener("touchend", up);
   };
 
-  const currentScale = dims.baseScale * zoom;
-
   return (
     <div className={className} style={style}>
       <div 
@@ -164,7 +186,7 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, style, 
             src={src}
             alt="Cover edit"
             style={{
-              transform: `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${currentScale})`,
+              transform: `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${zoom})`,
               transformOrigin: "center",
               filter: `brightness(${brightness}) contrast(${contrast})`,
               willChange: "transform",

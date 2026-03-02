@@ -365,6 +365,7 @@ export default function BookDetailPage() {
     brightness: 1,
     contrast: 1
   });
+  const [minZoomFloor, setMinZoomFloor] = useState<number>(1);
   const [coverState, setCoverState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -3054,6 +3055,7 @@ export default function BookDetailPage() {
                     src={coverEditorSrc}
                     state={editorState}
                     onChange={(next) => setEditorState(s => ({ ...s, ...next }))}
+                    onLoad={({ minZoom }) => setMinZoomFloor(minZoom)}
                     aspectRatio={coverAspect ?? (2/3)}
                     style={{ width: "100%", height: "100%" }}
                   />
@@ -3173,9 +3175,9 @@ export default function BookDetailPage() {
                             <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
                               <div className="muted" style={{ minWidth: 110 }}>Zoom</div>
                               <CustomSlider
-                                min={1}
-                                max={4}
-                                step={0.01}
+                                min={minZoomFloor}
+                                max={minZoomFloor * 4}
+                                step={minZoomFloor / 100}
                                 value={editorState.zoom}
                                 onChange={(zoom) => setEditorState(s => ({ ...s, zoom }))}
                                 style={{ flex: "1 1 auto" }}
