@@ -85,14 +85,14 @@ export default function PublicBookList({
 
   const containerStyle = useMemo((): React.CSSProperties => {
     if (viewMode === "list") {
-      return { marginTop: 18, display: "flex", flexDirection: "column", gap: 8 };
+      return { marginTop: 24, display: "flex", flexDirection: "column", gap: 8 };
     }
-    return { marginTop: 18, display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 12 };
+    return { marginTop: 24, display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 12 };
   }, [viewMode, gridCols]);
 
   return (
     <>
-      <div className="row" style={{ marginTop: 4, alignItems: "baseline", gap: 12 }}>
+      <div className="row" style={{ marginTop: 2, alignItems: "baseline", gap: 12 }}>
         <button
           type="button"
           className={sortOpen ? "text-primary" : "muted"}
