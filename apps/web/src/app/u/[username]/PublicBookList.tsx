@@ -13,20 +13,42 @@ type PublicBook = {
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
   authors_override: string[] | null;
+  subjects_override: string[] | null;
+  publisher_override: string | null;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
-  edition: { id: number; isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null } | null;
+  edition: { 
+    id: number; 
+    isbn13: string | null; 
+    title: string | null; 
+    authors: string[] | null; 
+    cover_url: string | null;
+    subjects: string[] | null;
+    publisher: string | null;
+    publish_date: string | null;
+    description: string | null;
+  } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
 
-type CatalogGroup = {
-  key: string;
-  libraryId: number;
-  primary: PublicBook;
-  copies: PublicBook[];
-};
+type CatalogGroup = { key: string; libraryId: number; primary: PublicBook; copies: PublicBook[] };
 
 type SortMode = "latest" | "earliest" | "title_asc" | "title_desc";
+
+type Props = {
+  libraries: Array<{ id: number; name: string }>;
+  groups: CatalogGroup[];
+  username: string;
+  profileId: string;
+  signedMap: Record<string, string>;
+  showLibraryBlocks: boolean;
+  activeFilters: { author?: string; subject?: string; tag?: string; category?: string; publisher?: string };
+  totalLibrariesCount: number;
+};
+
+function normalizeKeyPart(input: string): string {
+  return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 function effectiveTitleFor(b: PublicBook): string {
   const e = b.edition;
@@ -40,59 +62,172 @@ function effectiveAuthorsFor(b: PublicBook): string[] {
 }
 
 export default function PublicBookList({
+  libraries,
   groups,
   username,
   profileId,
-  signedMap
-}: {
-  groups: CatalogGroup[];
-  username: string;
-  profileId: string;
-  signedMap: Record<string, string>;
-}) {
+  signedMap,
+  showLibraryBlocks,
+  activeFilters,
+  totalLibrariesCount
+}: Props) {
+  const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [gridCols, setGridCols] = useState<2 | 4 | 8>(4);
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [sortOpen, setSortOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
 
-  const displayGroups = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    let result = groups.map((g, idx) => ({ g, idx }));
+  const filteredGroups = useMemo(() => {
+    let result = groups.slice();
 
-    if (q) {
-      result = result.filter(({ g }) => {
-        const title = effectiveTitleFor(g.primary).toLowerCase();
-        const authors = effectiveAuthorsFor(g.primary).join(" ").toLowerCase();
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(({ primary: b }) => {
+        const title = effectiveTitleFor(b).toLowerCase();
+        const authors = effectiveAuthorsFor(b).join(" ").toLowerCase();
         return title.includes(q) || authors.includes(q);
       });
     }
 
-    if (sortMode === "earliest") {
-      result = result.slice().reverse();
+    if (sortMode === "latest") {
+      result.sort((a, b) => b.primary.id - a.primary.id);
+    } else if (sortMode === "earliest") {
+      result.sort((a, b) => a.primary.id - b.primary.id);
     } else if (sortMode === "title_asc") {
-      result = result.slice().sort((a, b) =>
-        effectiveTitleFor(a.g.primary).localeCompare(effectiveTitleFor(b.g.primary))
-      );
+      result.sort((a, b) => effectiveTitleFor(a.primary).localeCompare(effectiveTitleFor(b.primary)));
     } else if (sortMode === "title_desc") {
-      result = result.slice().sort((a, b) =>
-        effectiveTitleFor(b.g.primary).localeCompare(effectiveTitleFor(a.g.primary))
-      );
+      result.sort((a, b) => effectiveTitleFor(b.primary).localeCompare(effectiveTitleFor(a.primary)));
     }
 
-    return result.map(({ g }) => g);
+    return result;
   }, [groups, searchQuery, sortMode]);
 
   const containerStyle = useMemo((): React.CSSProperties => {
     if (viewMode === "list") {
-      return { marginTop: 24, display: "flex", flexDirection: "column", gap: 8 };
+      return { display: "flex", flexDirection: "column", gap: 8 };
     }
-    return { marginTop: 24, display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 12 };
+    return { display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 12 };
   }, [viewMode, gridCols]);
 
+  const hasActiveFilters = Object.values(activeFilters).some(Boolean);
+
+  const renderBook = (g: CatalogGroup) => {
+    const b = g.primary;
+    const e = b.edition;
+    const title = effectiveTitleFor(b);
+    const authors = effectiveAuthorsFor(b);
+    const coverUrl =
+      g.copies
+        .map((c) => {
+          const cover = (c.media ?? []).find((m) => m.kind === "cover");
+          if (!cover) return null;
+          return signedMap[cover.storage_path] ?? null;
+        })
+        .find(Boolean) ?? e?.cover_url ?? null;
+    const cropData = g.copies.find((c) => c.cover_crop)?.cover_crop ?? null;
+    const originalSrc =
+      g.copies
+        .map((c) => (c.cover_original_url ? signedMap[c.cover_original_url] : null))
+        .find(Boolean) ?? null;
+    const href = `/u/${username}/b/${bookIdSlug(b.id, title)}`;
+
+    if (viewMode === "list") {
+      return (
+        <div key={g.key} className="card" style={{ display: "flex", gap: 12, alignItems: "start" }}>
+          <Link href={href} style={{ display: "block" }} className="om-book-card-link">
+            <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
+              <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
+            </div>
+          </Link>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Link href={href}>{title}</Link>
+            <div className="om-book-secondary">
+              {authors.length > 0
+                ? authors.map((a, idx) => (
+                    <span key={a}>
+                      <Link href={`/u/${username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                      {idx < authors.length - 1 ? <span>, </span> : null}
+                    </span>
+                  ))
+                : "—"}
+            </div>
+          </div>
+          <div style={{ marginLeft: "auto" }}>
+            <AddToLibraryButton editionId={e?.id ?? null} titleFallback={title} authorsFallback={authors} compact />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div key={g.key} className="om-book-card" style={{ position: "relative" }}>
+        <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
+          <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
+            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
+          </div>
+        </Link>
+        <div className="om-cover-add-btn" style={{ position: "absolute", top: 6, right: 6, zIndex: 1 }}>
+          <AddToLibraryButton
+            editionId={e?.id ?? null}
+            titleFallback={title}
+            authorsFallback={authors}
+            compact
+          />
+        </div>
+        <div style={{ marginTop: 10 }} className="book-title">
+          <Link href={href}>{title}</Link>
+        </div>
+        <div className="book-author muted">
+          {authors.length > 0
+            ? authors.map((a, idx) => (
+                <span key={a}>
+                  <Link href={`/u/${username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                  {idx < authors.length - 1 ? <span>, </span> : null}
+                </span>
+              ))
+            : "—"}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <>
-      <div className="row" style={{ alignItems: "baseline", gap: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
+      {/* Header Lockup */}
+      <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
+        <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center", margin: 0 }}>
+          <span className="muted">Catalogs</span>
+          <span>{totalLibrariesCount}</span>
+          <span className="muted">Books</span>
+          <span>{filteredGroups.length}</span>
+        </div>
+        <div className="row muted" style={{ gap: 10, justifyContent: "flex-end", margin: 0 }}>
+          {hasActiveFilters ? (
+            <>
+              {(() => {
+                const pairs: Array<{ label: string; value: string }> = [];
+                if (activeFilters.category) pairs.push({ label: "Category", value: activeFilters.category });
+                if (activeFilters.tag) pairs.push({ label: "Tag", value: activeFilters.tag });
+                if (activeFilters.author) pairs.push({ label: "Author", value: activeFilters.author });
+                if (activeFilters.subject) pairs.push({ label: "Subject", value: activeFilters.subject });
+                if (activeFilters.publisher) pairs.push({ label: "Publisher", value: activeFilters.publisher });
+                return pairs.length ? (
+                  <span style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
+                    {pairs.map((p) => (
+                      <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 6, alignItems: "baseline" }}>
+                        <span className="muted">{p.label}</span>
+                        <span style={{ color: "var(--fg)" }}>{p.value}</span>
+                      </span>
+                    ))}
+                  </span>
+                ) : null;
+              })()}(<Link href={`/u/${username}`} style={{ textDecoration: "underline" }}>clear</Link>)
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="row" style={{ margin: 0, alignItems: "baseline", gap: 12 }}>
         <button
           type="button"
           className={sortOpen ? "text-primary" : "muted"}
@@ -131,98 +266,38 @@ export default function PublicBookList({
         </div>
       )}
 
-      <PagedBookList
-        items={displayGroups}
-        viewMode={viewMode}
-        gridCols={gridCols}
-        searchQuery={searchQuery}
-        containerStyle={{ ...containerStyle, marginTop: 32 }}
-        renderItem={(g) => {
-          const b = g.primary;
-          const e = b.edition;
-          const title = effectiveTitleFor(b);
-          const authors = effectiveAuthorsFor(b);
-          const coverUrl =
-            g.copies
-              .map((c) => {
-                const cover = (c.media ?? []).find((m) => m.kind === "cover");
-                if (!cover) return null;
-                return signedMap[cover.storage_path] ?? null;
-              })
-              .find(Boolean) ?? e?.cover_url ?? null;
-          const cropData = b.cover_crop ?? null;
-          const imageSrc = cropData && b.cover_original_url ? (signedMap[b.cover_original_url] ?? coverUrl) : coverUrl;
-          const href = `/u/${username}/b/${bookIdSlug(b.id, title)}`;
+      <div style={{ marginTop: 32 }} />
 
-          if (viewMode === "list") {
+      {showLibraryBlocks ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {libraries.map((lib) => {
+            const libGroups = filteredGroups.filter(g => g.libraryId === lib.id);
+            if (libGroups.length === 0) return null;
             return (
-              <div key={b.id} className="om-book-card" style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                <Link href={href} className="om-book-card-link" style={{ flexShrink: 0 }}>
-                  <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
-                    <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
-                  </div>
-                </Link>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <Link href={href}>{title}</Link>
-                  <div className="om-book-secondary">
-                    {authors.length > 0
-                      ? authors.map((a, idx) => (
-                          <span key={a}>
-                            <Link href={`/u/${username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                            {idx < authors.length - 1 ? <span>, </span> : null}
-                          </span>
-                        ))
-                      : "—"}
-                  </div>
-                </div>
-                <div style={{ flexShrink: 0 }}>
-                  <AddToLibraryButton
-                    editionId={e?.id ?? null}
-                    titleFallback={title}
-                    authorsFallback={authors}
-                    sourceOwnerId={profileId}
-                    compact
-                  />
-                </div>
+              <div key={lib.id}>
+                <div style={{ marginBottom: 10 }}>{lib.name}</div>
+                <PagedBookList
+                  items={libGroups}
+                  viewMode={viewMode}
+                  gridCols={gridCols}
+                  searchQuery={searchQuery}
+                  containerStyle={containerStyle}
+                  renderItem={renderBook}
+                />
               </div>
             );
-          }
-
-          return (
-            <div key={b.id} className="om-book-card">
-              <div style={{ position: "relative" }}>
-                <Link href={href} style={{ display: "block" }} className="om-book-card-link">
-                  <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
-                    <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
-                  </div>
-                </Link>
-                <div className="om-cover-add-btn" style={{ position: "absolute", top: 6, right: 6, zIndex: 1 }}>
-                  <AddToLibraryButton
-                    editionId={e?.id ?? null}
-                    titleFallback={title}
-                    authorsFallback={authors}
-                    sourceOwnerId={profileId}
-                    compact
-                  />
-                </div>
-              </div>
-              <div style={{ marginTop: 8 }}>
-                <Link href={href}>{title}</Link>
-              </div>
-              <div className="om-book-secondary">
-                {authors.length > 0
-                  ? authors.map((a, idx) => (
-                      <span key={a}>
-                        <Link href={`/u/${username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                        {idx < authors.length - 1 ? <span>, </span> : null}
-                      </span>
-                    ))
-                  : "—"}
-              </div>
-            </div>
-          );
-        }}
-      />
-    </>
+          })}
+        </div>
+      ) : (
+        <PagedBookList
+          items={filteredGroups}
+          viewMode={viewMode}
+          gridCols={gridCols}
+          searchQuery={searchQuery}
+          containerStyle={containerStyle}
+          renderItem={renderBook}
+        />
+      )}
+    </div>
   );
 }

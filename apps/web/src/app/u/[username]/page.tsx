@@ -76,6 +76,7 @@ export default async function PublicProfilePage({
   const filterSubject = rawParams.subject ? decodeURIComponent(rawParams.subject) : undefined;
   const filterCategory = rawParams.category ? decodeURIComponent(rawParams.category) : undefined;
   const filterPublisher = rawParams.publisher ? decodeURIComponent(rawParams.publisher) : undefined;
+
   const usernameNorm = (username ?? "").trim().toLowerCase();
   const supabase = getServerSupabase();
 
@@ -154,7 +155,6 @@ export default async function PublicProfilePage({
     }
     if (filterTag) {
       // Tags are in user_book_tags table, not handled in this simple client-side filter yet
-      // but we need to prevent breakage.
     }
     if (filterSubject) {
       const subjects = (b.subjects_override ?? b.edition?.subjects ?? []).map(s => String(s).toLowerCase());
@@ -163,9 +163,6 @@ export default async function PublicProfilePage({
     if (filterPublisher) {
       const pub = b.publisher_override || b.edition?.publisher;
       if (String(pub ?? "").toLowerCase() !== filterPublisher.toLowerCase()) return false;
-    }
-    if (filterCategory) {
-      // Category is not a column on user_books, it might be a tag or metadata field.
     }
     return true;
   });
@@ -208,13 +205,6 @@ export default async function PublicProfilePage({
     return { key, libraryId: primary.library_id, primary, copies };
   });
 
-  const groupsByLibraryId = new Map<number, CatalogGroup[]>();
-  for (const g of groupedBooks) {
-    const list = groupsByLibraryId.get(g.libraryId) ?? [];
-    list.push(g);
-    groupsByLibraryId.set(g.libraryId, list);
-  }
-
   const DEFAULT_LIBRARY_NAME = "Your catalog";
   const showLibraryBlocks = libraries.length > 1 || (libraries.length === 1 && libraries[0]?.name !== DEFAULT_LIBRARY_NAME);
 
@@ -254,76 +244,20 @@ export default async function PublicProfilePage({
         ) : null}
       </div>
 
-      <AddToLibraryProvider editionIds={editionIds}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginTop: 24 }}>
-          <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
-            <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center", margin: 0 }}>
-              <span className="muted">Catalogs</span>
-              <span>{libraries.length}</span>
-              <span className="muted">Books</span>
-              <span>{groupedBooks.length}</span>
-            </div>
-            <div className="row muted" style={{ gap: 10, justifyContent: "flex-end", margin: 0 }}>
-              {filterAuthor || filterSubject || filterTag || filterCategory || filterPublisher ? (
-                <>
-                  {(() => {
-                    const pairs: Array<{ label: string; value: string }> = [];
-                    if (filterCategory) pairs.push({ label: "Category", value: filterCategory });
-                    if (filterTag) pairs.push({ label: "Tag", value: filterTag });
-                    if (filterAuthor) pairs.push({ label: "Author", value: filterAuthor });
-                    if (filterSubject) pairs.push({ label: "Subject", value: filterSubject });
-                    if (filterPublisher) pairs.push({ label: "Publisher", value: filterPublisher });
-                    return pairs.length ? (
-                      <span style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
-                        {pairs.map((p) => (
-                          <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 6, alignItems: "baseline" }}>
-                            <span className="muted">{p.label}</span>
-                            <span style={{ color: "var(--fg)" }}>{p.value}</span>
-                          </span>
-                        ))}
-                      </span>
-                    ) : null;
-                  })()}(<Link href={`/u/${profile.username}`} style={{ textDecoration: "underline" }}>clear</Link>)
-                </>
-              ) : null}
-            </div>
-          </div>
-
-          {showLibraryBlocks ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {libraries.map((lib) => {
-              const groups = groupsByLibraryId.get(lib.id) ?? [];
-              if (groups.length === 0) return null;
-              return (
-                <div key={lib.id} className="card">
-                  <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
-                    <div>{lib.name}</div>
-                    <div className="muted">
-                      {groups.length} book{groups.length === 1 ? "" : "s"}
-                    </div>
-                  </div>
-                  <PublicBookList
-                    groups={groups}
-                    username={profile.username}
-                    profileId={profile.id}
-                    signedMap={signedMap}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div>
-            <PublicBookList
-              groups={groupedBooks}
-              username={profile.username}
-              profileId={profile.id}
-              signedMap={signedMap}
-            />
-          </div>
-        )}
+      <div style={{ marginTop: 24 }}>
+        <AddToLibraryProvider editionIds={editionIds}>
+          <PublicBookList
+            libraries={libraries}
+            groups={groupedBooks}
+            username={profile.username}
+            profileId={profile.id}
+            signedMap={signedMap}
+            showLibraryBlocks={showLibraryBlocks}
+            activeFilters={{ author: filterAuthor, subject: filterSubject, tag: filterTag, category: filterCategory, publisher: filterPublisher }}
+            totalLibrariesCount={libraries.length}
+          />
+        </AddToLibraryProvider>
       </div>
-    </AddToLibraryProvider>
     </main>
   );
 }
