@@ -115,10 +115,12 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     );
   }
 
-  const countsRes = await supabase.rpc("get_follow_counts", { target_username: usernameNorm });
-  const countsRow = (countsRes.data as any[] | null)?.[0] ?? null;
-  const followersCount = typeof countsRow?.followers_count === "number" ? (countsRow.followers_count as number) : null;
-  const followingCount = typeof countsRow?.following_count === "number" ? (countsRow.following_count as number) : null;
+  const [followersCountRes, followingCountRes] = await Promise.all([
+    supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("followee_id", profile.id).eq("status", "approved"),
+    supabase.from("follows").select("followee_id", { count: "exact", head: true }).eq("follower_id", profile.id).eq("status", "approved")
+  ]);
+  const followersCount = followersCountRes.count;
+  const followingCount = followingCountRes.count;
 
   const bookRes = await supabase
     .from("user_books")
@@ -151,13 +153,14 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     permanentRedirect(`/u/${profile.username}/b/${canonical}`);
   }
 
-  const effectiveAuthors =
+  const effectiveAuthors = (
     (book.authors_override ?? []).filter(Boolean).length > 0
       ? (book.authors_override ?? []).filter(Boolean)
-      : (book.edition?.authors ?? []).filter(Boolean);
+      : (book.edition?.authors ?? []).filter(Boolean)
+  ).map(String);
 
-  const effectiveEditors = (book.editors_override ?? []).filter(Boolean);
-  const effectiveDesigners = (book.designers_override ?? []).filter(Boolean);
+  const effectiveEditors = (book.editors_override ?? []).filter(Boolean).map(String);
+  const effectiveDesigners = (book.designers_override ?? []).filter(Boolean).map(String);
   const effectivePrinter = (book.printer_override ?? "").trim();
   const effectiveMaterials = (book.materials_override ?? "").trim();
   const effectiveEdition = (book.edition_override ?? "").trim();
@@ -166,10 +169,11 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const effectivePublishDate = (book.publish_date_override ?? "").trim() || book.edition?.publish_date || "";
   const displayPublishDate = formatDateShort(effectivePublishDate || null);
   const effectiveDescription = (book.description_override ?? "").trim() || book.edition?.description || "";
-  const effectiveSubjects =
+  const effectiveSubjects = (
     book.subjects_override !== null && book.subjects_override !== undefined
       ? ((book.subjects_override ?? []).filter(Boolean) as string[])
-      : ((book.edition?.subjects ?? []).filter(Boolean) as string[]);
+      : ((book.edition?.subjects ?? []).filter(Boolean) as string[])
+  ).map(String);
   const subjects = effectiveSubjects.slice().sort((a, b) => a.localeCompare(b));
 
   const paths = Array.from(new Set([
@@ -191,9 +195,9 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   }
 
   const coverMedia = (book.media ?? []).find((m) => m.kind === "cover") ?? null;
-  const coverUrl = coverMedia ? signedMap[coverMedia.storage_path] : book.edition?.cover_url ?? null;
+  const coverUrl: string | null = coverMedia ? (signedMap[coverMedia.storage_path] ?? null) : (book.edition?.cover_url ?? null);
   const cropData = book.cover_crop ?? null;
-  const coverSrc = cropData && book.cover_original_url ? (signedMap[book.cover_original_url] ?? coverUrl) : coverUrl;
+  const coverSrc: string | null = cropData && book.cover_original_url ? (signedMap[book.cover_original_url] ?? coverUrl) : coverUrl;
   const images = (book.media ?? []).filter((m) => m.kind === "image");
   const editionId = book.edition?.id ?? null;
 
