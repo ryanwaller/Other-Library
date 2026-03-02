@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useLayoutEffect, useState } from "react";
+import { useRef, useEffect, useLayoutEffect, useState, useCallback } from "react";
 
 export type EditorState = {
   x: number;
@@ -27,17 +27,24 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
 
   const { x, y, zoom, rotation, brightness, contrast } = state;
 
+  // Track the current callback to avoid dependency cycles
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   // Internal state for dragging
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
 
   // Dimensions
-  const [dims, setDims] = useState({ cw: 0, ch: 0, iw: 0, ih: 0, minZoom: 1 });
+  const [dims, setDims] = useState({ cw: 0, ch: 0, iw: 0, ih: 0, minZoom: 0 });
 
   // Initialize dimensions
   useLayoutEffect(() => {
     if (!containerRef.current || !imgRef.current) return;
+    
     const updateDims = () => {
       if (!containerRef.current || !imgRef.current) return;
       const cw = containerRef.current.clientWidth;
@@ -47,8 +54,6 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
       const nh = imgRef.current.naturalHeight;
       if (!nw || !nh) return;
 
-      // Calculate minZoom (cover scale)
-      // Account for rotation swaps
       const isRotated = (rotation / 90) % 2 !== 0;
       const effectiveNw = isRotated ? nh : nw;
       const effectiveNh = isRotated ? nw : nh;
@@ -60,9 +65,9 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
       setDims({ cw, ch, iw: nw, ih: nh, minZoom });
       if (onLoad) onLoad({ minZoom });
 
-      // If current zoom is 1 (uninitialized) or below minZoom, reset to minZoom and center
-      if (zoom <= 1 || zoom < minZoom) {
-        onChange({ zoom: minZoom, x: 0, y: 0 });
+      // Only force update if uninitialized or critically invalid
+      if (zoom <= 0.01 || zoom < minZoom) {
+        onChangeRef.current({ zoom: minZoom, x: 0, y: 0 });
       }
     };
 
@@ -75,45 +80,35 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
     else img.onload = updateDims;
 
     return () => obs.disconnect();
-  }, [src, aspectRatio, rotation, onLoad]); // Recalculate on rotation as well
+  }, [src, aspectRatio, rotation, onLoad]); // zoom is NOT a dependency here to avoid loops
 
-  // Clamp position and zoom
-  useEffect(() => {
-    if (!dims.minZoom) return;
-    
-    let nextZoom = zoom;
-    let nextX = x;
-    let nextY = y;
-    let changed = false;
+  // Clamping helper
+  const getClampedPos = useCallback((nx: number, ny: number, nz: number, d: typeof dims) => {
+    if (!d.minZoom) return { x: nx, y: ny, zoom: nz };
 
-    // 1. Clamp Zoom
-    const maxZoom = dims.minZoom * 4;
-    if (nextZoom < dims.minZoom) {
-      nextZoom = dims.minZoom;
-      changed = true;
-    } else if (nextZoom > maxZoom) {
-      nextZoom = maxZoom;
-      changed = true;
-    }
-
-    // 2. Clamp Translation
     const isRotated = (rotation / 90) % 2 !== 0;
-    const rw = (isRotated ? dims.ih : dims.iw) * nextZoom;
-    const rh = (isRotated ? dims.iw : dims.ih) * nextZoom;
+    const rw = (isRotated ? d.ih : d.iw) * nz;
+    const rh = (isRotated ? d.iw : d.ih) * nz;
 
-    // Max offset from center (positive)
-    const maxX = Math.max(0, (rw - dims.cw) / 2);
-    const maxY = Math.max(0, (rh - dims.ch) / 2);
+    const maxX = Math.max(0, (rw - d.cw) / 2);
+    const maxY = Math.max(0, (rh - d.ch) / 2);
 
-    if (nextX > maxX) { nextX = maxX; changed = true; }
-    if (nextX < -maxX) { nextX = -maxX; changed = true; }
-    if (nextY > maxY) { nextY = maxY; changed = true; }
-    if (nextY < -maxY) { nextY = -maxY; changed = true; }
+    return {
+      x: Math.min(maxX, Math.max(-maxX, nx)),
+      y: Math.min(maxY, Math.max(-maxY, ny)),
+      zoom: nz
+    };
+  }, [rotation]);
 
-    if (changed) {
-      onChange({ zoom: nextZoom, x: nextX, y: nextY });
+  // Effect-based clamping (handles slider changes)
+  useEffect(() => {
+    if (!dims.minZoom || isDragging) return;
+
+    const clamped = getClampedPos(x, y, zoom, dims);
+    if (clamped.x !== x || clamped.y !== y || clamped.zoom !== zoom) {
+      onChangeRef.current(clamped);
     }
-  }, [zoom, x, y, rotation, dims, onChange]);
+  }, [x, y, zoom, dims, isDragging, getClampedPos]);
 
   // Drag handlers
   const handleDragStart = (cx: number, cy: number) => {
@@ -126,7 +121,10 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
     if (!isDragging) return;
     const dx = cx - dragStart.x;
     const dy = cy - dragStart.y;
-    onChange({ x: startPos.x + dx, y: startPos.y + dy });
+    
+    // We clamp during drag for immediate feedback
+    const clamped = getClampedPos(startPos.x + dx, startPos.y + dy, zoom, dims);
+    onChangeRef.current({ x: clamped.x, y: clamped.y });
   };
 
   const handleDragEnd = () => {
@@ -147,7 +145,7 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
   };
 
   const onTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault();
+    // Note: preventDefault can cause issues on some mobile browsers if not passive:false
     const t = e.touches[0]!;
     handleDragStart(t.clientX, t.clientY);
     const move = (ev: TouchEvent) => {
@@ -162,6 +160,9 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
     window.addEventListener("touchmove", move, { passive: false });
     window.addEventListener("touchend", up);
   };
+
+  const isRotated = (rotation / 90) % 2 !== 0;
+  const currentScale = dims.minZoom ? zoom : 1;
 
   return (
     <div className={className} style={style}>
@@ -186,13 +187,14 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
             src={src}
             alt="Cover edit"
             style={{
-              transform: `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${zoom})`,
+              transform: `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${currentScale})`,
               transformOrigin: "center",
               filter: `brightness(${brightness}) contrast(${contrast})`,
               willChange: "transform",
               pointerEvents: "none",
               maxWidth: "none",
-              maxHeight: "none"
+              maxHeight: "none",
+              display: dims.minZoom ? "block" : "none"
             }}
           />
         </div>
