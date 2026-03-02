@@ -2275,8 +2275,8 @@ function AppShell({
                     ))}
                   </span>
                 ) : null;
-              })()}{" "}
-              (<button
+                })()}(<button
+
                 type="button"
                 onClick={() => {
                   setTagMode("all");

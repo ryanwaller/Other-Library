@@ -70,7 +70,12 @@ export default async function PublicProfilePage({
   searchParams: Promise<{ author?: string; tag?: string; subject?: string; category?: string; publisher?: string }>
 }) {
   const { username } = await params;
-  const { author: filterAuthor, tag: filterTag, subject: filterSubject, category: filterCategory, publisher: filterPublisher } = await searchParams;
+  const rawParams = await searchParams;
+  const filterAuthor = rawParams.author ? decodeURIComponent(rawParams.author) : undefined;
+  const filterTag = rawParams.tag ? decodeURIComponent(rawParams.tag) : undefined;
+  const filterSubject = rawParams.subject ? decodeURIComponent(rawParams.subject) : undefined;
+  const filterCategory = rawParams.category ? decodeURIComponent(rawParams.category) : undefined;
+  const filterPublisher = rawParams.publisher ? decodeURIComponent(rawParams.publisher) : undefined;
   const usernameNorm = (username ?? "").trim().toLowerCase();
   const supabase = getServerSupabase();
 
@@ -278,8 +283,7 @@ export default async function PublicProfilePage({
                         ))}
                       </span>
                     ) : null;
-                  })()}{" "}
-                  (<Link href={`/u/${profile.username}`} style={{ textDecoration: "underline" }}>clear</Link>)
+                  })()}(<Link href={`/u/${profile.username}`} style={{ textDecoration: "underline" }}>clear</Link>)
                 </>
               ) : null}
             </div>
