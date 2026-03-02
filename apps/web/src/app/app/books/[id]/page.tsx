@@ -659,6 +659,8 @@ export default function BookDetailPage() {
     if (!Number.isFinite(bookId) || bookId <= 0) return;
     setBusy(true);
     setError(null);
+    setCoverOriginalSrc(null);
+    setSuggestedCoverUrl(null);
     setOwnerProfile(null);
     setOwnerBorrowDefaults(null);
     setMergeSource(null);
@@ -1993,7 +1995,13 @@ export default function BookDetailPage() {
 
       setCoverEditorSrc(null);
       setPendingCover(null);
+      setCoverOriginalSrc(null);
+      setSuggestedCoverUrl(null);
       setCoverToolsOpen(false);
+      
+      // Clear locally so useMemo updates immediately while refresh() is pending
+      setBook(s => s ? { ...s, media: s.media.filter(m => m.kind !== "cover"), cover_original_url: null, cover_crop: null } : null);
+
       await refresh();
       setCoverState({ busy: false, error: null, message: "Deleted" });
       window.setTimeout(() => setCoverState(s => s.message === "Deleted" ? { ...s, message: null } : s), 1500);
