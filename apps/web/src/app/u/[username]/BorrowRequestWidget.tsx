@@ -195,9 +195,8 @@ export default function BorrowRequestWidget({
 
   return (
     <div>
-      <div className="muted">Request to borrow: {bookTitle}</div>
       {!composerOpen ? (
-        <div className="row" style={{ marginTop: 8 }}>
+        <div className="row">
           <button
             onClick={() => setComposerOpen(true)}
             disabled={!canRequest || state.busy}

@@ -411,13 +411,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
               </>
             ) : null}
 
-            <div style={{ marginTop: 12 }} className="muted">
-              Borrowing
-            </div>
-            <div style={{ marginTop: 6 }} className="muted">
-              {effectiveBorrowable ? `borrowable (${effectiveBorrowScope})` : "not borrowable"}
-            </div>
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 12 }}>
               <BorrowRequestWidget
                 userBookId={book.id}
                 ownerId={book.owner_id}
