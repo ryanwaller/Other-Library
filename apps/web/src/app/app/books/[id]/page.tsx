@@ -1999,8 +1999,13 @@ export default function BookDetailPage() {
       setSuggestedCoverUrl(null);
       setCoverToolsOpen(false);
       
+      // Also clear the edition cover_url so the grey placeholder shows
+      if (book.edition?.id) {
+        await supabase.from("editions").update({ cover_url: null }).eq("id", book.edition.id);
+      }
+
       // Clear locally so useMemo updates immediately while refresh() is pending
-      setBook(s => s ? { ...s, media: s.media.filter(m => m.kind !== "cover"), cover_original_url: null, cover_crop: null } : null);
+      setBook(s => s ? { ...s, media: s.media.filter(m => m.kind !== "cover"), cover_original_url: null, cover_crop: null, edition: s.edition ? { ...s.edition, cover_url: null } : null } : null);
 
       await refresh();
       setCoverState({ busy: false, error: null, message: "Deleted" });
@@ -2277,7 +2282,7 @@ export default function BookDetailPage() {
     }
     if (!currentEffectivePublishDate && nextPublishDate) setFormPublishDate(nextPublishDate);
     if (!currentEffectiveDescription && nextDescription) setFormDescription(nextDescription);
-    if (!hasCurrentCover && nextCover) setSuggestedCoverUrl(nextCover);
+    if (nextCover) setSuggestedCoverUrl(nextCover);
 
     const mergedAuthors = uniqStrings([...(effectiveAuthors ?? []), ...nextAuthors]);
     if (mergedAuthors.length > 0) {
@@ -2419,7 +2424,7 @@ export default function BookDetailPage() {
 
       const hintedCover = String(coverUrlHint ?? "").trim();
       const resolvedCover = hintedCover || String(edition.cover_url ?? "").trim();
-      const shouldImportCover = Boolean(resolvedCover) && (!hadCover || Boolean(hintedCover));
+      const shouldImportCover = Boolean(resolvedCover);
       if (shouldImportCover && resolvedCover) {
         setSuggestedCoverUrl(resolvedCover);
         await importCoverFromUrl(resolvedCover);
