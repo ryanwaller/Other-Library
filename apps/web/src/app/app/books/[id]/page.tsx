@@ -553,7 +553,7 @@ export default function BookDetailPage() {
     setEditorState({
       x: 0,
       y: 0,
-      zoom: 0, // Clamps to baseScale (fit)
+      zoom: 1.0, // fit-to-fill
       rotation: 0,
       brightness: 1,
       contrast: 1
@@ -1769,7 +1769,7 @@ export default function BookDetailPage() {
 
   function resetCoverEdit() {
     setEditorState({
-      zoom: 0,
+      zoom: 1.0,
       x: 0,
       y: 0,
       rotation: 0,
@@ -3126,8 +3126,7 @@ export default function BookDetailPage() {
                       const crop = book?.cover_crop;
                       const isTransform = crop?.mode === "transform";
                       setEditorState({
-                        // If it's legacy data, zoom: 1 meant fit; we now use 0 to trigger fit clamping.
-                        zoom: isTransform ? (crop.zoom ?? 0) : 0,
+                        zoom: isTransform ? (crop.zoom ?? 1.0) : 1.0,
                         x: isTransform ? (crop.x ?? 0) : 0,
                         y: isTransform ? (crop.y ?? 0) : 0,
                         rotation: crop?.rotation ?? 0,
@@ -3209,8 +3208,8 @@ export default function BookDetailPage() {
                                 min={1}
                                 max={4}
                                 step={0.01}
-                                value={editorState.zoom / (minZoomFloor || 1) || 1}
-                                onChange={(relZoom) => setEditorState(s => ({ ...s, zoom: relZoom * (minZoomFloor || 1) }))}
+                                value={editorState.zoom}
+                                onChange={(zoom) => setEditorState(s => ({ ...s, zoom }))}
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>

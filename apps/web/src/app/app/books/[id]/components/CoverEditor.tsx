@@ -3,10 +3,11 @@
 import { useRef, useEffect, useLayoutEffect, useState, useCallback } from "react";
 
 export type EditorState = {
-  // Store these as absolute values: x/y in natural image pixels, zoom as absolute CSS scale.
+  // Store these as ratios: x/y in 0-1 range (offset from center / natural dimension)
+  // zoom as multiplier (1.0 = fit-to-fill)
   x: number; 
   y: number; 
-  zoom: number; // Absolute CSS scale factor (e.g. 0.25)
+  zoom: number; // 1.0 to 4.0 (multiplier of the 'fit' scale)
   rotation: number;
   brightness: number;
   contrast: number;
@@ -82,7 +83,7 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
       const baseScale = Math.max(scaleW, scaleH);
 
       setDims({ cw, ch, bw, bh, iw: nw, ih: nh, baseScale });
-      if (onLoad) onLoad({ minZoom: baseScale });
+      if (onLoad) onLoad({ minZoom: 1 }); // Relative zoom min is now 1.0
     };
 
     updateDims();
@@ -96,27 +97,34 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
     return () => obs.disconnect();
   }, [src, aspectRatio, rotation, onLoad]);
 
-  // Clamping helper (absolute coordinates)
+  // Clamping helper (relative coordinates)
   const getClampedPos = useCallback((nx: number, ny: number, nz: number, d: typeof dims) => {
     if (!d.baseScale) return { x: nx, y: ny, zoom: nz };
 
-    // nz is the absolute CSS scale. Clamp to fill (baseScale).
-    const currentScale = Math.max(d.baseScale, nz);
+    // nz is the zoom multiplier (e.g. 1.2 for 120% zoom)
+    const currentZoom = Math.max(1, nz);
+    const currentScale = d.baseScale * currentZoom;
     
     const isRotated = (rotation / 90) % 2 !== 0;
     const rw = (isRotated ? d.ih : d.iw); // natural width
     const rh = (isRotated ? d.iw : d.ih); // natural height
 
     // Max translation in natural image pixels
-    // (naturalWidth * scale - cropBoxWidth) / 2 = maxScreenOffset
-    // maxNaturalOffset = maxScreenOffset / scale
     const maxX = Math.max(0, (rw - d.bw / currentScale) / 2);
     const maxY = Math.max(0, (rh - d.bh / currentScale) / 2);
 
+    // Natural pixel offsets
+    const px = nx * d.iw;
+    const py = ny * d.ih;
+    
+    // Clamp in natural pixel space
+    const clampedPx = Math.min(maxX, Math.max(-maxX, px));
+    const clampedPy = Math.min(maxY, Math.max(-maxY, py));
+
     return {
-      x: Math.min(maxX, Math.max(-maxX, nx)),
-      y: Math.min(maxY, Math.max(-maxY, ny)),
-      zoom: Math.max(d.baseScale, Math.min(d.baseScale * 4, nz))
+      x: clampedPx / d.iw,
+      y: clampedPy / d.ih,
+      zoom: Math.max(1, Math.min(4, nz))
     };
   }, [rotation]);
 
@@ -142,10 +150,16 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
     const dx = cx - dragStart.x;
     const dy = cy - dragStart.y;
     
-    // dx/dy are screen pixels. zoom is absolute CSS scale factor.
-    // translate(x, y) scale(s) means x is in natural pixels.
-    // To move dx screen pixels, we move dx / currentScale natural pixels.
-    const clamped = getClampedPos(startPos.x + dx / zoom, startPos.y + dy / zoom, zoom, dims);
+    // dx/dy are screen pixels. 
+    // currentScale = baseScale * zoom
+    // translate(x_natural, y_natural) scale(currentScale) means visual offset = x_natural * currentScale.
+    // So x_natural = dx / (baseScale * zoom).
+    // dx_ratio = x_natural / nw = dx / (baseScale * zoom * nw).
+    const currentScale = dims.baseScale * zoom;
+    const dx_ratio = dx / (currentScale * dims.iw);
+    const dy_ratio = dy / (currentScale * dims.ih);
+
+    const clamped = getClampedPos(startPos.x + dx_ratio, startPos.y + dy_ratio, zoom, dims);
     onChangeRef.current({ x: clamped.x, y: clamped.y });
   };
 
@@ -182,7 +196,7 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
     window.addEventListener("touchend", up);
   };
 
-  const currentScale = Math.max(dims.baseScale, zoom);
+  const currentScale = dims.baseScale * zoom;
 
   return (
     <div className={className} style={{ ...style, position: "relative", overflow: "hidden" }}>
@@ -207,7 +221,7 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
             src={src}
             alt="Cover edit"
             style={{
-              transform: `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${currentScale})`,
+              transform: `translate(${x * dims.iw}px, ${y * dims.ih}px) rotate(${rotation}deg) scale(${currentScale})`,
               transformOrigin: "center",
               filter: `brightness(${brightness}) contrast(${contrast})`,
               willChange: "transform",
