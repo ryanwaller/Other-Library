@@ -150,7 +150,7 @@ export default function BookCard({
   }
 
   return (
-    <div className="card om-book-card">
+    <div className="card om-book-card" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {bulkMode ? (
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
           <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" />
@@ -159,10 +159,12 @@ export default function BookCard({
 
       {bulkMode ? (
         <>
-          <Link href={href} style={{ display: "flex", textDecoration: "none", alignItems: "flex-end" }} className="om-book-card-link">
-            {coverEl}
-          </Link>
-          <div style={{ marginTop: 12 }}>
+          <div style={{ flex: "1 1 auto", display: "flex", alignItems: "flex-end" }}>
+            <Link href={href} style={{ display: "flex", textDecoration: "none", width: "100%", alignItems: "flex-end" }} className="om-book-card-link">
+              {coverEl}
+            </Link>
+          </div>
+          <div style={{ flex: "0 0 auto", marginTop: 12 }}>
             <div className="row" style={{ justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
               <Link href={href} style={{ textDecoration: "none" }} className="om-book-card-link">
                 <span className="om-book-title">{title}</span>
@@ -187,7 +189,7 @@ export default function BookCard({
       ) : (
         <div
           className="om-book-card-link"
-          style={{ display: "block", color: "inherit", cursor: "pointer" }}
+          style={{ display: "flex", flexDirection: "column", height: "100%", color: "inherit", cursor: "pointer" }}
           role="link"
           tabIndex={0}
           onClick={() => router.push(href)}
@@ -198,10 +200,10 @@ export default function BookCard({
             }
           }}
         >
-          <div style={{ display: "flex", alignItems: "flex-end" }}>
+          <div style={{ flex: "1 1 auto", display: "flex", alignItems: "flex-end" }}>
             {coverEl}
           </div>
-          <div style={{ marginTop: 14 }}>
+          <div style={{ flex: "0 0 auto", marginTop: 14 }}>
             <div className="row" style={{ justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
               <span className="om-book-title">{title}</span>
             </div>
