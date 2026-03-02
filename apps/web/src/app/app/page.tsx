@@ -2274,8 +2274,7 @@ function AppShell({
                   </span>
                 ) : null;
               })()}{" "}
-              (
-              <button
+              (<button
                 type="button"
                 onClick={() => {
                   setTagMode("all");
@@ -2297,10 +2296,7 @@ function AppShell({
                   textDecoration: "underline",
                   cursor: "pointer"
                 }}
-              >
-                clear
-              </button>
-              )
+              >clear</button>)
             </>
           ) : null}
         </div>
