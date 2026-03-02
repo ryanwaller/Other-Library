@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import sizeOf from "image-size";
 
 export const runtime = "nodejs";
 
@@ -316,6 +317,30 @@ SELECT ?item ?itemLabel ?description ?pubdate ?publisherLabel ?authorLabel ?imag
   };
 }
 
+async function validateCoverUrl(url: string | null | undefined): Promise<string | null> {
+  const normalized = normalizeHttpsUrl(url);
+  if (!normalized) return null;
+
+  try {
+    const res = await fetch(normalized, {
+      method: "GET",
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!res.ok) return null;
+
+    const buffer = await res.arrayBuffer();
+    const dimensions = sizeOf(Buffer.from(buffer));
+    if (!dimensions.width || !dimensions.height) return null;
+    if (dimensions.width < 100 || dimensions.height < 100) return null;
+
+    return normalized;
+  } catch (e) {
+    console.error("validateCoverUrl failed:", e, normalized);
+    return null;
+  }
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const input = searchParams.get("isbn") ?? "";
@@ -357,7 +382,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Prefer the best available cover among all sources (covers often differ by source).
-  merged.cover_url = chooseBestCoverUrl([merged.cover_url, ...results.map(([, r]) => r?.cover_url)]);
+  const bestUrl = chooseBestCoverUrl([merged.cover_url, ...results.map(([, r]) => r?.cover_url)]);
+  merged.cover_url = await validateCoverUrl(bestUrl);
 
   // Ensure arrays are present.
   merged.authors = merged.authors ?? [];

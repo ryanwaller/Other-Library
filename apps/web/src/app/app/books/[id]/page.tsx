@@ -2696,7 +2696,19 @@ export default function BookDetailPage() {
                                     style={{ cursor: "pointer", opacity: isChecked ? 1 : 0.4, outline: isChecked ? "2px solid currentColor" : "2px solid transparent", outlineOffset: 2, borderRadius: 2 }}
                                   >
                                     {imgUrl
-                                      ? <img src={imgUrl} alt="Cover variant" style={{ width: 48, height: 72, objectFit: "cover", display: "block", borderRadius: 2 }} />
+                                      ? <img
+                                          src={imgUrl}
+                                          alt="Cover variant"
+                                          style={{ width: 48, height: 72, objectFit: "cover", display: "block", borderRadius: 2 }}
+                                          onLoad={(e) => {
+                                            if (e.currentTarget.naturalWidth < 100 || e.currentTarget.naturalHeight < 100) {
+                                              e.currentTarget.style.display = "none";
+                                            }
+                                          }}
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = "none";
+                                          }}
+                                        />
                                       : <div style={{ width: 48, height: 72, background: "var(--muted, #888)", opacity: 0.3, borderRadius: 2 }} />
                                     }
                                   </div>
@@ -2804,6 +2816,14 @@ export default function BookDetailPage() {
                                         width={60}
                                         height={90}
                                         style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                                        onLoad={(e) => {
+                                          if (e.currentTarget.naturalWidth < 100 || e.currentTarget.naturalHeight < 100) {
+                                            e.currentTarget.style.display = "none";
+                                          }
+                                        }}
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = "none";
+                                        }}
                                       />
                                     </div>
                                   ) : (

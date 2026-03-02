@@ -2500,6 +2500,11 @@ function AppShell({
                     width={60}
                     height={90}
                     style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                    onLoad={(e) => {
+                      if (e.currentTarget.naturalWidth < 100 || e.currentTarget.naturalHeight < 100) {
+                        setAddPreviewCoverFailed(true);
+                      }
+                    }}
                     onError={() => setAddPreviewCoverFailed(true)}
                   />
                 </div>
@@ -2595,6 +2600,11 @@ function AppShell({
                           width={60}
                           height={90}
                           style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                          onLoad={(e) => {
+                            if (e.currentTarget.naturalWidth < 100 || e.currentTarget.naturalHeight < 100) {
+                              e.currentTarget.style.display = "none";
+                            }
+                          }}
                           onError={(e) => {
                             e.currentTarget.style.display = "none";
                           }}

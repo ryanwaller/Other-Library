@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import sizeOf from "image-size";
 
 export const runtime = "nodejs";
 
@@ -692,6 +693,30 @@ function makeEmpty(): ImportMetadata {
   };
 }
 
+async function validateCoverUrl(url: string | null | undefined): Promise<string | null> {
+  const normalized = normalizeHttpsUrl(url);
+  if (!normalized) return null;
+
+  try {
+    const res = await fetch(normalized, {
+      method: "GET",
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!res.ok) return null;
+
+    const buffer = await res.arrayBuffer();
+    const dimensions = sizeOf(Buffer.from(buffer));
+    if (!dimensions.width || !dimensions.height) return null;
+    if (dimensions.width < 100 || dimensions.height < 100) return null;
+
+    return normalized;
+  } catch (e) {
+    console.error("validateCoverUrl failed:", e, normalized);
+    return null;
+  }
+}
+
 export async function POST(req: NextRequest) {
   let urlValue = "";
   try {
@@ -996,6 +1021,14 @@ export async function POST(req: NextRequest) {
     ].filter(Boolean) as string[]);
     merged.cover_url = normalizeHttpsUrl((isbnEdition as any).cover_url) ?? scraped.cover_url ?? null;
   }
+
+  // Final validation for all candidates and the picked URL
+  const validCandidates = (await Promise.all(
+    merged.cover_candidates.map(url => validateCoverUrl(url))
+  )).filter(Boolean) as string[];
+
+  merged.cover_candidates = validCandidates;
+  merged.cover_url = validCandidates[0] ?? null;
 
   return NextResponse.json({
     ok: true,

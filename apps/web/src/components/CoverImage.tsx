@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 
 export type CoverCrop = {
   // Display crop (ratios 0-1) — from react-easy-crop onCropComplete, divided by 100
@@ -29,9 +29,24 @@ export default function CoverImage({
   style?: CSSProperties;
   className?: string;
 }) {
-  if (!src) {
+  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
+
+  if (!src || status === "error") {
     return <div style={style} className={`${className || ""} om-cover-placeholder`.trim()} />;
   }
+
+  const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth < 100 || img.naturalHeight < 100) {
+      setStatus("error");
+    } else {
+      setStatus("ok");
+    }
+  };
+
+  const handleError = () => {
+    setStatus("error");
+  };
 
   if (!cropData) {
     return (
@@ -40,8 +55,11 @@ export default function CoverImage({
         <img
           alt={alt}
           src={src}
-          style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+          onLoad={handleLoad}
+          onError={handleError}
+          style={{ width: "100%", height: "100%", objectFit: "contain", display: status === "ok" ? "block" : "none" }}
         />
+        {status === "loading" && <div className="om-cover-placeholder" style={{ width: "100%", height: "100%" }} />}
       </div>
     );
   }
@@ -77,7 +95,14 @@ export default function CoverImage({
   return (
     <div style={containerStyle} className={className}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img alt={alt} src={src} style={imgStyle} />
+      <img
+        alt={alt}
+        src={src}
+        onLoad={handleLoad}
+        onError={handleError}
+        style={{ ...imgStyle, display: status === "ok" ? "block" : "none" }}
+      />
+      {status === "loading" && <div className="om-cover-placeholder" style={{ width: "100%", height: "100%" }} />}
     </div>
   );
 }
