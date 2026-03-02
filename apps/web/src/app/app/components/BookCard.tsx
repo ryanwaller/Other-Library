@@ -72,6 +72,7 @@ export default function BookCard({
         src={originalSrc ?? coverUrl}
         cropData={cropData}
         style={{ display: "block", width: "100%", height: "100%" }}
+        objectFit="contain"
       />
     </div>
   );
@@ -82,7 +83,7 @@ export default function BookCard({
         {bulkMode ? <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" /> : null}
         <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link">
           <div className="om-cover-slot" style={{ width: 70, height: 70 }}>
-            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "100%" }} />
+            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "100%" }} objectFit="contain" />
           </div>
         </Link>
         <div>

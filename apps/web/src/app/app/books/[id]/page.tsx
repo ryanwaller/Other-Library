@@ -3108,6 +3108,7 @@ export default function BookDetailPage() {
                     src={coverOriginalSrc ?? coverUrl}
                     cropData={book?.cover_crop ?? null}
                     style={{ width: "100%", height: "100%", display: "block" }}
+                    objectFit="cover"
                   />
                 )}
               </div>

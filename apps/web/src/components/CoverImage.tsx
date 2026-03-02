@@ -26,14 +26,17 @@ export default function CoverImage({
   cropData,
   alt,
   style,
-  className
+  className,
+  objectFit = "cover"
 }: {
   src: string | null;
-  cropData?: CoverCrop | null;
+  cropData: CoverCrop | null | undefined;
   alt: string;
   style?: CSSProperties;
   className?: string;
+  objectFit?: "cover" | "contain";
 }) {
+
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
 
   if (!src || status === "error") {
@@ -66,7 +69,7 @@ export default function CoverImage({
 
         const scaleW = cw / effectiveNw;
         const scaleH = ch / effectiveNh;
-        const baseScale = Math.max(scaleW, scaleH);
+        const baseScale = objectFit === "cover" ? Math.max(scaleW, scaleH) : Math.min(scaleW, scaleH);
         
         // cropData.zoom is now a multiplier (e.g. 1.0 = fit-to-fill, 1.2 = 20% zoom)
         const currentScale = baseScale * (cropData.zoom || 1);
@@ -78,6 +81,7 @@ export default function CoverImage({
         // Apply transform: translate in natural pixels, then scale
         img.style.transform = `translate(${tx}px, ${ty}px) rotate(${cropData.rotation || 0}deg) scale(${currentScale})`;
         img.style.transformOrigin = "center";
+        img.style.objectFit = objectFit;
       }
     }
     
