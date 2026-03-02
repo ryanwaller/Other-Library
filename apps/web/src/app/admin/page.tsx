@@ -427,15 +427,19 @@ export default function AdminPage() {
                 Invite
               </button>
               {inviteLink ? (
-                <button
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(inviteLink);
-                    setCopiedInvite(true);
-                    window.setTimeout(() => setCopiedInvite(false), 1500);
-                  }}
-                >
-                  {copiedInvite ? "Copied" : "Copy link"}
-                </button>
+                copiedInvite ? (
+                  <span style={{ marginLeft: 8 }}>Copied</span>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(inviteLink);
+                      setCopiedInvite(true);
+                      window.setTimeout(() => setCopiedInvite(false), 1500);
+                    }}
+                  >
+                    Copy link
+                  </button>
+                )
               ) : null}
             </div>
           </div>
@@ -771,17 +775,21 @@ export default function AdminPage() {
                       primary={primary}
                       primaryHref={hasUsername ? `/u/${encodeURIComponent(String(invite.username).trim())}` : null}
                       actions={
-                        <button
-                          onClick={async () => {
-                            const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(invite.token)}`;
-                            await navigator.clipboard.writeText(link);
-                            setInviteLink(link);
-                            setCopiedLinkForId(invite.id);
-                            window.setTimeout(() => setCopiedLinkForId(null), 1500);
-                          }}
-                        >
-                          {copiedLinkForId === invite.id ? "Copied" : "Copy link"}
-                        </button>
+                        copiedLinkForId === invite.id ? (
+                          <span>Copied</span>
+                        ) : (
+                          <button
+                            onClick={async () => {
+                              const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(invite.token)}`;
+                              await navigator.clipboard.writeText(link);
+                              setInviteLink(link);
+                              setCopiedLinkForId(invite.id);
+                              window.setTimeout(() => setCopiedLinkForId(null), 1500);
+                            }}
+                          >
+                            Copy link
+                          </button>
+                        )
                       }
                       meta={[
                         { label: "Status", value: titleCase(status) },

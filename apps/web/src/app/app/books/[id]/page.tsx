@@ -3977,9 +3977,13 @@ export default function BookDetailPage() {
                           >
                             {publicBookUrl.replace(/^https?:\/\//, "")}
                           </a>
-                          <button onClick={copyPublicLink} style={{ flex: "0 0 auto", marginLeft: 2 }}>
-                            {shareState.message === "Copied" ? "Copied" : "Copy"}
-                          </button>
+                          {shareState.message === "Copied" ? (
+                            <span style={{ flex: "0 0 auto", marginLeft: 2 }}>Copied</span>
+                          ) : (
+                            <button onClick={copyPublicLink} style={{ flex: "0 0 auto", marginLeft: 2 }}>
+                              Copy
+                            </button>
+                          )}
                         </div>
                         {shareState.error ? (
                           <div className="muted" style={{ marginTop: 6, textAlign: "right" }}>
