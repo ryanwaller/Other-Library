@@ -1590,6 +1590,15 @@ export default function BookDetailPage() {
       // ignore
     }
 
+    // Persist a cover URL that was set via Find more info / Link ISBN
+    if (suggestedCoverUrl) {
+      await supabase.from("user_books").update({ cover_original_url: suggestedCoverUrl }).eq("id", book.id);
+      if (book.edition?.id) {
+        await supabase.from("editions").update({ cover_url: suggestedCoverUrl }).eq("id", book.edition.id);
+      }
+      setSuggestedCoverUrl(null);
+    }
+
     await refresh();
     setSaveState({ busy: false, error: null, message: "Saved" });
     return true;
