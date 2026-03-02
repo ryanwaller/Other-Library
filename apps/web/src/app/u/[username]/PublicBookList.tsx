@@ -232,46 +232,42 @@ export default function PublicBookList({
     }
 
     return (
-      <div key={g.key} className="om-book-card" style={{ position: "relative", display: "flex", flexDirection: "column", height: "100%" }}>
-        <div style={{ flex: "1 1 auto", display: "flex", alignItems: "flex-end" }}>
-          <Link href={href} className="om-book-card-link" style={{ display: "block", width: "100%" }}>
-            <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
-              <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
-            </div>
-          </Link>
+      <div key={g.key} className="om-book-card" style={{ position: "relative" }}>
+        <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
+          <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
+            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
+          </div>
+        </Link>
+        <div className="om-cover-add-btn" style={{ position: "absolute", top: 6, right: 6, zIndex: 1 }}>
+          <AddToLibraryButton
+            editionId={e?.id ?? null}
+            titleFallback={title}
+            authorsFallback={authors}
+            compact
+          />
         </div>
-        <div style={{ flex: "0 0 auto" }}>
-          <div className="om-cover-add-btn" style={{ position: "absolute", top: 6, right: 6, zIndex: 1 }}>
-            <AddToLibraryButton
-              editionId={e?.id ?? null}
-              titleFallback={title}
-              authorsFallback={authors}
-              compact
-            />
-          </div>
-          <div style={{ marginTop: 10 }} className="book-title">
-            <Link href={href}>{title}</Link>
-          </div>
-          <div className="book-author muted">
-            {truncatedAuthors.length > 0
-              ? truncatedAuthors.map((a, idx) => (
-                  <span key={a}>
-                    {isMobile && a === "+ more" ? (
-                      <span className="muted">{a}</span>
-                    ) : (
-                      <button 
-                        onClick={() => setActiveFilters({ author: a })}
-                        className="om-filter-link"
-                        style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
-                      >
-                        {a}
-                      </button>
-                    )}
-                    {idx < truncatedAuthors.length - 1 ? <span>, </span> : null}
-                  </span>
-                ))
-              : "—"}
-          </div>
+        <div style={{ marginTop: 10 }} className="book-title">
+          <Link href={href}>{title}</Link>
+        </div>
+        <div className="book-author muted">
+          {truncatedAuthors.length > 0
+            ? truncatedAuthors.map((a, idx) => (
+                <span key={a}>
+                  {isMobile && a === "+ more" ? (
+                    <span className="muted">{a}</span>
+                  ) : (
+                    <button 
+                      onClick={() => setActiveFilters({ author: a })}
+                      className="om-filter-link"
+                      style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
+                    >
+                      {a}
+                    </button>
+                  )}
+                  {idx < truncatedAuthors.length - 1 ? <span>, </span> : null}
+                </span>
+              ))
+            : "—"}
         </div>
       </div>
     );
