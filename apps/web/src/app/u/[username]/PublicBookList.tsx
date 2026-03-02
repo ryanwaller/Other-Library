@@ -158,8 +158,8 @@ export default function PublicBookList({
             return (
               <div key={b.id} className="om-book-card" style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                 <Link href={href} className="om-book-card-link" style={{ flexShrink: 0 }}>
-                  <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
-                    <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
+                  <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
+                    <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
                   </div>
                 </Link>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -192,8 +192,8 @@ export default function PublicBookList({
             <div key={b.id} className="om-book-card">
               <div style={{ position: "relative" }}>
                 <Link href={href} style={{ display: "block" }} className="om-book-card-link">
-                  <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
-                    <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
+                  <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
+                    <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
                   </div>
                 </Link>
                 <div className="om-cover-add-btn" style={{ position: "absolute", top: 6, right: 6, zIndex: 1 }}>

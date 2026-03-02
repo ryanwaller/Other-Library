@@ -2880,13 +2880,13 @@ export default function BookDetailPage() {
                               <div className="om-lookup-row">
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
                                   {r.cover_url ? (
-                                    <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
+                                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
                                       <img
                                         src={r.cover_url}
                                         alt=""
                                         width={60}
-                                        height={90}
-                                        style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                                        style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
+
                                         onLoad={(e) => {
                                           if (e.currentTarget.naturalWidth < 100 || e.currentTarget.naturalHeight < 100) {
                                             e.currentTarget.style.display = "none";
@@ -2898,7 +2898,7 @@ export default function BookDetailPage() {
                                       />
                                     </div>
                                   ) : (
-                                    <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
+                                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
                                   )}
                                 </div>
                                 <div className="om-lookup-main">
@@ -2970,17 +2970,17 @@ export default function BookDetailPage() {
                               <div className="om-lookup-row">
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
                                   {previewCoverUrl ? (
-                                    <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
+                                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
                                       <img
                                         src={previewCoverUrl}
                                         alt=""
                                         width={60}
-                                        height={90}
-                                        style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                                        style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
                                       />
                                     </div>
+
                                   ) : (
-                                    <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
+                                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
                                   )}
                                 </div>
                                 <div className="om-lookup-main" style={{ minWidth: 0 }}>
@@ -3084,7 +3084,7 @@ export default function BookDetailPage() {
                 style={{
                   position: "relative",
                   width: "100%",
-                  height: isNarrow ? 360 : 280, // Non-negotiable fixed height
+                  height: "auto",
                   padding: 0,
                   overflow: "hidden",
                   display: coverEditorSrc ? "block" : "flex",
@@ -3100,15 +3100,15 @@ export default function BookDetailPage() {
                     onChange={(next) => setEditorState(s => ({ ...s, ...next }))}
                     onLoad={({ minZoom }) => setMinZoomFloor(minZoom)}
                     aspectRatio={coverAspect ?? (2/3)}
-                    style={{ width: "100%", height: "100%" }}
+                    style={{ width: "100%", height: "auto", aspectRatio: `${coverAspect ?? (2/3)}` }}
                   />
                 ) : (
                   <CoverImage
                     alt={effectiveTitle}
                     src={coverOriginalSrc ?? coverUrl}
                     cropData={book?.cover_crop ?? null}
-                    style={{ width: "100%", height: "100%", display: "block" }}
-                    objectFit="cover"
+                    style={{ width: "100%", height: "auto", display: "block" }}
+                    objectFit="contain"
                   />
                 )}
               </div>

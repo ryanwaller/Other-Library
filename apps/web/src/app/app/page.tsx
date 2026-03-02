@@ -1833,18 +1833,6 @@ function AppShell({
     return by;
   }, [displayGroups]);
 
-  const coverHeight = useMemo(() => {
-    if (viewMode === "list") return 56;
-    if (isMobile) {
-      if (gridCols === 1) return 260;
-      if (gridCols === 2) return 200;
-    }
-    if (gridCols === 1) return 420;
-    if (gridCols === 2) return 320;
-    if (gridCols === 8) return 140;
-    return 220;
-  }, [viewMode, gridCols, isMobile]);
-
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
     for (const it of items) {
@@ -2191,7 +2179,6 @@ function AppShell({
         copiesCount={g.copiesCount}
         href={`/app/books/${it.id}`}
         coverUrl={coverUrl}
-        coverHeight={coverHeight}
         cropData={cropData}
         originalSrc={originalSrc}
         onDeleteCopy={() => deleteEntry(it.id)}
@@ -2493,13 +2480,12 @@ function AppShell({
           <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
             <div style={{ width: 62, flex: "0 0 auto" }}>
               {addUrlPreview.cover_url && !addPreviewCoverFailed ? (
-                <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
+                <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
                   <img
                     src={`/api/image-proxy?url=${encodeURIComponent(addUrlPreview.cover_url)}`}
                     alt=""
                     width={60}
-                    height={90}
-                    style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                    style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
                     onLoad={(e) => {
                       if (e.currentTarget.naturalWidth < 100 || e.currentTarget.naturalHeight < 100) {
                         setAddPreviewCoverFailed(true);
@@ -2509,7 +2495,7 @@ function AppShell({
                   />
                 </div>
               ) : (
-                <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
+                <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
               )}
             </div>
             <div style={{ flex: "1 1 auto" }}>
@@ -2593,13 +2579,12 @@ function AppShell({
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                   <div style={{ width: 62, flex: "0 0 auto" }}>
                     {r.cover_url ? (
-                      <div className="om-cover-slot" style={{ width: 60, height: 90 }}>
+                      <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
                         <img
                           src={`/api/image-proxy?url=${encodeURIComponent(String(r.cover_url))}`}
                           alt=""
                           width={60}
-                          height={90}
-                          style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
+                          style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
                           onLoad={(e) => {
                             if (e.currentTarget.naturalWidth < 100 || e.currentTarget.naturalHeight < 100) {
                               e.currentTarget.style.display = "none";
@@ -2611,8 +2596,9 @@ function AppShell({
                         />
                       </div>
                     ) : (
-                      <div className="om-cover-slot" style={{ width: 60, height: 90 }} />
+                      <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
                     )}
+
                   </div>
                   <div style={{ flex: "1 1 auto" }}>
                     <div>{title}</div>

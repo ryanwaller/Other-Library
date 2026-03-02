@@ -19,7 +19,6 @@ export default function BookCard({
   copiesCount,
   href,
   coverUrl,
-  coverHeight,
   cropData,
   originalSrc,
   onDeleteCopy,
@@ -39,7 +38,6 @@ export default function BookCard({
   copiesCount: number;
   href: string;
   coverUrl: string | null;
-  coverHeight: number;
   cropData?: CoverCrop | null;
   originalSrc?: string | null;
   onDeleteCopy: () => void;
@@ -66,12 +64,12 @@ export default function BookCard({
   const authorLine = truncatedAuthors.length > 0 ? truncatedAuthors.join(", ") : "";
 
   const coverEl = (
-    <div className="om-cover-slot" style={{ height: coverHeight }}>
+    <div className="om-cover-slot" style={{ height: "auto", width: "100%" }}>
       <CoverImage
         alt={title}
         src={originalSrc ?? coverUrl}
         cropData={cropData}
-        style={{ display: "block", width: "100%", height: "100%" }}
+        style={{ display: "block", width: "100%", height: "auto" }}
         objectFit="contain"
       />
     </div>
@@ -82,8 +80,8 @@ export default function BookCard({
       <div className="card" style={{ display: "grid", gridTemplateColumns: bulkMode ? "26px 70px 1fr" : "70px 1fr", gap: 12, alignItems: "start" }}>
         {bulkMode ? <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" /> : null}
         <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link">
-          <div className="om-cover-slot" style={{ width: 70, height: 70 }}>
-            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "100%" }} objectFit="contain" />
+          <div className="om-cover-slot" style={{ width: 70, height: "auto" }}>
+            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto" }} objectFit="contain" />
           </div>
         </Link>
         <div>

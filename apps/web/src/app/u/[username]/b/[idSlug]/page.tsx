@@ -244,8 +244,8 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       <div style={{ marginTop: 14 }} className="card">
         <div className="om-book-detail-grid">
           <div>
-            <div className="om-cover-slot" style={{ width: "100%", height: 280 }}>
-              <CoverImage alt={effectiveTitle} src={coverSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
+            <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
+              <CoverImage alt={effectiveTitle} src={coverSrc} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
             </div>
           </div>
 

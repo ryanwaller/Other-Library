@@ -44,12 +44,12 @@ export default function PublicImageGrid({ images, signedMap }: Props) {
           return (
             <div key={m.id} onClick={() => setLightboxIndex(idx)} style={{ cursor: "pointer" }}>
               {url ? (
-                <div className="om-cover-slot" style={{ width: "100%", height: isNarrow ? 140 : 180, padding: 0 }}>
+                <div className="om-cover-slot" style={{ width: "100%", height: "auto", padding: 0 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt="" src={url} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+                  <img alt="" src={url} style={{ width: "100%", height: "auto", objectFit: "contain", display: "block" }} />
                 </div>
               ) : (
-                <div className="om-cover-slot" style={{ width: "100%", height: isNarrow ? 140 : 180, padding: 0 }} />
+                <div className="om-cover-slot" style={{ width: "100%", height: "auto", padding: 0 }} />
               )}
             </div>
           );

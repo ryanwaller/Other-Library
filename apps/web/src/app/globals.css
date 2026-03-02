@@ -120,9 +120,7 @@ a:focus-visible {
 
 .om-cover-placeholder {
   background: var(--placeholder-bg);
-  aspect-ratio: 2 / 3;
-  height: 100%;
-  width: auto;
+  width: 100%;
   display: block;
 }
 
