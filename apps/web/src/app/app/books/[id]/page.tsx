@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import Cropper, { type Area } from "react-easy-crop";
 import { supabase } from "../../../../lib/supabaseClient";
 import { isValidTrimSize, convertTrimUnit, formatTrimRatio, type TrimUnit } from "../../../../lib/trimSize";
 import { bookIdSlug } from "../../../../lib/slug";
@@ -14,6 +13,8 @@ import SignInCard from "../../../components/SignInCard";
 import EntityTokenField from "../../components/EntityTokenField";
 import CoverImage, { type CoverCrop } from "../../../../components/CoverImage";
 import ExpandableContent from "../../../../components/ExpandableContent";
+import CustomSlider from "../../../../components/CustomSlider";
+import CoverEditor, { type EditorState } from "./components/CoverEditor";
 
 type FacetRole =
   | "author"
@@ -310,93 +311,6 @@ function parseTitleAndAuthor(input: string): { title: string; author: string | n
   return { title: s, author: null };
 }
 
-function CustomSlider({
-  min,
-  max,
-  step = 1,
-  value,
-  onChange,
-  style
-}: {
-  min: number;
-  max: number;
-  step?: number;
-  value: number;
-  onChange: (val: number) => void;
-  style?: React.CSSProperties;
-}) {
-  const trackRef = useRef<HTMLDivElement>(null);
-
-  const handleMove = (clientX: number) => {
-    if (!trackRef.current) return;
-    const rect = trackRef.current.getBoundingClientRect();
-    const pos = (clientX - rect.left) / rect.width;
-    const raw = min + pos * (max - min);
-    const clamped = Math.min(max, Math.max(min, raw));
-    const stepped = Math.round(clamped / step) * step;
-    onChange(Number(stepped.toFixed(4)));
-  };
-
-  const onMouseDown = (e: React.MouseEvent) => {
-    handleMove(e.clientX);
-    const move = (me: MouseEvent) => handleMove(me.clientX);
-    const up = () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-    };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-  };
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    handleMove(e.touches[0]!.clientX);
-    const move = (te: TouchEvent) => handleMove(te.touches[0]!.clientX);
-    const up = () => {
-      window.removeEventListener("touchmove", move);
-      window.removeEventListener("touchend", up);
-    };
-    window.addEventListener("touchmove", move, { passive: false });
-    window.addEventListener("touchend", up);
-  };
-
-  const percent = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
-
-  return (
-    <div
-      ref={trackRef}
-      onMouseDown={onMouseDown}
-      onTouchStart={onTouchStart}
-      style={{
-        height: 24,
-        display: "flex",
-        alignItems: "center",
-        cursor: "pointer",
-        position: "relative",
-        userSelect: "none",
-        touchAction: "none",
-        ...style
-      }}
-    >
-      <div style={{ height: 1, width: "100%", background: "var(--border)", position: "relative" }}>
-        <div
-          style={{
-            position: "absolute",
-            left: `${percent}%`,
-            top: "50%",
-            transform: "translate(-50%, -50%)",
-            width: 14,
-            height: 14,
-            borderRadius: "50%",
-            background: "var(--fg)",
-            border: "none",
-            boxShadow: "none"
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
 export default function BookDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -439,6 +353,25 @@ export default function BookDetailPage() {
     cropTrimHeight: string;
     cropTrimUnit: TrimUnit | "ratio";
   } | null>(null);
+
+  const [pendingCover, setPendingCover] = useState<File | null>(null);
+  const [coverEditorSrc, setCoverEditorSrc] = useState<string | null>(null);
+  const coverEditorObjectUrlRef = useRef<string | null>(null);
+  const [editorState, setEditorState] = useState<EditorState>({
+    x: 0,
+    y: 0,
+    zoom: 1,
+    rotation: 0,
+    brightness: 1,
+    contrast: 1
+  });
+  const [coverState, setCoverState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
+  const [coverInputKey, setCoverInputKey] = useState(0);
+  const [deleteCoverConfirm, setDeleteCoverConfirm] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -555,26 +488,8 @@ export default function BookDetailPage() {
     message: null
   });
 
-  const [pendingCover, setPendingCover] = useState<File | null>(null);
-  const [coverEditorSrc, setCoverEditorSrc] = useState<string | null>(null);
   const [coverOriginalSrc, setCoverOriginalSrc] = useState<string | null>(null);
-  const coverEditorObjectUrlRef = useRef<string | null>(null);
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [coverCrop, setCoverCrop] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [coverZoom, setCoverZoom] = useState<number>(1);
-  const [coverRotation, setCoverRotation] = useState<number>(0);
-  const [coverBrightness, setCoverBrightness] = useState<number>(1);
-  const [coverContrast, setCoverContrast] = useState<number>(1);
-  const [coverAspectW, setCoverAspectW] = useState<number>(2);
-  const [coverAspectH, setCoverAspectH] = useState<number>(3);
-  const [coverCroppedArea, setCoverCroppedArea] = useState<Area | null>(null); // percentage area (0-100)
-  const [coverState, setCoverState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
-    busy: false,
-    error: null,
-    message: null
-  });
-  const [coverInputKey, setCoverInputKey] = useState(0);
-  const [deleteCoverConfirm, setDeleteCoverConfirm] = useState(false);
 
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [imagesState, setImagesState] = useState<{ busy: boolean; done: number; total: number; error: string | null; message: string | null }>({
@@ -618,14 +533,14 @@ export default function BookDetailPage() {
     if (coverEditorObjectUrlRef.current) URL.revokeObjectURL(coverEditorObjectUrlRef.current);
     coverEditorObjectUrlRef.current = url;
     setCoverEditorSrc(url);
-    setCoverCrop({ x: 0, y: 0 });
-    setCoverZoom(1);
-    setCoverRotation(0);
-    setCoverBrightness(1);
-    setCoverContrast(1);
-    setCoverAspectW(2);
-    setCoverAspectH(3);
-    setCoverCroppedArea(null);
+    setEditorState({
+      x: 0,
+      y: 0,
+      zoom: 1,
+      rotation: 0,
+      brightness: 1,
+      contrast: 1
+    });
     return () => {
       URL.revokeObjectURL(url);
     };
@@ -1548,7 +1463,6 @@ export default function BookDetailPage() {
     setCoverToolsOpen(false);
     setPendingCover(null);
     setCoverEditorSrc(null);
-    setCoverCroppedArea(null);
     setSaveState({ busy: false, error: null, message: null });
     setEditMode(false);
     setDeleteConfirm(false);
@@ -1831,28 +1745,24 @@ export default function BookDetailPage() {
   async function uploadCover() {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
-    if (!coverCroppedArea) { setCoverState({ busy: false, error: null, message: "Adjust crop first." }); return; }
-    setCoverState({ busy: true, error: null, message: "Saving…" });
 
+    setCoverState({ busy: true, error: null, message: "Saving…" });
     try {
-      // Build crop data to store (convert percentage area to 0-1 ratios)
+      // Build crop data to store using the new transform mode
       const cropData: CoverCrop = {
-        x: coverCroppedArea.x / 100,
-        y: coverCroppedArea.y / 100,
-        width: coverCroppedArea.width / 100,
-        height: coverCroppedArea.height / 100,
-        zoom: coverZoom,
-        cropX: coverCrop.x,
-        cropY: coverCrop.y,
-        rotation: coverRotation,
-        brightness: coverBrightness,
-        contrast: coverContrast
+        zoom: editorState.zoom,
+        rotation: editorState.rotation,
+        brightness: editorState.brightness,
+        contrast: editorState.contrast,
+        x: editorState.x,
+        y: editorState.y,
+        mode: "transform"
       };
 
       // If there's a new file to upload (pendingCover set), upload it as the new original
       if (pendingCover && coverEditorSrc) {
         const baseName = safeFileName(pendingCover.name.replace(/\.[^/.]+$/, ""));
-        const ext = pendingCover.type.includes("png") ? "png" : pendingCover.type.includes("webp") ? "webp" : "jpg";
+        const ext = extFromContentType(pendingCover.type);
         const path = `${userId}/${book.id}/cover-original-${Date.now()}-${baseName}.${ext}`;
 
         // Remove existing cover(s) from storage + media table
@@ -1866,7 +1776,7 @@ export default function BookDetailPage() {
         const up = await supabase.storage.from("user-book-media").upload(path, pendingCover, {
           cacheControl: "31536000", upsert: false, contentType: pendingCover.type || "image/jpeg"
         });
-        if (up.error) { setCoverState({ busy: false, error: up.error.message, message: "Upload failed" }); return; }
+        if (up.error) throw new Error(up.error.message);
 
         // Record in user_book_media
         await supabase.from("user_book_media").insert({ user_book_id: book.id, kind: "cover", storage_path: path, caption: null });
@@ -1883,8 +1793,6 @@ export default function BookDetailPage() {
       await supabase.from("user_books").update({ cover_crop: cropData as any }).eq("id", book.id);
 
       // Persist trim values to the database before refresh() reloads form state from Supabase.
-      // In in/mm mode the crop W/H are physical dimensions and should be saved; in ratio mode
-      // the W/H are aspect-only hints so we preserve whatever is already stored in form state.
       {
         let tw: number | null = null;
         let th: number | null = null;
@@ -1907,7 +1815,6 @@ export default function BookDetailPage() {
 
       setPendingCover(null);
       setCoverEditorSrc(null);
-      setCoverCroppedArea(null);
       setCoverInputKey((k) => k + 1);
       await refresh();
       setCoverState({ busy: false, error: null, message: "Saved" });
@@ -3138,31 +3045,17 @@ export default function BookDetailPage() {
                   padding: 0,
                   display: coverEditorSrc ? "block" : "flex",
                   filter: coverEditorSrc
-                    ? `brightness(${coverBrightness}) contrast(${coverContrast})`
+                    ? `brightness(${editorState.brightness}) contrast(${editorState.contrast})`
                     : undefined
                 }}
               >
                 {coverEditorSrc ? (
-                  <Cropper
-                    image={coverEditorSrc}
-                    crop={coverCrop}
-                    zoom={coverZoom}
-                    rotation={coverRotation}
-                    aspect={coverAspect}
-                    onCropChange={setCoverCrop}
-                    onZoomChange={setCoverZoom}
-                    onRotationChange={setCoverRotation}
-                    onCropComplete={(area, _pixels) => setCoverCroppedArea(area)}
-                    showGrid={false}
-                    minZoom={1}
-                    objectFit="cover"
-                    classes={{
-                      containerClassName: "om-cropper-container",
-                      mediaClassName: "om-cropper-image"
-                    }}
-                    style={{
-                      containerStyle: { width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }
-                    }}
+                  <CoverEditor
+                    src={coverEditorSrc}
+                    state={editorState}
+                    onChange={(next) => setEditorState(s => ({ ...s, ...next }))}
+                    aspectRatio={coverAspect ?? (2/3)}
+                    style={{ width: "100%", height: "100%" }}
                   />
                 ) : (
                   <CoverImage
@@ -3190,23 +3083,14 @@ export default function BookDetailPage() {
                     if (open && coverUrl && !coverEditorSrc && !pendingCover) {
                       const origSrc = toFullSizeImageUrl(coverOriginalSrc ?? coverUrl);
                       setCoverEditorSrc(origSrc);
-                      if (book?.cover_crop) {
-                        const c = book.cover_crop;
-                        setCoverZoom(c.zoom);
-                        setCoverCrop({ x: c.cropX, y: c.cropY });
-                        setCoverRotation(c.rotation);
-                        setCoverBrightness(c.brightness);
-                        setCoverContrast(c.contrast);
-                        setCoverCroppedArea({ x: c.x * 100, y: c.y * 100, width: c.width * 100, height: c.height * 100 });
-                      } else {
-                        // Default to FREE crop and fit-to-image
-                        setCoverZoom(1);
-                        setCoverCrop({ x: 0, y: 0 });
-                        setCoverRotation(0);
-                        setCoverBrightness(1);
-                        setCoverContrast(1);
-                        setCoverCroppedArea(null);
-                      }
+                      setEditorState({
+                        zoom: book?.cover_crop?.zoom ?? 1,
+                        x: book?.cover_crop?.x ?? 0,
+                        y: book?.cover_crop?.y ?? 0,
+                        rotation: book?.cover_crop?.rotation ?? 0,
+                        brightness: book?.cover_crop?.brightness ?? 1,
+                        contrast: book?.cover_crop?.contrast ?? 1
+                      });
                     }
                   }}
                   style={{ marginTop: 10, border: "none", outline: "none", boxShadow: "none" }}
@@ -3260,7 +3144,7 @@ export default function BookDetailPage() {
                                   value={cropTrimWidth}
                                   min={0.01}
                                   step={0.01}
-                                  onChange={(e) => handleCropTrimWidthChange(e.target.value)}
+                                  onChange={(e) => setCropTrimWidth(e.target.value)}
                                   placeholder="W"
                                   style={{ width: 68 }}
                                 />
@@ -3270,13 +3154,13 @@ export default function BookDetailPage() {
                                   value={cropTrimHeight}
                                   min={0.01}
                                   step={0.01}
-                                  onChange={(e) => handleCropTrimHeightChange(e.target.value)}
+                                  onChange={(e) => setCropTrimHeight(e.target.value)}
                                   placeholder="H"
                                   style={{ width: 68 }}
                                 />
                                 <select
                                   value={cropTrimUnit}
-                                  onChange={(e) => handleCropTrimUnitChange(e.target.value as TrimUnit | "ratio")}
+                                  onChange={(e) => setCropTrimUnit(e.target.value as any)}
                                   style={{ width: "auto", minWidth: 0 }}
                                 >
                                   <option value="ratio">ratio</option>
@@ -3285,55 +3169,48 @@ export default function BookDetailPage() {
                                 </select>
                               </div>
                             </div>
+
                             <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
-                              <div className="muted" style={{ minWidth: 110 }}>
-                                Zoom
-                              </div>
+                              <div className="muted" style={{ minWidth: 110 }}>Zoom</div>
                               <CustomSlider
                                 min={1}
-                                max={3}
+                                max={4}
                                 step={0.01}
-                                value={coverZoom}
-                                onChange={setCoverZoom}
+                                value={editorState.zoom}
+                                onChange={(zoom) => setEditorState(s => ({ ...s, zoom }))}
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
                             <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
-                              <div className="muted" style={{ minWidth: 110 }}>
-                                Rotate
-                              </div>
+                              <div className="muted" style={{ minWidth: 110 }}>Rotate</div>
                               <CustomSlider
                                 min={-180}
                                 max={180}
                                 step={1}
-                                value={coverRotation}
-                                onChange={setCoverRotation}
+                                value={editorState.rotation}
+                                onChange={(rotation) => setEditorState(s => ({ ...s, rotation }))}
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
                             <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
-                              <div className="muted" style={{ minWidth: 110 }}>
-                                Bright
-                              </div>
+                              <div className="muted" style={{ minWidth: 110 }}>Bright</div>
                               <CustomSlider
                                 min={0.5}
                                 max={1.5}
                                 step={0.01}
-                                value={coverBrightness}
-                                onChange={setCoverBrightness}
+                                value={editorState.brightness}
+                                onChange={(brightness) => setEditorState(s => ({ ...s, brightness }))}
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
                             <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
-                              <div className="muted" style={{ minWidth: 110 }}>
-                                Contrast
-                              </div>
+                              <div className="muted" style={{ minWidth: 110 }}>Contrast</div>
                               <CustomSlider
                                 min={0.5}
                                 max={1.5}
                                 step={0.01}
-                                value={coverContrast}
-                                onChange={setCoverContrast}
+                                value={editorState.contrast}
+                                onChange={(contrast) => setEditorState(s => ({ ...s, contrast }))}
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
@@ -3351,10 +3228,6 @@ export default function BookDetailPage() {
                           </button>
                           <button
                             onClick={() => {
-                              if (coverEditorObjectUrlRef.current) {
-                                URL.revokeObjectURL(coverEditorObjectUrlRef.current);
-                                coverEditorObjectUrlRef.current = null;
-                              }
                               setPendingCover(null);
                               setCoverEditorSrc(null);
                               setCoverInputKey((k) => k + 1);
