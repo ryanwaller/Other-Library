@@ -167,12 +167,17 @@ function decodeEntities(input: string): string {
 }
 
 function stripTitleSuffix(input: string, hostname: string): string {
-  const t = input.trim().replace(/\s+/g, " ");
+  let t = input.trim().replace(/\s+/g, " ");
   if (!t) return t;
 
   const host = hostname.toLowerCase().replace(/^www\./, "");
   const hostLabel = host.split(".")[0] ?? host;
   const hostWords = hostLabel.replace(/[^a-z0-9]+/g, " ").trim();
+
+  // Specifically for Printed Matter
+  if (hostLabel === "printedmatter") {
+    t = t.replace(/ - Printed Matter$/i, "").replace(/ \| Printed Matter$/i, "").replace(/ Printed Matter$/i, "");
+  }
 
   const candidates = [
     { sep: " | ", preferLeft: true },
@@ -189,21 +194,18 @@ function stripTitleSuffix(input: string, hostname: string): string {
     const parts = t.split(sep).map((p) => p.trim()).filter(Boolean);
     if (parts.length < 2) continue;
     
-    // Check if the last part looks like a site name or is very short
-    const right = parts[parts.length - 1] ?? "";
-    const rightLc = right.toLowerCase();
+    const lastPart = parts[parts.length - 1] ?? "";
+    const lastPartLc = lastPart.toLowerCase();
+    
     const hostHit =
-      (hostWords && rightLc === hostWords) ||
-      (hostLabel && rightLc === hostLabel) ||
-      rightLc === host;
+      (hostWords && lastPartLc.includes(hostWords)) ||
+      (hostLabel && lastPartLc.includes(hostLabel)) ||
+      lastPartLc.includes(host);
     
-    // Site-specific suffixes often seen in Page Titles
-    const isCommonSuffix = ["shop", "store", "online", "books", "official site"].some(s => rightLc.includes(s));
-    
-    const shortRight = right.length <= 20;
+    const isCommonSuffix = ["shop", "store", "online", "books", "official site", "catalog", "publisher"].some(s => lastPartLc.includes(s));
+    const shortRight = lastPart.length <= 20;
     
     if (hostHit || isCommonSuffix || shortRight) {
-      // Return everything except the last part
       return parts.slice(0, -1).join(sep).trim();
     }
   }
@@ -542,7 +544,9 @@ function scrapePrintedMatter(html: string): Partial<ImportMetadata> {
   for (const re of descCandidates) {
     const match = re.exec(html);
     if (match) {
-      const cleaned = decodeEntities(match[1]!.replace(/<[^>]+>/g, " ").replace(/[ \t]+/g, " ").trim());
+      const content = match[1]!;
+      // More aggressive HTML tag removal while preserving structure if possible
+      const cleaned = decodeEntities(content.replace(/<[^>]+>/g, "\n").replace(/[ \t]+/g, " ").trim());
       if (cleaned.length > 50) {
         description = normalizeDescription(cleaned, true);
         break;
@@ -555,9 +559,10 @@ function scrapePrintedMatter(html: string): Partial<ImportMetadata> {
     const hrIdx = html.lastIndexOf("<hr");
     if (hrIdx !== -1) {
       const afterHr = html.slice(hrIdx);
-      const paraRe = /<(?:p|div)[^>]*>([\s\S]{20,10000}?)<\/(?:p|div)>/i.exec(afterHr);
-      if (paraRe) {
-        description = normalizeDescription(decodeEntities(paraRe[1]!.replace(/<[^>]+>/g, " ")), true);
+      // Capture everything after HR instead of just one block
+      const fullRest = decodeEntities(afterHr.replace(/<[^>]+>/g, "\n").replace(/[ \t]+/g, " ").trim());
+      if (fullRest.length > 20) {
+        description = normalizeDescription(fullRest, true);
       }
     }
   }
