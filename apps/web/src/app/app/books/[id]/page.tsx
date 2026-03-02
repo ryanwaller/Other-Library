@@ -2119,7 +2119,7 @@ export default function BookDetailPage() {
         domain_kind: typeof json.domain_kind === "string" ? json.domain_kind : null,
         scraped_sources: Array.isArray(json.scraped?.sources) ? (json.scraped.sources as string[]) : []
       });
-      setImportState({ busy: false, error: null, message: preview ? "Preview ready" : "No preview" });
+      setImportState({ busy: false, error: null, message: json.info ?? (preview ? "Preview ready" : "No preview") });
     } catch (e: any) {
       setImportState({ busy: false, error: e?.message ?? "Import failed", message: "Import failed" });
     }

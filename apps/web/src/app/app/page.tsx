@@ -1260,7 +1260,7 @@ function AppShell({
         domain: typeof json.domain === "string" ? json.domain : null,
         domain_kind: typeof json.domain_kind === "string" ? json.domain_kind : null
       });
-      setAddState({ busy: false, error: null, message: null });
+      setAddState({ busy: false, error: null, message: json.info ?? null });
     } catch (e: any) {
       setAddState({ busy: false, error: e?.message ?? "Import failed", message: "Import failed" });
     }

@@ -564,6 +564,13 @@ function extractIsbnFromAbeUrl(url: URL): string | null {
   return null;
 }
 
+function extractIsbnFromPrintedMatterUrl(url: URL): string | null {
+  // Pattern: /tables/9781234567890 (not a real PM pattern but for consistency)
+  const pathMatch = url.pathname.match(/\/(\d{13}|\d{10})\b/);
+  if (pathMatch) return pathMatch[1]!;
+  return null;
+}
+
 // --- Generic helpers ---
 
 function mergePreferBase(base: ImportMetadata, next: Partial<ImportMetadata>, sourceName: string): ImportMetadata {
@@ -630,27 +637,77 @@ function isBlockedHostname(hostname: string): boolean {
 }
 
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
+  // Option A: Full browser-like headers
+  const browserHeaders = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+    "Referer": "https://www.google.com/",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "cross-site",
+    "Upgrade-Insecure-Requests": "1"
+  };
+
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), 10_000);
+  const t = setTimeout(() => controller.abort(), 8000);
+  
   try {
+    console.log(`[fetch] Trying Option A (browser headers) for ${url}`);
     const res = await fetch(url, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-      },
+      headers: browserHeaders,
       redirect: "follow",
       signal: controller.signal
     });
-    if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
 
-    const len = Number(res.headers.get("content-length") ?? "0");
-    if (len && len > 2_000_000) throw new Error("Page too large");
+    if (res.ok) {
+      console.log(`[fetch] Option A succeeded for ${url}`);
+      const txt = await res.text();
+      const html = txt.length > 2_000_000 ? txt.slice(0, 2_000_000) : txt;
+      return { html, finalUrl: res.url || url };
+    }
 
-    const txt = await res.text();
-    const html = txt.length > 2_000_000 ? txt.slice(0, 2_000_000) : txt;
-    return { html, finalUrl: res.url || url };
+    if (res.status === 403) {
+      console.warn(`[fetch] Option A failed with 403 for ${url}`);
+    } else {
+      throw new Error(`Fetch failed (${res.status})`);
+    }
+  } catch (e: any) {
+    if (e.name === "AbortError") {
+      console.warn(`[fetch] Option A timed out for ${url}`);
+    } else {
+      console.error(`[fetch] Option A error for ${url}:`, e.message);
+    }
   } finally {
     clearTimeout(t);
+  }
+
+  // Option B: Scraping Proxy (AllOrigins)
+  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+  const proxyController = new AbortController();
+  const pt = setTimeout(() => proxyController.abort(), 12000);
+
+  try {
+    console.log(`[fetch] Trying Option B (AllOrigins proxy) for ${url}`);
+    const res = await fetch(proxyUrl, { signal: proxyController.signal });
+    if (!res.ok) throw new Error(`Proxy failed (${res.status})`);
+    
+    const json = await res.json();
+    const html = String(json?.contents ?? "");
+    if (!html || html.length < 100) throw new Error("Empty proxy response");
+
+    console.log(`[fetch] Option B succeeded for ${url}`);
+    return { 
+      html: html.length > 2_000_000 ? html.slice(0, 2_000_000) : html,
+      finalUrl: url 
+    };
+  } catch (e: any) {
+    console.error(`[fetch] Option B failed for ${url}:`, e.message);
+    throw e;
+  } finally {
+    clearTimeout(pt);
   }
 }
 
@@ -791,6 +848,40 @@ export async function POST(req: NextRequest) {
     html = fetched.html;
     finalUrl = fetched.finalUrl;
   } catch (e: any) {
+    // Option C: ISBN extraction and fallback
+    console.warn(`[fetch] All fetch options failed for ${urlValue}. Trying Option C (ISBN fallback).`);
+    const isbnFromUrl = domainKind === "abebooks" ? extractIsbnFromAbeUrl(parsed) : extractIsbnFromPrintedMatterUrl(parsed);
+    if (isbnFromUrl) {
+      const edition = await tryIsbnEnrichment(req, isbnFromUrl);
+      if (edition && typeof edition === "object") {
+        const preview: ImportMetadata = mergePreferBase(makeEmpty(), {
+          title: typeof edition.title === "string" ? edition.title : null,
+          authors: Array.isArray(edition.authors) ? edition.authors : [],
+          publisher: typeof edition.publisher === "string" ? edition.publisher : null,
+          publish_date: typeof edition.publish_date === "string" ? edition.publish_date : null,
+          description: typeof edition.description === "string" ? edition.description : null,
+          subjects: Array.isArray(edition.subjects) ? edition.subjects : [],
+          isbn10: typeof edition.isbn10 === "string" ? edition.isbn10 : null,
+          isbn13: typeof edition.isbn13 === "string" ? edition.isbn13 : null,
+          cover_url: normalizeHttpsUrl(edition.cover_url),
+          cover_candidates: [normalizeHttpsUrl(edition.cover_url)].filter(Boolean) as string[],
+          raw: { isbnEdition: edition, fallback: true }
+        }, "isbn");
+        
+        console.log(`[fetch] Option C succeeded for ${urlValue} (found ISBN ${isbnFromUrl})`);
+        return NextResponse.json({
+          ok: true,
+          domain: parsed.hostname,
+          domain_kind: domainKind,
+          final_url: urlValue,
+          scraped: preview,
+          isbn_edition: edition,
+          preview,
+          info: "Direct scrape failed but ISBN data was found."
+        });
+      }
+    }
+
     // AbeBooks fetch failure: return helpful message
     if (domainKind === "abebooks") {
       return NextResponse.json(
