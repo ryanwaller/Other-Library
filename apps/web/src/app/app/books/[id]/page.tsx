@@ -487,6 +487,7 @@ export default function BookDetailPage() {
     message: null
   });
   const [coverInputKey, setCoverInputKey] = useState(0);
+  const [deleteCoverConfirm, setDeleteCoverConfirm] = useState(false);
 
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [imagesState, setImagesState] = useState<{ busy: boolean; done: number; total: number; error: string | null; message: string | null }>({
@@ -1940,6 +1941,38 @@ export default function BookDetailPage() {
     setCoverState({ busy: false, error: null, message: "Updated" });
   }
 
+  async function deleteCover() {
+    if (!supabase || !book || !userId) return;
+    if (book.owner_id !== userId) return;
+    setCoverState({ busy: true, error: null, message: "Deleting cover…" });
+    try {
+      // Clear cover columns
+      const up = await supabase.from("user_books").update({ cover_original_url: null, cover_crop: null }).eq("id", book.id);
+      if (up.error) throw new Error(up.error.message);
+
+      // Remove cover entry from media
+      const existing = (book.media ?? []).filter((m) => m.kind === "cover");
+      for (const m of existing) {
+        if (m?.storage_path) {
+          await supabase.storage.from("user-book-media").remove([m.storage_path]);
+        }
+        if (m?.id) {
+          await supabase.from("user_book_media").delete().eq("id", m.id);
+        }
+      }
+
+      setCoverEditorSrc(null);
+      setPendingCover(null);
+      setDeleteCoverConfirm(false);
+      setCoverToolsOpen(false);
+      await refresh();
+      setCoverState({ busy: false, error: null, message: "Deleted" });
+      window.setTimeout(() => setCoverState(s => s.message === "Deleted" ? { ...s, message: null } : s), 1500);
+    } catch (e: any) {
+      setCoverState({ busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" });
+    }
+  }
+
   async function deleteMedia(mediaId: number, storagePath: string) {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
@@ -3096,22 +3129,44 @@ export default function BookDetailPage() {
                         {coverToolsOpen ? "Close" : (coverUrl ? "Edit cover" : "Add cover")}
                       </span>
                       {coverToolsOpen && (
-                        <label 
-                          className="muted" 
-                          style={{ cursor: "pointer", textDecoration: "underline" }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {coverUrl ? "Replace" : "Add cover"}
-                          <input
-                            key={coverInputKey}
-                            type="file"
-                            accept="image/*"
-                            onChange={(ev) => {
-                              setPendingCover((ev.target.files ?? [])[0] ?? null);
-                            }}
-                            style={{ display: "none" }}
-                          />
-                        </label>
+                        <div className="row" style={{ gap: 12 }}>
+                          {coverUrl && (
+                            <>
+                              {deleteCoverConfirm ? (
+                                <div className="row" style={{ gap: 8 }}>
+                                  <span className="muted">Are you sure?</span>
+                                  <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); void deleteCover(); }} style={{ padding: 0, border: "none", background: "none", textDecoration: "underline", cursor: "pointer" }}>Yes</button>
+                                  <span className="muted">/</span>
+                                  <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteCoverConfirm(false); }} style={{ padding: 0, border: "none", background: "none", textDecoration: "underline", cursor: "pointer" }}>No</button>
+                                </div>
+                              ) : (
+                                <button 
+                                  className="muted" 
+                                  style={{ padding: 0, border: "none", background: "none", textDecoration: "underline", cursor: "pointer" }}
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteCoverConfirm(true); }}
+                                >
+                                  Delete
+                                </button>
+                              )}
+                            </>
+                          )}
+                          <label 
+                            className="muted" 
+                            style={{ cursor: "pointer", textDecoration: "underline" }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {coverUrl ? "Replace" : "Add cover"}
+                            <input
+                              key={coverInputKey}
+                              type="file"
+                              accept="image/*"
+                              onChange={(ev) => {
+                                setPendingCover((ev.target.files ?? [])[0] ?? null);
+                              }}
+                              style={{ display: "none" }}
+                            />
+                          </label>
+                        </div>
                       )}
                     </div>
                   </summary>
