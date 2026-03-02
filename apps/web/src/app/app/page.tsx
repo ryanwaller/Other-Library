@@ -2302,7 +2302,7 @@ function AppShell({
         </div>
       </div>
 
-      <div className="row" style={{ marginTop: 6, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+      <div className="row" style={{ marginTop: "var(--space-sm)", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
         <div className="row" style={{ gap: 12, alignItems: "baseline", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
           <button
             onClick={() => {

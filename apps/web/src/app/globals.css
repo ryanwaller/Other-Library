@@ -36,6 +36,8 @@
   --input-bg: #fff;
   --button-bg: #fff;
   --placeholder-bg: #e8e8e8;
+
+  --space-sm: 6px;
 }
 
 @media (prefers-color-scheme: dark) {

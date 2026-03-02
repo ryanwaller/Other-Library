@@ -206,7 +206,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       </div>
 
       <AddToLibraryProvider editionIds={editionIds}>
-        <div className="row" style={{ marginTop: 14, gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="row" style={{ marginTop: 16, gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <span className="muted">Catalogs</span>
           <span>{libraries.length}</span>
           <span className="muted">Books</span>
@@ -237,7 +237,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             })}
           </div>
         ) : (
-          <div className="card" style={{ marginTop: 14 }}>
+          <div className="card" style={{ marginTop: "var(--space-sm)" }}>
             <PublicBookList
               groups={groupedBooks}
               username={profile.username}
