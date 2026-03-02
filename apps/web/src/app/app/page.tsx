@@ -2143,7 +2143,8 @@ function AppShell({
       display: viewMode === "grid" ? "grid" : "flex",
       flexDirection: viewMode === "list" ? ("column" as const) : undefined,
       gridTemplateColumns: viewMode === "grid" ? `repeat(${gridCols}, minmax(0, 1fr))` : undefined,
-      gap: viewMode === "grid" ? 12 : 12
+      gap: viewMode === "grid" ? 12 : 12,
+      alignItems: viewMode === "grid" ? "end" : "stretch"
       }),
 
     [viewMode, gridCols]

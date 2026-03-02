@@ -164,7 +164,7 @@ export default function PublicBookList({
     if (viewMode === "list") {
       return { display: "flex", flexDirection: "column", gap: 8 };
     }
-    return { display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 12 };
+    return { display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 12, alignItems: "end" };
   }, [viewMode, gridCols]);
 
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
