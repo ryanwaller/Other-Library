@@ -206,6 +206,13 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       </div>
 
       <AddToLibraryProvider editionIds={editionIds}>
+        <div className="row" style={{ marginTop: 14, gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <span className="muted">Catalogs</span>
+          <span>{libraries.length}</span>
+          <span className="muted">Books</span>
+          <span>{groupedBooks.length}</span>
+        </div>
+
         {showLibraryBlocks ? (
           <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
             {libraries.map((lib) => {
