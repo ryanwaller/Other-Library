@@ -165,7 +165,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     groupsByLibraryId.set(g.libraryId, list);
   }
 
-  const showLibraryBlocks = libraries.length > 1;
+  const DEFAULT_LIBRARY_NAME = "Your catalog";
+  const showLibraryBlocks = libraries.length > 1 || (libraries.length === 1 && libraries[0]?.name !== DEFAULT_LIBRARY_NAME);
   const editionIds = Array.from(new Set(visibleBooks.map(b => b.edition?.id).filter(Boolean))) as number[];
 
   return (
