@@ -85,14 +85,14 @@ export default function PublicBookList({
 
   const containerStyle = useMemo((): React.CSSProperties => {
     if (viewMode === "list") {
-      return { marginTop: 10, display: "flex", flexDirection: "column", gap: 8 };
+      return { marginTop: 18, display: "flex", flexDirection: "column", gap: 8 };
     }
-    return { marginTop: 10, display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 12 };
+    return { marginTop: 18, display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 12 };
   }, [viewMode, gridCols]);
 
   return (
     <>
-      <div className="row" style={{ marginTop: 10, alignItems: "baseline", gap: 12 }}>
+      <div className="row" style={{ marginTop: 4, alignItems: "baseline", gap: 12 }}>
         <button
           type="button"
           className={sortOpen ? "text-primary" : "muted"}
@@ -196,7 +196,7 @@ export default function PublicBookList({
                     <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
                   </div>
                 </Link>
-                <div style={{ position: "absolute", top: 6, right: 6, zIndex: 1 }}>
+                <div className="om-cover-add-btn" style={{ position: "absolute", top: 6, right: 6, zIndex: 1 }}>
                   <AddToLibraryButton
                     editionId={e?.id ?? null}
                     titleFallback={title}

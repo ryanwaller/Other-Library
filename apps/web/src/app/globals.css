@@ -149,6 +149,17 @@ a:focus-visible {
   filter: brightness(1.03);
 }
 
+.om-cover-add-btn {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.om-book-card:hover .om-cover-add-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .om-avatar-lockup {
   display: inline-flex;
   align-items: center;
