@@ -4,6 +4,7 @@ import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
 import { formatDateShort } from "../../../../../lib/formatDate";
 import AddToLibraryButton from "../../AddToLibraryButton";
+import AddToLibraryProvider from "../../AddToLibraryProvider";
 import BorrowRequestWidget from "../../BorrowRequestWidget";
 import ScrollToTopOnMount from "../../../../components/ScrollToTopOnMount";
 import ExpandableContent from "../../../../../components/ExpandableContent";
@@ -213,254 +214,256 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   return (
     <main className="container">
       <ScrollToTopOnMount />
-      <div className="card">
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <div>
-            <div className="om-avatar-lockup">
-              {avatarUrl ? (
-                <Link href={`/u/${profile.username}`} className="om-avatar-link" aria-label="Open profile">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-public" />
-                </Link>
+      <AddToLibraryProvider editionIds={editionId ? [editionId] : []}>
+        <div className="card">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <div>
+              <div className="om-avatar-lockup">
+                {avatarUrl ? (
+                  <Link href={`/u/${profile.username}`} className="om-avatar-link" aria-label="Open profile">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-public" />
+                  </Link>
+                ) : null}
+                <Link href={`/u/${profile.username}`}>{profile.username}</Link>
+              </div>
+            </div>
+            <div className="muted">public</div>
+          </div>
+          {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
+          <div className="row muted" style={{ marginTop: 8, justifyContent: "flex-start", alignItems: "baseline", gap: 18, flexWrap: "wrap" }}>
+            <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
+              Followers <span style={{ marginInline: 10 }}>{followersCount ?? "—"}</span>
+            </Link>
+            <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
+              Following <span style={{ marginInline: 10 }}>{followingCount ?? "—"}</span>
+            </Link>
+            <FollowControls profileId={profile.id} profileUsername={profile.username} inline />
+          </div>
+          {profile.bio ? (
+            <div className="muted" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
+              {profile.bio}
+            </div>
+          ) : null}
+        </div>
+
+        <div style={{ marginTop: 14 }} className="card">
+          <div className="om-book-detail-grid">
+            <div>
+              <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
+                <CoverImage alt={effectiveTitle} src={coverSrc} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
+              </div>
+            </div>
+
+            <div>
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+                <div>{effectiveTitle}</div>
+                <AddToLibraryButton
+                  editionId={editionId}
+                  titleFallback={effectiveTitle}
+                  authorsFallback={effectiveAuthors}
+                  sourceOwnerId={book.owner_id}
+                  compact
+                />
+              </div>
+              {effectiveAuthors.length > 0 ? (
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Authors
+                  </div>
+                  <div className="om-hanging-value">
+                    {effectiveAuthors.map((a, idx) => (
+                      <span key={a}>
+                        <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                        {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               ) : null}
-              <Link href={`/u/${profile.username}`}>{profile.username}</Link>
-            </div>
-          </div>
-          <div className="muted">public</div>
-        </div>
-        {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
-        <div className="row muted" style={{ marginTop: 8, justifyContent: "flex-start", alignItems: "baseline", gap: 18, flexWrap: "wrap" }}>
-          <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
-            Followers <span style={{ marginInline: 10 }}>{followersCount ?? "—"}</span>
-          </Link>
-          <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
-            Following <span style={{ marginInline: 10 }}>{followingCount ?? "—"}</span>
-          </Link>
-          <FollowControls profileId={profile.id} profileUsername={profile.username} inline />
-        </div>
-        {profile.bio ? (
-          <div className="muted" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
-            {profile.bio}
-          </div>
-        ) : null}
-      </div>
 
-      <div style={{ marginTop: 14 }} className="card">
-        <div className="om-book-detail-grid">
-          <div>
-            <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
-              <CoverImage alt={effectiveTitle} src={coverSrc} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
-            </div>
-          </div>
+              {effectiveEditors.length > 0 ? (
+                <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Editors
+                  </div>
+                  <div>{effectiveEditors.join(", ")}</div>
+                </div>
+              ) : null}
 
-          <div>
-            <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-              <div>{effectiveTitle}</div>
-              <AddToLibraryButton
-                editionId={editionId}
-                titleFallback={effectiveTitle}
-                authorsFallback={effectiveAuthors}
-                sourceOwnerId={book.owner_id}
-                compact
-              />
-            </div>
-            {effectiveAuthors.length > 0 ? (
-              <div className="row om-row-baseline" style={{ marginTop: 8 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Authors
+              {effectiveDesigners.length > 0 ? (
+                <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Designers
+                  </div>
+                  <div>{effectiveDesigners.join(", ")}</div>
                 </div>
-                <div className="om-hanging-value">
-                  {effectiveAuthors.map((a, idx) => (
-                    <span key={a}>
-                      <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                      {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {effectiveEditors.length > 0 ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Editors
+              {effectivePrinter ? (
+                <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Printer
+                  </div>
+                  <div>{effectivePrinter}</div>
                 </div>
-                <div>{effectiveEditors.join(", ")}</div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {effectiveDesigners.length > 0 ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Designers
+              {effectiveMaterials ? (
+                <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Materials
+                  </div>
+                  <div>{effectiveMaterials}</div>
                 </div>
-                <div>{effectiveDesigners.join(", ")}</div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {effectivePrinter ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Printer
+              {effectiveEdition ? (
+                <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Edition
+                  </div>
+                  <div>{effectiveEdition}</div>
                 </div>
-                <div>{effectivePrinter}</div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {effectiveMaterials ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Materials
+              {effectivePublisher ? (
+                <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Publisher
+                  </div>
+                  <div>
+                    <Link href={`/u/${profile.username}/p/${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link>
+                  </div>
                 </div>
-                <div>{effectiveMaterials}</div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {effectiveEdition ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Edition
+              {effectivePublishDate ? (
+                <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Publish date
+                  </div>
+                  <div>{displayPublishDate}</div>
                 </div>
-                <div>{effectiveEdition}</div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {effectivePublisher ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Publisher
+              {book.pages ? (
+                <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Pages
+                  </div>
+                  <div>{book.pages}</div>
                 </div>
-                <div>
-                  <Link href={`/u/${profile.username}/p/${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link>
-                </div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {effectivePublishDate ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Publish date
+              {(book.group_label ?? "").trim() ? (
+                <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Group
+                  </div>
+                  <div>{(book.group_label ?? "").trim()}</div>
                 </div>
-                <div>{displayPublishDate}</div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {book.pages ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Pages
+              {(book.object_type ?? "").trim() ? (
+                <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Object type
+                  </div>
+                  <div>{(book.object_type ?? "").trim()}</div>
                 </div>
-                <div>{book.pages}</div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {(book.group_label ?? "").trim() ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Group
+              {(book.decade ?? "").trim() ? (
+                <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Decade
+                  </div>
+                  <div>{(book.decade ?? "").trim()}</div>
                 </div>
-                <div>{(book.group_label ?? "").trim()}</div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {(book.object_type ?? "").trim() ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Object type
+              {subjects.length > 0 ? (
+                <div className="row om-row-baseline" style={{ marginTop: 12 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Subjects
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    <ExpandableContent
+                      items={subjects}
+                      limit={15}
+                      renderVisible={(visible, isExpanded) => (
+                        <div>
+                          {visible.map((s, idx) => (
+                            <span key={s}>
+                              <Link href={`/u/${profile.username}/s/${encodeURIComponent(s)}`}>{s}</Link>
+                              {idx < visible.length - 1 ? <span>, </span> : null}
+                            </span>
+                          ))}
+                          {!isExpanded && subjects.length > 15 ? " …" : ""}
+                        </div>
+                      )}
+                    />
+                  </div>
                 </div>
-                <div>{(book.object_type ?? "").trim()}</div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {(book.decade ?? "").trim() ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Decade
+              {book.edition?.isbn13 || book.edition?.isbn10 ? (
+                <div className="row om-row-baseline" style={{ marginTop: 6 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    ISBN
+                  </div>
+                  <div>{book.edition?.isbn13 ?? book.edition?.isbn10}</div>
                 </div>
-                <div>{(book.decade ?? "").trim()}</div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {subjects.length > 0 ? (
-              <div className="row om-row-baseline" style={{ marginTop: 12 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  Subjects
+              {effectiveDescription ? (
+                <div style={{ marginTop: 12 }}>
+                  <div className="muted">
+                    Description
+                  </div>
+                  <div style={{ marginTop: 6 }}>
+                    <ExpandableContent
+                      items={effectiveDescription.trim().split(/\s+/)}
+                      limit={100}
+                      renderVisible={(visible, isExpanded) => (
+                        <div style={{ whiteSpace: "pre-wrap" }}>
+                          {isExpanded ? effectiveDescription : visible.join(" ") + (effectiveDescription.trim().split(/\s+/).length > 100 ? "…" : "")}
+                        </div>
+                      )}
+                    />
+                  </div>
                 </div>
-                <div style={{ flex: "1 1 auto" }}>
-                  <ExpandableContent
-                    items={subjects}
-                    limit={15}
-                    renderVisible={(visible, isExpanded) => (
-                      <div>
-                        {visible.map((s, idx) => (
-                          <span key={s}>
-                            <Link href={`/u/${profile.username}/s/${encodeURIComponent(s)}`}>{s}</Link>
-                            {idx < visible.length - 1 ? <span>, </span> : null}
-                          </span>
-                        ))}
-                        {!isExpanded && subjects.length > 15 ? " …" : ""}
-                      </div>
-                    )}
-                  />
-                </div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {book.edition?.isbn13 || book.edition?.isbn10 ? (
-              <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                <div style={{ minWidth: 110 }} className="muted">
-                  ISBN
-                </div>
-                <div>{book.edition?.isbn13 ?? book.edition?.isbn10}</div>
-              </div>
-            ) : null}
-
-            {effectiveDescription ? (
               <div style={{ marginTop: 12 }}>
-                <div className="muted">
-                  Description
-                </div>
-                <div style={{ marginTop: 6 }}>
-                  <ExpandableContent
-                    items={effectiveDescription.trim().split(/\s+/)}
-                    limit={100}
-                    renderVisible={(visible, isExpanded) => (
-                      <div style={{ whiteSpace: "pre-wrap" }}>
-                        {isExpanded ? effectiveDescription : visible.join(" ") + (effectiveDescription.trim().split(/\s+/).length > 100 ? "…" : "")}
-                      </div>
-                    )}
-                  />
-                </div>
+                <BorrowRequestWidget
+                  userBookId={book.id}
+                  ownerId={book.owner_id}
+                  ownerUsername={profile.username}
+                  bookTitle={effectiveTitle}
+                  borrowable={effectiveBorrowable}
+                  scope={effectiveBorrowScope}
+                />
               </div>
-            ) : null}
-
-            <div style={{ marginTop: 12 }}>
-              <BorrowRequestWidget
-                userBookId={book.id}
-                ownerId={book.owner_id}
-                ownerUsername={profile.username}
-                bookTitle={effectiveTitle}
-                borrowable={effectiveBorrowable}
-                scope={effectiveBorrowScope}
-              />
             </div>
           </div>
-        </div>
 
-        {images.length > 0 ? (
+          {images.length > 0 ? (
+            <div style={{ marginTop: 16 }}>
+              <hr className="om-hr" style={{ marginBottom: 16 }} />
+              <div className="muted">
+                Images
+              </div>
+              <PublicImageGrid images={images} signedMap={signedMap} />
+            </div>
+          ) : null}
+
           <div style={{ marginTop: 16 }}>
-            <hr className="om-hr" style={{ marginBottom: 16 }} />
-            <div className="muted">
-              Images
-            </div>
-            <PublicImageGrid images={images} signedMap={signedMap} />
+            {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={book.id} excludeOwnerId={book.owner_id} /> : null}
           </div>
-        ) : null}
-
-        <div style={{ marginTop: 16 }}>
-          {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={book.id} excludeOwnerId={book.owner_id} /> : null}
         </div>
-      </div>
+      </AddToLibraryProvider>
     </main>
   );
 }
