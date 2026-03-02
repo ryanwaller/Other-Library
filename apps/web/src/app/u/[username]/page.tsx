@@ -1,11 +1,8 @@
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../lib/supabaseServer";
 import Link from "next/link";
-import { bookIdSlug } from "../../../lib/slug";
 import FollowControls from "./FollowControls";
-import AddToLibraryButton from "./AddToLibraryButton";
 import AddToLibraryProvider from "./AddToLibraryProvider";
-import CoverImage, { type CoverCrop } from "../../../components/CoverImage";
 import PublicBookList from "./PublicBookList";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +16,17 @@ type PublicBook = {
   subjects_override: string[] | null;
   publisher_override: string | null;
   cover_original_url: string | null;
-  cover_crop: CoverCrop | null;
+  cover_crop: {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    zoom: number;
+    rotation: number;
+    brightness: number;
+    contrast: number;
+    mode?: "transform";
+  } | null;
   edition: { 
     id: number; 
     isbn13: string | null; 
@@ -33,34 +40,6 @@ type PublicBook = {
   } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
-
-type CatalogGroup = { key: string; libraryId: number; primary: PublicBook; copies: PublicBook[] };
-
-function normalizeKeyPart(input: string): string {
-  return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function effectiveTitleFor(b: PublicBook): string {
-  const e = b.edition;
-  return (b.title_override ?? "").trim() || e?.title || "(untitled)";
-}
-
-function effectiveAuthorsFor(b: PublicBook): string[] {
-  const override = (b.authors_override ?? []).filter(Boolean);
-  if (override.length > 0) return override;
-  return (b.edition?.authors ?? []).filter(Boolean);
-}
-
-function groupKeyFor(b: PublicBook): string {
-  const eId = b.edition?.id ?? null;
-  if (eId) return `e:${eId}`;
-  const title = normalizeKeyPart(effectiveTitleFor(b));
-  const authors = effectiveAuthorsFor(b)
-    .map((a) => normalizeKeyPart(a))
-    .filter(Boolean)
-    .join("|");
-  return `m:${title}|${authors}`;
-}
 
 export default async function PublicProfilePage({ 
   params,
@@ -148,28 +127,9 @@ export default async function PublicProfilePage({
     return profile.visibility === "public";
   });
 
-  const filteredBooks = visibleBooks.filter((b) => {
-    if (filterAuthor) {
-      const authors = (b.authors_override ?? b.edition?.authors ?? []).map(s => String(s).toLowerCase());
-      if (!authors.includes(filterAuthor.toLowerCase())) return false;
-    }
-    if (filterTag) {
-      // Tags are in user_book_tags table, not handled in this simple client-side filter yet
-    }
-    if (filterSubject) {
-      const subjects = (b.subjects_override ?? b.edition?.subjects ?? []).map(s => String(s).toLowerCase());
-      if (!subjects.includes(filterSubject.toLowerCase())) return false;
-    }
-    if (filterPublisher) {
-      const pub = b.publisher_override || b.edition?.publisher;
-      if (String(pub ?? "").toLowerCase() !== filterPublisher.toLowerCase()) return false;
-    }
-    return true;
-  });
-
   const mediaPaths = Array.from(new Set([
-    ...filteredBooks.flatMap(b => b.media.map(m => m.storage_path)),
-    ...filteredBooks.filter(b => b.cover_crop && b.cover_original_url).map(b => b.cover_original_url as string)
+    ...visibleBooks.flatMap(b => b.media.map(m => m.storage_path)),
+    ...visibleBooks.filter(b => b.cover_crop && b.cover_original_url).map(b => b.cover_original_url as string)
   ]));
 
   let signedMap: Record<string, string> = {};
@@ -182,28 +142,7 @@ export default async function PublicProfilePage({
     }
   }
 
-  const byKey = new Map<string, PublicBook[]>();
-  for (const b of filteredBooks) {
-    const key = groupKeyFor(b);
-    const cur = byKey.get(key);
-    if (!cur) byKey.set(key, [b]);
-    else cur.push(b);
-  }
-
-  const editionIds = Array.from(new Set(filteredBooks.map(b => b.edition?.id).filter(Boolean))) as number[];
-
-  const groupedBooks: CatalogGroup[] = Array.from(byKey.entries()).map(([key, copies]) => {
-    const primary = copies.slice().sort((a, b) => {
-      const score = (x: PublicBook) => {
-        let s = 0;
-        if (x.media.some(m => m.kind === 'cover')) s += 1000;
-        if (x.edition?.cover_url) s += 150;
-        return s;
-      };
-      return score(b) - score(a);
-    })[0]!;
-    return { key, libraryId: primary.library_id, primary, copies };
-  });
+  const editionIds = Array.from(new Set(visibleBooks.map(b => b.edition?.id).filter(Boolean))) as number[];
 
   const DEFAULT_LIBRARY_NAME = "Your catalog";
   const showLibraryBlocks = libraries.length > 1 || (libraries.length === 1 && libraries[0]?.name !== DEFAULT_LIBRARY_NAME);
@@ -248,13 +187,12 @@ export default async function PublicProfilePage({
         <AddToLibraryProvider editionIds={editionIds}>
           <PublicBookList
             libraries={libraries}
-            groups={groupedBooks}
+            allBooks={visibleBooks}
             username={profile.username}
             profileId={profile.id}
             signedMap={signedMap}
             showLibraryBlocks={showLibraryBlocks}
-            activeFilters={{ author: filterAuthor, subject: filterSubject, tag: filterTag, category: filterCategory, publisher: filterPublisher }}
-            totalLibrariesCount={libraries.length}
+            initialFilters={{ author: filterAuthor, subject: filterSubject, tag: filterTag, category: filterCategory, publisher: filterPublisher }}
           />
         </AddToLibraryProvider>
       </div>

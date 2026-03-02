@@ -37,13 +37,12 @@ type SortMode = "latest" | "earliest" | "title_asc" | "title_desc";
 
 type Props = {
   libraries: Array<{ id: number; name: string }>;
-  groups: CatalogGroup[];
+  allBooks: PublicBook[]; // All visible books, unfiltered
   username: string;
   profileId: string;
   signedMap: Record<string, string>;
   showLibraryBlocks: boolean;
-  activeFilters: { author?: string; subject?: string; tag?: string; category?: string; publisher?: string };
-  totalLibrariesCount: number;
+  initialFilters: { author?: string; subject?: string; tag?: string; category?: string; publisher?: string };
 };
 
 function normalizeKeyPart(input: string): string {
@@ -61,15 +60,25 @@ function effectiveAuthorsFor(b: PublicBook): string[] {
   return (b.edition?.authors ?? []).filter(Boolean);
 }
 
+function groupKeyFor(b: PublicBook): string {
+  const eId = b.edition?.id ?? null;
+  if (eId) return `e:${eId}`;
+  const title = normalizeKeyPart(effectiveTitleFor(b));
+  const authors = effectiveAuthorsFor(b)
+    .map((a) => normalizeKeyPart(a))
+    .filter(Boolean)
+    .join("|");
+  return `m:${title}|${authors}`;
+}
+
 export default function PublicBookList({
   libraries,
-  groups,
+  allBooks,
   username,
   profileId,
   signedMap,
   showLibraryBlocks,
-  activeFilters,
-  totalLibrariesCount
+  initialFilters
 }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -77,30 +86,71 @@ export default function PublicBookList({
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [sortOpen, setSortOpen] = useState(false);
 
-  const filteredGroups = useMemo(() => {
-    let result = groups.slice();
+  // Use state for filters so we can clear them instantly
+  const [activeFilters, setActiveFilters] = useState(initialFilters);
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter(({ primary: b }) => {
+  const filteredGroups = useMemo(() => {
+    // 1. Filter books based on activeFilters and searchQuery
+    const filtered = allBooks.filter((b) => {
+      if (activeFilters.author) {
+        const authors = effectiveAuthorsFor(b).map(s => String(s).toLowerCase());
+        if (!authors.includes(activeFilters.author.toLowerCase())) return false;
+      }
+      if (activeFilters.subject) {
+        const subjects = (b.subjects_override ?? b.edition?.subjects ?? []).map(s => String(s).toLowerCase());
+        if (!subjects.includes(activeFilters.subject.toLowerCase())) return false;
+      }
+      if (activeFilters.publisher) {
+        const pub = b.publisher_override || b.edition?.publisher;
+        if (String(pub ?? "").toLowerCase() !== activeFilters.publisher.toLowerCase()) return false;
+      }
+      
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
         const title = effectiveTitleFor(b).toLowerCase();
         const authors = effectiveAuthorsFor(b).join(" ").toLowerCase();
-        return title.includes(q) || authors.includes(q);
-      });
+        const subjects = (b.subjects_override ?? b.edition?.subjects ?? []).join(" ").toLowerCase();
+        const pub = (b.publisher_override || b.edition?.publisher || "").toLowerCase();
+        if (!title.includes(q) && !authors.includes(q) && !subjects.includes(q) && !pub.includes(q)) return false;
+      }
+      return true;
+    });
+
+    // 2. Group the filtered books
+    const byKey = new Map<string, PublicBook[]>();
+    for (const b of filtered) {
+      const key = groupKeyFor(b);
+      const cur = byKey.get(key);
+      if (!cur) byKey.set(key, [b]);
+      else cur.push(b);
     }
 
+    const groups: CatalogGroup[] = Array.from(byKey.entries()).map(([key, copies]) => {
+      const primary = copies.slice().sort((a, b) => {
+        const score = (x: PublicBook) => {
+          let s = 0;
+          if (x.media.some(m => m.kind === 'cover')) s += 1000;
+          if (x.edition?.cover_url) s += 150;
+          return s;
+        };
+        return score(b) - score(a);
+      })[0]!;
+      return { key, libraryId: primary.library_id, primary, copies };
+    });
+
+    // 3. Sort groups
     if (sortMode === "latest") {
-      result.sort((a, b) => b.primary.id - a.primary.id);
+      groups.sort((a, b) => b.primary.id - a.primary.id);
     } else if (sortMode === "earliest") {
-      result.sort((a, b) => a.primary.id - b.primary.id);
+      groups.sort((a, b) => a.primary.id - b.primary.id);
     } else if (sortMode === "title_asc") {
-      result.sort((a, b) => effectiveTitleFor(a.primary).localeCompare(effectiveTitleFor(b.primary)));
+      groups.sort((a, b) => effectiveTitleFor(a.primary).localeCompare(effectiveTitleFor(b.primary)));
     } else if (sortMode === "title_desc") {
-      result.sort((a, b) => effectiveTitleFor(b.primary).localeCompare(effectiveTitleFor(a.primary)));
+      groups.sort((a, b) => effectiveTitleFor(b.primary).localeCompare(effectiveTitleFor(a.primary)));
     }
 
-    return result;
-  }, [groups, searchQuery, sortMode]);
+    return groups;
+  }, [allBooks, activeFilters, searchQuery, sortMode]);
 
   const containerStyle = useMemo((): React.CSSProperties => {
     if (viewMode === "list") {
@@ -145,7 +195,13 @@ export default function PublicBookList({
               {authors.length > 0
                 ? authors.map((a, idx) => (
                     <span key={a}>
-                      <Link href={`/u/${username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                      <button 
+                        onClick={() => setActiveFilters({ author: a })}
+                        className="om-filter-link"
+                        style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
+                      >
+                        {a}
+                      </button>
                       {idx < authors.length - 1 ? <span>, </span> : null}
                     </span>
                   ))
@@ -181,7 +237,13 @@ export default function PublicBookList({
           {authors.length > 0
             ? authors.map((a, idx) => (
                 <span key={a}>
-                  <Link href={`/u/${username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                  <button 
+                    onClick={() => setActiveFilters({ author: a })}
+                    className="om-filter-link"
+                    style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
+                  >
+                    {a}
+                  </button>
                   {idx < authors.length - 1 ? <span>, </span> : null}
                 </span>
               ))
@@ -197,7 +259,7 @@ export default function PublicBookList({
       <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
         <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center", margin: 0 }}>
           <span className="muted">Catalogs</span>
-          <span>{totalLibrariesCount}</span>
+          <span>{libraries.length}</span>
           <span className="muted">Books</span>
           <span>{filteredGroups.length}</span>
         </div>
@@ -221,9 +283,13 @@ export default function PublicBookList({
                     ))}
                   </span>
                 ) : null;
-
-                })()}<Link href={`/u/${username}`} className="om-clear-filter-btn">clear</Link>
-
+              })()}<button 
+                onClick={() => {
+                  setActiveFilters({});
+                  window.history.replaceState({}, "", `/u/${username}`);
+                }}
+                className="om-clear-filter-btn"
+              >clear</button>
             </>
           ) : null}
         </div>
