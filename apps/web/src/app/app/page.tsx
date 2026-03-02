@@ -2872,7 +2872,7 @@ function AppShell({
         />
       </div>
 
-      <div style={{ marginTop: 24 }} />
+      <div style={{ marginTop: 32 }} />
 
       {libraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];

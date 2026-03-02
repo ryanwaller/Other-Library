@@ -16,11 +16,27 @@ type PublicBook = {
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
   authors_override: string[] | null;
+  subjects_override: string[] | null;
+  publisher_override: string | null;
+  tags: string[] | null;
+  category: string | null;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
-  edition: { id: number; isbn13: string | null; title: string | null; authors: string[] | null; cover_url: string | null } | null;
+  edition: { 
+    id: number; 
+    isbn13: string | null; 
+    title: string | null; 
+    authors: string[] | null; 
+    cover_url: string | null;
+    subjects: string[] | null;
+    publisher: string | null;
+    publish_date: string | null;
+    description: string | null;
+  } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
+
+type CatalogGroup = { key: string; libraryId: number; primary: PublicBook; copies: PublicBook[] };
 
 function normalizeKeyPart(input: string): string {
   return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -48,8 +64,15 @@ function groupKeyFor(b: PublicBook): string {
   return `m:${title}|${authors}`;
 }
 
-export default async function PublicProfilePage({ params }: { params: Promise<{ username: string }> }) {
+export default async function PublicProfilePage({ 
+  params,
+  searchParams
+}: { 
+  params: Promise<{ username: string }>,
+  searchParams: Promise<{ author?: string; tag?: string; subject?: string; category?: string; publisher?: string }>
+}) {
   const { username } = await params;
+  const { author: filterAuthor, tag: filterTag, subject: filterSubject, category: filterCategory, publisher: filterPublisher } = await searchParams;
   const usernameNorm = (username ?? "").trim().toLowerCase();
   const supabase = getServerSupabase();
 
@@ -109,7 +132,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   const booksRes = await supabase
     .from("user_books")
-    .select("id,library_id,visibility,title_override,authors_override,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,cover_url),media:user_book_media(kind,storage_path)")
+    .select("id,library_id,visibility,title_override,authors_override,subjects_override,publisher_override,tags,category,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path)")
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -121,9 +144,33 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     return profile.visibility === "public";
   });
 
+  const filteredBooks = visibleBooks.filter((b) => {
+    if (filterAuthor) {
+      const authors = (b.authors_override ?? b.edition?.authors ?? []).map(s => String(s).toLowerCase());
+      if (!authors.includes(filterAuthor.toLowerCase())) return false;
+    }
+    if (filterTag) {
+      const tags = (b.tags ?? []).map(s => String(s).toLowerCase());
+      if (!tags.includes(filterTag.toLowerCase())) return false;
+    }
+    if (filterSubject) {
+      const subjects = (b.subjects_override ?? b.edition?.subjects ?? []).map(s => String(s).toLowerCase());
+      if (!subjects.includes(filterSubject.toLowerCase())) return false;
+    }
+    if (filterPublisher) {
+      const pub = b.publisher_override || b.edition?.publisher;
+      if (String(pub ?? "").toLowerCase() !== filterPublisher.toLowerCase()) return false;
+    }
+    if (filterCategory) {
+      const cat = b.category;
+      if (String(cat ?? "").toLowerCase() !== filterCategory.toLowerCase()) return false;
+    }
+    return true;
+  });
+
   const mediaPaths = Array.from(new Set([
-    ...visibleBooks.flatMap(b => b.media.map(m => m.storage_path)),
-    ...visibleBooks.filter(b => b.cover_crop && b.cover_original_url).map(b => b.cover_original_url as string)
+    ...filteredBooks.flatMap(b => b.media.map(m => m.storage_path)),
+    ...filteredBooks.filter(b => b.cover_crop && b.cover_original_url).map(b => b.cover_original_url as string)
   ]));
 
   let signedMap: Record<string, string> = {};
@@ -137,14 +184,15 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   }
 
   const byKey = new Map<string, PublicBook[]>();
-  for (const b of visibleBooks) {
+  for (const b of filteredBooks) {
     const key = groupKeyFor(b);
     const cur = byKey.get(key);
     if (!cur) byKey.set(key, [b]);
     else cur.push(b);
   }
 
-  type CatalogGroup = { key: string; libraryId: number; primary: PublicBook; copies: PublicBook[] };
+  const editionIds = Array.from(new Set(filteredBooks.map(b => b.edition?.id).filter(Boolean))) as number[];
+
   const groupedBooks: CatalogGroup[] = Array.from(byKey.entries()).map(([key, copies]) => {
     const primary = copies.slice().sort((a, b) => {
       const score = (x: PublicBook) => {
@@ -167,7 +215,6 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   const DEFAULT_LIBRARY_NAME = "Your catalog";
   const showLibraryBlocks = libraries.length > 1 || (libraries.length === 1 && libraries[0]?.name !== DEFAULT_LIBRARY_NAME);
-  const editionIds = Array.from(new Set(visibleBooks.map(b => b.edition?.id).filter(Boolean))) as number[];
 
   return (
     <main className="container">
@@ -206,15 +253,42 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       </div>
 
       <AddToLibraryProvider editionIds={editionIds}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginTop: 16 }}>
-          <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center", margin: 0 }}>
-          <span className="muted">Catalogs</span>
-          <span>{libraries.length}</span>
-          <span className="muted">Books</span>
-          <span>{groupedBooks.length}</span>
-        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginTop: 24 }}>
+          <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
+            <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center", margin: 0 }}>
+              <span className="muted">Catalogs</span>
+              <span>{libraries.length}</span>
+              <span className="muted">Books</span>
+              <span>{groupedBooks.length}</span>
+            </div>
+            <div className="row muted" style={{ gap: 10, justifyContent: "flex-end", margin: 0 }}>
+              {filterAuthor || filterSubject || filterTag || filterCategory || filterPublisher ? (
+                <>
+                  {(() => {
+                    const pairs: Array<{ label: string; value: string }> = [];
+                    if (filterCategory) pairs.push({ label: "Category", value: filterCategory });
+                    if (filterTag) pairs.push({ label: "Tag", value: filterTag });
+                    if (filterAuthor) pairs.push({ label: "Author", value: filterAuthor });
+                    if (filterSubject) pairs.push({ label: "Subject", value: filterSubject });
+                    if (filterPublisher) pairs.push({ label: "Publisher", value: filterPublisher });
+                    return pairs.length ? (
+                      <span style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
+                        {pairs.map((p) => (
+                          <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 6, alignItems: "baseline" }}>
+                            <span className="muted">{p.label}</span>
+                            <span style={{ color: "var(--fg)" }}>{p.value}</span>
+                          </span>
+                        ))}
+                      </span>
+                    ) : null;
+                  })()}{" "}
+                  (<Link href={`/u/${profile.username}`} style={{ textDecoration: "underline" }}>clear</Link>)
+                </>
+              ) : null}
+            </div>
+          </div>
 
-        {showLibraryBlocks ? (
+          {showLibraryBlocks ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {libraries.map((lib) => {
               const groups = groupsByLibraryId.get(lib.id) ?? [];

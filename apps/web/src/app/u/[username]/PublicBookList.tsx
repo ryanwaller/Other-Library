@@ -136,7 +136,7 @@ export default function PublicBookList({
         viewMode={viewMode}
         gridCols={gridCols}
         searchQuery={searchQuery}
-        containerStyle={{ ...containerStyle, marginTop: 24 }}
+        containerStyle={{ ...containerStyle, marginTop: 32 }}
         renderItem={(g) => {
           const b = g.primary;
           const e = b.edition;
