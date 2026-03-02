@@ -547,11 +547,11 @@ export default function SettingsPage() {
                     <img
                       alt=""
                       src={avatarUrl}
-                      style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border)" }}
+                      style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border-avatar)" }}
                     />
                   </a>
                 ) : (
-                  <div style={{ width: 28, height: 28, borderRadius: 999, border: "1px solid var(--border)" }} />
+                  <div style={{ width: 28, height: 28, borderRadius: 999, border: "1px solid var(--border-avatar)" }} />
                 )}
                 <input type="file" accept="image/*" onChange={(e) => setPendingAvatar((e.target.files ?? [])[0] ?? null)} />
                 <button onClick={uploadAvatar} disabled={!pendingAvatar || avatarState.busy}>
@@ -583,7 +583,7 @@ export default function SettingsPage() {
 
             {pendingAvatarPreviewUrl ? (
               <div style={{ marginTop: 10 }}>
-                <div style={{ position: "relative", width: 280, height: 180, border: "1px solid var(--border)", background: "black" }}>
+                <div style={{ position: "relative", width: 280, height: 180, border: "1px solid var(--border-avatar)", background: "black" }}>
                   <Cropper
                     image={pendingAvatarPreviewUrl}
                     crop={avatarCrop}

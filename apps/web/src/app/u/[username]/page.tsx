@@ -153,12 +153,12 @@ export default async function PublicProfilePage({
         <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
           <div className="row" style={{ gap: 12, alignItems: "center" }}>
             {avatarUrl ? (
-              <div style={{ width: 48, height: 48, borderRadius: 999, overflow: "hidden", border: "1px solid var(--border)" }}>
+              <div style={{ width: 48, height: 48, borderRadius: 999, overflow: "hidden", border: "1px solid var(--border-avatar)" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img alt="" src={avatarUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
             ) : (
-              <div style={{ width: 48, height: 48, borderRadius: 999, border: "1px solid var(--border)", background: "var(--bg-muted)" }} />
+              <div style={{ width: 48, height: 48, borderRadius: 999, border: "1px solid var(--border-avatar)", background: "var(--bg-muted)" }} />
             )}
             <div>
               <div style={{ fontSize: "1em" }}>{profile.display_name || `@${profile.username}`}</div>

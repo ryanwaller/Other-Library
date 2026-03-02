@@ -37,6 +37,8 @@
   --button-bg: #fff;
   --placeholder-bg: #e8e8e8;
 
+  --border-avatar: #e0e0e0;
+
   --space-sm: 6px;
   --space-md: 12px;
 }
@@ -51,6 +53,8 @@
     --input-bg: #101014;
     --button-bg: #101014;
     --placeholder-bg: #1a1a1a;
+
+    --border-avatar: #2a2a2e;
   }
 }
 
@@ -185,7 +189,7 @@ a:focus-visible {
   height: var(--avatar-size);
   border-radius: 999px;
   object-fit: cover;
-  border: 0;
+  border: 1px solid var(--border-avatar);
   display: block;
   transform: translateY(-1px);
 }
