@@ -1283,7 +1283,7 @@ export default function BookDetailPage() {
     if (cropTrimSizeValid) {
       return parseFloat(cropTrimWidth) / parseFloat(cropTrimHeight);
     }
-    return 2 / 3;
+    return undefined; // Free aspect
   }, [cropTrimSizeValid, cropTrimWidth, cropTrimHeight]);
   const imageMedia = useMemo(() => (book?.media ?? []).filter((m) => m.kind === "image") ?? [], [book]);
 
@@ -3112,6 +3112,7 @@ export default function BookDetailPage() {
                         setCoverContrast(c.contrast);
                         setCoverCroppedArea({ x: c.x * 100, y: c.y * 100, width: c.width * 100, height: c.height * 100 });
                       } else {
+                        // Default to FREE crop and fit-to-image
                         setCoverZoom(1);
                         setCoverCrop({ x: 0, y: 0 });
                         setCoverRotation(0);
@@ -3131,24 +3132,13 @@ export default function BookDetailPage() {
                       {coverToolsOpen && (
                         <div className="row" style={{ gap: 12 }}>
                           {coverUrl && (
-                            <>
-                              {deleteCoverConfirm ? (
-                                <div className="row" style={{ gap: 8 }}>
-                                  <span className="muted">Are you sure?</span>
-                                  <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); void deleteCover(); }} style={{ padding: 0, border: "none", background: "none", textDecoration: "underline", cursor: "pointer" }}>Yes</button>
-                                  <span className="muted">/</span>
-                                  <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteCoverConfirm(false); }} style={{ padding: 0, border: "none", background: "none", textDecoration: "underline", cursor: "pointer" }}>No</button>
-                                </div>
-                              ) : (
-                                <button 
-                                  className="muted" 
-                                  style={{ padding: 0, border: "none", background: "none", textDecoration: "underline", cursor: "pointer" }}
-                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteCoverConfirm(true); }}
-                                >
-                                  Delete
-                                </button>
-                              )}
-                            </>
+                            <button 
+                              className="muted" 
+                              style={{ padding: 0, border: "none", background: "none", textDecoration: "underline", cursor: "pointer" }}
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); void deleteCover(); }}
+                            >
+                              Delete
+                            </button>
                           )}
                           <label 
                             className="muted" 

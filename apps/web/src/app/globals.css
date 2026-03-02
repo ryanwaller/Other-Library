@@ -562,11 +562,11 @@ input[type="range"]::-webkit-slider-runnable-track {
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  height: 8px;
-  width: 8px;
+  height: 12px;
+  width: 12px;
   background: var(--fg);
   border-radius: 50%;
-  margin-top: -3.5px; /* (1/2) - (8/2) = -3.5 */
+  margin-top: -5.5px; /* (1/2) - (12/2) = -5.5 */
   border: none;
   transition: background 0.1s ease;
   box-shadow: none !important;
@@ -586,11 +586,13 @@ input[type="range"]::-moz-range-track {
   height: 1px;
   background: var(--border);
   border: none;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 input[type="range"]::-moz-range-thumb {
-  height: 8px;
-  width: 8px;
+  height: 12px;
+  width: 12px;
   background: var(--fg);
   border-radius: 50%;
   border: none;
