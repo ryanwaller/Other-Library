@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { bookIdSlug } from "../../../lib/slug";
 import AddToLibraryButton from "./AddToLibraryButton";
@@ -86,6 +86,14 @@ export default function PublicBookList({
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [sortOpen, setSortOpen] = useState(false);
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   // Use state for filters so we can clear them instantly
   const [activeFilters, setActiveFilters] = useState(initialFilters);
 
@@ -166,6 +174,10 @@ export default function PublicBookList({
     const e = b.edition;
     const title = effectiveTitleFor(b);
     const authors = effectiveAuthorsFor(b);
+
+    const truncatedAuthors = isMobile && authors.length > 2
+      ? [...authors.slice(0, 2), "+ more"]
+      : authors;
     const coverUrl =
       g.copies
         .map((c) => {
@@ -192,17 +204,21 @@ export default function PublicBookList({
           <div style={{ flex: 1, minWidth: 0 }}>
             <Link href={href}>{title}</Link>
             <div className="om-book-secondary">
-              {authors.length > 0
-                ? authors.map((a, idx) => (
+              {truncatedAuthors.length > 0
+                ? truncatedAuthors.map((a, idx) => (
                     <span key={a}>
-                      <button 
-                        onClick={() => setActiveFilters({ author: a })}
-                        className="om-filter-link"
-                        style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
-                      >
-                        {a}
-                      </button>
-                      {idx < authors.length - 1 ? <span>, </span> : null}
+                      {isMobile && a === "+ more" ? (
+                        <span className="muted">{a}</span>
+                      ) : (
+                        <button 
+                          onClick={() => setActiveFilters({ author: a })}
+                          className="om-filter-link"
+                          style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
+                        >
+                          {a}
+                        </button>
+                      )}
+                      {idx < truncatedAuthors.length - 1 ? <span>, </span> : null}
                     </span>
                   ))
                 : "—"}
@@ -234,17 +250,21 @@ export default function PublicBookList({
           <Link href={href}>{title}</Link>
         </div>
         <div className="book-author muted">
-          {authors.length > 0
-            ? authors.map((a, idx) => (
+          {truncatedAuthors.length > 0
+            ? truncatedAuthors.map((a, idx) => (
                 <span key={a}>
-                  <button 
-                    onClick={() => setActiveFilters({ author: a })}
-                    className="om-filter-link"
-                    style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
-                  >
-                    {a}
-                  </button>
-                  {idx < authors.length - 1 ? <span>, </span> : null}
+                  {isMobile && a === "+ more" ? (
+                    <span className="muted">{a}</span>
+                  ) : (
+                    <button 
+                      onClick={() => setActiveFilters({ author: a })}
+                      className="om-filter-link"
+                      style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
+                    >
+                      {a}
+                    </button>
+                  )}
+                  {idx < truncatedAuthors.length - 1 ? <span>, </span> : null}
                 </span>
               ))
             : "—"}
@@ -321,8 +341,8 @@ export default function PublicBookList({
           {viewMode === "grid" && (
             <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as 2 | 4 | 8)}>
               <option value={2}>2</option>
-              <option value={4}>4</option>
-              <option value={8}>8</option>
+              {!isMobile && <option value={4}>4</option>}
+              {!isMobile && <option value={8}>8</option>}
             </select>
           )}
           <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)}>

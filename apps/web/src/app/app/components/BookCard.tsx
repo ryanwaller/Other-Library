@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, type MouseEvent } from "react";
+import { useMemo, useState, useEffect, type MouseEvent } from "react";
 import CoverImage, { type CoverCrop } from "../../../components/CoverImage";
 
 export type BookCardViewMode = "grid" | "list";
@@ -54,12 +54,23 @@ export default function BookCard({
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "auto" }));
   };
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   const truncatedAuthors = useMemo(() => {
+    if (isMobile && authors.length > 2) {
+      return [...authors.slice(0, 2), "+ more"];
+    }
     if (gridCols === 8 && authors.length > 1) {
       return [`${authors[0]} + more`];
     }
     return authors;
-  }, [gridCols, authors]);
+  }, [gridCols, authors, isMobile]);
 
   const authorLine = truncatedAuthors.length > 0 ? truncatedAuthors.join(", ") : "";
 
@@ -91,17 +102,21 @@ export default function BookCard({
             </Link>
           </div>
           <div className="muted" style={{ marginTop: 4 }}>
-            {authors.length > 0 ? (
+            {truncatedAuthors.length > 0 ? (
               <>
-                {authors.map((a, idx) => (
+                {truncatedAuthors.map((a, idx) => (
                   <span key={a}>
-                    <Link
-                      href={`/app?author=${encodeURIComponent(a)}`}
-                      onClick={(e) => openAuthorFilter(e, a)}
-                    >
-                      {a}
-                    </Link>
-                    {idx < authors.length - 1 ? <span>, </span> : null}
+                    {isMobile && a === "+ more" ? (
+                      <span className="muted">{a}</span>
+                    ) : (
+                      <Link
+                        href={`/app?author=${encodeURIComponent(a)}`}
+                        onClick={(e) => openAuthorFilter(e, a)}
+                      >
+                        {a}
+                      </Link>
+                    )}
+                    {idx < truncatedAuthors.length - 1 ? <span>, </span> : null}
                   </span>
                 ))}
               </>
@@ -194,6 +209,8 @@ export default function BookCard({
                   <span key={author}>
                     {gridCols === 8 && authors.length > 1 ? (
                       <span>{author}</span>
+                    ) : isMobile && author === "+ more" ? (
+                      <span className="muted">{author}</span>
                     ) : (
                       <Link
                         href={`/app?author=${encodeURIComponent(author)}`}
