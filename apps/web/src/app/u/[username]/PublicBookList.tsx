@@ -71,8 +71,7 @@ export default function PublicBookList({
         const href = `/u/${username}/b/${bookIdSlug(b.id, title)}`;
         return (
           <div key={b.id} className="om-book-card">
-            <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-              <span className="muted">{g.copies.length > 1 ? `(${g.copies.length})` : ""}</span>
+            <div className="row" style={{ justifyContent: "flex-end", alignItems: "center" }}>
               <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "nowrap" }}>
                 <AddToLibraryButton
                   editionId={e?.id ?? null}

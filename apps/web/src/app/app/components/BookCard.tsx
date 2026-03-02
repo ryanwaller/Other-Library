@@ -89,8 +89,7 @@ export default function BookCard({
           <div>
             <Link href={href} className="om-book-card-link">
               <span className="om-book-title">{title}</span>
-            </Link>{" "}
-            {!hideCopyCount ? <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span> : null}
+            </Link>
           </div>
           <div className="muted" style={{ marginTop: 4 }}>
             {authors.length > 0 ? (
@@ -141,7 +140,6 @@ export default function BookCard({
       {bulkMode ? (
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
           <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" />
-          {!hideCopyCount ? <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span> : null}
         </div>
       ) : null}
 
@@ -155,7 +153,6 @@ export default function BookCard({
               <Link href={href} style={{ textDecoration: "none" }} className="om-book-card-link">
                 <span className="om-book-title">{title}</span>
               </Link>
-              {!hideCopyCount ? <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span> : null}
             </div>
             {authorLine ? (
               <div className="muted" style={{ marginTop: 6 }}>
@@ -191,7 +188,6 @@ export default function BookCard({
           <div style={{ marginTop: 14 }}>
             <div className="row" style={{ justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
               <span className="om-book-title">{title}</span>
-              {!hideCopyCount ? <span className="muted">{copiesCount > 1 ? `(${copiesCount})` : ""}</span> : null}
             </div>
             {authorLine ? (
               <div className="om-book-secondary">
