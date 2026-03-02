@@ -154,6 +154,8 @@ export default function AdminPage() {
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [copiedInvite, setCopiedInvite] = useState(false);
+  const [copiedLinkForId, setCopiedLinkForId] = useState<number | string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
 
   const [userTab, setUserTab] = useState<"all" | "active" | "disabled" | "admins">("all");
@@ -428,9 +430,11 @@ export default function AdminPage() {
                 <button
                   onClick={async () => {
                     await navigator.clipboard.writeText(inviteLink);
+                    setCopiedInvite(true);
+                    window.setTimeout(() => setCopiedInvite(false), 1500);
                   }}
                 >
-                  Copy link
+                  {copiedInvite ? "Copied" : "Copy link"}
                 </button>
               ) : null}
             </div>
@@ -772,9 +776,11 @@ export default function AdminPage() {
                             const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(invite.token)}`;
                             await navigator.clipboard.writeText(link);
                             setInviteLink(link);
+                            setCopiedLinkForId(invite.id);
+                            window.setTimeout(() => setCopiedLinkForId(null), 1500);
                           }}
                         >
-                          Copy link
+                          {copiedLinkForId === invite.id ? "Copied" : "Copy link"}
                         </button>
                       }
                       meta={[
