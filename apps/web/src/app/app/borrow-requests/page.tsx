@@ -187,7 +187,9 @@ export default function BorrowRequestsPage() {
                       </div>
 
                       <div className="muted" style={{ whiteSpace: "nowrap" }}>
-                        {statusLabel(r.status)}
+                        {r.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
+                        {r.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
+                        {r.status === "pending" ? <span>…</span> : null}
                       </div>
                     </div>
 

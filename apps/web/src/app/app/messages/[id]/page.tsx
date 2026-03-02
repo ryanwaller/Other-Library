@@ -293,15 +293,40 @@ export default function MessageThreadPage() {
         <Link href="/app/messages">Back</Link>
       </div>
 
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div>{title}</div>
-          <div className="muted">
-            with {other?.username ? <Link href={`/u/${other.username}`}>{other.username}</Link> : <span className="muted">{otherUserId ?? ""}</span>}
+      {req && (
+        <div className="card">
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+            <div className="om-avatar-lockup">
+              {otherAvatarUrl ? (
+                <a href={otherAvatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar" className="om-avatar-link">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt=""
+                    src={otherAvatarUrl}
+                    className="om-avatar-img"
+                  />
+                </a>
+              ) : (
+                <div className="om-avatar-img" />
+              )}
+              <div>
+                <span className="muted">{isOwner ? "request from " : "request to "}</span>
+                {other?.username ? <Link href={`/u/${other.username}`}>{other.username}</Link> : <span className="muted">{otherUserId ?? ""}</span>}
+              </div>
+            </div>
+            <div className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {req.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
+              {req.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
+              {req.status === "pending" ? <span>…</span> : null}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 8 }}>
+            <span className="muted">{book?.object_type || "book"}: </span>
+            <Link href={`/app/books/${req.user_book_id}`}>{title}</Link>
           </div>
         </div>
-        <div className="muted">{busy ? "Loading…" : error ? error : req ? statusLabel(req.status) : ""}</div>
-      </div>
+      )}
 
       <div className="om-thread" style={{ marginTop: 14 }}>
         {req?.message ? (
@@ -344,6 +369,12 @@ export default function MessageThreadPage() {
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void send();
+            }
+          }}
           placeholder="Message"
           rows={4}
           style={{ width: "100%" }}

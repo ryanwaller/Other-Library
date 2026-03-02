@@ -240,15 +240,14 @@ export default function MessagesPage() {
                       <div className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                         {r.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
                         {r.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
+                        {r.status === "pending" ? <span>…</span> : null}
                         {isUnread ? <span style={{ color: "#b00020" }}>new</span> : null}
-                        {isUnread ? <span>·</span> : null}
-                        <span>{r.status}</span>
                       </div>
                     </div>
 
                     <div style={{ marginTop: 8 }}>
-                      <span className="muted">Book: </span>
-                      <span>{title}</span>
+                      <span className="muted">{book?.object_type || "book"}: </span>
+                      <Link href={`/app/books/${r.user_book_id}`}>{title}</Link>
                     </div>
 
                     {preview ? (
