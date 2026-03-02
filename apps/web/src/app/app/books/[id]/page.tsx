@@ -372,8 +372,6 @@ export default function BookDetailPage() {
     message: null
   });
   const [coverInputKey, setCoverInputKey] = useState(0);
-  const [deleteCoverConfirm, setDeleteCoverConfirm] = useState(false);
-  const [resetConfirm, setResetConfirm] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1613,10 +1611,10 @@ export default function BookDetailPage() {
 
       router.push("/app");
     } catch (e: any) {
-      setDeleteState({ busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" });
-      setDeleteConfirm(false);
+      setCoverState({ busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" });
     }
-  }
+    }
+
 
   async function doneEditMode() {
     if (!isOwner) return;
@@ -1765,8 +1763,6 @@ export default function BookDetailPage() {
     setCoverEditorSrc(null);
     setCoverInputKey((k) => k + 1);
     setCoverToolsOpen(false);
-    setResetConfirm(false);
-    setDeleteCoverConfirm(false);
   }
 
   function resetCoverEdit() {
@@ -1780,7 +1776,6 @@ export default function BookDetailPage() {
     });
     const origSrc = toFullSizeImageUrl((coverOriginalSrc ?? coverUrl) || "");
     setCoverEditorSrc(origSrc);
-    setResetConfirm(false);
   }
 
   async function uploadCover() {
@@ -1998,7 +1993,6 @@ export default function BookDetailPage() {
 
       setCoverEditorSrc(null);
       setPendingCover(null);
-      setDeleteCoverConfirm(false);
       setCoverToolsOpen(false);
       await refresh();
       setCoverState({ busy: false, error: null, message: "Deleted" });
@@ -3271,39 +3265,24 @@ export default function BookDetailPage() {
                           </label>
 
                           {coverUrl && (
-                            resetConfirm ? (
-                              <div className="row" style={{ gap: 8 }}>
-                                <span className="muted">Reset?</span>
-                                <button onClick={resetCoverEdit}>Yes</button>
-                                <button className="muted" onClick={() => setResetConfirm(false)}>No</button>
-                              </div>
-                            ) : (
-                              <button 
-                                className="muted" 
-                                style={{ textDecoration: "underline" }}
-                                onClick={() => setResetConfirm(true)}
-                              >
-                                Reset
-                              </button>
-                            )
+                            <button 
+                              className="muted" 
+                              style={{ textDecoration: "underline" }}
+                              onClick={resetCoverEdit}
+                            >
+                              Reset
+                            </button>
                           )}
 
                           {coverUrl && (
-                            deleteCoverConfirm ? (
-                              <div className="row" style={{ gap: 8 }}>
-                                <span className="muted">Delete?</span>
-                                <button onClick={() => void deleteCover()} disabled={coverState.busy}>Yes</button>
-                                <button className="muted" onClick={() => setDeleteCoverConfirm(false)} disabled={coverState.busy}>No</button>
-                              </div>
-                            ) : (
-                              <button 
-                                className="muted" 
-                                style={{ textDecoration: "underline" }}
-                                onClick={() => setDeleteCoverConfirm(true)}
-                              >
-                                Delete
-                              </button>
-                            )
+                            <button 
+                              className="muted" 
+                              style={{ textDecoration: "underline" }}
+                              onClick={() => void deleteCover()}
+                              disabled={coverState.busy}
+                            >
+                              Delete
+                            </button>
                           )}
                         </div>
                       )}
