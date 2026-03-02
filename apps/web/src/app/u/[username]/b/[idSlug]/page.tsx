@@ -126,11 +126,24 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const bookRes = await supabase
     .from("user_books")
     .select(
-      "id,owner_id,visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,pages,group_label,object_type,decade,description_override,subjects_override,borrowable_override,borrow_request_scope_override,cover_original_url,cover_crop,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
+      "*,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
     )
     .eq("id", bookId)
     .eq("owner_id", profile.id)
     .maybeSingle();
+
+  if (bookRes.error) {
+    return (
+      <main className="container">
+        <div className="card">
+          <div>Error loading book.</div>
+          <div className="muted" style={{ marginTop: 8 }}>
+            {bookRes.error.message}
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   const book = (bookRes.data ?? null) as unknown as PublicBookDetail | null;
   if (!book) {
