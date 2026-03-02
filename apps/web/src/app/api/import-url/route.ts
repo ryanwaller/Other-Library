@@ -113,11 +113,21 @@ function pickBestIsbn(candidates: string[]): { isbn10: string | null; isbn13: st
   let isbn13: string | null = null;
   let isbn10: string | null = null;
   for (const c of candidates) {
+    if (!c) continue;
     const n = normalizeIsbn(c);
-    if (n.length === 13 && isValidIsbn13(n)) isbn13 = isbn13 ?? n;
-    if (n.length === 10 && isValidIsbn10(n)) isbn10 = isbn10 ?? n;
+    if (n.length === 13 && isValidIsbn13(n)) {
+      isbn13 = isbn13 ?? n;
+      console.log(`[isbn] Valid ISBN-13 detected: ${n}`);
+    }
+    if (n.length === 10 && isValidIsbn10(n)) {
+      isbn10 = isbn10 ?? n;
+      console.log(`[isbn] Valid ISBN-10 detected: ${n}`);
+    }
   }
-  if (!isbn13 && isbn10) isbn13 = isbn10ToIsbn13(isbn10);
+  if (!isbn13 && isbn10) {
+    isbn13 = isbn10ToIsbn13(isbn10);
+    if (isbn13) console.log(`[isbn] Derived ISBN-13 from ISBN-10: ${isbn13}`);
+  }
   return { isbn10, isbn13 };
 }
 
@@ -251,8 +261,23 @@ function normalizeDescription(value: string | null, allowBoilerplate: boolean): 
   // Trim each line and collapse multiple newlines
   s = s.split(/\r?\n/).map(line => line.trim()).filter(Boolean).join("\n\n");
   if (!s) return null;
-  if (!allowBoilerplate && looksLikeBoilerplateDescription(s)) return null;
-  if (s.length > 10000) return s.slice(0, 10000);
+
+  // Reject if it looks like a full page text dump
+  const paragraphCount = s.split("\n\n").length;
+  if (paragraphCount > 15) {
+    console.warn(`[scrape] Rejecting description: too many paragraphs (${paragraphCount})`);
+    return null;
+  }
+
+  if (!allowBoilerplate && looksLikeBoilerplateDescription(s)) {
+    console.warn(`[scrape] Rejecting description: looks like boilerplate`);
+    return null;
+  }
+  
+  if (s.length > 1500) {
+    console.log(`[scrape] Truncating description from ${s.length} to 1500`);
+    s = s.slice(0, 1500);
+  }
   return s;
 }
 
@@ -548,8 +573,8 @@ function scrapePrintedMatter(html: string): Partial<ImportMetadata> {
       // More aggressive HTML tag removal while preserving structure if possible
       const cleaned = decodeEntities(content.replace(/<[^>]+>/g, "\n").replace(/[ \t]+/g, " ").trim());
       if (cleaned.length > 50) {
-        description = normalizeDescription(cleaned, true);
-        break;
+        description = normalizeDescription(cleaned, false);
+        if (description) break;
       }
     }
   }
@@ -562,7 +587,7 @@ function scrapePrintedMatter(html: string): Partial<ImportMetadata> {
       // Capture everything after HR instead of just one block
       const fullRest = decodeEntities(afterHr.replace(/<[^>]+>/g, "\n").replace(/[ \t]+/g, " ").trim());
       if (fullRest.length > 20) {
-        description = normalizeDescription(fullRest, true);
+        description = normalizeDescription(fullRest, false);
       }
     }
   }
@@ -1079,49 +1104,88 @@ export async function POST(req: NextRequest) {
   const covers = uniqStrings([...(jsonldImages ?? []), normalizeHttpsUrl(ogImage), normalizeHttpsUrl(twitterImage)].filter(Boolean) as string[]);
 
   let scraped = makeEmpty();
-  scraped = mergePreferBase(
-    scraped,
-    {
-      title: jsonldTitle,
-      authors: jsonldAuthors,
-      publisher: jsonldPublisher,
-      publish_date: jsonldPublishDate,
-      description: jsonldDescription,
-      subjects: jsonldSubjects,
-      isbn10: picked.isbn10,
-      isbn13: picked.isbn13,
-      cover_candidates: covers,
-      cover_url: covers[0] ?? null,
-      trim_width: jsonldParsedDims.trim_width,
-      trim_height: jsonldParsedDims.trim_height,
-      trim_unit: jsonldParsedDims.trim_unit,
-      raw: { jsonld, jsonldNodesCount: jsonldNodes.length }
-    },
-    "jsonld"
-  );
+  
+  // 1. JSON-LD (Priority 1)
+  if (jsonld) {
+    console.log("[scrape] Populating from JSON-LD");
+    scraped = mergePreferBase(
+      scraped,
+      {
+        title: jsonldTitle,
+        authors: jsonldAuthors,
+        publisher: jsonldPublisher,
+        publish_date: jsonldPublishDate,
+        description: jsonldDescription,
+        subjects: jsonldSubjects,
+        isbn10: picked.isbn10,
+        isbn13: picked.isbn13,
+        cover_candidates: covers,
+        cover_url: covers[0] ?? null,
+        trim_width: jsonldParsedDims.trim_width,
+        trim_height: jsonldParsedDims.trim_height,
+        trim_unit: jsonldParsedDims.trim_unit,
+        raw: { jsonld, source: "jsonld" }
+      },
+      "jsonld"
+    );
+  }
+
+  // 2. Open Graph (Priority 2)
+  console.log("[scrape] Merging Open Graph");
   scraped = mergePreferBase(
     scraped,
     {
       title: ogTitle ? String(ogTitle).trim() : null,
       description: ogDescription ? String(ogDescription).trim() : null,
-      cover_candidates: uniqStrings([normalizeHttpsUrl(ogImage), normalizeHttpsUrl(twitterImage)].filter(Boolean) as string[]),
+      cover_candidates: covers,
       cover_url: normalizeHttpsUrl(ogImage) ?? normalizeHttpsUrl(twitterImage) ?? null,
-      raw: { meta }
+      raw: { og: meta }
     },
     "opengraph"
   );
+
+  // 3. Standard Meta Tags (Priority 3)
+  const metaDesc = normalizeDescription(meta["description"], bookish);
+  const metaAuthor = meta["author"] ? [meta["author"]] : [];
+  console.log("[scrape] Merging standard meta tags");
   scraped = mergePreferBase(
     scraped,
     {
-      title: titleTag,
-      raw: { titleTag }
+      description: metaDesc,
+      authors: metaAuthor,
+      raw: { meta }
     },
-    "html"
+    "meta"
   );
+
+  // 4. HTML Title Tag (Priority 4)
+  if (!scraped.title && titleTag) {
+    console.log("[scrape] Falling back to HTML title tag");
+    scraped.title = titleTag;
+  }
+
+  // 5. Minimal DOM Extraction (Last resort)
+  // Only if we still have no title
+  if (!scraped.title) {
+    const h1Match = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(html);
+    if (h1Match) {
+      const h1Title = decodeEntities(h1Match[1]!.replace(/<[^>]+>/g, "").trim());
+      if (h1Title && h1Title.length < 200) {
+        console.log("[scrape] Falling back to H1 for title");
+        scraped.title = stripTitleSuffix(h1Title, parsed.hostname);
+      }
+    }
+  }
 
   scraped.cover_candidates = uniqStrings(scraped.cover_candidates ?? []);
   scraped.authors = uniqStrings(scraped.authors ?? []);
   scraped.subjects = uniqStrings(scraped.subjects ?? []);
+
+  // Validation: strip branding from title if it leaked through
+  if (scraped.title) {
+    scraped.title = stripTitleSuffix(scraped.title, parsed.hostname);
+    if (scraped.title.length > 300) scraped.title = scraped.title.slice(0, 300);
+  }
 
   // Optional enrichment: if we found an ISBN, prefer "authoritative" resolvers for metadata.
   const isbnForLookup = scraped.isbn13 ?? scraped.isbn10 ?? null;
@@ -1129,6 +1193,7 @@ export async function POST(req: NextRequest) {
 
   let merged = scraped;
   if (isbnEdition && typeof isbnEdition === "object") {
+    console.log(`[scrape] Enriching with ISBN metadata for ${isbnForLookup}`);
     const editionAsImport: Partial<ImportMetadata> = {
       title: typeof (isbnEdition as any).title === "string" ? String((isbnEdition as any).title) : null,
       authors: Array.isArray((isbnEdition as any).authors) ? (isbnEdition as any).authors : [],
@@ -1139,18 +1204,21 @@ export async function POST(req: NextRequest) {
       isbn10: typeof (isbnEdition as any).isbn10 === "string" ? String((isbnEdition as any).isbn10) : null,
       isbn13: typeof (isbnEdition as any).isbn13 === "string" ? String((isbnEdition as any).isbn13) : null,
       cover_url: normalizeHttpsUrl((isbnEdition as any).cover_url),
-      cover_candidates: uniqStrings([normalizeHttpsUrl((isbnEdition as any).cover_url), ...merged.cover_candidates].filter(Boolean) as string[]),
+      cover_candidates: [normalizeHttpsUrl((isbnEdition as any).cover_url), ...merged.cover_candidates].filter(Boolean) as string[],
       raw: { isbnEdition }
     };
+    
     // Prefer edition metadata; fill any missing values from scrape.
     merged = mergePreferBase(makeEmpty(), editionAsImport, "isbn");
     merged = mergePreferBase(merged, scraped, "scrape");
+    
     // Prefer the best available cover (edition first, then scrape).
-    merged.cover_candidates = uniqStrings([
+    const allCovers = uniqStrings([
       normalizeHttpsUrl((isbnEdition as any).cover_url),
       ...scraped.cover_candidates
     ].filter(Boolean) as string[]);
-    merged.cover_url = normalizeHttpsUrl((isbnEdition as any).cover_url) ?? scraped.cover_url ?? null;
+    merged.cover_candidates = allCovers;
+    merged.cover_url = allCovers[0] ?? null;
   }
 
   // Final validation for all candidates and the picked URL
