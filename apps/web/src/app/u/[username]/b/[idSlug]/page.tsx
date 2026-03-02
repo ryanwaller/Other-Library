@@ -4,12 +4,13 @@ import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
 import { formatDateShort } from "../../../../../lib/formatDate";
 import AddToLibraryButton from "../../AddToLibraryButton";
-import AlsoOwnedBy from "../../AlsoOwnedBy";
 import BorrowRequestWidget from "../../BorrowRequestWidget";
 import ScrollToTopOnMount from "../../../../components/ScrollToTopOnMount";
 import ExpandableContent from "../../../../../components/ExpandableContent";
 import FollowControls from "../../FollowControls";
 import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
+import PublicImageGrid from "./PublicImageGrid";
+import AlsoOwnedBy from "../../AlsoOwnedBy";
 
 export const dynamic = "force-dynamic";
 
@@ -443,32 +444,19 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
         </div>
 
         {images.length > 0 ? (
-          <>
-            <div style={{ marginTop: 14 }} className="muted">
+          <div style={{ marginTop: 16 }}>
+            <hr className="om-hr" style={{ marginBottom: 16 }} />
+            <div className="muted">
               Images
             </div>
-            <div className="om-images-grid" style={{ marginTop: 10 }}>
-              {images.map((m) => {
-                const url = signedMap[m.storage_path];
-                return (
-                  <a key={m.id} href={url || "#"} target="_blank" rel="noreferrer">
-                    {url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <div className="om-cover-slot" style={{ width: "100%", height: 180 }}>
-                        <img alt="" src={url} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                      </div>
-                    ) : (
-                      <div className="om-cover-slot" style={{ width: "100%", height: 180 }} />
-                    )}
-                  </a>
-                );
-              })}
-            </div>
-          </>
+            <PublicImageGrid images={images} signedMap={signedMap} />
+          </div>
         ) : null}
-      </div>
 
-      {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={book.id} excludeOwnerId={book.owner_id} /> : null}
+        <div style={{ marginTop: 16 }}>
+          {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={book.id} excludeOwnerId={book.owner_id} /> : null}
+        </div>
+      </div>
     </main>
   );
 }

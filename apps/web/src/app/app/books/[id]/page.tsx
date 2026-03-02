@@ -503,6 +503,23 @@ export default function BookDetailPage() {
   const [imagesInputKey, setImagesInputKey] = useState(0);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
+  const imageMedia = useMemo(() => (book?.media ?? []).filter((m) => m.kind === "image") ?? [], [book]);
+
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowLeft") setLightboxIndex(prev => (prev !== null && prev > 0 ? prev - 1 : imageMedia.length - 1));
+      if (e.key === "ArrowRight") {
+        setLightboxIndex(prev => (prev !== null && prev < imageMedia.length - 1 ? prev + 1 : 0));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxIndex, imageMedia.length]);
+
   const [mergeSource, setMergeSource] = useState<MergeSource | null>(null);
   const [mergeState, setMergeState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
@@ -1288,7 +1305,6 @@ export default function BookDetailPage() {
     }
     return undefined; // Free aspect
   }, [cropTrimSizeValid, cropTrimWidth, cropTrimHeight]);
-  const imageMedia = useMemo(() => (book?.media ?? []).filter((m) => m.kind === "image") ?? [], [book]);
 
   const publicBookPath = useMemo(() => {
     if (!book || !ownerProfile?.username) return null;
@@ -3975,6 +3991,7 @@ export default function BookDetailPage() {
 
           {(isOwner && editMode) || imageMedia.length > 0 ? (
             <div style={{ gridColumn: "1 / -1", marginTop: 16 }}>
+              <hr className="om-hr" style={{ marginBottom: 16 }} />
               {isOwner && editMode ? (
                 <details style={{ marginTop: 8, border: "none", outline: "none", boxShadow: "none" }}>
                   <summary className="muted" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none", cursor: "pointer" }}>Add images…</summary>
@@ -4016,15 +4033,19 @@ export default function BookDetailPage() {
 
               {imageMedia.length > 0 ? (
                 <div className="om-images-grid" style={{ marginTop: 10 }}>
-                  {imageMedia.map((m) => {
+                  {imageMedia.map((m, idx) => {
                     const url = mediaUrlsByPath[m.storage_path];
                     return (
                       <div key={m.id}>
                         {url ? (
-                          <a href={url} target="_blank" rel="noreferrer" className="om-cover-slot" style={{ width: "100%", height: isNarrow ? 140 : 180, padding: 0 }}>
+                          <div 
+                            onClick={() => setLightboxIndex(idx)}
+                            className="om-cover-slot" 
+                            style={{ width: "100%", height: isNarrow ? 140 : 180, padding: 0, cursor: "pointer" }}
+                          >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img alt="" src={url} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
-                          </a>
+                          </div>
                         ) : (
                           <div className="om-cover-slot" style={{ width: "100%", height: isNarrow ? 140 : 180, padding: 0 }} />
                         )}
@@ -4052,6 +4073,68 @@ export default function BookDetailPage() {
         <div style={{ marginTop: 16 }}>
           {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} /> : null}
         </div>
+        </div>
+      )}
+
+      {lightboxIndex !== null && imageMedia[lightboxIndex] && (
+        <div 
+          style={{ 
+            position: "fixed", top: 0, left: 0, width: "100%", height: "100%", 
+            background: "rgba(0,0,0,0.85)", zIndex: 2000, 
+            display: "flex", alignItems: "center", justifyContent: "center"
+          }}
+          onClick={() => setLightboxIndex(null)}
+        >
+          <div 
+            style={{ 
+              position: "absolute", top: 24, right: 24, 
+              color: "#fff", cursor: "pointer", 
+              fontSize: 14, textDecoration: "underline" 
+            }}
+            onClick={(e) => { e.stopPropagation(); setLightboxIndex(null); }}
+          >
+            Close
+          </div>
+
+          {imageMedia.length > 1 && (
+            <>
+              <div 
+                style={{ 
+                  position: "absolute", left: 0, top: 0, bottom: 0, width: "25%", 
+                  cursor: "pointer", display: "flex", alignItems: "center", paddingLeft: 24 
+                }}
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setLightboxIndex(prev => (prev !== null && prev > 0 ? prev - 1 : imageMedia.length - 1));
+                }}
+              />
+              <div 
+                style={{ 
+                  position: "absolute", right: 0, top: 0, bottom: 0, width: "25%", 
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 24 
+                }}
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setLightboxIndex(prev => (prev !== null && prev < imageMedia.length - 1 ? prev + 1 : 0));
+                }}
+              />
+            </>
+          )}
+
+          <div 
+            style={{ 
+              position: "relative", width: "calc(100% - 64px)", height: "calc(100% - 64px)", 
+              display: "flex", alignItems: "center", justifyContent: "center" 
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={mediaUrlsByPath[imageMedia[lightboxIndex]!.storage_path]} 
+              alt="" 
+              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} 
+            />
+          </div>
         </div>
       )}
 
