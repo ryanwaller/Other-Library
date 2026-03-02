@@ -58,6 +58,7 @@ export default function CoverImage({
         const ch = container.clientHeight;
         const nw = img.naturalWidth;
         const nh = img.naturalHeight;
+        if (!nw || !nh || !cw || !ch) return;
         
         const isRotated = (cropData.rotation / 90) % 2 !== 0;
         const effectiveNw = isRotated ? nh : nw;
@@ -67,8 +68,11 @@ export default function CoverImage({
         const scaleH = ch / effectiveNh;
         const baseScale = Math.max(scaleW, scaleH);
         
-        const currentScale = baseScale * (cropData.zoom || 1);
+        // cropData.zoom is now the absolute CSS scale factor (e.g. 0.3).
+        // We clamp it to baseScale to ensure the image fills the container slot.
+        const currentScale = cropData.zoom ? Math.max(cropData.zoom, baseScale) : baseScale;
         
+        // x and y are in natural image pixels. Applied before scale in CSS transform.
         img.style.transform = `translate(${cropData.x || 0}px, ${cropData.y || 0}px) rotate(${cropData.rotation || 0}deg) scale(${currentScale})`;
         img.style.transformOrigin = "center";
       }

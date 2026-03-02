@@ -3,10 +3,10 @@
 import { useRef, useEffect, useLayoutEffect, useState, useCallback } from "react";
 
 export type EditorState = {
-  // Store these as relative values (0-1 range for center offset and scale relative to fit)
-  x: number; // -0.5 to 0.5 (percent of image width)
-  y: number; // -0.5 to 0.5 (percent of image height)
-  zoom: number; // 1.0 to 4.0 (multiplier of the 'fit' scale)
+  // Store these as absolute values: x/y in natural image pixels, zoom as absolute CSS scale.
+  x: number; 
+  y: number; 
+  zoom: number; // Absolute CSS scale factor (e.g. 0.25)
   rotation: number;
   brightness: number;
   contrast: number;
@@ -76,13 +76,13 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
       const effectiveNw = isRotated ? nh : nw;
       const effectiveNh = isRotated ? nw : nh;
 
-      // baseScale is the scale needed to cover the crop box (bw, bh)
-      const scaleW = bw / effectiveNw;
-      const scaleH = bh / effectiveNh;
+      // baseScale is the scale needed to cover the container slot (cw, ch)
+      const scaleW = cw / effectiveNw;
+      const scaleH = ch / effectiveNh;
       const baseScale = Math.max(scaleW, scaleH);
 
       setDims({ cw, ch, bw, bh, iw: nw, ih: nh, baseScale });
-      if (onLoad) onLoad({ minZoom: 1 }); // Zoom is now relative to baseScale (1 = fit)
+      if (onLoad) onLoad({ minZoom: baseScale });
     };
 
     updateDims();
@@ -96,23 +96,27 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
     return () => obs.disconnect();
   }, [src, aspectRatio, rotation, onLoad]);
 
-  // Clamping helper (relative coordinates)
+  // Clamping helper (absolute coordinates)
   const getClampedPos = useCallback((nx: number, ny: number, nz: number, d: typeof dims) => {
     if (!d.baseScale) return { x: nx, y: ny, zoom: nz };
 
-    const currentScale = d.baseScale * nz;
+    // nz is the absolute CSS scale. Clamp to fill (baseScale).
+    const currentScale = Math.max(d.baseScale, nz);
+    
     const isRotated = (rotation / 90) % 2 !== 0;
-    const rw = (isRotated ? d.ih : d.iw) * currentScale;
-    const rh = (isRotated ? d.iw : d.ih) * currentScale;
+    const rw = (isRotated ? d.ih : d.iw); // natural width
+    const rh = (isRotated ? d.iw : d.ih); // natural height
 
-    // Max translation in pixels
-    const maxX = Math.max(0, (rw - d.bw) / 2);
-    const maxY = Math.max(0, (rh - d.bh) / 2);
+    // Max translation in natural image pixels
+    // (naturalWidth * scale - cropBoxWidth) / 2 = maxScreenOffset
+    // maxNaturalOffset = maxScreenOffset / scale
+    const maxX = Math.max(0, (rw - d.bw / currentScale) / 2);
+    const maxY = Math.max(0, (rh - d.bh / currentScale) / 2);
 
     return {
       x: Math.min(maxX, Math.max(-maxX, nx)),
       y: Math.min(maxY, Math.max(-maxY, ny)),
-      zoom: Math.max(1, Math.min(4, nz))
+      zoom: Math.max(d.baseScale, Math.min(d.baseScale * 4, nz))
     };
   }, [rotation]);
 
@@ -138,7 +142,10 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
     const dx = cx - dragStart.x;
     const dy = cy - dragStart.y;
     
-    const clamped = getClampedPos(startPos.x + dx, startPos.y + dy, zoom, dims);
+    // dx/dy are screen pixels. zoom is absolute CSS scale factor.
+    // translate(x, y) scale(s) means x is in natural pixels.
+    // To move dx screen pixels, we move dx / currentScale natural pixels.
+    const clamped = getClampedPos(startPos.x + dx / zoom, startPos.y + dy / zoom, zoom, dims);
     onChangeRef.current({ x: clamped.x, y: clamped.y });
   };
 
@@ -175,7 +182,7 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
     window.addEventListener("touchend", up);
   };
 
-  const currentScale = dims.baseScale * zoom;
+  const currentScale = Math.max(dims.baseScale, zoom);
 
   return (
     <div className={className} style={{ ...style, position: "relative", overflow: "hidden" }}>

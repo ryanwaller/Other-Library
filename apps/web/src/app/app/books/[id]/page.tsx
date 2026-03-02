@@ -554,7 +554,7 @@ export default function BookDetailPage() {
     setEditorState({
       x: 0,
       y: 0,
-      zoom: 1,
+      zoom: 0, // Clamps to baseScale (fit)
       rotation: 0,
       brightness: 1,
       contrast: 1
@@ -3102,13 +3102,16 @@ export default function BookDetailPage() {
                     if (open && coverUrl && !coverEditorSrc && !pendingCover) {
                       const origSrc = toFullSizeImageUrl(coverOriginalSrc ?? coverUrl);
                       setCoverEditorSrc(origSrc);
+                      const crop = book?.cover_crop;
+                      const isTransform = crop?.mode === "transform";
                       setEditorState({
-                        zoom: book?.cover_crop?.zoom ?? 1,
-                        x: book?.cover_crop?.x ?? 0,
-                        y: book?.cover_crop?.y ?? 0,
-                        rotation: book?.cover_crop?.rotation ?? 0,
-                        brightness: book?.cover_crop?.brightness ?? 1,
-                        contrast: book?.cover_crop?.contrast ?? 1
+                        // If it's legacy data, zoom: 1 meant fit; we now use 0 to trigger fit clamping.
+                        zoom: isTransform ? (crop.zoom ?? 0) : 0,
+                        x: isTransform ? (crop.x ?? 0) : 0,
+                        y: isTransform ? (crop.y ?? 0) : 0,
+                        rotation: crop?.rotation ?? 0,
+                        brightness: crop?.brightness ?? 1,
+                        contrast: crop?.contrast ?? 1
                       });
                     }
                   }}
@@ -3195,8 +3198,8 @@ export default function BookDetailPage() {
                                 min={1}
                                 max={4}
                                 step={0.01}
-                                value={editorState.zoom}
-                                onChange={(zoom) => setEditorState(s => ({ ...s, zoom }))}
+                                value={editorState.zoom / (minZoomFloor || 1) || 1}
+                                onChange={(relZoom) => setEditorState(s => ({ ...s, zoom: relZoom * (minZoomFloor || 1) }))}
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
