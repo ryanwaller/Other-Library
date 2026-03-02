@@ -36,7 +36,7 @@ export default function CoverImage({
   if (!src || status === "error") {
     return (
       <div style={{ ...style, display: "flex", alignItems: "center", justifyContent: "center" }} className={className}>
-        <div className="om-cover-placeholder" style={{ width: "100%", height: "auto" }} />
+        <div className="om-cover-placeholder" style={{ height: "100%", width: "auto" }} />
       </div>
     );
   }
