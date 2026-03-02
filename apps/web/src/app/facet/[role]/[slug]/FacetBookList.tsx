@@ -48,7 +48,7 @@ export default function FacetBookList({
         return (
           <div key={book.id} className="om-book-card">
             <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
-              <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
+              <div className="om-cover-slot" style={{ width: "100%", aspectRatio: "2 / 3" }}>
                 <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
               </div>
               <div style={{ marginTop: 10 }} className="book-title">

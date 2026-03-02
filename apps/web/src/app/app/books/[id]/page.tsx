@@ -3047,7 +3047,7 @@ export default function BookDetailPage() {
                 style={{
                   position: "relative",
                   width: "100%",
-                  height: isNarrow ? 360 : 280,
+                  aspectRatio: "2 / 3",
                   padding: 0,
                   display: coverEditorSrc ? "block" : "flex",
                   filter: coverEditorSrc

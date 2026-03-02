@@ -120,9 +120,10 @@ a:focus-visible {
 
 .om-cover-placeholder {
   background: var(--placeholder-bg);
-  aspect-ratio: 6 / 9;
+  aspect-ratio: 2 / 3;
   width: 100%;
   height: auto;
+  display: block;
 }
 
 .om-cover-slot img {

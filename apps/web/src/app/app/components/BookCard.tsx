@@ -66,7 +66,7 @@ export default function BookCard({
   const authorLine = truncatedAuthors.length > 0 ? truncatedAuthors.join(", ") : "";
 
   const coverEl = (
-    <div className="om-cover-slot" style={{ height: coverHeight }}>
+    <div className="om-cover-slot" style={{ width: "100%", aspectRatio: "2 / 3" }}>
       <CoverImage
         alt={title}
         src={originalSrc ?? coverUrl}
