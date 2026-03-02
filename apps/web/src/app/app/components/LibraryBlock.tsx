@@ -192,7 +192,7 @@ export default function LibraryBlock({
         <>
           {renderBooks(limit)}
           {bookCount > limit && (
-            <div className="row" style={{ marginTop: 12, justifyContent: "center" }}>
+            <div className="row" style={{ marginTop: 12, marginBottom: 24, justifyContent: "center" }}>
               <button onClick={loadMore} className="muted">
                 Load more
               </button>
