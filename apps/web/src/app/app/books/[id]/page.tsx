@@ -13,6 +13,7 @@ import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
 import SignInCard from "../../../components/SignInCard";
 import EntityTokenField from "../../components/EntityTokenField";
 import CoverImage, { type CoverCrop } from "../../../../components/CoverImage";
+import ExpandableContent from "../../../../components/ExpandableContent";
 
 type FacetRole =
   | "author"
@@ -3606,7 +3607,16 @@ export default function BookDetailPage() {
                           disabled={!isOwner || busy || saveState.busy}
                         />
                       ) : (
-                        <FacetLinks role="subject" items={facetView.subject} />
+                        <ExpandableContent
+                          items={facetView.subject}
+                          limit={15}
+                          renderVisible={(visible, isExpanded) => (
+                            <>
+                              <FacetLinks role="subject" items={visible} />
+                              {!isExpanded && facetView.subject.length > 15 ? " …" : ""}
+                            </>
+                          )}
+                        />
                       )}
                     </div>
                   </div>
@@ -3634,8 +3644,16 @@ export default function BookDetailPage() {
                         style={{ overflow: "hidden", resize: "none", marginTop: 6 }}
                       />
                     ) : (
-                      <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-                        {effectiveDescription}
+                      <div style={{ marginTop: 6 }}>
+                        <ExpandableContent
+                          items={effectiveDescription.trim().split(/\s+/)}
+                          limit={100}
+                          renderVisible={(visible, isExpanded) => (
+                            <div style={{ whiteSpace: "pre-wrap" }}>
+                              {isExpanded ? effectiveDescription : visible.join(" ") + (effectiveDescription.trim().split(/\s+/).length > 100 ? "…" : "")}
+                            </div>
+                          )}
+                        />
                       </div>
                     )}
                   </div>

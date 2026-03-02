@@ -7,6 +7,7 @@ import AddToLibraryButton from "../../AddToLibraryButton";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
 import BorrowRequestWidget from "../../BorrowRequestWidget";
 import ScrollToTopOnMount from "../../../../components/ScrollToTopOnMount";
+import ExpandableContent from "../../../../../components/ExpandableContent";
 import FollowControls from "../../FollowControls";
 import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
 
@@ -380,13 +381,22 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 <div style={{ minWidth: 110 }} className="muted">
                   Subjects
                 </div>
-                <div>
-                  {subjects.map((s, idx) => (
-                    <span key={s}>
-                      <Link href={`/u/${profile.username}/s/${encodeURIComponent(s)}`}>{s}</Link>
-                      {idx < subjects.length - 1 ? <span>, </span> : null}
-                    </span>
-                  ))}
+                <div style={{ flex: "1 1 auto" }}>
+                  <ExpandableContent
+                    items={subjects}
+                    limit={15}
+                    renderVisible={(visible, isExpanded) => (
+                      <div>
+                        {visible.map((s, idx) => (
+                          <span key={s}>
+                            <Link href={`/u/${profile.username}/s/${encodeURIComponent(s)}`}>{s}</Link>
+                            {idx < visible.length - 1 ? <span>, </span> : null}
+                          </span>
+                        ))}
+                        {!isExpanded && subjects.length > 15 ? " …" : ""}
+                      </div>
+                    )}
+                  />
                 </div>
               </div>
             ) : null}
@@ -401,14 +411,22 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
             ) : null}
 
             {effectiveDescription ? (
-              <>
-                <div style={{ marginTop: 12 }} className="muted">
+              <div style={{ marginTop: 12 }}>
+                <div className="muted">
                   Description
                 </div>
-                <div className="muted" style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-                  {effectiveDescription}
+                <div style={{ marginTop: 6 }}>
+                  <ExpandableContent
+                    items={effectiveDescription.trim().split(/\s+/)}
+                    limit={100}
+                    renderVisible={(visible, isExpanded) => (
+                      <div style={{ whiteSpace: "pre-wrap" }}>
+                        {isExpanded ? effectiveDescription : visible.join(" ") + (effectiveDescription.trim().split(/\s+/).length > 100 ? "…" : "")}
+                      </div>
+                    )}
+                  />
                 </div>
-              </>
+              </div>
             ) : null}
 
             <div style={{ marginTop: 12 }}>
