@@ -1841,11 +1841,30 @@ export default function BookDetailPage() {
     return "jpg";
   }
 
+  function checkImageDimensions(url: string | null): Promise<boolean> {
+    if (!url) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const ok = img.naturalWidth >= 100 && img.naturalHeight >= 100;
+        resolve(ok);
+      };
+      img.onerror = () => resolve(false);
+      img.src = url;
+    });
+  }
+
   async function importCoverFromUrl(url: string) {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
     const value = url.trim();
     if (!value) return;
+
+    const ok = await checkImageDimensions(value);
+    if (!ok) {
+      setSuggestedCoverState({ busy: false, error: "Image too small (min 100px)", message: "Image too small" });
+      return;
+    }
 
     setSuggestedCoverState({ busy: true, error: null, message: "Importing cover…" });
     try {
@@ -1998,8 +2017,19 @@ export default function BookDetailPage() {
       const res = await fetch(`/api/search?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}`);
       const json = await res.json();
       if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Search failed");
-      setSearchResults((json.results ?? []) as MetadataSearchResult[]);
-      setSearchState({ busy: false, error: null, message: (json.results ?? []).length ? "Done" : "No results" });
+      
+      const rawResults = (json.results ?? []) as MetadataSearchResult[];
+      // Filter out small covers from search results
+      const processed = await Promise.all(rawResults.map(async (r) => {
+        if (r.cover_url) {
+          const ok = await checkImageDimensions(r.cover_url);
+          if (!ok) return { ...r, cover_url: null };
+        }
+        return r;
+      }));
+
+      setSearchResults(processed);
+      setSearchState({ busy: false, error: null, message: processed.length ? "Done" : "No results" });
     } catch (e: any) {
       setSearchState({ busy: false, error: e?.message ?? "Search failed", message: "Search failed" });
     }
@@ -2020,6 +2050,13 @@ export default function BookDetailPage() {
       const json = await res.json();
       if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Import failed");
       const rawPreview = json.preview ?? null;
+
+      let finalCoverUrl = rawPreview?.cover_url ?? null;
+      if (finalCoverUrl) {
+        const ok = await checkImageDimensions(finalCoverUrl);
+        if (!ok) finalCoverUrl = null;
+      }
+
       const preview: ImportPreview | null = rawPreview
         ? {
             title: rawPreview.title ?? null,
@@ -2033,7 +2070,7 @@ export default function BookDetailPage() {
             subjects: Array.isArray(rawPreview.subjects) ? rawPreview.subjects : [],
             isbn10: rawPreview.isbn10 ?? null,
             isbn13: rawPreview.isbn13 ?? null,
-            cover_url: rawPreview.cover_url ?? null,
+            cover_url: finalCoverUrl,
             cover_candidates: Array.isArray(rawPreview.cover_candidates) ? rawPreview.cover_candidates : [],
             trim_width: typeof rawPreview.trim_width === "number" ? rawPreview.trim_width : null,
             trim_height: typeof rawPreview.trim_height === "number" ? rawPreview.trim_height : null,
@@ -2066,6 +2103,13 @@ export default function BookDetailPage() {
       if (!res.ok || !json?.ok) throw new Error(json?.error ?? "ISBN lookup failed");
       const edition = (json.edition ?? null) as any;
       if (!edition || typeof edition !== "object") throw new Error("No edition returned");
+
+      let finalCoverUrl = typeof edition.cover_url === "string" ? edition.cover_url : null;
+      if (finalCoverUrl) {
+        const ok = await checkImageDimensions(finalCoverUrl);
+        if (!ok) finalCoverUrl = null;
+      }
+
       const preview: ImportPreview = {
         title: typeof edition.title === "string" ? edition.title : null,
         authors: Array.isArray(edition.authors) ? edition.authors.filter(Boolean) : [],
@@ -2078,8 +2122,8 @@ export default function BookDetailPage() {
         subjects: Array.isArray(edition.subjects) ? edition.subjects.filter(Boolean) : [],
         isbn10: typeof edition.isbn10 === "string" ? edition.isbn10 : null,
         isbn13: typeof edition.isbn13 === "string" ? edition.isbn13 : null,
-        cover_url: typeof edition.cover_url === "string" ? edition.cover_url : null,
-        cover_candidates: uniqStrings([typeof edition.cover_url === "string" ? edition.cover_url : null]),
+        cover_url: finalCoverUrl,
+        cover_candidates: uniqStrings([finalCoverUrl]),
         trim_width: null,
         trim_height: null,
         trim_unit: null,
@@ -3176,46 +3220,6 @@ export default function BookDetailPage() {
                       {coverState.message ? (
                         <div className="muted" style={{ marginTop: 6 }}>
                           {coverState.error ? `${coverState.message} (${coverState.error})` : coverState.message}
-                        </div>
-                      ) : null}
-                      {suggestedCoverUrl ? (
-                        <div style={{ marginTop: 10 }}>
-                          <div className="muted">Cover from preview</div>
-                          <div className="row" style={{ marginTop: 6, justifyContent: "space-between", alignItems: "flex-start" }}>
-                            <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <div className="om-cover-slot" style={{ width: 44, height: 66, padding: 4 }}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={suggestedCoverUrl}
-                                  alt=""
-                                  width={44}
-                                  height={66}
-                                  style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }}
-                                />
-                              </div>
-                              <div className="muted" style={{ maxWidth: 140, wordBreak: "break-word" }}>
-                                <a href={suggestedCoverUrl} target="_blank" rel="noreferrer">
-                                  open
-                                </a>
-                              </div>
-                            </div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                              <button onClick={() => importCoverFromUrl(suggestedCoverUrl)} disabled={suggestedCoverState.busy}>
-                                {suggestedCoverState.busy ? "Importing…" : "Use as cover"}
-                              </button>
-                              <button onClick={() => setSuggestedCoverUrl(null)} disabled={suggestedCoverState.busy}>
-                                Clear
-                              </button>
-                            </div>
-                          </div>
-                          {suggestedCoverState.message ? (
-                            <div className="muted" style={{ marginTop: 6 }}>
-                              {suggestedCoverState.error
-                                ? `${suggestedCoverState.message} (${suggestedCoverState.error})`
-                                : suggestedCoverState.message}
-                            </div>
-                          ) : null}
                         </div>
                       ) : null}
                     </div>

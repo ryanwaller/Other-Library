@@ -527,8 +527,9 @@ select.om-filter-control::-ms-expand {
 }
 
 input[type="range"] {
+  outline: none;
+  box-shadow: none;
   -webkit-appearance: none;
-  appearance: none;
   background: transparent;
   cursor: pointer;
   height: 24px;
@@ -536,14 +537,8 @@ input[type="range"] {
   align-items: center;
   width: 100%;
   border-bottom: none !important;
-  outline: none !important;
-  box-shadow: none !important;
   margin-top: 2px;
   -webkit-tap-highlight-color: transparent;
-}
-
-input[type="range"]::-moz-focus-outer {
-  border: 0;
 }
 
 input[type="range"]:focus,
@@ -559,6 +554,8 @@ input[type="range"]::-webkit-slider-runnable-track {
   height: 1px;
   background: var(--border);
   border: none;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 input[type="range"]::-webkit-slider-thumb {

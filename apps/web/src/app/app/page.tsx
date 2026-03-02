@@ -942,6 +942,19 @@ function AppShell({
     }
   }
 
+  function checkImageDimensions(url: string | null): Promise<boolean> {
+    if (!url) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const ok = img.naturalWidth >= 100 && img.naturalHeight >= 100;
+        resolve(ok);
+      };
+      img.onerror = () => resolve(false);
+      img.src = url;
+    });
+  }
+
   async function createUserBookByIsbnNoRefresh(isbnValue: string): Promise<number> {
     if (!supabase) throw new Error("Supabase is not configured");
     if (!addLibraryId) throw new Error("Choose a catalog first");
@@ -953,6 +966,12 @@ function AppShell({
     const edition = (json.edition ?? {}) as EditionMetadata;
     const isbn13 = (edition.isbn13 ?? "").trim();
     if (!isbn13) throw new Error("No ISBN-13 returned by resolver");
+
+    let finalCoverUrl = edition.cover_url ?? null;
+    if (finalCoverUrl) {
+      const ok = await checkImageDimensions(finalCoverUrl);
+      if (!ok) finalCoverUrl = null;
+    }
 
     const existing = await supabase.from("editions").select("id").eq("isbn13", isbn13).maybeSingle();
     if (existing.error) throw new Error(existing.error.message);
@@ -970,7 +989,7 @@ function AppShell({
           publish_date: edition.publish_date ?? null,
           description: edition.description ?? null,
           subjects: edition.subjects ?? [],
-          cover_url: edition.cover_url ?? null,
+          cover_url: finalCoverUrl,
           raw: edition.raw ?? null
         })
         .select("id")
@@ -1230,7 +1249,12 @@ function AppShell({
       });
       const json = await res.json();
       if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Import failed");
-      setAddUrlPreview(json.preview ?? null);
+      const preview = json.preview ?? null;
+      if (preview?.cover_url) {
+        const ok = await checkImageDimensions(preview.cover_url);
+        if (!ok) preview.cover_url = null;
+      }
+      setAddUrlPreview(preview);
       setAddUrlMeta({
         final_url: typeof json.final_url === "string" ? json.final_url : null,
         domain: typeof json.domain === "string" ? json.domain : null,
@@ -1253,6 +1277,13 @@ function AppShell({
       if (!res.ok || !json?.ok) throw new Error(json?.error ?? "ISBN lookup failed");
       const edition = (json.edition ?? null) as any;
       if (!edition || typeof edition !== "object") throw new Error("No edition returned");
+
+      let finalCoverUrl = typeof edition.cover_url === "string" ? edition.cover_url.trim() || null : null;
+      if (finalCoverUrl) {
+        const ok = await checkImageDimensions(finalCoverUrl);
+        if (!ok) finalCoverUrl = null;
+      }
+
       setAddUrlPreview({
         title: typeof edition.title === "string" ? edition.title : null,
         authors: Array.isArray(edition.authors) ? edition.authors.filter(Boolean) : [],
@@ -1262,7 +1293,7 @@ function AppShell({
         subjects: Array.isArray(edition.subjects) ? edition.subjects.filter(Boolean) : [],
         isbn10: typeof edition.isbn10 === "string" ? edition.isbn10 : null,
         isbn13: typeof edition.isbn13 === "string" ? edition.isbn13 : null,
-        cover_url: typeof edition.cover_url === "string" ? edition.cover_url.trim() || null : null,
+        cover_url: finalCoverUrl,
         sources: Array.from(new Set(["isbn", ...((edition.sources ?? []) as any[]).map((s: any) => String(s))])).filter(Boolean)
       });
       setAddState({ busy: false, error: null, message: null });
