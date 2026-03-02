@@ -159,7 +159,7 @@ export default function BookCard({
 
       {bulkMode ? (
         <>
-          <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link">
+          <Link href={href} style={{ display: "flex", textDecoration: "none", alignItems: "flex-end" }} className="om-book-card-link">
             {coverEl}
           </Link>
           <div style={{ marginTop: 12 }}>
@@ -198,7 +198,9 @@ export default function BookCard({
             }
           }}
         >
-          {coverEl}
+          <div style={{ display: "flex", alignItems: "flex-end" }}>
+            {coverEl}
+          </div>
           <div style={{ marginTop: 14 }}>
             <div className="row" style={{ justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
               <span className="om-book-title">{title}</span>

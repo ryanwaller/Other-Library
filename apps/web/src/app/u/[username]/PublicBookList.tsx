@@ -233,11 +233,13 @@ export default function PublicBookList({
 
     return (
       <div key={g.key} className="om-book-card" style={{ position: "relative" }}>
-        <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
-          <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
-            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
-          </div>
-        </Link>
+        <div style={{ display: "flex", alignItems: "flex-end" }}>
+          <Link href={href} className="om-book-card-link" style={{ display: "block", width: "100%" }}>
+            <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
+              <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
+            </div>
+          </Link>
+        </div>
         <div className="om-cover-add-btn" style={{ position: "absolute", top: 6, right: 6, zIndex: 1 }}>
           <AddToLibraryButton
             editionId={e?.id ?? null}
