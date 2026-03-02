@@ -1590,13 +1590,10 @@ export default function BookDetailPage() {
       // ignore
     }
 
-    // Persist a cover URL that was set via Find more info / Link ISBN
+    // If a cover URL was staged via Find more info / Fill fields but never uploaded, import it now.
+    // importCoverFromUrl uploads to storage, creates user_book_media, and calls refresh() internally.
     if (suggestedCoverUrl) {
-      await supabase.from("user_books").update({ cover_original_url: suggestedCoverUrl }).eq("id", book.id);
-      if (book.edition?.id) {
-        await supabase.from("editions").update({ cover_url: suggestedCoverUrl }).eq("id", book.edition.id);
-      }
-      setSuggestedCoverUrl(null);
+      await importCoverFromUrl(suggestedCoverUrl);
     }
 
     await refresh();
