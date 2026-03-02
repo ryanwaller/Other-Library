@@ -310,6 +310,93 @@ function parseTitleAndAuthor(input: string): { title: string; author: string | n
   return { title: s, author: null };
 }
 
+function CustomSlider({
+  min,
+  max,
+  step = 1,
+  value,
+  onChange,
+  style
+}: {
+  min: number;
+  max: number;
+  step?: number;
+  value: number;
+  onChange: (val: number) => void;
+  style?: React.CSSProperties;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const handleMove = (clientX: number) => {
+    if (!trackRef.current) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    const pos = (clientX - rect.left) / rect.width;
+    const raw = min + pos * (max - min);
+    const clamped = Math.min(max, Math.max(min, raw));
+    const stepped = Math.round(clamped / step) * step;
+    onChange(Number(stepped.toFixed(4)));
+  };
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    handleMove(e.clientX);
+    const move = (me: MouseEvent) => handleMove(me.clientX);
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    handleMove(e.touches[0]!.clientX);
+    const move = (te: TouchEvent) => handleMove(te.touches[0]!.clientX);
+    const up = () => {
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", up);
+    };
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("touchend", up);
+  };
+
+  const percent = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+
+  return (
+    <div
+      ref={trackRef}
+      onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
+      style={{
+        height: 24,
+        display: "flex",
+        alignItems: "center",
+        cursor: "pointer",
+        position: "relative",
+        userSelect: "none",
+        touchAction: "none",
+        ...style
+      }}
+    >
+      <div style={{ height: 1, width: "100%", background: "var(--border)", position: "relative" }}>
+        <div
+          style={{
+            position: "absolute",
+            left: `${percent}%`,
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+            width: 14,
+            height: 14,
+            borderRadius: "50%",
+            background: "var(--fg)",
+            border: "none",
+            boxShadow: "none"
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function BookDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -3067,8 +3154,8 @@ export default function BookDetailPage() {
                     onRotationChange={setCoverRotation}
                     onCropComplete={(area, _pixels) => setCoverCroppedArea(area)}
                     showGrid={false}
-                    minZoom={0.5}
-                    objectFit="cover"
+                    minZoom={0.1}
+                    objectFit="contain"
                     classes={{
                       containerClassName: "om-cropper-container",
                       mediaClassName: "om-cropper-image"
@@ -3202,13 +3289,12 @@ export default function BookDetailPage() {
                               <div className="muted" style={{ minWidth: 110 }}>
                                 Zoom
                               </div>
-                              <input
-                                type="range"
-                                min={1}
+                              <CustomSlider
+                                min={0.1}
                                 max={3}
                                 step={0.01}
                                 value={coverZoom}
-                                onChange={(e) => setCoverZoom(Number(e.target.value))}
+                                onChange={setCoverZoom}
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
@@ -3216,13 +3302,12 @@ export default function BookDetailPage() {
                               <div className="muted" style={{ minWidth: 110 }}>
                                 Rotate
                               </div>
-                              <input
-                                type="range"
+                              <CustomSlider
                                 min={-180}
                                 max={180}
                                 step={1}
                                 value={coverRotation}
-                                onChange={(e) => setCoverRotation(Number(e.target.value))}
+                                onChange={setCoverRotation}
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
@@ -3230,13 +3315,12 @@ export default function BookDetailPage() {
                               <div className="muted" style={{ minWidth: 110 }}>
                                 Bright
                               </div>
-                              <input
-                                type="range"
+                              <CustomSlider
                                 min={0.7}
                                 max={1.3}
                                 step={0.01}
                                 value={coverBrightness}
-                                onChange={(e) => setCoverBrightness(Number(e.target.value))}
+                                onChange={setCoverBrightness}
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
@@ -3244,13 +3328,12 @@ export default function BookDetailPage() {
                               <div className="muted" style={{ minWidth: 110 }}>
                                 Contrast
                               </div>
-                              <input
-                                type="range"
+                              <CustomSlider
                                 min={0.7}
                                 max={1.3}
                                 step={0.01}
                                 value={coverContrast}
-                                onChange={(e) => setCoverContrast(Number(e.target.value))}
+                                onChange={setCoverContrast}
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
