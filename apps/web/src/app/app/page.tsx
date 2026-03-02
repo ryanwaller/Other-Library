@@ -192,6 +192,9 @@ function AppShell({
   filterAuthor,
   filterSubject,
   filterPublisher,
+  filterDesigner,
+  filterGroup,
+  filterDecade,
   filterCategory,
   openCsvPicker,
   openAddPanel
@@ -201,6 +204,9 @@ function AppShell({
   filterAuthor: string | null;
   filterSubject: string | null;
   filterPublisher: string | null;
+  filterDesigner: string | null;
+  filterGroup: string | null;
+  filterDecade: string | null;
   filterCategory: string | null;
   openCsvPicker: boolean;
   openAddPanel: boolean;
@@ -298,6 +304,9 @@ function AppShell({
     authors_override: string[] | null;
     subjects_override: string[] | null;
     publisher_override: string | null;
+    designers_override: string[] | null;
+    group_label: string | null;
+    decade: string | null;
     cover_original_url: string | null;
     cover_crop: CoverCrop | null;
     edition: {
@@ -324,6 +333,9 @@ function AppShell({
     filterAuthors: string[];
     filterSubjects: string[];
     filterPublishers: string[];
+    filterDesigners: string[];
+    filterGroups: string[];
+    filterDecades: string[];
     title: string;
     visibility: "inherit" | "followers_only" | "public" | "mixed";
     effectiveVisibility: "public" | "followers_only" | "mixed";
@@ -537,7 +549,7 @@ function AppShell({
     const { data, error } = await supabase
       .from("user_books")
       .select(
-        "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
+        "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
       )
       .eq("owner_id", userId)
       .order("created_at", { ascending: false })
@@ -1624,6 +1636,9 @@ function AppShell({
     const author = (filterAuthor ?? "").trim().toLowerCase();
     const subject = (filterSubject ?? "").trim().toLowerCase();
     const publisher = (filterPublisher ?? "").trim().toLowerCase();
+    const designer = (filterDesigner ?? "").trim().toLowerCase();
+    const groupVal = (filterGroup ?? "").trim().toLowerCase();
+    const decadeVal = (filterDecade ?? "").trim().toLowerCase();
     const activeCategoryMode = (filterCategory ?? categoryMode) || "all";
     const categoryTag = (activeCategoryMode === "all" ? "" : String(activeCategoryMode)).trim().toLowerCase();
     const q = searchQuery.trim().toLowerCase();
@@ -1670,6 +1685,9 @@ function AppShell({
       const authorsSet = new Set<string>();
       const subjectsSet = new Set<string>();
       const publishersSet = new Set<string>();
+      const designersSet = new Set<string>();
+      const groupsSet = new Set<string>();
+      const decadesSet = new Set<string>();
       const visSet = new Set<string>();
       const effVisSet = new Set<string>();
       let latest = -Infinity;
@@ -1683,6 +1701,10 @@ function AppShell({
         for (const s of effectiveSubjectsFor(c)) subjectsSet.add(s);
         const p = effectivePublisherFor(c);
         if (p) publishersSet.add(p);
+        for (const d of (c.designers_override ?? [])) if (d) designersSet.add(d);
+        if (c.group_label) groupsSet.add(c.group_label);
+        if (c.decade) decadesSet.add(c.decade);
+
         visSet.add(c.visibility);
         const eff = (c.visibility === "inherit" || !c.visibility ? profileVis : c.visibility) as string;
         effVisSet.add(eff);
@@ -1710,6 +1732,9 @@ function AppShell({
         filterAuthors: Array.from(authorsSet.values()),
         filterSubjects: Array.from(subjectsSet.values()),
         filterPublishers: Array.from(publishersSet.values()),
+        filterDesigners: Array.from(designersSet.values()),
+        filterGroups: Array.from(groupsSet.values()),
+        filterDecades: Array.from(decadesSet.values()),
         title,
         visibility,
         effectiveVisibility,
@@ -1722,6 +1747,9 @@ function AppShell({
     if (author) groups = groups.filter((g) => g.filterAuthors.some((a) => a.toLowerCase() === author));
     if (subject) groups = groups.filter((g) => g.filterSubjects.some((s) => String(s).toLowerCase() === subject));
     if (publisher) groups = groups.filter((g) => g.filterPublishers.some((p) => p.toLowerCase() === publisher));
+    if (designer) groups = groups.filter((g) => g.filterDesigners.some((d) => d.toLowerCase() === designer));
+    if (groupVal) groups = groups.filter((g) => g.filterGroups.some((v) => v.toLowerCase() === groupVal));
+    if (decadeVal) groups = groups.filter((g) => g.filterDecades.some((v) => v.toLowerCase() === decadeVal));
     if (categoryTag) groups = groups.filter((g) => g.categoryNames.some((t) => t.toLowerCase() === categoryTag));
     if (visibilityMode !== "all") {
       groups = groups.filter((g) => {
@@ -1737,6 +1765,7 @@ function AppShell({
         const authors = (g.filterAuthors ?? []).join(" ").toLowerCase();
         const subjects = (g.filterSubjects ?? []).join(" ").toLowerCase();
         const publishers = (g.filterPublishers ?? []).join(" ").toLowerCase();
+        const designers = (g.filterDesigners ?? []).join(" ").toLowerCase();
         const tags = (g.tagNames ?? []).join(" ").toLowerCase();
         const isbn = String(e?.isbn13 ?? "").toLowerCase();
         return (
@@ -1744,6 +1773,7 @@ function AppShell({
           authors.includes(q) ||
           subjects.includes(q) ||
           publishers.includes(q) ||
+          designers.includes(q) ||
           tags.includes(q) ||
           (q.length >= 6 && isbn.includes(q))
         );
@@ -1759,7 +1789,7 @@ function AppShell({
     });
 
     return groups;
-  }, [filteredItems, filterTag, tagMode, filterAuthor, filterSubject, filterPublisher, filterCategory, categoryMode, visibilityMode, sortMode, searchQuery, profile?.visibility]);
+  }, [filteredItems, filterTag, tagMode, filterAuthor, filterSubject, filterPublisher, filterDesigner, filterGroup, filterDecade, filterCategory, categoryMode, visibilityMode, sortMode, searchQuery, profile?.visibility]);
 
   const displayGroupsByLibraryId = useMemo(() => {
     const by: Record<number, CatalogGroup[]> = {};
@@ -2953,6 +2983,9 @@ function AppWithFilters({ session }: { session: Session }) {
   const filterAuthor = searchParams.get("author");
   const filterSubject = searchParams.get("subject");
   const filterPublisher = searchParams.get("publisher");
+  const filterDesigner = searchParams.get("designer");
+  const filterGroup = searchParams.get("group");
+  const filterDecade = searchParams.get("decade");
   const filterCategory = searchParams.get("category");
   const openAddPanel = searchParams.get("add") === "1";
   const openCsvPicker = searchParams.get("csv") === "1";
@@ -2963,6 +2996,9 @@ function AppWithFilters({ session }: { session: Session }) {
       filterAuthor={filterAuthor}
       filterSubject={filterSubject}
       filterPublisher={filterPublisher}
+      filterDesigner={filterDesigner}
+      filterGroup={filterGroup}
+      filterDecade={filterDecade}
       filterCategory={filterCategory}
       openAddPanel={openAddPanel}
       openCsvPicker={openCsvPicker}

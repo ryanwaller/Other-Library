@@ -240,8 +240,18 @@ function parseAuthorsInput(input: string): string[] {
   return out;
 }
 
-function facetHref(role: string, slug: string): string {
-  return `/facet/${encodeURIComponent(role)}/${encodeURIComponent(slug)}`;
+function facetHref(role: string, name: string): string {
+  const mapping: Record<string, string> = {
+    author: "author",
+    subject: "subject",
+    publisher: "publisher",
+    designer: "designer",
+    material: "material",
+    category: "category",
+    tag: "tag"
+  };
+  const param = mapping[role] || role;
+  return `/app?${param}=${encodeURIComponent(name)}`;
 }
 
 function FacetLinks(props: { role: FacetRole; items: EntityRef[] }) {
@@ -250,7 +260,7 @@ function FacetLinks(props: { role: FacetRole; items: EntityRef[] }) {
     <span>
       {items.map((e, idx) => (
         <span key={e.id}>
-          <Link href={facetHref(role, e.slug)}>{e.name}</Link>
+          <Link href={facetHref(role, e.name)}>{e.name}</Link>
           {idx < items.length - 1 ? ", " : ""}
         </span>
       ))}
@@ -3495,7 +3505,9 @@ export default function BookDetailPage() {
                           placeholder="Add group"
                         />
                       ) : (
-                        (book?.group_label ?? "").trim()
+                        <Link href={`/app?group=${encodeURIComponent((book?.group_label ?? "").trim())}`}>
+                          {(book?.group_label ?? "").trim()}
+                        </Link>
                       )}
                     </div>
                   </div>
@@ -3542,7 +3554,9 @@ export default function BookDetailPage() {
                           <option value="2020s">2020s</option>
                         </select>
                       ) : (
-                        (book?.decade ?? "").trim()
+                        <Link href={`/app?decade=${encodeURIComponent((book?.decade ?? "").trim())}`}>
+                          {(book?.decade ?? "").trim()}
+                        </Link>
                       )}
                     </div>
                   </div>
@@ -3670,7 +3684,7 @@ export default function BookDetailPage() {
                           </div>
                         </>
                       ) : (
-                        <div className="muted">{copiesCountState.busy ? "…" : copiesCount !== null ? String(copiesCount) : "—"}</div>
+                        <div>{copiesCountState.busy ? "…" : copiesCount !== null ? String(copiesCount) : "—"}</div>
                       )}
                     </div>
                     {editMode || facetView.category.length > 0 ? (
@@ -3720,10 +3734,10 @@ export default function BookDetailPage() {
                         <div style={{ minWidth: 110 }} className="muted">
                           Notes
                         </div>
-                        <div style={{ flex: "1 1 auto" }} className="muted">
+                        <div style={{ flex: "1 1 auto" }}>
                           {editMode ? (
                             <textarea
-                              className="om-inline-control muted"
+                              className="om-inline-control"
                               value={formNotes}
                               onChange={(e) => setFormNotes(e.target.value)}
                               rows={1}
