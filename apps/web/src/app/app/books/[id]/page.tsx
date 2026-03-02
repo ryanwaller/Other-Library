@@ -3001,6 +3001,7 @@ export default function BookDetailPage() {
                     }
 
                     setCoverToolsOpen(open);
+                    // Initialize editor if opening and we have a cover
                     if (open && coverUrl && !coverEditorSrc && !pendingCover) {
                       const origSrc = toFullSizeImageUrl(coverOriginalSrc ?? coverUrl);
                       setCoverEditorSrc(origSrc);
@@ -3029,13 +3030,13 @@ export default function BookDetailPage() {
                       <span className="muted" style={{ cursor: "pointer" }}>
                         {coverToolsOpen ? "Close" : (coverUrl ? "Edit cover" : "Add cover")}
                       </span>
-                      {coverToolsOpen && coverUrl && (
+                      {coverToolsOpen && (
                         <label 
                           className="muted" 
                           style={{ cursor: "pointer", textDecoration: "underline" }}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          Replace
+                          {coverUrl ? "Replace" : "Add cover"}
                           <input
                             key={coverInputKey}
                             type="file"
@@ -3145,7 +3146,11 @@ export default function BookDetailPage() {
                             </div>
                           </div>
                         </div>
-                      ) : null}
+                      ) : coverUrl ? (
+                        <div className="muted" style={{ marginTop: 8 }}>Click Replace or wait for cover to load.</div>
+                      ) : (
+                        <div className="muted" style={{ marginTop: 8 }}>No cover image. Click “Add cover” to upload.</div>
+                      )}
                       {coverEditorSrc ? (
                         <div className="row" style={{ marginTop: 8, gap: 8 }}>
                           <button onClick={uploadCover} disabled={coverState.busy}>

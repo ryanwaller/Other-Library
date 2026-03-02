@@ -35,6 +35,7 @@
   --card-bg: #fff;
   --input-bg: #fff;
   --button-bg: #fff;
+  --placeholder-bg: #e8e8e8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,6 +47,7 @@
     --card-bg: #101014;
     --input-bg: #101014;
     --button-bg: #101014;
+    --placeholder-bg: #1a1a1a;
   }
 }
 
@@ -114,6 +116,13 @@ a:focus-visible {
   border: 0 !important;
   outline: 0 !important;
   box-shadow: none !important;
+}
+
+.om-cover-placeholder {
+  background: var(--placeholder-bg);
+  aspect-ratio: 4 / 5;
+  width: 100%;
+  height: auto;
 }
 
 .om-cover-slot img {

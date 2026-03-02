@@ -30,7 +30,7 @@ export default function CoverImage({
   className?: string;
 }) {
   if (!src) {
-    return <div style={style} className={className} />;
+    return <div style={style} className={`${className || ""} om-cover-placeholder`.trim()} />;
   }
 
   if (!cropData) {
