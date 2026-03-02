@@ -194,7 +194,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
         <div className="row muted" style={{ gap: 8, flexWrap: "wrap" }}>
           <span>{facetLabel}</span>
           <span style={{ color: "var(--fg)" }}>{entity.name}</span>
-          <Link href="/app" style={{ textDecoration: "underline" }}>(clear)</Link>
+          <Link href="/app" className="om-clear-filter-btn">clear</Link>
         </div>
       </div>
 

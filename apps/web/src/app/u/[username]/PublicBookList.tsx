@@ -221,7 +221,8 @@ export default function PublicBookList({
                     ))}
                   </span>
                 ) : null;
-              })()}(<Link href={`/u/${username}`} style={{ textDecoration: "underline" }}>clear</Link>)
+                })()}<Link href={`/u/${username}`} className="om-clear-filter-btn">clear</Link>
+
             </>
           ) : null}
         </div>

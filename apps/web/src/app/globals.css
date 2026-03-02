@@ -734,6 +734,22 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   text-decoration: underline;
 }
 
+.om-clear-filter-btn {
+  color: var(--muted);
+  text-decoration: none;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  margin-left: 8px;
+}
+
+.om-clear-filter-btn:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
 .admin-filter-row {
   align-items: baseline;
 }

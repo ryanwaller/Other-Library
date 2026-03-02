@@ -2243,8 +2243,9 @@ function AppShell({
               {bulkSelectedCount > 0 ? (
                 <button
                   type="button"
+                  className="om-clear-filter-btn"
                   onClick={() => setBulkSelectedKeys({})}
-                  style={{ background: "transparent", border: 0, padding: 0, font: "inherit", color: "inherit", textDecoration: "underline", cursor: "pointer" }}
+                  style={{ margin: 0 }}
                 >
                   clear
                 </button>
@@ -2275,9 +2276,9 @@ function AppShell({
                     ))}
                   </span>
                 ) : null;
-                })()}(<button
-
+                })()}<button
                 type="button"
+                className="om-clear-filter-btn"
                 onClick={() => {
                   setTagMode("all");
                   setCategoryMode("all");
@@ -2289,16 +2290,8 @@ function AppShell({
                   closeCategoryMenu();
                   router.push("/app");
                 }}
-                style={{
-                  background: "transparent",
-                  border: 0,
-                  padding: 0,
-                  font: "inherit",
-                  color: "inherit",
-                  textDecoration: "underline",
-                  cursor: "pointer"
-                }}
-              >clear</button>)
+                >clear</button>
+
             </>
           ) : null}
         </div>
