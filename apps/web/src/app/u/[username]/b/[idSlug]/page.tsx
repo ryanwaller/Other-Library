@@ -7,7 +7,7 @@ import AddToLibraryButton from "../../AddToLibraryButton";
 import AddToLibraryProvider from "../../AddToLibraryProvider";
 import BorrowRequestWidget from "../../BorrowRequestWidget";
 import ScrollToTopOnMount from "../../../../components/ScrollToTopOnMount";
-import ExpandableContent from "../../../../../components/ExpandableContent";
+import { ExpandableSubjects, ExpandableDescription } from "./PublicExpandables";
 import FollowControls from "../../FollowControls";
 import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
 import PublicImageGrid from "./PublicImageGrid";
@@ -402,21 +402,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     Subjects
                   </div>
                   <div style={{ flex: "1 1 auto" }}>
-                    <ExpandableContent
-                      items={subjects}
-                      limit={15}
-                      renderVisible={(visible, isExpanded) => (
-                        <div>
-                          {visible.map((s, idx) => (
-                            <span key={s}>
-                              <Link href={`/u/${profile.username}/s/${encodeURIComponent(s)}`}>{s}</Link>
-                              {idx < visible.length - 1 ? <span>, </span> : null}
-                            </span>
-                          ))}
-                          {!isExpanded && subjects.length > 15 ? " …" : ""}
-                        </div>
-                      )}
-                    />
+                    <ExpandableSubjects subjects={subjects} username={profile.username} />
                   </div>
                 </div>
               ) : null}
@@ -436,15 +422,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     Description
                   </div>
                   <div style={{ marginTop: 6 }}>
-                    <ExpandableContent
-                      items={effectiveDescription.trim().split(/\s+/)}
-                      limit={100}
-                      renderVisible={(visible, isExpanded) => (
-                        <div style={{ whiteSpace: "pre-wrap" }}>
-                          {isExpanded ? effectiveDescription : visible.join(" ") + (effectiveDescription.trim().split(/\s+/).length > 100 ? "…" : "")}
-                        </div>
-                      )}
-                    />
+                    <ExpandableDescription text={effectiveDescription} />
                   </div>
                 </div>
               ) : null}
