@@ -177,22 +177,35 @@ function stripTitleSuffix(input: string, hostname: string): string {
   const candidates = [
     { sep: " | ", preferLeft: true },
     { sep: " — ", preferLeft: true },
+    { sep: " – ", preferLeft: true },
     { sep: " - ", preferLeft: true },
-    { sep: " · ", preferLeft: true }
+    { sep: " · ", preferLeft: true },
+    { sep: " : ", preferLeft: true },
+    { sep: ": ", preferLeft: true }
   ];
 
   for (const { sep } of candidates) {
     if (!t.includes(sep)) continue;
     const parts = t.split(sep).map((p) => p.trim()).filter(Boolean);
     if (parts.length < 2) continue;
+    
+    // Check if the last part looks like a site name or is very short
     const right = parts[parts.length - 1] ?? "";
     const rightLc = right.toLowerCase();
     const hostHit =
-      (hostWords && rightLc.includes(hostWords)) ||
-      (hostLabel && rightLc.includes(hostLabel)) ||
-      rightLc.includes(host);
-    const shortRight = right.length <= 28;
-    if (hostHit || shortRight) return parts[0] ?? t;
+      (hostWords && rightLc === hostWords) ||
+      (hostLabel && rightLc === hostLabel) ||
+      rightLc === host;
+    
+    // Site-specific suffixes often seen in Page Titles
+    const isCommonSuffix = ["shop", "store", "online", "books", "official site"].some(s => rightLc.includes(s));
+    
+    const shortRight = right.length <= 20;
+    
+    if (hostHit || isCommonSuffix || shortRight) {
+      // Return everything except the last part
+      return parts.slice(0, -1).join(sep).trim();
+    }
   }
 
   return t;
@@ -231,10 +244,13 @@ function looksLikeBoilerplateDescription(desc: string): boolean {
 function normalizeDescription(value: string | null, allowBoilerplate: boolean): string | null {
   const raw = (value ?? "").trim();
   if (!raw) return null;
-  const s = raw.replace(/\s+/g, " ").trim();
+  // Replace multiple horizontal spaces but keep newlines
+  let s = raw.replace(/[ \t]+/g, " ");
+  // Trim each line and collapse multiple newlines
+  s = s.split(/\r?\n/).map(line => line.trim()).filter(Boolean).join("\n\n");
   if (!s) return null;
   if (!allowBoilerplate && looksLikeBoilerplateDescription(s)) return null;
-  if (s.length > 2000) return s.slice(0, 2000);
+  if (s.length > 10000) return s.slice(0, 10000);
   return s;
 }
 
@@ -514,23 +530,42 @@ function scrapePrintedMatter(html: string): Partial<ImportMetadata> {
     : null;
   const cover_url = normalizeHttpsUrl(cloudfrontMatch?.[1] ?? anyImgMatch?.[1] ?? null);
 
-  // Description: text block after the last <hr> near the bottom of the page
-  const hrIdx = html.lastIndexOf("<hr");
+  // Description: search for common content containers
   let description: string | null = null;
-  if (hrIdx !== -1) {
-    const afterHr = html.slice(hrIdx);
-    // Try <p> first, then <div>
-    const paraRe = /<(?:p|div)[^>]*>([\s\S]{20,2000}?)<\/(?:p|div)>/i.exec(afterHr);
-    if (paraRe) {
-      const cleaned = decodeEntities(paraRe[1]!.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
-      if (cleaned.length > 20) description = cleaned.slice(0, 2000);
+  const descCandidates = [
+    /<div\b[^>]+class="[^"]*product-description[^"]*"[^>]*>([\s\S]+?)<\/div>/i,
+    /<div\b[^>]+class="[^"]*product-details[^"]*"[^>]*>([\s\S]+?)<\/div>/i,
+    /<div\b[^>]+id="[^"]*description[^"]*"[^>]*>([\s\S]+?)<\/div>/i,
+    /<article\b[^>]*>([\s\S]+?)<\/article>/i
+  ];
+
+  for (const re of descCandidates) {
+    const match = re.exec(html);
+    if (match) {
+      const cleaned = decodeEntities(match[1]!.replace(/<[^>]+>/g, " ").replace(/[ \t]+/g, " ").trim());
+      if (cleaned.length > 50) {
+        description = normalizeDescription(cleaned, true);
+        break;
+      }
     }
   }
 
-  // Extract credited roles from description text
-  const editors = extractRolesFromText(description, /[Ee]dited\s+by\s+([^.;\n]+)/);
-  const designers = extractRolesFromText(description, /[Dd]esigned?\s+by\s+([^.;\n]+)/);
-  const printers = extractRolesFromText(description, /[Pp]rinted\s+by\s+([^.;\n]+)/);
+  // Fallback: text block after the last <hr> near the bottom of the page
+  if (!description) {
+    const hrIdx = html.lastIndexOf("<hr");
+    if (hrIdx !== -1) {
+      const afterHr = html.slice(hrIdx);
+      const paraRe = /<(?:p|div)[^>]*>([\s\S]{20,10000}?)<\/(?:p|div)>/i.exec(afterHr);
+      if (paraRe) {
+        description = normalizeDescription(decodeEntities(paraRe[1]!.replace(/<[^>]+>/g, " ")), true);
+      }
+    }
+  }
+
+  // Extract credited roles from description text - use more robust matching
+  const editors = extractRolesFromText(description, /[Ee]dited\s+by\s+([^.;\n\r]+)/);
+  const designers = extractRolesFromText(description, /[Dd]esigned?\s+by\s+([^.;\n\r]+)/);
+  const printers = extractRolesFromText(description, /[Pp]rinted\s+by\s+([^.;\n\r]+)/);
 
   return {
     title,
