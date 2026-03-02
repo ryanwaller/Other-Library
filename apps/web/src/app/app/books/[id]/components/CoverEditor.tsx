@@ -77,10 +77,8 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
       const effectiveNw = isRotated ? nh : nw;
       const effectiveNh = isRotated ? nw : nh;
 
-      // baseScale is the scale needed to cover the container slot (cw, ch)
-      const scaleW = cw / effectiveNw;
-      const scaleH = ch / effectiveNh;
-      const baseScale = Math.max(scaleW, scaleH);
+      // baseScale: zoom=1 means image at natural width (matches CoverImage contain/natural display)
+      const baseScale = cw / effectiveNw;
 
       setDims({ cw, ch, bw, bh, iw: nw, ih: nh, baseScale });
       if (onLoad) onLoad({ minZoom: 1 }); // Relative zoom min is now 1.0

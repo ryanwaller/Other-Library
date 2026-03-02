@@ -54,7 +54,17 @@ export default function CoverImage({
       return;
     }
     
-    if (objectFit === "cover" && cropData?.mode === "transform") {
+    if (cropData?.mode === "transform" && objectFit === "contain") {
+      // Contain mode with saved transform: apply width-fit scale + pan/rotate
+      // This matches CoverEditor's rendering (baseScale = cw/nw, so zoom=1 = natural width)
+      img.style.width = "100%";
+      img.style.height = "auto";
+      img.style.transformOrigin = "center";
+      const tx = (cropData.x || 0) * img.naturalWidth;
+      const ty = (cropData.y || 0) * img.naturalHeight;
+      img.style.transform = `translate(${tx}px, ${ty}px) rotate(${cropData.rotation || 0}deg) scale(${cropData.zoom || 1})`;
+      img.style.filter = `brightness(${cropData.brightness ?? 1}) contrast(${cropData.contrast ?? 1})`;
+    } else if (objectFit === "cover" && cropData?.mode === "transform") {
       const container = img.parentElement?.parentElement;
       if (container) {
         const cw = container.clientWidth;
