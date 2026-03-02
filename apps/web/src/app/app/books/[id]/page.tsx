@@ -3042,8 +3042,9 @@ export default function BookDetailPage() {
                 style={{
                   position: "relative",
                   width: "100%",
-                  height: isNarrow ? 360 : 280,
+                  height: isNarrow ? 360 : 280, // Non-negotiable fixed height
                   padding: 0,
+                  overflow: "hidden",
                   display: coverEditorSrc ? "block" : "flex",
                   filter: coverEditorSrc
                     ? `brightness(${editorState.brightness}) contrast(${editorState.contrast})`
