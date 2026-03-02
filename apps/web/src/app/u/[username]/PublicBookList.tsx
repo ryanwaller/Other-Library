@@ -83,7 +83,7 @@ export default function PublicBookList({
               </div>
             </div>
             <Link href={href} style={{ display: "block", marginTop: 6 }} className="om-book-card-link">
-              <div className="om-cover-slot" style={{ width: "100%", aspectRatio: "2 / 3" }}>
+              <div className="om-cover-slot" style={{ width: "100%", height: 220 }}>
                 <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "100%", display: "block" }} />
               </div>
             </Link>

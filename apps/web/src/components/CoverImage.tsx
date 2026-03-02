@@ -34,7 +34,11 @@ export default function CoverImage({
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
 
   if (!src || status === "error") {
-    return <div style={style} className={`${className || ""} om-cover-placeholder`.trim()} />;
+    return (
+      <div style={{ ...style, display: "flex", alignItems: "center", justifyContent: "center" }} className={className}>
+        <div className="om-cover-placeholder" style={{ width: "100%", height: "auto" }} />
+      </div>
+    );
   }
 
   const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
