@@ -3154,8 +3154,8 @@ export default function BookDetailPage() {
                     onRotationChange={setCoverRotation}
                     onCropComplete={(area, _pixels) => setCoverCroppedArea(area)}
                     showGrid={false}
-                    minZoom={0.1}
-                    objectFit="contain"
+                    minZoom={1}
+                    objectFit="cover"
                     classes={{
                       containerClassName: "om-cropper-container",
                       mediaClassName: "om-cropper-image"
@@ -3290,7 +3290,7 @@ export default function BookDetailPage() {
                                 Zoom
                               </div>
                               <CustomSlider
-                                min={0.1}
+                                min={1}
                                 max={3}
                                 step={0.01}
                                 value={coverZoom}
@@ -3316,8 +3316,8 @@ export default function BookDetailPage() {
                                 Bright
                               </div>
                               <CustomSlider
-                                min={0.7}
-                                max={1.3}
+                                min={0.5}
+                                max={1.5}
                                 step={0.01}
                                 value={coverBrightness}
                                 onChange={setCoverBrightness}
@@ -3329,8 +3329,8 @@ export default function BookDetailPage() {
                                 Contrast
                               </div>
                               <CustomSlider
-                                min={0.7}
-                                max={1.3}
+                                min={0.5}
+                                max={1.5}
                                 step={0.01}
                                 value={coverContrast}
                                 onChange={setCoverContrast}
