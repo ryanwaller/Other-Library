@@ -4077,64 +4077,52 @@ export default function BookDetailPage() {
       )}
 
       {lightboxIndex !== null && imageMedia[lightboxIndex] && (
-        <div 
-          style={{ 
-            position: "fixed", top: 0, left: 0, width: "100%", height: "100%", 
-            background: "rgba(0,0,0,0.85)", zIndex: 2000, 
+        <div
+          style={{
+            position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+            background: "rgba(0,0,0,0.85)", zIndex: 2000,
             display: "flex", alignItems: "center", justifyContent: "center"
           }}
           onClick={() => setLightboxIndex(null)}
         >
-          <div 
-            style={{ 
-              position: "absolute", top: 24, right: 24, 
-              color: "#fff", cursor: "pointer", 
-              fontSize: 14, textDecoration: "underline" 
-            }}
-            onClick={(e) => { e.stopPropagation(); setLightboxIndex(null); }}
-          >
-            Close
-          </div>
-
-          {imageMedia.length > 1 && (
-            <>
-              <div 
-                style={{ 
-                  position: "absolute", left: 0, top: 0, bottom: 0, width: "25%", 
-                  cursor: "pointer", display: "flex", alignItems: "center", paddingLeft: 24 
-                }}
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  setLightboxIndex(prev => (prev !== null && prev > 0 ? prev - 1 : imageMedia.length - 1));
-                }}
-              />
-              <div 
-                style={{ 
-                  position: "absolute", right: 0, top: 0, bottom: 0, width: "25%", 
-                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 24 
-                }}
-                onClick={(e) => { 
-                  e.stopPropagation(); 
-                  setLightboxIndex(prev => (prev !== null && prev < imageMedia.length - 1 ? prev + 1 : 0));
-                }}
-              />
-            </>
-          )}
-
-          <div 
-            style={{ 
-              position: "relative", width: "calc(100% - 64px)", height: "calc(100% - 64px)", 
-              display: "flex", alignItems: "center", justifyContent: "center" 
+          <div
+            style={{
+              position: "absolute", top: 24, right: 24, zIndex: 2001,
+              display: "flex", gap: 16, alignItems: "baseline"
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img 
-              src={mediaUrlsByPath[imageMedia[lightboxIndex]!.storage_path]} 
-              alt="" 
-              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} 
-            />
+            {(lightboxIndex ?? 0) > 0 && (
+              <button
+                style={{ color: "#fff" }}
+                onClick={() => setLightboxIndex(prev => prev !== null ? prev - 1 : 0)}
+              >
+                Prev
+              </button>
+            )}
+            {(lightboxIndex ?? 0) < imageMedia.length - 1 && (
+              <button
+                style={{ color: "#fff" }}
+                onClick={() => setLightboxIndex(prev => prev !== null ? prev + 1 : 0)}
+              >
+                Next
+              </button>
+            )}
+            <button
+              style={{ color: "#fff" }}
+              onClick={() => setLightboxIndex(null)}
+            >
+              Close
+            </button>
           </div>
+
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={mediaUrlsByPath[imageMedia[lightboxIndex]!.storage_path]}
+            alt=""
+            style={{ maxWidth: "calc(100% - 64px)", maxHeight: "calc(100% - 64px)", objectFit: "contain" }}
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
 
