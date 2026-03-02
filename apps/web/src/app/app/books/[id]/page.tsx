@@ -373,6 +373,7 @@ export default function BookDetailPage() {
   });
   const [coverInputKey, setCoverInputKey] = useState(0);
   const [deleteCoverConfirm, setDeleteCoverConfirm] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1759,6 +1760,29 @@ export default function BookDetailPage() {
     }
   }
 
+  function cancelCoverEdit() {
+    setPendingCover(null);
+    setCoverEditorSrc(null);
+    setCoverInputKey((k) => k + 1);
+    setCoverToolsOpen(false);
+    setResetConfirm(false);
+    setDeleteCoverConfirm(false);
+  }
+
+  function resetCoverEdit() {
+    setEditorState({
+      zoom: 0,
+      x: 0,
+      y: 0,
+      rotation: 0,
+      brightness: 1,
+      contrast: 1
+    });
+    const origSrc = toFullSizeImageUrl((coverOriginalSrc ?? coverUrl) || "");
+    setCoverEditorSrc(origSrc);
+    setResetConfirm(false);
+  }
+
   async function uploadCover() {
     if (!supabase || !book || !userId) return;
     if (book.owner_id !== userId) return;
@@ -3091,16 +3115,11 @@ export default function BookDetailPage() {
                   open={coverToolsOpen}
                   onToggle={(e) => {
                     const open = (e.currentTarget as HTMLDetailsElement).open;
-                    
-                    // If it was open and we're closing it, auto-save if we have something to save
-                    if (!open && coverToolsOpen && coverEditorSrc && !coverState.busy) {
-                      void uploadCover();
-                    }
-
                     setCoverToolsOpen(open);
+                    
                     // Initialize editor if opening and we have a cover
                     if (open && coverUrl && !coverEditorSrc && !pendingCover) {
-                      const origSrc = toFullSizeImageUrl(coverOriginalSrc ?? coverUrl);
+                      const origSrc = toFullSizeImageUrl((coverOriginalSrc ?? coverUrl) || "");
                       setCoverEditorSrc(origSrc);
                       const crop = book?.cover_crop;
                       const isTransform = crop?.mode === "transform";
@@ -3119,37 +3138,27 @@ export default function BookDetailPage() {
                 >
                   <summary className="om-disclosure-summary" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none", display: "flex", width: "100%" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-                      <span className="muted" style={{ cursor: "pointer" }}>
-                        {coverToolsOpen ? "Close" : (coverUrl ? "Edit cover" : "Add cover")}
-                      </span>
+                      {coverToolsOpen ? (
+                        <button 
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); void uploadCover(); }} 
+                          disabled={coverState.busy}
+                        >
+                          {coverState.busy ? "Saving…" : "Save"}
+                        </button>
+                      ) : (
+                        <span className="muted" style={{ cursor: "pointer" }}>
+                          {coverUrl ? "Edit cover" : "Add cover"}
+                        </span>
+                      )}
+                      
                       {coverToolsOpen && (
-                        <div className="row" style={{ gap: 12 }}>
-                          {coverUrl && (
-                            <button 
-                              className="muted" 
-                              style={{ padding: 0, border: "none", background: "none", textDecoration: "underline", cursor: "pointer" }}
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); void deleteCover(); }}
-                            >
-                              Delete
-                            </button>
-                          )}
-                          <label 
-                            className="muted" 
-                            style={{ cursor: "pointer", textDecoration: "underline" }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {coverUrl ? "Replace" : "Add cover"}
-                            <input
-                              key={coverInputKey}
-                              type="file"
-                              accept="image/*"
-                              onChange={(ev) => {
-                                setPendingCover((ev.target.files ?? [])[0] ?? null);
-                              }}
-                              style={{ display: "none" }}
-                            />
-                          </label>
-                        </div>
+                        <button 
+                          className="muted" 
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); cancelCoverEdit(); }}
+                          disabled={coverState.busy}
+                        >
+                          Cancel
+                        </button>
                       )}
                     </div>
                   </summary>
@@ -3243,24 +3252,61 @@ export default function BookDetailPage() {
                       ) : (
                         <div className="muted" style={{ marginTop: 8 }}>No cover image. Click “Add cover” to upload.</div>
                       )}
-                      {coverEditorSrc ? (
-                        <div className="row" style={{ marginTop: 8, gap: 8 }}>
-                          <button onClick={uploadCover} disabled={coverState.busy}>
-                            {coverState.busy ? "Saving…" : "Save"}
-                          </button>
-                          <button
-                            onClick={() => {
-                              setPendingCover(null);
-                              setCoverEditorSrc(null);
-                              setCoverInputKey((k) => k + 1);
-                              setCoverToolsOpen(false);
-                            }}
-                            disabled={coverState.busy}
+                      {coverToolsOpen && (
+                        <div className="row" style={{ marginTop: 12, gap: 16 }}>
+                          <label 
+                            className="muted" 
+                            style={{ cursor: "pointer", textDecoration: "underline" }}
                           >
-                            Cancel
-                          </button>
+                            Replace
+                            <input
+                              key={coverInputKey}
+                              type="file"
+                              accept="image/*"
+                              onChange={(ev) => {
+                                setPendingCover((ev.target.files ?? [])[0] ?? null);
+                              }}
+                              style={{ display: "none" }}
+                            />
+                          </label>
+
+                          {coverUrl && (
+                            resetConfirm ? (
+                              <div className="row" style={{ gap: 8 }}>
+                                <span className="muted">Reset?</span>
+                                <button onClick={resetCoverEdit}>Yes</button>
+                                <button className="muted" onClick={() => setResetConfirm(false)}>No</button>
+                              </div>
+                            ) : (
+                              <button 
+                                className="muted" 
+                                style={{ textDecoration: "underline" }}
+                                onClick={() => setResetConfirm(true)}
+                              >
+                                Reset
+                              </button>
+                            )
+                          )}
+
+                          {coverUrl && (
+                            deleteCoverConfirm ? (
+                              <div className="row" style={{ gap: 8 }}>
+                                <span className="muted">Delete?</span>
+                                <button onClick={() => void deleteCover()} disabled={coverState.busy}>Yes</button>
+                                <button className="muted" onClick={() => setDeleteCoverConfirm(false)} disabled={coverState.busy}>No</button>
+                              </div>
+                            ) : (
+                              <button 
+                                className="muted" 
+                                style={{ textDecoration: "underline" }}
+                                onClick={() => setDeleteCoverConfirm(true)}
+                              >
+                                Delete
+                              </button>
+                            )
+                          )}
                         </div>
-                      ) : null}
+                      )}
                       {coverState.message ? (
                         <div className="muted" style={{ marginTop: 6 }}>
                           {coverState.error ? `${coverState.message} (${coverState.error})` : coverState.message}
