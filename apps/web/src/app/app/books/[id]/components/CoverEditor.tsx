@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useEffect, useLayoutEffect, useState, useCallback, useMemo } from "react";
+import { useRef, useEffect, useLayoutEffect, useState, useCallback } from "react";
 
 export type EditorState = {
-  x: number;
-  y: number;
-  zoom: number;
+  // Store these as relative values (0-1 range for center offset and scale relative to fit)
+  x: number; // -0.5 to 0.5 (percent of image width)
+  y: number; // -0.5 to 0.5 (percent of image height)
+  zoom: number; // 1.0 to 4.0 (multiplier of the 'fit' scale)
   rotation: number;
   brightness: number;
   contrast: number;
@@ -27,9 +28,6 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
 
   const { x, y, zoom, rotation, brightness, contrast } = state;
 
-  // Outer container is fixed to 2:3 (6:9 consensus)
-  const viewportRatio = 2 / 3;
-
   // Track the current callback to avoid dependency cycles
   const onChangeRef = useRef(onChange);
   useEffect(() => {
@@ -46,12 +44,12 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
     cw: 0, ch: 0, // Container (viewport) dims
     bw: 0, bh: 0, // Box (crop area) dims
     iw: 0, ih: 0, // Image natural dims
-    minZoom: 0 
+    baseScale: 0 
   });
 
-  // Calculate crop box and minZoom
+  // Calculate crop box and baseScale
   useLayoutEffect(() => {
-    if (!containerRef.current || !imgRef.current) return;
+    if (!imgRef.current) return;
     
     const updateDims = () => {
       if (!containerRef.current || !imgRef.current) return;
@@ -62,15 +60,14 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
       const nh = imgRef.current.naturalHeight;
       if (!nw || !nh) return;
 
-      // Calculate the crop box that fits inside the cw/ch viewport
-      // while matching the target aspectRatio
+      // Outer viewport is 2:3 fixed in BookDetailPage (usually).
+      // We calculate the inner crop box (bw, bh) based on target aspectRatio.
+      const viewportRatio = cw / ch;
       let bw, bh;
       if (aspectRatio > viewportRatio) {
-        // Box is wider than viewport ratio (constrained by width)
         bw = cw;
         bh = bw / aspectRatio;
       } else {
-        // Box is taller than viewport ratio (constrained by height)
         bh = ch;
         bw = bh * aspectRatio;
       }
@@ -79,53 +76,49 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
       const effectiveNw = isRotated ? nh : nw;
       const effectiveNh = isRotated ? nw : nh;
 
-      // minZoom must cover the crop box (bw, bh)
+      // baseScale is the scale needed to cover the crop box (bw, bh)
       const scaleW = bw / effectiveNw;
       const scaleH = bh / effectiveNh;
-      const minZoom = Math.max(scaleW, scaleH);
+      const baseScale = Math.max(scaleW, scaleH);
 
-      setDims({ cw, ch, bw, bh, iw: nw, ih: nh, minZoom });
-      if (onLoad) onLoad({ minZoom });
-
-      // Force update if uninitialized or below floor
-      if (zoom <= 0.01 || zoom < minZoom) {
-        onChangeRef.current({ zoom: minZoom, x: 0, y: 0 });
-      }
+      setDims({ cw, ch, bw, bh, iw: nw, ih: nh, baseScale });
+      if (onLoad) onLoad({ minZoom: 1 }); // Zoom is now relative to baseScale (1 = fit)
     };
 
     updateDims();
     const obs = new ResizeObserver(updateDims);
-    obs.observe(containerRef.current);
+    obs.observe(containerRef.current!);
     
     const img = imgRef.current;
     if (img.complete) updateDims();
     else img.onload = updateDims;
 
     return () => obs.disconnect();
-  }, [src, aspectRatio, rotation, onLoad, viewportRatio]);
+  }, [src, aspectRatio, rotation, onLoad]);
 
-  // Clamping helper (anchored to crop box center)
+  // Clamping helper (relative coordinates)
   const getClampedPos = useCallback((nx: number, ny: number, nz: number, d: typeof dims) => {
-    if (!d.minZoom) return { x: nx, y: ny, zoom: nz };
+    if (!d.baseScale) return { x: nx, y: ny, zoom: nz };
 
+    const currentScale = d.baseScale * nz;
     const isRotated = (rotation / 90) % 2 !== 0;
-    const rw = (isRotated ? d.ih : d.iw) * nz;
-    const rh = (isRotated ? d.iw : d.ih) * nz;
+    const rw = (isRotated ? d.ih : d.iw) * currentScale;
+    const rh = (isRotated ? d.iw : d.ih) * currentScale;
 
-    // Max movement relative to crop box center
+    // Max translation in pixels
     const maxX = Math.max(0, (rw - d.bw) / 2);
     const maxY = Math.max(0, (rh - d.bh) / 2);
 
     return {
       x: Math.min(maxX, Math.max(-maxX, nx)),
       y: Math.min(maxY, Math.max(-maxY, ny)),
-      zoom: nz
+      zoom: Math.max(1, Math.min(4, nz))
     };
   }, [rotation]);
 
   // Effect-based clamping (handles slider changes)
   useEffect(() => {
-    if (!dims.minZoom || isDragging) return;
+    if (!dims.baseScale || isDragging) return;
 
     const clamped = getClampedPos(x, y, zoom, dims);
     if (clamped.x !== x || clamped.y !== y || clamped.zoom !== zoom) {
@@ -182,6 +175,8 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
     window.addEventListener("touchend", up);
   };
 
+  const currentScale = dims.baseScale * zoom;
+
   return (
     <div className={className} style={{ ...style, position: "relative", overflow: "hidden" }}>
       <div 
@@ -205,31 +200,25 @@ export default function CoverEditor({ src, state, aspectRatio, onChange, onLoad,
             src={src}
             alt="Cover edit"
             style={{
-              transform: `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${zoom})`,
+              transform: `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${currentScale})`,
               transformOrigin: "center",
               filter: `brightness(${brightness}) contrast(${contrast})`,
               willChange: "transform",
               pointerEvents: "none",
               maxWidth: "none",
               maxHeight: "none",
-              display: dims.minZoom ? "block" : "none"
+              display: dims.baseScale ? "block" : "none"
             }}
           />
         </div>
 
         {/* Dimmed overlays for areas outside the crop box */}
-        {dims.minZoom > 0 && (
+        {dims.baseScale > 0 && (
           <div style={{ pointerEvents: "none", position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}>
-            {/* Top */}
-            <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: (dims.ch - dims.bh) / 2, background: "rgba(0,0,0,0.5)" }} />
-            {/* Bottom */}
-            <div style={{ position: "absolute", bottom: 0, left: 0, width: "100%", height: (dims.ch - dims.bh) / 2, background: "rgba(0,0,0,0.5)" }} />
-            {/* Left */}
-            <div style={{ position: "absolute", top: (dims.ch - dims.bh) / 2, left: 0, width: (dims.cw - dims.bw) / 2, height: dims.bh, background: "rgba(0,0,0,0.5)" }} />
-            {/* Right */}
-            <div style={{ position: "absolute", top: (dims.ch - dims.bh) / 2, right: 0, width: (dims.cw - dims.bw) / 2, height: dims.bh, background: "rgba(0,0,0,0.5)" }} />
-            
-            {/* Crop Box Border (optional but helpful) */}
+            <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: Math.max(0, (dims.ch - dims.bh) / 2), background: "rgba(0,0,0,0.5)" }} />
+            <div style={{ position: "absolute", bottom: 0, left: 0, width: "100%", height: Math.max(0, (dims.ch - dims.bh) / 2), background: "rgba(0,0,0,0.5)" }} />
+            <div style={{ position: "absolute", top: (dims.ch - dims.bh) / 2, left: 0, width: Math.max(0, (dims.cw - dims.bw) / 2), height: dims.bh, background: "rgba(0,0,0,0.5)" }} />
+            <div style={{ position: "absolute", top: (dims.ch - dims.bh) / 2, right: 0, width: Math.max(0, (dims.cw - dims.bw) / 2), height: dims.bh, background: "rgba(0,0,0,0.5)" }} />
             <div style={{ 
               position: "absolute", 
               top: (dims.ch - dims.bh) / 2, 

@@ -3192,9 +3192,9 @@ export default function BookDetailPage() {
                             <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
                               <div className="muted" style={{ minWidth: 110 }}>Zoom</div>
                               <CustomSlider
-                                min={minZoomFloor}
-                                max={minZoomFloor * 4}
-                                step={minZoomFloor / 100}
+                                min={1}
+                                max={4}
+                                step={0.01}
                                 value={editorState.zoom}
                                 onChange={(zoom) => setEditorState(s => ({ ...s, zoom }))}
                                 style={{ flex: "1 1 auto" }}
