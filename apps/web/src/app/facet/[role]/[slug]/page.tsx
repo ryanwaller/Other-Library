@@ -191,7 +191,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
           <span className="muted">Books</span>
           <span>{booksCount}</span>
         </div>
-        <div className="row muted" style={{ gap: 8, flexWrap: "wrap" }}>
+        <div className="row muted" style={{ gap: 12, flexWrap: "wrap" }}>
           <span>{facetLabel}</span>
           <span style={{ color: "var(--fg)" }}>{entity.name}</span>
           <Link href="/app" className="om-clear-filter-btn">clear</Link>

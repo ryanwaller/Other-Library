@@ -2269,7 +2269,7 @@ function AppShell({
                 return pairs.length ? (
                   <span style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
                     {pairs.map((p) => (
-                      <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 6, alignItems: "baseline" }}>
+                      <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 12, alignItems: "baseline" }}>
                         <span className="muted">{p.label}</span>
                         <span style={{ color: "var(--fg)" }}>{p.value}</span>
                       </span>
