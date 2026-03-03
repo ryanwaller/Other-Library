@@ -44,6 +44,10 @@ function extractTitleLines(text: string): string[] {
     .slice(0, 3);
 }
 
+// Colors forced for the dark camera background (always black regardless of system theme)
+const FG = "#e8e8ea";   // matches --fg dark
+const MUTED = "#a8a8ad"; // matches --muted dark
+
 export default function BookScannerModal({ open, onClose, onResult }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -274,40 +278,6 @@ export default function BookScannerModal({ open, onClose, onResult }: Props) {
         flexDirection: "column",
       }}
     >
-      {/* Header bar */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 2,
-          padding: "12px 16px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.75), transparent)",
-        }}
-      >
-        <span style={{ color: "#fff", fontSize: "0.9em" }}>
-          {camError ?? status}
-        </span>
-        <button
-          onClick={onClose}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#fff",
-            fontSize: "1.3em",
-            cursor: "pointer",
-            padding: "4px 8px",
-            lineHeight: 1,
-          }}
-        >
-          ✕
-        </button>
-      </div>
-
       {/* Camera feed */}
       <video
         ref={videoRef}
@@ -319,42 +289,50 @@ export default function BookScannerModal({ open, onClose, onResult }: Props) {
       {/* Hidden canvas for OCR / ZXing frame capture */}
       <canvas ref={canvasRef} style={{ display: "none" }} />
 
-      {/* Scan guide */}
+      {/* Header bar — gradient fade, status + close */}
       <div
         style={{
           position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -55%)",
-          width: "72%",
-          height: 100,
-          border: "2px solid rgba(255,255,255,0.55)",
-          borderRadius: 6,
-          pointerEvents: "none",
-          zIndex: 1,
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 2,
+          padding: "16px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          background: "linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)",
         }}
-      />
+      >
+        <span style={{ color: camError ? MUTED : FG }}>
+          {camError ?? status}
+        </span>
+        <button onClick={onClose} style={{ color: FG }}>
+          Cancel
+        </button>
+      </div>
 
       {/* Title suggestion prompt (Layer 3) */}
       {titleSuggestion && !firedRef.current && (
         <div
           style={{
             position: "absolute",
-            top: 60,
-            left: 16,
-            right: 16,
+            top: 0,
+            left: 0,
+            right: 0,
             zIndex: 3,
-            background: "rgba(0,0,0,0.88)",
-            borderRadius: 8,
-            padding: "14px 16px",
+            padding: "52px 16px 16px",
+            background: "linear-gradient(to bottom, rgba(0,0,0,0.75), transparent)",
           }}
         >
-          <div style={{ color: "#fff", marginBottom: 10, fontSize: "0.9em" }}>
+          <div style={{ color: FG }}>
             Found: <em>&ldquo;{titleSuggestion}&rdquo;</em> — search this?
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => handleResult(titleSuggestion)}>Yes</button>
-            <button className="muted" onClick={() => setTitleSuggestion(null)}>
+          <div style={{ marginTop: 6, display: "flex", gap: 12 }}>
+            <button onClick={() => handleResult(titleSuggestion)} style={{ color: FG }}>
+              Yes
+            </button>
+            <button onClick={() => setTitleSuggestion(null)} style={{ color: MUTED }}>
               Try again
             </button>
           </div>
@@ -366,22 +344,21 @@ export default function BookScannerModal({ open, onClose, onResult }: Props) {
         <div
           style={{
             position: "absolute",
-            bottom: 48,
-            left: 16,
-            right: 16,
+            bottom: 0,
+            left: 0,
+            right: 0,
             zIndex: 3,
-            background: "rgba(0,0,0,0.75)",
-            borderRadius: 8,
-            padding: "12px 16px",
+            padding: "16px 16px 32px",
+            background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
             textAlign: "center",
           }}
         >
-          <div style={{ color: "#ccc", marginBottom: 10, fontSize: "0.9em" }}>
-            Try better light or move closer
+          <div style={{ color: MUTED }}>Try better light or move closer</div>
+          <div style={{ marginTop: 6 }}>
+            <button onClick={onClose} style={{ color: MUTED }}>
+              Type instead
+            </button>
           </div>
-          <button className="muted" onClick={onClose} style={{ color: "#aaa" }}>
-            Type instead
-          </button>
         </div>
       )}
     </div>

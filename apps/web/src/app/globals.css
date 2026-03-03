@@ -653,24 +653,6 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   outline: none;
 }
 
-.om-input-underline-wrapper {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 9px;
-}
-
-.om-input-underline-wrapper:focus-within {
-  border-bottom-color: var(--fg) !important;
-}
-
-.om-input-underline-wrapper input {
-  border-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
 .muted {
   color: var(--muted);
 }

@@ -2870,7 +2870,7 @@ export default function BookDetailPage() {
                           <span className="muted">or</span>
                         </div>
                       )}
-                      <div className="om-input-underline-wrapper">
+                      <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                         <input
                           className="om-inline-control"
                           placeholder={showScan ? "enter ISBN, URL, or title" : "Scan or enter ISBN, URL, or title"}
@@ -2881,16 +2881,16 @@ export default function BookDetailPage() {
                           onKeyDown={(e) => onEnter(e, smartLookup)}
                           style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
                         />
-                        {(lookupInput.trim() || lookupInputFocused) ? (
-                          <button
-                            onClick={() => smartLookup()}
-                            disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
-                            style={{ whiteSpace: "nowrap", marginLeft: 12 }}
-                          >
-                            Find
-                          </button>
-                        ) : null}
                       </div>
+                      {(lookupInput.trim() || lookupInputFocused) ? (
+                        <button
+                          onClick={() => smartLookup()}
+                          disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
+                          style={{ whiteSpace: "nowrap", marginLeft: 12 }}
+                        >
+                          Find
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                   <div className="muted" style={{ marginTop: 6 }}>
