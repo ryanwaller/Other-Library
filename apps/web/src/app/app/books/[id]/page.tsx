@@ -10,6 +10,7 @@ import { bookIdSlug } from "../../../../lib/slug";
 import ScrollToTopOnMount from "../../../components/ScrollToTopOnMount";
 import ExpandableContent from "../../../../components/ExpandableContent";
 import FollowControls from "../../../u/[username]/FollowControls";
+import EntityTokenField from "../../components/EntityTokenField";
 import CoverImage, { type CoverCrop } from "../../../../components/CoverImage";
 import CoverEditor, { type EditorState } from "./components/CoverEditor";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
@@ -179,16 +180,16 @@ export default function BookDetailPage() {
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [formTitle, setFormTitle] = useState("");
-  const [formAuthors, setFormAuthors] = useState("");
-  const [formEditors, setFormEditors] = useState("");
-  const [formDesigners, setFormDesigners] = useState("");
+  const [formAuthors, setFormAuthors] = useState<string[]>([]);
+  const [formEditors, setFormEditors] = useState<string[]>([]);
+  const [formDesigners, setFormDesigners] = useState<string[]>([]);
   const [formPrinter, setFormPrinter] = useState("");
   const [formMaterials, setFormMaterials] = useState("");
   const [formEdition, setFormEdition] = useState("");
   const [formPublishDate, setFormPublishDate] = useState("");
   const [formPublisher, setFormPublisher] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formSubjects, setFormSubjects] = useState("");
+  const [formSubjects, setFormSubjects] = useState<string[]>([]);
   const [formGroup, setFormGroup] = useState("");
   const [formObjectType, setFormObjectType] = useState("");
   const [formDecade, setFormDecade] = useState("");
@@ -311,16 +312,16 @@ export default function BookDetailPage() {
   useEffect(() => {
     if (!book) return;
     setFormTitle(book.title_override ?? "");
-    setFormAuthors((book.authors_override ?? []).join(", "));
-    setFormEditors((book.editors_override ?? []).join(", "));
-    setFormDesigners((book.designers_override ?? []).join(", "));
+    setFormAuthors(book.authors_override ?? []);
+    setFormEditors(book.editors_override ?? []);
+    setFormDesigners(book.designers_override ?? []);
     setFormPrinter(book.printer_override ?? "");
     setFormMaterials(book.materials_override ?? "");
     setFormEdition(book.edition_override ?? "");
     setFormPublishDate(book.publish_date_override ?? "");
     setFormPublisher(book.publisher_override ?? "");
     setFormDescription(book.description_override ?? "");
-    setFormSubjects((book.subjects_override ?? []).join(", "));
+    setFormSubjects(book.subjects_override ?? []);
     setFormGroup(book.group_label ?? "");
     setFormObjectType(book.object_type ?? "");
     setFormDecade(book.decade ?? "");
@@ -569,16 +570,16 @@ export default function BookDetailPage() {
     try {
       const updates: any = {
         title_override: formTitle.trim() || null,
-        authors_override: parseAuthorsInput(formAuthors),
-        editors_override: parseAuthorsInput(formEditors),
-        designers_override: parseAuthorsInput(formDesigners),
+        authors_override: formAuthors,
+        editors_override: formEditors,
+        designers_override: formDesigners,
         printer_override: formPrinter.trim() || null,
         materials_override: formMaterials.trim() || null,
         edition_override: formEdition.trim() || null,
         publish_date_override: formPublishDate.trim() || null,
         publisher_override: formPublisher.trim() || null,
         description_override: formDescription.trim() || null,
-        subjects_override: parseAuthorsInput(formSubjects),
+        subjects_override: formSubjects,
         group_label: formGroup.trim() || null,
         object_type: formObjectType.trim() || null,
         decade: formDecade.trim() || null,
@@ -1179,25 +1180,42 @@ export default function BookDetailPage() {
 
               <div>
                 {editMode ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <input
-                      type="text"
-                      value={formTitle}
-                      onChange={(e) => setFormTitle(e.target.value)}
-                      placeholder="Title"
-                      style={{ width: "100%", fontWeight: 600, fontSize: "1.1em" }}
-                    />
-                    <input
-                      type="text"
-                      value={formAuthors}
-                      onChange={(e) => setFormAuthors(e.target.value)}
-                      placeholder="Authors (comma separated)"
-                      style={{ width: "100%" }}
-                    />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div className="row om-row-baseline">
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Title
+                      </div>
+                      <div style={{ flex: "1 1 auto" }}>
+                        <input
+                          className="om-inline-control"
+                          value={formTitle}
+                          onChange={(e) => setFormTitle(e.target.value)}
+                          onKeyDown={(e) => onEnter(e, () => void saveEdits())}
+                          placeholder="Add title"
+                          style={{ fontWeight: 600, fontSize: "1.1em" }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Authors
+                      </div>
+                      <div style={{ flex: "1 1 auto" }}>
+                        <EntityTokenField
+                          role="author"
+                          value={formAuthors}
+                          onChange={setFormAuthors}
+                          placeholder="Add an author"
+                        />
+                      </div>
+                    </div>
+
                     <div style={{ marginTop: 4 }}>
-                      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-                        <div className="muted">Catalog</div>
+                      <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                        <div style={{ minWidth: 110 }} className="muted">Catalog</div>
                         <select
+                          className="om-inline-control"
                           value={formLibraryId ?? ""}
                           onChange={(e) => setFormLibraryId(Number(e.target.value))}
                           style={{ width: "auto", minWidth: 140 }}
@@ -1210,10 +1228,12 @@ export default function BookDetailPage() {
                         </select>
                       </div>
                     </div>
+
                     <div style={{ marginTop: 4 }}>
-                      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-                        <div className="muted">Status</div>
+                      <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                        <div style={{ minWidth: 110 }} className="muted">Status</div>
                         <select
+                          className="om-inline-control"
                           value={formStatus}
                           onChange={(e) => setFormStatus(e.target.value as any)}
                           style={{ width: "auto", minWidth: 140 }}
@@ -1225,10 +1245,12 @@ export default function BookDetailPage() {
                         </select>
                       </div>
                     </div>
+
                     <div style={{ marginTop: 4 }}>
-                      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-                        <div className="muted">Visibility</div>
+                      <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                        <div style={{ minWidth: 110 }} className="muted">Visibility</div>
                         <select
+                          className="om-inline-control"
                           value={formVisibility}
                           onChange={(e) => setFormVisibility(e.target.value as any)}
                           style={{ width: "auto", minWidth: 140 }}
@@ -1239,10 +1261,12 @@ export default function BookDetailPage() {
                         </select>
                       </div>
                     </div>
+
                     <div style={{ marginTop: 4 }}>
-                      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-                        <div className="muted">Borrowable</div>
+                      <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                        <div style={{ minWidth: 110 }} className="muted">Borrowable</div>
                         <select
+                          className="om-inline-control"
                           value={formBorrowable}
                           onChange={(e) => setFormBorrowable(e.target.value as any)}
                           style={{ width: "auto", minWidth: 140 }}
@@ -1259,54 +1283,69 @@ export default function BookDetailPage() {
                         Metadata overrides
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Publisher
                           </div>
-                          <input type="text" value={formPublisher} onChange={(e) => setFormPublisher(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <input className="om-inline-control" type="text" value={formPublisher} onChange={(e) => setFormPublisher(e.target.value)} style={{ flex: "1 1 auto" }} />
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Publish date
                           </div>
-                          <input type="text" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <input className="om-inline-control" type="text" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} style={{ flex: "1 1 auto" }} />
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Editors
                           </div>
-                          <input type="text" value={formEditors} onChange={(e) => setFormEditors(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <div style={{ flex: "1 1 auto" }}>
+                            <EntityTokenField
+                              role="editor"
+                              value={formEditors}
+                              onChange={setFormEditors}
+                              placeholder="Add an editor"
+                            />
+                          </div>
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Designers
                           </div>
-                          <input type="text" value={formDesigners} onChange={(e) => setFormDesigners(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <div style={{ flex: "1 1 auto" }}>
+                            <EntityTokenField
+                              role="designer"
+                              value={formDesigners}
+                              onChange={setFormDesigners}
+                              placeholder="Add a designer"
+                            />
+                          </div>
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Printer
                           </div>
-                          <input type="text" value={formPrinter} onChange={(e) => setFormPrinter(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <input className="om-inline-control" type="text" value={formPrinter} onChange={(e) => setFormPrinter(e.target.value)} style={{ flex: "1 1 auto" }} />
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Materials
                           </div>
-                          <input type="text" value={formMaterials} onChange={(e) => setFormMaterials(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <input className="om-inline-control" type="text" value={formMaterials} onChange={(e) => setFormMaterials(e.target.value)} style={{ flex: "1 1 auto" }} />
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Edition
                           </div>
-                          <input type="text" value={formEdition} onChange={(e) => setFormEdition(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <input className="om-inline-control" type="text" value={formEdition} onChange={(e) => setFormEdition(e.target.value)} style={{ flex: "1 1 auto" }} />
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Trim size
                           </div>
                           <div className="row" style={{ gap: 8 }}>
                             <input
+                              className="om-inline-control"
                               type="text"
                               inputMode="decimal"
                               placeholder="W"
@@ -1316,6 +1355,7 @@ export default function BookDetailPage() {
                             />
                             <span className="muted">×</span>
                             <input
+                              className="om-inline-control"
                               type="text"
                               inputMode="decimal"
                               placeholder="H"
@@ -1324,6 +1364,7 @@ export default function BookDetailPage() {
                               style={{ width: 50, textAlign: "center" }}
                             />
                             <select
+                              className="om-inline-control"
                               value={formTrimUnit}
                               onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)}
                               style={{ width: "auto", minWidth: 60 }}
@@ -1333,11 +1374,12 @@ export default function BookDetailPage() {
                             </select>
                           </div>
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Pages
                           </div>
                           <input
+                            className="om-inline-control"
                             type="text"
                             inputMode="numeric"
                             value={formPages}
@@ -1345,29 +1387,36 @@ export default function BookDetailPage() {
                             style={{ flex: "1 1 auto" }}
                           />
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Group
                           </div>
-                          <input type="text" value={formGroup} onChange={(e) => setFormGroup(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <input className="om-inline-control" type="text" value={formGroup} onChange={(e) => setFormGroup(e.target.value)} style={{ flex: "1 1 auto" }} />
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Object type
                           </div>
-                          <input type="text" value={formObjectType} onChange={(e) => setFormObjectType(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <input className="om-inline-control" type="text" value={formObjectType} onChange={(e) => setFormObjectType(e.target.value)} style={{ flex: "1 1 auto" }} />
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Decade
                           </div>
-                          <input type="text" value={formDecade} onChange={(e) => setFormDecade(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <input className="om-inline-control" type="text" value={formDecade} onChange={(e) => setFormDecade(e.target.value)} style={{ flex: "1 1 auto" }} />
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Subjects
                           </div>
-                          <input type="text" value={formSubjects} onChange={(e) => setFormSubjects(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <div style={{ flex: "1 1 auto" }}>
+                            <EntityTokenField
+                              role="subject"
+                              value={formSubjects}
+                              onChange={setFormSubjects}
+                              placeholder="Add a subject"
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1377,24 +1426,25 @@ export default function BookDetailPage() {
                         Private notes & location
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Location
                           </div>
-                          <input type="text" value={formLocation} onChange={(e) => setFormLocation(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <input className="om-inline-control" type="text" value={formLocation} onChange={(e) => setFormLocation(e.target.value)} style={{ flex: "1 1 auto" }} />
                         </div>
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div className="row om-row-baseline">
                           <div className="muted" style={{ minWidth: 110 }}>
                             Shelf
                           </div>
-                          <input type="text" value={formShelf} onChange={(e) => setFormShelf(e.target.value)} style={{ flex: "1 1 auto" }} />
+                          <input className="om-inline-control" type="text" value={formShelf} onChange={(e) => setFormShelf(e.target.value)} style={{ flex: "1 1 auto" }} />
                         </div>
                         <textarea
                           ref={descriptionTextareaRef}
+                          className="om-inline-control"
                           value={formNotes}
                           onChange={(e) => setFormNotes(e.target.value)}
                           placeholder="Private notes…"
-                          style={{ width: "100%", minHeight: 100, marginTop: 4 }}
+                          style={{ width: "100%", minHeight: 100, marginTop: 4, resize: "none" }}
                         />
                       </div>
                     </div>
@@ -1431,6 +1481,7 @@ export default function BookDetailPage() {
                     ) : null}
                   </div>
                 ) : (
+
                   <>
                     <div style={{ fontSize: "1.2em", fontWeight: 600 }}>{effectiveTitle}</div>
                     {effectiveAuthors.length > 0 ? (
