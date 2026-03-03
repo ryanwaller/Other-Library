@@ -48,6 +48,19 @@ function extractTitleLines(text: string): string[] {
 const FG = "#e8e8ea";   // matches --fg dark
 const MUTED = "#a8a8ad"; // matches --muted dark
 
+/** Capture a downscaled JPEG frame from the video element, returned as raw base64. */
+function captureScaledFrame(video: HTMLVideoElement, maxDim = 640): string {
+  const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+  const w = Math.round(video.videoWidth * scale);
+  const h = Math.round(video.videoHeight * scale);
+  const tmp = document.createElement("canvas");
+  tmp.width = w;
+  tmp.height = h;
+  tmp.getContext("2d")!.drawImage(video, 0, 0, w, h);
+  // strip "data:image/jpeg;base64," prefix
+  return tmp.toDataURL("image/jpeg", 0.8).split(",")[1]!;
+}
+
 export default function BookScannerModal({ open, onClose, onResult }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -196,6 +209,36 @@ export default function BookScannerModal({ open, onClose, onResult }: Props) {
             return worker;
           })
           .catch(() => null);
+
+        // Layer 1.5: Google Vision WEB_DETECTION — start after 2 s, every 4 s
+        timers.push(
+          setTimeout(() => {
+            if (!activeRef.current) return;
+            const id = setInterval(async () => {
+              if (!activeRef.current) { clearInterval(id); return; }
+              const vid = videoRef.current;
+              if (!vid || !vid.videoWidth) return;
+              try {
+                const image = captureScaledFrame(vid);
+                const res = await fetch("/api/vision-scan", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ image }),
+                });
+                if (!res.ok || !activeRef.current) return;
+                const data = await res.json() as { ok: boolean; isbn?: string; query?: string; confidence?: number };
+                if (!data.ok || !activeRef.current) return;
+                if (data.isbn) {
+                  clearInterval(id);
+                  handleResult(data.isbn);
+                } else if (data.query && !firedRef.current) {
+                  setTitleSuggestion((prev) => prev ?? data.query!);
+                }
+              } catch { /* network error, ignore */ }
+            }, 4000);
+            intervals.push(id);
+          }, 2000)
+        );
 
         // Layer 2: OCR ISBN text — start after 3 s
         timers.push(
