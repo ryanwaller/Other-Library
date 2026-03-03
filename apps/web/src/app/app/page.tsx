@@ -1973,7 +1973,7 @@ function AppShell({
                     />
                   </div>
                 ) : (
-                  <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
+                  <div className="om-cover-slot" style={{ width: 60, height: "auto" }}><div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} /></div>
                 )}
               </div>
               <div className="om-lookup-main">
@@ -2005,7 +2005,7 @@ function AppShell({
                         <img src={result.cover_url} alt="" width={60} style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }} />
                       </div>
                     ) : (
-                      <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
+                      <div className="om-cover-slot" style={{ width: 60, height: "auto" }}><div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} /></div>
                     )}
                   </div>
                   <div className="om-lookup-main">

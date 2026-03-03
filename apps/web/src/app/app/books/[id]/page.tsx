@@ -2963,7 +2963,7 @@ export default function BookDetailPage() {
                                       />
                                     </div>
                                   ) : (
-                                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
+                                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }}><div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} /></div>
                                   )}
                                 </div>
                                 <div className="om-lookup-main">
@@ -3044,7 +3044,7 @@ export default function BookDetailPage() {
                                     </div>
 
                                   ) : (
-                                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
+                                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }}><div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} /></div>
                                   )}
                                 </div>
                                 <div className="om-lookup-main" style={{ minWidth: 0 }}>
