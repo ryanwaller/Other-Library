@@ -245,12 +245,18 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           </div>
           {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
           <div className="row muted" style={{ marginTop: 8, justifyContent: "flex-start", alignItems: "baseline", gap: 18, flexWrap: "wrap" }}>
-            <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
-              Followers <span style={{ marginInline: 10 }}>{followersCount ?? "—"}</span>
-            </Link>
-            <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
-              Following <span style={{ marginInline: 10 }}>{followingCount ?? "—"}</span>
-            </Link>
+            <span style={{ display: "inline-flex", gap: 10 }}>
+              <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
+                Followers
+              </Link>
+              <span>{followersCount ?? "—"}</span>
+            </span>
+            <span style={{ display: "inline-flex", gap: 10 }}>
+              <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
+                Following
+              </Link>
+              <span>{followingCount ?? "—"}</span>
+            </span>
             <FollowControls profileId={profile.id} profileUsername={profile.username} inline />
           </div>
           {profile.bio ? (

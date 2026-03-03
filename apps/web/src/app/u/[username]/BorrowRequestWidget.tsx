@@ -158,7 +158,7 @@ export default function BorrowRequestWidget({
   }
 
   if (!sessionUserId) {
-    return <SignInCard note="Sign in to request to borrow." />;
+    return null;
   }
 
   if (scope !== "anyone" && !relationshipAllowed) {

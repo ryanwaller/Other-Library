@@ -921,12 +921,18 @@ export default function BookDetailPage() {
         </div>
 
         <div className="row muted" style={{ marginTop: 12, gap: 16 }}>
-          <Link href={`/u/${ownerProfile?.username}/followers`} className="muted">
-            Followers <span style={{ marginInline: 10 }}>{followersCount ?? "—"}</span>
-          </Link>
-          <Link href={`/u/${ownerProfile?.username}/following`} className="muted">
-            Following <span style={{ marginInline: 10 }}>{followingCount ?? "—"}</span>
-          </Link>
+          <span style={{ display: "inline-flex", gap: 10 }}>
+            <Link href={`/u/${ownerProfile?.username}/followers`} className="muted">
+              Followers
+            </Link>
+            <span>{followersCount ?? "—"}</span>
+          </span>
+          <span style={{ display: "inline-flex", gap: 10 }}>
+            <Link href={`/u/${ownerProfile?.username}/following`} className="muted">
+              Following
+            </Link>
+            <span>{followingCount ?? "—"}</span>
+          </span>
           {ownerProfile && <FollowControls profileId={book.owner_id} profileUsername={ownerProfile.username} inline />}
         </div>
       </div>

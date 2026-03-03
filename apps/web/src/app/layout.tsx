@@ -2,7 +2,7 @@ import "./globals.css";
 import GlobalNav from "./GlobalNav";
 
 export const metadata = {
-  title: "OM Library",
+  title: "Other Library",
   description: "A minimal social book catalog."
 };
 
@@ -17,7 +17,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <GlobalNav />
-        {children}
+        <div className="om-page-transition">
+          {children}
+        </div>
       </body>
     </html>
   );

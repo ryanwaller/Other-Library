@@ -32,6 +32,14 @@ export default function DiscoverClient() {
   const [rows, setRows] = useState<ResultRow[]>([]);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -140,7 +148,7 @@ export default function DiscoverClient() {
                 <PagedBookList
                   items={grouped.mine}
                   viewMode="list"
-                  gridCols={4}
+                  gridCols={isMobile ? 2 : 4}
                   searchQuery={q}
                   renderItem={(r) => (
                     <div key={`mine-${r.user_book_id}`} style={{ marginTop: 8 }}>
@@ -160,7 +168,7 @@ export default function DiscoverClient() {
                 <PagedBookList
                   items={grouped.following}
                   viewMode="list"
-                  gridCols={4}
+                  gridCols={isMobile ? 2 : 4}
                   searchQuery={q}
                   renderItem={(r) => (
                     <div key={`f-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
@@ -181,7 +189,7 @@ export default function DiscoverClient() {
                 <PagedBookList
                   items={grouped.second}
                   viewMode="list"
-                  gridCols={4}
+                  gridCols={isMobile ? 2 : 4}
                   searchQuery={q}
                   renderItem={(r) => (
                     <div key={`s-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
@@ -202,7 +210,7 @@ export default function DiscoverClient() {
                 <PagedBookList
                   items={grouped.pub}
                   viewMode="list"
-                  gridCols={4}
+                  gridCols={isMobile ? 2 : 4}
                   searchQuery={q}
                   renderItem={(r) => (
                     <div key={`p-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
