@@ -103,6 +103,8 @@ export default function AlsoOwnedBy({
   if (!initialized || busy || error || owners.length === 0) return null;
 
   return (
+    <>
+    <hr style={{ border: 0, borderTop: "1px solid var(--border)", margin: "16px 0 0" }} />
     <div style={{ marginTop: 14 }} className="card">
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>Also owned by</div>
@@ -134,5 +136,6 @@ export default function AlsoOwnedBy({
         </div>
       )}
     </div>
+    </>
   );
 }
