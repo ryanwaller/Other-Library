@@ -3050,17 +3050,16 @@ export default function BookDetailPage() {
                                     {preview.trim_width && preview.trim_height ? ` · ${preview.trim_width} × ${preview.trim_height} ${preview.trim_unit ?? ""}`.trim() : ""}
                                   </div>
                                   <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    {preview.isbn13 || preview.isbn10 ? `ISBN: ${preview.isbn13 ?? preview.isbn10}` : "No ISBN found"} · {(preview.sources ?? []).join(", ") || "—"}
+                                    {preview.isbn13 || preview.isbn10 ? `ISBN: ${preview.isbn13 ?? preview.isbn10}` : "No ISBN found"}
                                   </div>
-                                  <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    {importMeta.domain ? `${importMeta.domain_kind ?? "generic"} · ${importMeta.domain}` : importMeta.domain_kind ?? ""}
-                                    {previewFinalUrl ? (
-                                      <>{" "}· <a href={previewFinalUrl} target="_blank" rel="noreferrer">open page</a></>
-                                    ) : null}
-                                    {previewCoverUrl ? (
-                                      <>{" "}· <a href={previewCoverUrl} target="_blank" rel="noreferrer">open cover</a></>
-                                    ) : null}
-                                  </div>
+                                  {(importMeta.domain || previewFinalUrl) && (
+                                    <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {importMeta.domain ? `${importMeta.domain_kind ?? "generic"} · ${importMeta.domain}` : importMeta.domain_kind ?? ""}
+                                      {previewFinalUrl ? (
+                                        <>{" "}· <a href={previewFinalUrl} target="_blank" rel="noreferrer">open page</a></>
+                                      ) : null}
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="om-lookup-actions">
                                   <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>

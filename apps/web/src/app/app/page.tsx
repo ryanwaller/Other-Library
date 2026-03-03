@@ -1959,47 +1959,70 @@ function AppShell({
         )}
 
         {addUrlPreview && (
-          <div className="card" style={{ marginTop: 8, display: "flex", gap: 12, alignItems: "flex-start" }}>
-            {addUrlPreview.cover_url && !addPreviewCoverFailed && (
-              <img
-                src={addUrlPreview.cover_url}
-                alt={addUrlPreview.title ?? "Book cover"}
-                style={{ width: 56, flexShrink: 0, objectFit: "contain" }}
-                onError={() => setAddPreviewCoverFailed(true)}
-              />
-            )}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div>{addUrlPreview.title ?? "(no title)"}</div>
-              {addUrlPreview.authors.length > 0 && (
-                <div className="muted">{addUrlPreview.authors.join(", ")}</div>
-              )}
-              {(addUrlPreview.publisher || addUrlPreview.publish_date) && (
-                <div className="muted" style={{ fontSize: "0.875em" }}>
-                  {[addUrlPreview.publisher, addUrlPreview.publish_date?.slice(0, 4)].filter(Boolean).join(" · ")}
+          <div className="om-lookup-item">
+            <div className="om-lookup-row">
+              <div style={{ width: 62, flex: "0 0 auto" }}>
+                {addUrlPreview.cover_url && !addPreviewCoverFailed ? (
+                  <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
+                    <img
+                      src={addUrlPreview.cover_url}
+                      alt=""
+                      width={60}
+                      style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
+                      onError={() => setAddPreviewCoverFailed(true)}
+                    />
+                  </div>
+                ) : (
+                  <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
+                )}
+              </div>
+              <div className="om-lookup-main">
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(addUrlPreview.title ?? "").trim() || "—"}</div>
+                <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {(addUrlPreview.authors ?? []).filter(Boolean).join(", ") || "—"}
                 </div>
-              )}
+                <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {[addUrlPreview.publisher ?? "", addUrlPreview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
+                </div>
+              </div>
+              <div className="om-lookup-actions">
+                <button onClick={confirmAddFromPreview} disabled={addState.busy}>
+                  {addState.busy ? "…" : "Add to catalog"}
+                </button>
+              </div>
             </div>
-            <button onClick={confirmAddFromPreview} disabled={addState.busy}>
-              {addState.busy ? "…" : "Add to catalog"}
-            </button>
           </div>
         )}
 
         {addSearchResults.length > 0 && (
-          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div>
             {addSearchResults.map((result, i) => (
-              <div key={i} className="card" style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                {result.cover_url && (
-                  <img src={result.cover_url} alt={result.title ?? ""} style={{ width: 48, flexShrink: 0, objectFit: "contain" }} />
-                )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div>{result.title ?? "(no title)"}</div>
-                  {result.authors.length > 0 && <div className="muted">{result.authors.join(", ")}</div>}
-                  {result.publish_year && <div className="muted" style={{ fontSize: "0.875em" }}>{result.publish_year}</div>}
+              <div key={i} className="om-lookup-item">
+                <div className="om-lookup-row">
+                  <div style={{ width: 62, flex: "0 0 auto" }}>
+                    {result.cover_url ? (
+                      <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
+                        <img src={result.cover_url} alt="" width={60} style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }} />
+                      </div>
+                    ) : (
+                      <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
+                    )}
+                  </div>
+                  <div className="om-lookup-main">
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(result.title ?? "").trim() || "—"}</div>
+                    <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {(result.authors ?? []).filter(Boolean).join(", ") || "—"}
+                    </div>
+                    <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {[result.publisher ?? "", result.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
+                    </div>
+                  </div>
+                  <div className="om-lookup-actions">
+                    <button onClick={() => addFromSearchResultItem(result)} disabled={addState.busy}>
+                      {addState.busy ? "…" : "Add"}
+                    </button>
+                  </div>
                 </div>
-                <button onClick={() => addFromSearchResultItem(result)} disabled={addState.busy}>
-                  {addState.busy ? "…" : "Add"}
-                </button>
               </div>
             ))}
           </div>
