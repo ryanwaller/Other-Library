@@ -2434,6 +2434,9 @@ function AppShell({
               value={searchQuery}
               onFocus={() => {
                 if (bulkMode) exitEditMode();
+                setAddOpen(false);
+                setSortOpen(false);
+                cancelAddPreview();
                 setSearchFocused(true);
               }}
               onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
@@ -2466,6 +2469,9 @@ function AppShell({
               value={searchQuery}
               onFocus={() => {
                 if (bulkMode) exitEditMode();
+                setAddOpen(false);
+                setSortOpen(false);
+                cancelAddPreview();
                 setSearchFocused(true);
               }}
               onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
@@ -2574,6 +2580,9 @@ function AppShell({
                     value={addInput}
                     onFocus={() => {
                       if (bulkMode) exitEditMode();
+                      setAddOpen(true);
+                      setSearchOpen(false);
+                      setSortOpen(false);
                       setAddInputFocused(true);
                     }}
                     onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
