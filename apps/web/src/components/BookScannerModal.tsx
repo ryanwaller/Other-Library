@@ -44,6 +44,9 @@ function extractTitleLines(text: string): string[] {
     .slice(0, 3);
 }
 
+// Set to false to disable Tesseract OCR layers (useful for testing Vision in isolation)
+const OCR_ENABLED = false;
+
 // Colors forced for the dark camera background (always black regardless of system theme)
 const FG = "#e8e8ea";   // matches --fg dark
 const MUTED = "#a8a8ad"; // matches --muted dark
@@ -226,18 +229,20 @@ export default function BookScannerModal({ open, onClose, onResult }: Props) {
         }
 
         // Start loading Tesseract immediately so it's ready by the time OCR phases begin
-        const tesseractLoadPromise = import("tesseract.js")
-          .then(async (m) => {
-            if (!activeRef.current) return null;
-            const worker = await m.createWorker(["eng"]);
-            if (!activeRef.current) {
-              worker.terminate().catch(() => {});
-              return null;
-            }
-            tesseractWorker = worker;
-            return worker;
-          })
-          .catch(() => null);
+        const tesseractLoadPromise = OCR_ENABLED
+          ? import("tesseract.js")
+            .then(async (m) => {
+              if (!activeRef.current) return null;
+              const worker = await m.createWorker(["eng"]);
+              if (!activeRef.current) {
+                worker.terminate().catch(() => {});
+                return null;
+              }
+              tesseractWorker = worker;
+              return worker;
+            })
+            .catch(() => null)
+          : Promise.resolve(null); // OCR disabled — layers 2 & 3 will no-op
 
         // Layer 1.5: Google Vision WEB_DETECTION — start after 4 s, every 4 s
         // (4 s gives the camera time to initialize, focus, and adjust exposure)
