@@ -2855,19 +2855,24 @@ export default function BookDetailPage() {
 
               {isOwner && findMoreOpen ? (
                 <div style={{ marginTop: 14 }}>
-                  <div className="om-lookup-controls" style={{ marginTop: 8, gridTemplateColumns: "auto 1fr auto" }}>
+                  <div className="om-lookup-controls" style={{ marginTop: 8, gridTemplateColumns: "auto auto 1fr auto" }}>
                     {showScan ? (
-                      <button className="muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: "0 6px", fontSize: "0.85em", height: "32px", alignSelf: "center" }}>
+                      <button 
+                        className="muted" 
+                        onClick={openScanner} 
+                        style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}
+                      >
                         Scan
                       </button>
                     ) : (
-                      <span className="muted" style={{ whiteSpace: "nowrap", fontSize: "0.85em", alignSelf: "center", padding: "0 6px" }}>
+                      <span className="muted" style={{ whiteSpace: "nowrap" }}>
                         Scan
                       </span>
                     )}
+                    <span className="muted">or</span>
                     <input
                       className="om-inline-control"
-                      placeholder="or enter ISBN, URL, or title"
+                      placeholder="enter ISBN, URL, or title"
                       value={lookupInput}
                       onChange={(e) => setLookupInput(e.target.value)}
                       onKeyDown={(e) => onEnter(e, smartLookup)}
