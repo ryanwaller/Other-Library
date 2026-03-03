@@ -189,6 +189,10 @@ function parseStructuredNotes(notes: string | null): {
   };
 }
 
+function normalizeKeyPart(input: string): string {
+  return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 function AppShell({
   session,
   filterTag,
@@ -389,18 +393,19 @@ function AppShell({
     error: null,
     message: null
   });
-const [bulkMode, setBulkMode] = useState(false);
-const [addOpen, setAddOpen] = useState(false);
-const [searchOpen, setSearchOpen] = useState(false);
-const [sortOpen, setSortOpen] = useState(false);
-const [searchFocused, setSearchFocused] = useState(false);
-...
-function exitEditMode() {
-  setBulkMode(false);
-  setReorderMode(false);
-  setBulkSelectedKeys({});
-  setBulkState({ busy: false, error: null, message: null });
-}
+
+  const [bulkMode, setBulkMode] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+
+  function exitEditMode() {
+    setBulkMode(false);
+    setReorderMode(false);
+    setBulkSelectedKeys({});
+    setBulkState({ busy: false, error: null, message: null });
+  }
 
   const [bulkSelectedKeys, setBulkSelectedKeys] = useState<Record<string, true | undefined>>({});
   const [bulkCategoryName, setBulkCategoryName] = useState("");
@@ -1507,10 +1512,6 @@ function exitEditMode() {
     return items;
   }, [items]);
 
-  function normalizeKeyPart(input: string): string {
-    return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-  }
-
   function effectiveTitleFor(it: CatalogItem): string {
     const e = it.edition;
     return it.title_override?.trim() ? it.title_override : e?.title ?? "(untitled)";
@@ -2159,7 +2160,7 @@ function exitEditMode() {
       display: viewMode === "grid" ? "grid" : "flex",
       flexDirection: viewMode === "list" ? ("column" as const) : undefined,
       gridTemplateColumns: viewMode === "grid" ? `repeat(${gridCols}, minmax(0, 1fr))` : undefined,
-      gap: viewMode === "grid" ? 12 : 12
+      gap: 12
       }),
 
     [viewMode, gridCols]
@@ -2185,6 +2186,7 @@ function exitEditMode() {
     const delState = deleteStateByBookId[it.id];
     return (
       <BookCard
+        key={g.key}
         viewMode={viewMode}
         bulkMode={bulkMode}
         selected={selected}
@@ -2483,7 +2485,7 @@ function exitEditMode() {
         </div>
       )}
 
-      {showAddPanel && !searchOpen && (
+      {showAddPanel && !searchOpen ? (
         <>
           <div className="row" style={{ width: "100%", marginTop: 6, flexWrap: "nowrap", gap: 0, alignItems: "baseline" }}>
             {stagedCsvData ? (
@@ -3025,6 +3027,10 @@ function exitEditMode() {
               manageMode={bulkMode}
               onStartEdit={beginEditLibrary}
               onNameDraftChange={setLibraryNameDraft}
+              onNameDraftKeyDown={(e) => {
+                if (e.key === "Enter") saveLibraryName(lib.id, libraryNameDraft);
+                if (e.key === "Escape") cancelEditLibrary();
+              }}
               onSaveName={saveLibraryName}
               onCancelEdit={cancelEditLibrary}
               onDelete={deleteLibrary}
