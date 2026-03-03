@@ -389,11 +389,19 @@ function AppShell({
     error: null,
     message: null
   });
+const [bulkMode, setBulkMode] = useState(false);
+const [addOpen, setAddOpen] = useState(false);
+const [searchOpen, setSearchOpen] = useState(false);
+const [sortOpen, setSortOpen] = useState(false);
+const [searchFocused, setSearchFocused] = useState(false);
+...
+function exitEditMode() {
+  setBulkMode(false);
+  setReorderMode(false);
+  setBulkSelectedKeys({});
+  setBulkState({ busy: false, error: null, message: null });
+}
 
-  const [bulkMode, setBulkMode] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
-  const [sortOpen, setSortOpen] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
   const [bulkSelectedKeys, setBulkSelectedKeys] = useState<Record<string, true | undefined>>({});
   const [bulkCategoryName, setBulkCategoryName] = useState("");
   const [bulkState, setBulkState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
@@ -2312,36 +2320,37 @@ function AppShell({
           margin: 0, 
           alignItems: "baseline", 
           justifyContent: "flex-start", 
-          gap: 10, 
-          flexDirection: isMobile ? "column-reverse" : "row",
+          gap: 12, 
+          flexDirection: "row",
           flexWrap: "nowrap"
         }}
       >
-        {/* Buttons row - will be below search on mobile */}
+        {/* Toolbar Buttons */}
         <div 
           className="row" 
           style={{ 
             gap: 12, 
             alignItems: "baseline", 
             minWidth: 0, 
-            flex: isMobile ? "0 0 auto" : "0 0 auto", 
+            flex: "0 0 auto", 
             flexWrap: "nowrap", 
             margin: 0 
           }}
         >
           <button
             onClick={() => {
-              setBulkMode((prev) => {
-                const next = !prev;
-                if (!next) setBulkSelectedKeys({});
-                setBulkState({ busy: false, error: null, message: null });
-                setReorderMode(next);
-                setSortOpen(false);
+              const next = !bulkMode;
+              if (next) {
                 setAddOpen(false);
+                setSortOpen(false);
+                setSearchOpen(false);
+                setReorderMode(true);
                 closeTagMenu();
                 closeCategoryMenu();
-                return next;
-              });
+              } else {
+                exitEditMode();
+              }
+              setBulkMode(next);
             }}
           >
             {bulkMode ? "Done" : "Edit"}
@@ -2350,66 +2359,133 @@ function AppShell({
             type="button"
             className={sortOpen ? "text-primary" : "muted"}
             onClick={() => {
-              setSortOpen((v) => !v);
-              setAddOpen(false);
-              closeTagMenu();
-              closeCategoryMenu();
+              if (bulkMode) exitEditMode();
+              const next = !sortOpen;
+              setSortOpen(next);
+              if (next) {
+                setAddOpen(false);
+                setSearchOpen(false);
+                closeTagMenu();
+                closeCategoryMenu();
+              }
             }}
           >
             View by
           </button>
           <button
             type="button"
-            className={showAddPanel ? "text-primary" : "muted"}
+            className={addOpen ? "text-primary" : "muted"}
             onClick={() => {
-              setAddOpen((prev) => !prev);
-              setSortOpen(false);
-              closeTagMenu();
-              closeCategoryMenu();
+              if (bulkMode) exitEditMode();
+              const next = !addOpen;
+              setAddOpen(next);
+              if (next) {
+                setSortOpen(false);
+                setSearchOpen(false);
+                closeTagMenu();
+                closeCategoryMenu();
+              } else {
+                cancelAddPreview();
+              }
             }}
           >
-            Add to catalog
+            Add
           </button>
-        </div>
-
-        {/* Search row - will be on top on mobile */}
-        <div 
-          className="row" 
-          style={{ 
-            flex: "1 1 auto", 
-            width: "100%", 
-            gap: 12, 
-            alignItems: "baseline", 
-            margin: 0,
-            flexWrap: "nowrap"
-          }}
-        >
-          <input
-            className="om-inline-search-input"
-            placeholder="Search your catalog"
-            value={searchQuery}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
-          />
-
-          {(searchFocused || searchQuery.trim()) ? (
-            <Link
-              href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
-              className="muted"
-              style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}
+          {isMobile && (
+            <button
+              type="button"
+              className={searchOpen ? "text-primary" : "muted"}
+              onClick={() => {
+                if (bulkMode) exitEditMode();
+                const next = !searchOpen;
+                setSearchOpen(next);
+                if (next) {
+                  setAddOpen(false);
+                  cancelAddPreview();
+                  setSortOpen(false);
+                  closeTagMenu();
+                  closeCategoryMenu();
+                }
+              }}
             >
-              Search others
-            </Link>
-          ) : null}
+              Search
+            </button>
+          )}
         </div>
+
+        {/* Desktop Search row - hidden on mobile */}
+        {!isMobile && (
+          <div 
+            className="row" 
+            style={{ 
+              flex: "1 1 auto", 
+              width: "100%", 
+              gap: 12, 
+              alignItems: "baseline", 
+              margin: 0,
+              flexWrap: "nowrap"
+            }}
+          >
+            <input
+              className="om-inline-search-input"
+              placeholder="Search your catalog"
+              value={searchQuery}
+              onFocus={() => {
+                if (bulkMode) exitEditMode();
+                setSearchFocused(true);
+              }}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
+            />
+
+            {(searchFocused || searchQuery.trim()) ? (
+              <Link
+                href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
+                className="muted"
+                style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}
+              >
+                Search others
+              </Link>
+            ) : null}
+          </div>
+        )}
       </div>
+
     </div>
 
-      {showAddPanel ? (
+      {/* Mobile Search Panel */}
+      {isMobile && searchOpen && (
+        <div className="row" style={{ width: "100%", marginTop: 6, alignItems: "baseline", gap: 12, flexWrap: "nowrap" }}>
+          <div className="row" style={{ flex: "1 1 auto", width: "100%", gap: 12, alignItems: "baseline", margin: 0, flexWrap: "nowrap" }}>
+            <input
+              className="om-inline-search-input"
+              placeholder="Search your catalog"
+              value={searchQuery}
+              onFocus={() => {
+                if (bulkMode) exitEditMode();
+                setSearchFocused(true);
+              }}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
+            />
+            {(searchFocused || searchQuery.trim()) ? (
+              <Link
+                href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
+                className="muted"
+                style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}
+              >
+                Search others
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {showAddPanel && !searchOpen && (
         <>
-          <div className="row" style={{ width: "100%", marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap", gap: 0, alignItems: "baseline" }}>
+          <div className="row" style={{ width: "100%", marginTop: 6, flexWrap: "nowrap", gap: 0, alignItems: "baseline" }}>
             {stagedCsvData ? (
               <div className="row" style={{ flex: 1, gap: 12, alignItems: "baseline" }}>
                 <span style={{ fontWeight: 600 }}>{stagedCsvFilename}</span>
@@ -2477,9 +2553,9 @@ function AppShell({
                 </div>
               </div>
             ) : (
-              <div className="row" style={{ width: "100%", gap: 12, alignItems: "baseline" }}>
+              <div className="row" style={{ width: "100%", gap: 10, alignItems: "baseline", flexWrap: "nowrap" }}>
                 {showScan && (
-                  <div className="row" style={{ gap: 12, flex: "0 0 auto", alignItems: "baseline" }}>
+                  <div className="row" style={{ gap: 6, flex: "0 0 auto", alignItems: "baseline" }}>
                     <button 
                       className="muted" 
                       onClick={openScanner} 
@@ -2487,14 +2563,17 @@ function AppShell({
                     >
                       Scan
                     </button>
-                    <span className="muted">or</span>
+                    <span className="muted" style={{ fontSize: "0.9em" }}>or</span>
                   </div>
                 )}
-                <div className="om-input-underline-wrapper">
+                <div className="om-input-underline-wrapper" style={{ gap: 10 }}>
                   <input
-                    placeholder={showScan ? "enter ISBN, URL, or title" : "Add by ISBN, URL, or title"}
+                    placeholder={showScan ? "enter ISBN…" : "Add by ISBN, URL, or title"}
                     value={addInput}
-                    onFocus={() => setAddInputFocused(true)}
+                    onFocus={() => {
+                      if (bulkMode) exitEditMode();
+                      setAddInputFocused(true);
+                    }}
                     onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
                     onChange={(e) => setAddInput(e.target.value)}
                     onKeyDown={(e) => {
@@ -2504,10 +2583,10 @@ function AppShell({
                     }}
                     style={{ width: "100%", margin: 0 }}
                   />
-                  <div className="row" style={{ marginLeft: 12, gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
+                  <div className="row" style={{ gap: 10, flex: "0 0 auto", justifyContent: "flex-end" }}>
                     {(addInput.trim() || addInputFocused) ? (
                       <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
-                        {addState.busy ? "Working…" : "Go"}
+                        {addState.busy ? "…" : "Go"}
                       </button>
                     ) : null}
                     {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (

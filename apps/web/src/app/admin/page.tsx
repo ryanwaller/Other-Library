@@ -191,6 +191,14 @@ export default function AdminPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  function handleAuthError(msg: string): boolean {
+    if (msg !== "not_authenticated") return false;
+    // Access token was stale (getSession() returns cached token without refreshing).
+    // Silently trigger a refresh; onAuthStateChange → setSession → token change → retry.
+    supabase?.auth.refreshSession().catch(() => supabase?.auth.signOut());
+    return true;
+  }
+
   async function refreshSummary() {
     if (!token) return;
     try {
@@ -198,7 +206,9 @@ export default function AdminPage() {
       const res = await api<UsersResponse>(`/api/admin/users?${params.toString()}`, { method: "GET", token });
       setUsersMetrics(res.metrics);
     } catch (e: any) {
-      setError(e?.message ?? "Failed to load summary");
+      const msg = e?.message ?? "Failed to load summary";
+      if (handleAuthError(msg)) return;
+      setError(msg);
       setUsersMetrics({ total: 0, active: 0, disabled: 0, pending: 0 });
     }
   }
@@ -226,7 +236,9 @@ export default function AdminPage() {
       setUsersData(res);
       setUsersMetrics(res.metrics);
     } catch (e: any) {
-      setError(e?.message ?? "Failed to load users");
+      const msg = e?.message ?? "Failed to load users";
+      if (handleAuthError(msg)) return;
+      setError(msg);
       setUsersData(null);
     } finally {
       setBusy(false);
@@ -249,7 +261,9 @@ export default function AdminPage() {
       const res = await api<WaitlistResponse>(`/api/admin/waitlist?${params.toString()}`, { method: "GET", token });
       setWaitlistData(res);
     } catch (e: any) {
-      setError(e?.message ?? "Failed to load waitlist");
+      const msg = e?.message ?? "Failed to load waitlist";
+      if (handleAuthError(msg)) return;
+      setError(msg);
       setWaitlistData(null);
     } finally {
       setBusy(false);
@@ -271,7 +285,9 @@ export default function AdminPage() {
       const res = await api<InvitesResponse>(`/api/admin/invites?${params.toString()}`, { method: "GET", token });
       setInvitesData(res);
     } catch (e: any) {
-      setError(e?.message ?? "Failed to load invites");
+      const msg = e?.message ?? "Failed to load invites";
+      if (handleAuthError(msg)) return;
+      setError(msg);
       setInvitesData(null);
     } finally {
       setBusy(false);
