@@ -1058,13 +1058,25 @@ export default function BookDetailPage() {
   const mergeFieldGroups = useMemo((): MergeFieldGroup[] => {
     if (!book || mergeAllSources.length === 0) return [];
 
-    function aggregateStr(key: keyof MergeSource, localVal: string | null | undefined): MergeFieldGroup | null {
-      const localNorm = (localVal ?? "").trim().toLowerCase();
+    function normalizeUrl(url: string | null | undefined): string {
+      if (!url) return "";
+      try {
+        const u = new URL(url);
+        u.search = "";
+        u.hash = "";
+        return u.toString().toLowerCase().trim();
+      } catch {
+        return (url ?? "").trim().toLowerCase();
+      }
+    }
+
+    function aggregateStr(key: keyof MergeSource, localValues: Array<string | null | undefined>): MergeFieldGroup | null {
+      const normalizedLocals = new Set(localValues.map(v => (v ?? "").trim().toLowerCase()).filter(Boolean));
       const counts: Record<string, number> = {};
       for (const s of mergeAllSources) {
         const v = (s[key] as string | null)?.trim();
         if (!v) continue;
-        if (localNorm && v.toLowerCase() === localNorm) continue;
+        if (normalizedLocals.has(v.toLowerCase())) continue;
         counts[v] = (counts[v] ?? 0) + 1;
       }
       const candidates: FieldCandidate[] = Object.entries(counts)
@@ -1072,7 +1084,7 @@ export default function BookDetailPage() {
         .slice(0, 4)
         .map(([value, count]) => ({ value, count }));
       if (candidates.length === 0) return null;
-      return { key: String(key), label: "", localValue: (localVal ?? "").trim() || null, candidates, isArray: false };
+      return { key: String(key), label: "", localValue: (localValues[0] ?? "").trim() || null, candidates, isArray: false };
     }
 
     function aggregateArr(key: keyof MergeSource, localVal: string[] | null | undefined): MergeFieldGroup | null {
@@ -1099,8 +1111,8 @@ export default function BookDetailPage() {
 
     const groups: MergeFieldGroup[] = [];
 
-    function pushStr(key: keyof MergeSource, label: string, localVal: string | null | undefined) {
-      const g = aggregateStr(key, localVal);
+    function pushStr(key: keyof MergeSource, label: string, localValues: Array<string | null | undefined>) {
+      const g = aggregateStr(key, localValues);
       if (g) groups.push({ ...g, label });
     }
     function pushArr(key: keyof MergeSource, label: string, localVal: string[] | null | undefined) {
@@ -1108,12 +1120,13 @@ export default function BookDetailPage() {
       if (g) groups.push({ ...g, label });
     }
 
-    // Cover — one candidate per unique storage_path from community; always shown when community has covers.
-    // Pre-selected only when user has no cover (never auto-replace an existing cover).
+    // Cover — compare community candidate cover_url against current cover_url (normalized).
     const hasCover = book.media.some((m) => m.kind === "cover");
-    // Build a set of "original filenames" already present in the user's covers.
-    // Merged covers are stored as merge-<timestamp>-<originalFilename>, so we
-    // strip that prefix to recover the source filename for deduplication.
+    const localCoverUrl = book.edition?.cover_url;
+    const localCoverOrig = book.cover_original_url;
+    const normLocalCover = normalizeUrl(localCoverUrl);
+    const normLocalOrig = normalizeUrl(localCoverOrig);
+
     const userCoverPaths = book.media.filter((m) => m.kind === "cover").map((m) => m.storage_path);
     const userCoverSourceFilenames = new Set<string>();
     for (const p of userCoverPaths) {
@@ -1121,13 +1134,23 @@ export default function BookDetailPage() {
       const m = filename.match(/^merge-\d+-(.+)$/);
       userCoverSourceFilenames.add(m ? m[1] : filename);
     }
+
     const coverPathCounts: Record<string, number> = {};
     for (const s of mergeAllSources) {
       for (const m of s.media) {
         if (m.kind !== "cover") continue;
         const communityFilename = m.storage_path.split("/").pop() ?? "";
-        if (userCoverSourceFilenames.has(communityFilename)) continue; // already merged this image
-        if (userCoverPaths.includes(m.storage_path)) continue; // exact path match
+        if (userCoverSourceFilenames.has(communityFilename)) continue; 
+        if (userCoverPaths.includes(m.storage_path)) continue; 
+
+        // Also check against normalized URLs if available in mergeCoverUrls
+        const signedUrl = mergeCoverUrls[m.storage_path];
+        if (signedUrl) {
+          const normCommunity = normalizeUrl(signedUrl);
+          if (normLocalCover && normCommunity === normLocalCover) continue;
+          if (normLocalOrig && normCommunity === normLocalOrig) continue;
+        }
+
         coverPathCounts[m.storage_path] = (coverPathCounts[m.storage_path] ?? 0) + 1;
       }
     }
@@ -1140,15 +1163,15 @@ export default function BookDetailPage() {
     }
 
     // Metadata fields in page order
-    pushStr("title_override",        "Title",        book.title_override);
+    pushStr("title_override",        "Title",        [book.title_override, book.edition?.title]);
     pushArr("authors_override",       "Authors",      book.authors_override ?? book.edition?.authors);
     pushArr("editors_override",       "Editors",      book.editors_override);
     pushArr("designers_override",     "Designers",    book.designers_override);
-    pushStr("printer_override",       "Printer",      book.printer_override);
-    pushStr("materials_override",     "Materials",    book.materials_override);
-    pushStr("edition_override",       "Edition",      book.edition_override);
-    pushStr("publisher_override",     "Publisher",    book.publisher_override ?? book.edition?.publisher);
-    pushStr("publish_date_override",  "Publish date", book.publish_date_override ?? book.edition?.publish_date);
+    pushStr("printer_override",       "Printer",      [book.printer_override]);
+    pushStr("materials_override",     "Materials",    [book.materials_override]);
+    pushStr("edition_override",       "Edition",      [book.edition_override]);
+    pushStr("publisher_override",     "Publisher",    [book.publisher_override, book.edition?.publisher]);
+    pushStr("publish_date_override",  "Publish date", [book.publish_date_override, book.edition?.publish_date]);
 
     // Pages
     const localPages = book.pages ? String(book.pages) : null;
@@ -1187,7 +1210,7 @@ export default function BookDetailPage() {
     }
 
     pushArr("subjects_override",     "Subjects",     book.subjects_override ?? book.edition?.subjects);
-    pushStr("description_override",  "Description",  book.description_override ?? book.edition?.description);
+    pushStr("description_override",  "Description",  [book.description_override, book.edition?.description]);
 
     return groups;
   }, [book, mergeAllSources]);

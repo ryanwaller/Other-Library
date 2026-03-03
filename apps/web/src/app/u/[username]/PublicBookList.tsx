@@ -229,10 +229,10 @@ export default function PublicBookList({
             compact
           />
         </div>
-        <div style={{ marginTop: 10 }} className="book-title">
-          <Link href={href}>{title}</Link>
+        <div style={{ marginTop: 14 }}>
+          <Link href={href} style={{ color: "inherit" }}><span className="om-book-title">{title}</span></Link>
         </div>
-        <div className="book-author muted">
+        <div className="om-book-secondary">
           {truncatedAuthors.length > 0
             ? truncatedAuthors.map((a, idx) => (
                 <span key={a}>

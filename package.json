@@ -11,6 +11,6 @@
     "dev:mobile": "npm -w @om/mobile run dev",
     "install:web": "npm install -w @om/shared -w @om/web",
     "build:web": "npm -w @om/web run build",
-    "typecheck": "npm -ws run typecheck"
+    "typecheck": "npm --workspaces run typecheck"
   }
 }
