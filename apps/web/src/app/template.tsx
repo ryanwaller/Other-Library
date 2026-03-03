@@ -6,7 +6,7 @@ export default function Template({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div key={pathname} className="om-page-fade-in">
+    <div key={pathname} style={{ animation: "fadeIn 150ms ease-out" }}>
       {children}
     </div>
   );

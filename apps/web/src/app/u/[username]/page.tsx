@@ -127,10 +127,10 @@ export default async function PublicProfilePage({
             ) : (
               <div style={{ width: 48, height: 48, borderRadius: 999, border: "1px solid var(--border-avatar)", background: "var(--bg-muted)" }} />
             )}
-            <div>
-              <div style={{ fontSize: "1em" }}>{profile.display_name || `@${profile.username}`}</div>
+            <Link href={`/u/${profile.username}`} style={{ textDecoration: "none", color: "inherit" }} className="om-header-name-link">
+              <div style={{ fontSize: "1em" }} className="om-header-display-name">{profile.display_name || `@${profile.username}`}</div>
               {profile.display_name ? <div className="muted">@{profile.username}</div> : null}
-            </div>
+            </Link>
           </div>
         </div>
 
