@@ -2143,7 +2143,7 @@ function AppShell({
               gridCols={effectiveCols}
               searchQuery={searchQuery}
               renderBooks={(limit) => (
-                <div style={{ marginTop: 10, display: viewMode === "grid" ? "grid" : "flex", flexDirection: viewMode === "list" ? "column" : undefined, gridTemplateColumns: viewMode === "grid" ? `repeat(${effectiveCols}, minmax(0, 1fr))` : undefined, gap: 12 }}>
+                <div style={{ display: viewMode === "grid" ? "grid" : "flex", flexDirection: viewMode === "list" ? "column" : undefined, gridTemplateColumns: viewMode === "grid" ? `repeat(${effectiveCols}, minmax(0, 1fr))` : undefined, gap: 12 }}>
                   {groups.slice(0, limit).map(g => (
                     <BookCard
                       key={g.key}

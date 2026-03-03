@@ -366,12 +366,14 @@ export default function PublicBookList({
                     >
                       <span className="om-catalog-caret" data-collapsed={collapsed ? "true" : "false"} aria-hidden="true" />
                     </button>
-                    <button onClick={toggle} style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left" }}>
-                      {lib.name}
-                    </button>
-                    <span className="muted" style={{ marginLeft: 4, whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
-                      {libGroups.length}&nbsp;&nbsp;book{libGroups.length === 1 ? "" : "s"}
-                    </span>
+                    <div className="row" style={{ flex: 1, justifyContent: "space-between", alignItems: "baseline", minWidth: 0 }}>
+                      <button onClick={toggle} style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left" }}>
+                        {lib.name}
+                      </button>
+                      <span className="muted" style={{ marginLeft: 12, whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
+                        {libGroups.length}&nbsp;&nbsp;book{libGroups.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 {!collapsed && (
