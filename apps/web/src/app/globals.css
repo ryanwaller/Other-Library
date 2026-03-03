@@ -78,15 +78,6 @@ body {
   text-size-adjust: 100%;
 }
 
-.om-page-transition {
-  animation: om-fade-in 0.15s ease-out forwards;
-}
-
-@keyframes om-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
 a, 
 button.muted,
 button.om-filter-link,
@@ -106,7 +97,7 @@ a:hover,
 button.muted:hover,
 button.om-filter-link:hover,
 .om-filter-link:hover {
-  color: var(--fg);
+  color: var(--fg) !important;
   text-decoration: underline;
   text-decoration-color: currentColor;
 }
@@ -136,6 +127,14 @@ button.muted:focus-visible {
 .om-book-secondary {
   color: var(--muted);
   margin-top: 6px;
+}
+
+.om-book-secondary a {
+  color: inherit;
+}
+
+.om-book-secondary a:visited {
+  color: inherit;
 }
 
 .om-cover-slot {
@@ -859,14 +858,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.om-book-secondary a {
-  color: var(--muted);
-}
-
-.om-book-secondary a:visited {
-  color: var(--muted);
-}
-
+.om-book-secondary a,
 .muted a {
   color: inherit;
 }

@@ -1881,11 +1881,11 @@ function AppShell({
         <div className="om-filter-row" style={{ marginTop: 16, marginBottom: 14, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, alignItems: "center" }}>
           <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
             <option value="grid">grid</option>
-            <option value="list">list</option>
+            {isMobile && <option value="list">list</option>}
           </select>
           {viewMode === "grid" && (
             <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
-              <option value={1}>1</option>
+              {isMobile && <option value={1}>1</option>}
               <option value={2}>2</option>
               {!isMobile && (
                 <>
@@ -1895,6 +1895,7 @@ function AppShell({
               )}
             </select>
           )}
+
           <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
             <option value="latest">latest</option>
             <option value="earliest">earliest</option>
