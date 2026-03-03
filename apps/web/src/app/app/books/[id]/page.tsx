@@ -860,7 +860,7 @@ export default function BookDetailPage() {
     const res = await fetch(`/api/image-proxy?url=${encodeURIComponent(value)}`);
     if (!res.ok) return;
     const blob = await res.blob();
-    const ext = extFromContentType(res.headers.get("content-type") ?? "image/jpeg");
+    const ext = extFromContentType(blob.type);
     const path = `${userId}/${userBookId}/cover-import-${Date.now()}.${ext}`;
     const up = await supabase.storage.from("user-book-media").upload(path, blob, {
       cacheControl: "3600",
@@ -896,47 +896,52 @@ export default function BookDetailPage() {
   return (
     <main className="container">
       <ScrollToTopOnMount />
-      <div className="card">
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-          <div className="row" style={{ gap: 12, alignItems: "center" }}>
-            {avatarUrl ? (
-              <div style={{ width: 48, height: 48, borderRadius: 999, overflow: "hidden", border: "1px solid var(--border-avatar)" }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img alt="" src={avatarUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              </div>
-            ) : (
-              <div style={{ width: 48, height: 48, borderRadius: 999, border: "1px solid var(--border-avatar)", background: "var(--bg-muted)" }} />
-            )}
-            <div>
-              <Link href="/app" className="muted" style={{ fontSize: "0.9em", textDecoration: "none" }}>
-                Your catalog
+      {isOwner && (
+        <div className="row" style={{ justifyContent: "flex-end", marginBottom: 12 }}>
+          <button onClick={() => setEditMode(!editMode)} className={editMode ? "text-primary" : ""}>
+            {editMode ? "Done" : "Edit"}
+          </button>
+        </div>
+      )}
+
+      {!isOwner && (
+        <div className="card">
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+            <div className="row" style={{ gap: 12, alignItems: "center" }}>
+              <Link href={`/u/${ownerProfile?.username}`} className="om-avatar-link" aria-label="Open profile">
+                {avatarUrl ? (
+                  <div style={{ width: 48, height: 48, borderRadius: 999, overflow: "hidden", border: "1px solid var(--border-avatar)" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img alt="" src={avatarUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                ) : (
+                  <div style={{ width: 48, height: 48, borderRadius: 999, border: "1px solid var(--border-avatar)", background: "var(--bg-muted)" }} />
+                )}
               </Link>
-              <div style={{ fontSize: "1.1em", marginTop: 2 }}>{ownerProfile?.display_name || `@${ownerProfile?.username}`}</div>
+              <Link href={`/u/${ownerProfile?.username}`} style={{ textDecoration: "none", color: "inherit" }} className="om-header-name-link">
+                <div style={{ fontSize: "1em" }} className="om-header-display-name">{ownerProfile?.display_name || `@${ownerProfile?.username}`}</div>
+                {ownerProfile?.display_name ? <div className="muted">@{ownerProfile?.username}</div> : null}
+              </Link>
             </div>
           </div>
-          {isOwner && (
-            <button onClick={() => setEditMode(!editMode)} className={editMode ? "text-primary" : ""}>
-              {editMode ? "Done" : "Edit"}
-            </button>
-          )}
-        </div>
 
-        <div className="row muted" style={{ marginTop: 12, gap: 16 }}>
-          <span style={{ display: "inline-flex", gap: 10 }}>
-            <Link href={`/u/${ownerProfile?.username}/followers`} className="muted">
-              Followers
-            </Link>
-            <span>{followersCount ?? "—"}</span>
-          </span>
-          <span style={{ display: "inline-flex", gap: 10 }}>
-            <Link href={`/u/${ownerProfile?.username}/following`} className="muted">
-              Following
-            </Link>
-            <span>{followingCount ?? "—"}</span>
-          </span>
-          {ownerProfile && <FollowControls profileId={book.owner_id} profileUsername={ownerProfile.username} inline />}
+          <div className="row muted" style={{ marginTop: 12, gap: 16 }}>
+            <span style={{ display: "inline-flex", gap: 10 }}>
+              <Link href={`/u/${ownerProfile?.username}/followers`} className="muted">
+                Followers
+              </Link>
+              <span>{followersCount ?? "—"}</span>
+            </span>
+            <span style={{ display: "inline-flex", gap: 10 }}>
+              <Link href={`/u/${ownerProfile?.username}/following`} className="muted">
+                Following
+              </Link>
+              <span>{followingCount ?? "—"}</span>
+            </span>
+            {ownerProfile && <FollowControls profileId={book.owner_id} profileUsername={ownerProfile.username} inline />}
+          </div>
         </div>
-      </div>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 24 }}>
         <AddToLibraryProvider editionIds={editionId ? [editionId] : []}>
@@ -1179,675 +1184,642 @@ export default function BookDetailPage() {
               </div>
 
               <div>
-                {editMode ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div className="row om-row-baseline">
-                      <div style={{ minWidth: 110 }} className="muted">
-                        Title
+                <div className="row om-row-baseline">
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Title
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input
+                        className="om-inline-control"
+                        value={formTitle}
+                        onChange={(e) => setFormTitle(e.target.value)}
+                        onKeyDown={(e) => onEnter(e, () => void saveEdits())}
+                        placeholder="Add title"
+                        style={{ fontWeight: 600, fontSize: "1.1em" }}
+                      />
+                    ) : (
+                      <div style={{ fontSize: "1.2em", fontWeight: 600 }}>{effectiveTitle}</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Authors
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <EntityTokenField
+                        role="author"
+                        value={formAuthors}
+                        onChange={setFormAuthors}
+                        placeholder="Add an author"
+                      />
+                    ) : effectiveAuthors.length > 0 ? (
+                      <div className="om-hanging-value">
+                        {effectiveAuthors.map((a, idx) => (
+                          <span key={a}>
+                            <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
+                            {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                          </span>
+                        ))}
                       </div>
-                      <div style={{ flex: "1 1 auto" }}>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Publisher
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input className="om-inline-control" type="text" value={formPublisher} onChange={(e) => setFormPublisher(e.target.value)} placeholder="Add publisher" />
+                    ) : effectivePublisher ? (
+                      <Link href={`/app?publisher=${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Publish date
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input className="om-inline-control" type="text" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} placeholder="Add date" />
+                    ) : effectivePublishDate ? (
+                      displayPublishDate
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Editors
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <EntityTokenField
+                        role="editor"
+                        value={formEditors}
+                        onChange={setFormEditors}
+                        placeholder="Add an editor"
+                      />
+                    ) : effectiveEditors.length > 0 ? (
+                      effectiveEditors.join(", ")
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Designers
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <EntityTokenField
+                        role="designer"
+                        value={formDesigners}
+                        onChange={setFormDesigners}
+                        placeholder="Add a designer"
+                      />
+                    ) : effectiveDesigners.length > 0 ? (
+                      effectiveDesigners.join(", ")
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Printer
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input className="om-inline-control" type="text" value={formPrinter} onChange={(e) => setFormPrinter(e.target.value)} placeholder="Add printer" />
+                    ) : effectivePrinter || null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Materials
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input className="om-inline-control" type="text" value={formMaterials} onChange={(e) => setFormMaterials(e.target.value)} placeholder="Add materials" />
+                    ) : effectiveMaterials || null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Edition
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input className="om-inline-control" type="text" value={formEdition} onChange={(e) => setFormEdition(e.target.value)} placeholder="Add edition" />
+                    ) : effectiveEdition || null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Trim size
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <div className="row" style={{ gap: 8 }}>
                         <input
                           className="om-inline-control"
-                          value={formTitle}
-                          onChange={(e) => setFormTitle(e.target.value)}
-                          onKeyDown={(e) => onEnter(e, () => void saveEdits())}
-                          placeholder="Add title"
-                          style={{ fontWeight: 600, fontSize: "1.1em" }}
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="W"
+                          value={formTrimWidth}
+                          onChange={(e) => setFormTrimWidth(e.target.value)}
+                          style={{ width: 50, textAlign: "center" }}
                         />
+                        <span className="muted">×</span>
+                        <input
+                          className="om-inline-control"
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="H"
+                          value={formTrimHeight}
+                          onChange={(e) => setFormTrimHeight(e.target.value)}
+                          style={{ width: 50, textAlign: "center" }}
+                        />
+                        <select
+                          className="om-inline-control"
+                          value={formTrimUnit}
+                          onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)}
+                          style={{ width: "auto", minWidth: 60 }}
+                        >
+                          <option value="in">in</option>
+                          <option value="mm">mm</option>
+                        </select>
+                      </div>
+                    ) : trimSizeValid ? (
+                      formatTrimSize(formTrimWidth, formTrimHeight, formTrimUnit)
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Pages
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input
+                        className="om-inline-control"
+                        type="text"
+                        inputMode="numeric"
+                        value={formPages}
+                        onChange={(e) => setFormPages(e.target.value)}
+                        placeholder="Add pages"
+                      />
+                    ) : book.pages ? (
+                      book.pages
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Group
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input className="om-inline-control" type="text" value={formGroup} onChange={(e) => setFormGroup(e.target.value)} placeholder="Add group" />
+                    ) : book.group_label ? (
+                      book.group_label
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Object type
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input className="om-inline-control" type="text" value={formObjectType} onChange={(e) => setFormObjectType(e.target.value)} placeholder="Add object type" />
+                    ) : book.object_type ? (
+                      book.object_type
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Decade
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <input className="om-inline-control" type="text" value={formDecade} onChange={(e) => setFormDecade(e.target.value)} placeholder="Add decade" />
+                    ) : book.decade ? (
+                      book.decade
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    Subjects
+                  </div>
+                  <div style={{ flex: "1 1 auto" }}>
+                    {editMode ? (
+                      <EntityTokenField
+                        role="subject"
+                        value={formSubjects}
+                        onChange={setFormSubjects}
+                        placeholder="Add a subject"
+                      />
+                    ) : subjects.length > 0 ? (
+                      <ExpandableContent
+                        items={subjects}
+                        limit={15}
+                        renderVisible={(visible: any[], isExpanded: boolean) => (
+                          <div>
+                            {visible.map((s, idx) => (
+                              <span key={s}>
+                                <Link href={`/app?subject=${encodeURIComponent(s)}`}>{s}</Link>
+                                {idx < visible.length - 1 ? <span>, </span> : null}
+                              </span>
+                            ))}
+                            {!isExpanded && subjects.length > 15 ? " …" : ""}
+                          </div>
+                        )}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div style={{ minWidth: 110 }} className="muted">
+                    ISBN
+                  </div>
+                  <div>{book.edition?.isbn13 ?? book.edition?.isbn10}</div>
+                </div>
+
+                <div style={{ marginTop: 8 }}>
+                  <div className="muted">Description</div>
+                  <div style={{ flex: "1 1 auto", marginTop: 6 }}>
+                    {editMode ? (
+                      <textarea
+                        ref={descriptionTextareaRef}
+                        className="om-inline-control"
+                        value={formDescription}
+                        onChange={(e) => setFormDescription(e.target.value)}
+                        placeholder="Add description"
+                        style={{ width: "100%", minHeight: 100, resize: "none" }}
+                      />
+                    ) : effectiveDescription ? (
+                      <ExpandableContent
+                        items={effectiveDescription.trim().split(/\s+/)}
+                        limit={100}
+                        renderVisible={(visible: any[], isExpanded: boolean) => (
+                          <div style={{ whiteSpace: "pre-wrap" }}>
+                            {isExpanded ? effectiveDescription : visible.join(" ") + (effectiveDescription.trim().split(/\s+/).length > 100 ? "…" : "")}
+                          </div>
+                        )}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+
+                {isOwner && (
+                  <>
+                    <hr className="om-hr" style={{ marginTop: 14, marginBottom: 14 }} />
+                    <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Catalog
+                      </div>
+                      <div style={{ flex: "1 1 auto" }}>
+                        {editMode ? (
+                          <select
+                            className="om-inline-control"
+                            value={formLibraryId ?? ""}
+                            onChange={(e) => setFormLibraryId(Number(e.target.value))}
+                            style={{ width: "auto", minWidth: 140 }}
+                          >
+                            {libraries.map((l) => (
+                              <option key={l.id} value={l.id}>
+                                {l.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          libraries.find((l) => l.id === formLibraryId)?.name ?? "—"
+                        )}
                       </div>
                     </div>
 
                     <div className="row om-row-baseline" style={{ marginTop: 8 }}>
                       <div style={{ minWidth: 110 }} className="muted">
-                        Authors
+                        Status
                       </div>
                       <div style={{ flex: "1 1 auto" }}>
-                        <EntityTokenField
-                          role="author"
-                          value={formAuthors}
-                          onChange={setFormAuthors}
-                          placeholder="Add an author"
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: 4 }}>
-                      <div className="row om-row-baseline" style={{ marginTop: 8 }}>
-                        <div style={{ minWidth: 110 }} className="muted">Catalog</div>
-                        <select
-                          className="om-inline-control"
-                          value={formLibraryId ?? ""}
-                          onChange={(e) => setFormLibraryId(Number(e.target.value))}
-                          style={{ width: "auto", minWidth: 140 }}
-                        >
-                          {libraries.map((l) => (
-                            <option key={l.id} value={l.id}>
-                              {l.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: 4 }}>
-                      <div className="row om-row-baseline" style={{ marginTop: 8 }}>
-                        <div style={{ minWidth: 110 }} className="muted">Status</div>
-                        <select
-                          className="om-inline-control"
-                          value={formStatus}
-                          onChange={(e) => setFormStatus(e.target.value as any)}
-                          style={{ width: "auto", minWidth: 140 }}
-                        >
-                          <option value="owned">Owned</option>
-                          <option value="loaned">Loaned</option>
-                          <option value="selling">Selling</option>
-                          <option value="trading">Trading</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: 4 }}>
-                      <div className="row om-row-baseline" style={{ marginTop: 8 }}>
-                        <div style={{ minWidth: 110 }} className="muted">Visibility</div>
-                        <select
-                          className="om-inline-control"
-                          value={formVisibility}
-                          onChange={(e) => setFormVisibility(e.target.value as any)}
-                          style={{ width: "auto", minWidth: 140 }}
-                        >
-                          <option value="inherit">Inherit</option>
-                          <option value="followers_only">Followers only</option>
-                          <option value="public">Public</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: 4 }}>
-                      <div className="row om-row-baseline" style={{ marginTop: 8 }}>
-                        <div style={{ minWidth: 110 }} className="muted">Borrowable</div>
-                        <select
-                          className="om-inline-control"
-                          value={formBorrowable}
-                          onChange={(e) => setFormBorrowable(e.target.value as any)}
-                          style={{ width: "auto", minWidth: 140 }}
-                        >
-                          <option value="inherit">Inherit</option>
-                          <option value="yes">Yes</option>
-                          <option value="no">No</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: 10 }}>
-                      <div className="muted" style={{ marginBottom: 6 }}>
-                        Metadata overrides
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Publisher
-                          </div>
-                          <input className="om-inline-control" type="text" value={formPublisher} onChange={(e) => setFormPublisher(e.target.value)} style={{ flex: "1 1 auto" }} />
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Publish date
-                          </div>
-                          <input className="om-inline-control" type="text" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} style={{ flex: "1 1 auto" }} />
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Editors
-                          </div>
-                          <div style={{ flex: "1 1 auto" }}>
-                            <EntityTokenField
-                              role="editor"
-                              value={formEditors}
-                              onChange={setFormEditors}
-                              placeholder="Add an editor"
-                            />
-                          </div>
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Designers
-                          </div>
-                          <div style={{ flex: "1 1 auto" }}>
-                            <EntityTokenField
-                              role="designer"
-                              value={formDesigners}
-                              onChange={setFormDesigners}
-                              placeholder="Add a designer"
-                            />
-                          </div>
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Printer
-                          </div>
-                          <input className="om-inline-control" type="text" value={formPrinter} onChange={(e) => setFormPrinter(e.target.value)} style={{ flex: "1 1 auto" }} />
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Materials
-                          </div>
-                          <input className="om-inline-control" type="text" value={formMaterials} onChange={(e) => setFormMaterials(e.target.value)} style={{ flex: "1 1 auto" }} />
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Edition
-                          </div>
-                          <input className="om-inline-control" type="text" value={formEdition} onChange={(e) => setFormEdition(e.target.value)} style={{ flex: "1 1 auto" }} />
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Trim size
-                          </div>
-                          <div className="row" style={{ gap: 8 }}>
-                            <input
-                              className="om-inline-control"
-                              type="text"
-                              inputMode="decimal"
-                              placeholder="W"
-                              value={formTrimWidth}
-                              onChange={(e) => setFormTrimWidth(e.target.value)}
-                              style={{ width: 50, textAlign: "center" }}
-                            />
-                            <span className="muted">×</span>
-                            <input
-                              className="om-inline-control"
-                              type="text"
-                              inputMode="decimal"
-                              placeholder="H"
-                              value={formTrimHeight}
-                              onChange={(e) => setFormTrimHeight(e.target.value)}
-                              style={{ width: 50, textAlign: "center" }}
-                            />
-                            <select
-                              className="om-inline-control"
-                              value={formTrimUnit}
-                              onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)}
-                              style={{ width: "auto", minWidth: 60 }}
-                            >
-                              <option value="in">in</option>
-                              <option value="mm">mm</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Pages
-                          </div>
-                          <input
+                        {editMode ? (
+                          <select
                             className="om-inline-control"
-                            type="text"
-                            inputMode="numeric"
-                            value={formPages}
-                            onChange={(e) => setFormPages(e.target.value)}
-                            style={{ flex: "1 1 auto" }}
-                          />
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Group
-                          </div>
-                          <input className="om-inline-control" type="text" value={formGroup} onChange={(e) => setFormGroup(e.target.value)} style={{ flex: "1 1 auto" }} />
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Object type
-                          </div>
-                          <input className="om-inline-control" type="text" value={formObjectType} onChange={(e) => setFormObjectType(e.target.value)} style={{ flex: "1 1 auto" }} />
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Decade
-                          </div>
-                          <input className="om-inline-control" type="text" value={formDecade} onChange={(e) => setFormDecade(e.target.value)} style={{ flex: "1 1 auto" }} />
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Subjects
-                          </div>
-                          <div style={{ flex: "1 1 auto" }}>
-                            <EntityTokenField
-                              role="subject"
-                              value={formSubjects}
-                              onChange={setFormSubjects}
-                              placeholder="Add a subject"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ marginTop: 10 }}>
-                      <div className="muted" style={{ marginBottom: 6 }}>
-                        Private notes & location
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Location
-                          </div>
-                          <input className="om-inline-control" type="text" value={formLocation} onChange={(e) => setFormLocation(e.target.value)} style={{ flex: "1 1 auto" }} />
-                        </div>
-                        <div className="row om-row-baseline">
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Shelf
-                          </div>
-                          <input className="om-inline-control" type="text" value={formShelf} onChange={(e) => setFormShelf(e.target.value)} style={{ flex: "1 1 auto" }} />
-                        </div>
-                        <textarea
-                          ref={descriptionTextareaRef}
-                          className="om-inline-control"
-                          value={formNotes}
-                          onChange={(e) => setFormNotes(e.target.value)}
-                          placeholder="Private notes…"
-                          style={{ width: "100%", minHeight: 100, marginTop: 4, resize: "none" }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="row" style={{ marginTop: 12, gap: 12 }}>
-                      <button onClick={() => void saveEdits()} disabled={saveState.busy}>
-                        {saveState.busy ? "Saving…" : "Save changes"}
-                      </button>
-                      <button onClick={() => setEditMode(false)} className="muted">
-                        Cancel
-                      </button>
-                      <div className="row" style={{ marginLeft: "auto", gap: 12 }}>
-                        {deleteConfirm ? (
-                          <>
-                            <span className="muted">Sure?</span>
-                            <button onClick={deleteBook} disabled={saveState.busy}>
-                              Yes
-                            </button>
-                            <button onClick={() => setDeleteConfirm(false)} className="muted">
-                              No
-                            </button>
-                          </>
+                            value={formStatus}
+                            onChange={(e) => setFormStatus(e.target.value as any)}
+                            style={{ width: "auto", minWidth: 140 }}
+                          >
+                            <option value="owned">Owned</option>
+                            <option value="loaned">Loaned</option>
+                            <option value="selling">Selling</option>
+                            <option value="trading">Trading</option>
+                          </select>
                         ) : (
-                          <button onClick={() => setDeleteConfirm(true)} className="muted">
-                            Delete entry
-                          </button>
+                          formStatus
                         )}
                       </div>
                     </div>
-                    {saveState.message ? (
-                      <div className="muted" style={{ marginTop: 6 }}>
-                        {saveState.error ? `${saveState.message} (${saveState.error})` : saveState.message}
+
+                    <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Visibility
                       </div>
-                    ) : null}
-                  </div>
-                ) : (
-
-                  <>
-                    <div style={{ fontSize: "1.2em", fontWeight: 600 }}>{effectiveTitle}</div>
-                    {effectiveAuthors.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 10 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Authors
-                        </div>
-                        <div className="om-hanging-value">
-                          {effectiveAuthors.map((a, idx) => (
-                            <span key={a}>
-                              <Link href={`/app?author=${encodeURIComponent(a)}`}>{a}</Link>
-                              {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                            </span>
-                          ))}
-                        </div>
+                      <div style={{ flex: "1 1 auto" }}>
+                        {editMode ? (
+                          <select
+                            className="om-inline-control"
+                            value={formVisibility}
+                            onChange={(e) => setFormVisibility(e.target.value as any)}
+                            style={{ width: "auto", minWidth: 140 }}
+                          >
+                            <option value="inherit">Inherit</option>
+                            <option value="followers_only">Followers only</option>
+                            <option value="public">Public</option>
+                          </select>
+                        ) : (
+                          formVisibility
+                        )}
                       </div>
-                    ) : null}
-
-                    {effectiveEditors.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Editors
-                        </div>
-                        <div>{effectiveEditors.join(", ")}</div>
-                      </div>
-                    ) : null}
-
-                    {effectiveDesigners.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Designers
-                        </div>
-                        <div>{effectiveDesigners.join(", ")}</div>
-                      </div>
-                    ) : null}
-
-                    {effectivePrinter ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Printer
-                        </div>
-                        <div>{effectivePrinter}</div>
-                      </div>
-                    ) : null}
-
-                    {effectiveMaterials ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Materials
-                        </div>
-                        <div>{effectiveMaterials}</div>
-                      </div>
-                    ) : null}
-
-                    {effectiveEdition ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Edition
-                        </div>
-                        <div>{effectiveEdition}</div>
-                      </div>
-                    ) : null}
-
-                    {effectivePublisher ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Publisher
-                        </div>
-                        <div>
-                          <Link href={`/app?publisher=${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {effectivePublishDate ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Publish date
-                        </div>
-                        <div>{displayPublishDate}</div>
-                      </div>
-                    ) : null}
-
-                    {trimSizeValid ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Trim size
-                        </div>
-                        <div>{formatTrimSize(formTrimWidth, formTrimHeight, formTrimUnit)}</div>
-                      </div>
-                    ) : null}
-
-                    {book.pages ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Pages
-                        </div>
-                        <div>{book.pages}</div>
-                      </div>
-                    ) : null}
-
-                    {(book.group_label ?? "").trim() ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Group
-                        </div>
-                        <div>{(book.group_label ?? "").trim()}</div>
-                      </div>
-                    ) : null}
-
-                    {(book.object_type ?? "").trim() ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Object type
-                        </div>
-                        <div>{(book.object_type ?? "").trim()}</div>
-                      </div>
-                    ) : null}
-
-                    {(book.decade ?? "").trim() ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Decade
-                        </div>
-                        <div>{(book.decade ?? "").trim()}</div>
-                      </div>
-                    ) : null}
-
-                    {subjects.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 12 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          Subjects
-                        </div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          <ExpandableContent
-                            items={subjects}
-                            limit={15}
-                            renderVisible={(visible: any[], isExpanded: boolean) => (
-                              <div>
-                                {visible.map((s, idx) => (
-                                  <span key={s}>
-                                    <Link href={`/app?subject=${encodeURIComponent(s)}`}>{s}</Link>
-                                    {idx < visible.length - 1 ? <span>, </span> : null}
-                                  </span>
-                                ))}
-                                {!isExpanded && subjects.length > 15 ? " …" : ""}
-                              </div>
-                            )}
-                          />
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {book.edition?.isbn13 || book.edition?.isbn10 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 6 }}>
-                        <div style={{ minWidth: 110 }} className="muted">
-                          ISBN
-                        </div>
-                        <div>{book.edition?.isbn13 ?? book.edition?.isbn10}</div>
-                      </div>
-                    ) : null}
-
-                    {isOwner && (
-                      <>
-                        <hr className="om-hr" style={{ marginTop: 14, marginBottom: 14 }} />
-                        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Location
-                          </div>
-                          <div>{book.location || "—"}</div>
-                        </div>
-                        <div className="row" style={{ marginTop: 6, justifyContent: "space-between", alignItems: "baseline" }}>
-                          <div className="muted" style={{ minWidth: 110 }}>
-                            Shelf
-                          </div>
-                          <div>{book.shelf || "—"}</div>
-                        </div>
-                        {book.notes ? (
-                          <div style={{ marginTop: 12 }}>
-                            <div className="muted">Private notes</div>
-                            <div style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>{book.notes}</div>
-                          </div>
-                        ) : null}
-                      </>
-                    )}
-
-                    {book.edition?.description ? (
-                      <div style={{ marginTop: 12 }}>
-                        <div className="muted">Description</div>
-                        <div style={{ marginTop: 6 }}>
-                          <ExpandableContent
-                            items={book.edition.description.trim().split(/\s+/)}
-                            limit={100}
-                            renderVisible={(visible: any[], isExpanded: boolean) => (
-                              <div style={{ whiteSpace: "pre-wrap" }}>
-                                {isExpanded ? book.edition!.description : visible.join(" ") + (book.edition!.description!.trim().split(/\s+/).length > 100 ? "…" : "")}
-                              </div>
-                            )}
-                          />
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {isOwner && !book.edition && (
-                      <div style={{ marginTop: 14 }}>
-                        <details open={findMoreOpen} onToggle={(e) => setFindMoreOpen((e.currentTarget as HTMLDetailsElement).open)}>
-                          <summary className="muted" style={{ cursor: "pointer", textDecoration: "underline" }}>
-                            Link to edition metadata…
-                          </summary>
-                          <div style={{ marginTop: 14 }}>
-                            <div className="row" style={{ width: "100%", gap: 12, alignItems: "baseline" }}>
-                              {showScan && (
-                                <div className="row" style={{ gap: 12, flex: "0 0 auto", alignItems: "baseline" }}>
-                                  <button 
-                                    className="muted" 
-                                    onClick={openScanner} 
-                                    style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}
-                                  >
-                                    Scan
-                                  </button>
-                                  <span className="muted">or</span>
-                                </div>
-                              )}
-                              <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                                <input
-                                  className="om-inline-control"
-                                  placeholder={showScan ? "enter ISBN…" : "Scan or enter ISBN, URL, or title"}
-                                  value={lookupInput}
-                                  onFocus={() => setLookupInputFocused(true)}
-                                  onBlur={() => setTimeout(() => setLookupInputFocused(false), 150)}
-                                  onChange={(e) => setLookupInput(e.target.value)}
-                                  onKeyDown={(e) => onEnter(e, smartLookup)}
-                                  style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
-                                />
-                              </div>
-                              {(lookupInput.trim() || lookupInputFocused) ? (
-                                <button
-                                  onClick={() => smartLookup()}
-                                  disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
-                                  style={{ whiteSpace: "nowrap", marginLeft: 12 }}
-                                >
-                                  Find
-                                </button>
-                              ) : null}
-                            </div>
-                          </div>
-                          <div className="muted" style={{ marginTop: 6 }}>
-                            {importState.busy || searchState.busy
-                              ? "Working…"
-                              : importState.error
-                              ? `${importState.message} (${importState.error})`
-                              : importState.message || searchState.error || searchState.message || "Enter ISBN, URL, or Title to link this book to metadata."}
-                          </div>
-
-                          {searchResults.length > 0 && (
-                            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                              {searchResults.map((r, idx) => (
-                                <div key={idx} className="card" style={{ padding: "8px 12px", background: "var(--bg-muted)" }}>
-                                  <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                                    {r.cover_url ? (
-                                      <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
-                                        <img
-                                          src={r.cover_url}
-                                          alt=""
-                                          width={60}
-                                          style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
-                                          onLoad={(e) => {
-                                            if (e.currentTarget.naturalWidth < 100 || e.currentTarget.naturalHeight < 100) {
-                                              e.currentTarget.style.display = "none";
-                                            }
-                                          }}
-                                        />
-                                      </div>
-                                    ) : (
-                                      <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
-                                    )}
-                                    <div style={{ flex: "1 1 auto" }}>
-                                      <div style={{ fontWeight: 600 }}>{r.title}</div>
-                                      <div className="muted" style={{ fontSize: "0.9em" }}>
-                                        {(r.authors ?? []).join(", ")}
-                                        {r.publisher ? ` · ${r.publisher}` : ""}
-                                        {r.publish_year ? ` · ${r.publish_year}` : ""}
-                                      </div>
-                                      <div className="muted" style={{ fontSize: "0.85em", marginTop: 4 }}>
-                                        {r.isbn13 || r.isbn10} · {r.source}
-                                      </div>
-                                    </div>
-                                    <button onClick={() => linkToEdition(r)} disabled={importState.busy}>
-                                      Link
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </details>
-                      </div>
-                    )}
-
-                    {isOwner && book.edition && (
-                      <div style={{ marginTop: 14 }}>
-                        <button onClick={unlinkEdition} className="muted" style={{ textDecoration: "underline" }}>
-                          Unlink edition metadata
-                        </button>
-                      </div>
-                    )}
-
-                    <div style={{ marginTop: 14 }}>
-                      <BorrowRequestWidget
-                        userBookId={book.id}
-                        ownerId={book.owner_id}
-                        ownerUsername={ownerProfile?.username || ""}
-                        bookTitle={effectiveTitle}
-                        borrowable={effectiveBorrowable}
-                        scope={effectiveBorrowScope}
-                      />
                     </div>
 
-                    <div style={{ marginTop: 14 }}>
-                      <div className="row" style={{ alignItems: "baseline", gap: 12 }}>
-                        <span className="muted">Public link:</span>
-                        <div className="row" style={{ flex: "1 1 auto", minWidth: 0, gap: 8, alignItems: "baseline" }}>
-                          <a
-                            href={publicBookUrl || ""}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                              color: "var(--fg)",
-                              opacity: isPubliclyVisible ? 1 : 0.5
-                            }}
+                    <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Borrowable
+                      </div>
+                      <div style={{ flex: "1 1 auto" }}>
+                        {editMode ? (
+                          <select
+                            className="om-inline-control"
+                            value={formBorrowable}
+                            onChange={(e) => setFormBorrowable(e.target.value as any)}
+                            style={{ width: "auto", minWidth: 140 }}
                           >
-                            {publicBookUrl || "…"}
-                          </a>
-                          {!isPubliclyVisible && (
-                            <span className="muted" style={{ fontSize: "0.85em" }}>
-                              (private)
-                            </span>
-                          )}
-                          <div style={{ flex: "0 0 auto", marginLeft: "auto" }}>
-                            {shareState.message === "Copied" ? (
-                              <span style={{ flex: "0 0 auto", marginLeft: 2 }}>Copied</span>
-                            ) : (
-                              <button onClick={copyPublicLink} style={{ flex: "0 0 auto", marginLeft: 2 }}>
-                                Copy
-                              </button>
-                            )}
-                          </div>
-                          {shareState.error ? (
-                            <div className="muted" style={{ marginTop: 6, textAlign: "right" }}>
-                              {shareState.message} ({shareState.error})
-                            </div>
-                          ) : null}
-                        </div>
+                            <option value="inherit">Inherit</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        ) : (
+                          formBorrowable
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Location
+                      </div>
+                      <div style={{ flex: "1 1 auto" }}>
+                        {editMode ? (
+                          <input className="om-inline-control" type="text" value={formLocation} onChange={(e) => setFormLocation(e.target.value)} placeholder="Add location" />
+                        ) : (
+                          book.location || "—"
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                      <div style={{ minWidth: 110 }} className="muted">
+                        Shelf
+                      </div>
+                      <div style={{ flex: "1 1 auto" }}>
+                        {editMode ? (
+                          <input className="om-inline-control" type="text" value={formShelf} onChange={(e) => setFormShelf(e.target.value)} placeholder="Add shelf" />
+                        ) : (
+                          book.shelf || "—"
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 12 }}>
+                      <div className="muted">Private notes</div>
+                      <div style={{ flex: "1 1 auto", marginTop: 6 }}>
+                        {editMode ? (
+                          <textarea
+                            className="om-inline-control"
+                            value={formNotes}
+                            onChange={(e) => setFormNotes(e.target.value)}
+                            placeholder="Add notes"
+                            style={{ width: "100%", minHeight: 100, resize: "none" }}
+                          />
+                        ) : book.notes ? (
+                          <div style={{ whiteSpace: "pre-wrap" }}>{book.notes}</div>
+                        ) : null}
                       </div>
                     </div>
                   </>
+                )}
+
+                {editMode && (
+                  <div className="row" style={{ marginTop: 12, gap: 12 }}>
+                    <button onClick={() => void saveEdits()} disabled={saveState.busy}>
+                      {saveState.busy ? "Saving…" : "Save changes"}
+                    </button>
+                    <button onClick={() => setEditMode(false)} className="muted">
+                      Cancel
+                    </button>
+                    <div className="row" style={{ marginLeft: "auto", gap: 12 }}>
+                      {deleteConfirm ? (
+                        <>
+                          <span className="muted">Sure?</span>
+                          <button onClick={deleteBook} disabled={saveState.busy}>
+                            Yes
+                          </button>
+                          <button onClick={() => setDeleteConfirm(false)} className="muted">
+                            No
+                          </button>
+                        </>
+                      ) : (
+                        <button onClick={() => setDeleteConfirm(true)} className="muted">
+                          Delete entry
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {!editMode && isOwner && !book.edition && (
+                  <div style={{ marginTop: 14 }}>
+                    <details open={findMoreOpen} onToggle={(e) => setFindMoreOpen((e.currentTarget as HTMLDetailsElement).open)}>
+                      <summary className="muted" style={{ cursor: "pointer", textDecoration: "underline" }}>
+                        Link to edition metadata…
+                      </summary>
+                      <div style={{ marginTop: 14 }}>
+                        <div className="om-lookup-controls" style={{ marginTop: 8, gridTemplateColumns: "1fr", gap: 0 }}>
+                          <div className="row" style={{ width: "100%", gap: 12, alignItems: "baseline" }}>
+                            {showScan && (
+                              <div className="row" style={{ gap: 12, flex: "0 0 auto", alignItems: "baseline" }}>
+                                <button 
+                                  className="muted" 
+                                  onClick={openScanner} 
+                                  style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}
+                                >
+                                  Scan
+                                </button>
+                                <span className="muted">or</span>
+                              </div>
+                            )}
+                            <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                              <input
+                                className="om-inline-control"
+                                placeholder={showScan ? "enter ISBN…" : "Scan or enter ISBN, URL, or title"}
+                                value={lookupInput}
+                                onFocus={() => setLookupInputFocused(true)}
+                                onBlur={() => setTimeout(() => setLookupInputFocused(false), 150)}
+                                onChange={(e) => setLookupInput(e.target.value)}
+                                onKeyDown={(e) => onEnter(e, smartLookup)}
+                                style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
+                              />
+                            </div>
+                            {(lookupInput.trim() || lookupInputFocused) ? (
+                              <button
+                                onClick={() => smartLookup()}
+                                disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
+                                style={{ whiteSpace: "nowrap", marginLeft: 12 }}
+                              >
+                                Find
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="muted" style={{ marginTop: 6 }}>
+                          {importState.busy || searchState.busy
+                            ? "Working…"
+                            : importState.error
+                            ? `${importState.message} (${importState.error})`
+                            : importState.message || searchState.error || searchState.message || "Enter ISBN, URL, or Title to link this book to metadata."}
+                        </div>
+
+                        {searchResults.length > 0 && (
+                          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                            {searchResults.map((r, idx) => (
+                              <div key={idx} className="card" style={{ padding: "8px 12px", background: "var(--bg-muted)" }}>
+                                <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                                  {r.cover_url ? (
+                                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
+                                      <img
+                                        src={r.cover_url}
+                                        alt=""
+                                        width={60}
+                                        style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
+                                        onLoad={(e) => {
+                                          if (e.currentTarget.naturalWidth < 100 || e.currentTarget.naturalHeight < 100) {
+                                            e.currentTarget.style.display = "none";
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
+                                  )}
+                                  <div style={{ flex: "1 1 auto" }}>
+                                    <div style={{ fontWeight: 600 }}>{r.title}</div>
+                                    <div className="muted" style={{ fontSize: "0.9em" }}>
+                                      {(r.authors ?? []).join(", ")}
+                                      {r.publisher ? ` · ${r.publisher}` : ""}
+                                      {r.publish_year ? ` · ${r.publish_year}` : ""}
+                                    </div>
+                                    <div className="muted" style={{ fontSize: "0.85em", marginTop: 4 }}>
+                                      {r.isbn13 || r.isbn10} · {r.source}
+                                    </div>
+                                  </div>
+                                  <button onClick={() => linkToEdition(r)} disabled={importState.busy}>
+                                    Link
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ marginTop: 12 }}>
+                        <BorrowRequestWidget
+                          userBookId={book.id}
+                          ownerId={book.owner_id}
+                          ownerUsername={ownerProfile?.username || ""}
+                          bookTitle={effectiveTitle}
+                          borrowable={effectiveBorrowable}
+                          scope={effectiveBorrowScope}
+                        />
+                      </div>
+                    </details>
+                  </div>
+                )}
+
+                {!editMode && isOwner && book.edition && (
+                  <div style={{ marginTop: 14 }}>
+                    <button onClick={unlinkEdition} className="muted" style={{ textDecoration: "underline" }}>
+                      Unlink edition metadata
+                    </button>
+                  </div>
+                )}
+
+                {!editMode && (
+                  <div style={{ marginTop: 14 }}>
+                    <div className="row" style={{ alignItems: "baseline", gap: 12 }}>
+                      <span className="muted">Public link:</span>
+                      <div className="row" style={{ flex: "1 1 auto", minWidth: 0, gap: 8, alignItems: "baseline" }}>
+                        <a
+                          href={publicBookUrl || ""}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            color: "var(--fg)",
+                            opacity: isPubliclyVisible ? 1 : 0.5
+                          }}
+                        >
+                          {publicBookUrl || "…"}
+                        </a>
+                        {!isPubliclyVisible && (
+                          <span className="muted" style={{ fontSize: "0.85em" }}>
+                            (private)
+                          </span>
+                        )}
+                        <div style={{ flex: "0 0 auto", marginLeft: "auto" }}>
+                          {shareState.message === "Copied" ? (
+                            <span style={{ flex: "0 0 auto", marginLeft: 2 }}>Copied</span>
+                          ) : (
+                            <button onClick={copyPublicLink} style={{ flex: "0 0 auto", marginLeft: 2 }}>
+                              Copy
+                            </button>
+                          )}
+                        </div>
+                        {shareState.error ? (
+                          <div className="muted" style={{ marginTop: 6, textAlign: "right" }}>
+                            {shareState.message} ({shareState.error})
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
 
             <div style={{ marginTop: 16 }}>
-              <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-                <div className="muted">Additional images</div>
+              <div className="row" style={{ justifyContent: "flex-end", alignItems: "baseline" }}>
                 {isOwner && (
                   <div style={{ display: "inline-flex", gap: 12 }}>
                     <label className="muted" style={{ cursor: "pointer", textDecoration: "underline" }}>
