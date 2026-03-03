@@ -268,7 +268,7 @@ textarea:focus-visible {
   outline: 0 !important;
   box-shadow: none !important;
   border-color: var(--border) !important;
-  border-bottom: 1px solid var(--fg) !important;
+  border-bottom: 0 !important;
 }
 
 select:focus,
@@ -276,7 +276,7 @@ select:focus-visible {
   outline: 0 !important;
   box-shadow: none !important;
   border-color: var(--border) !important;
-  border-bottom: 1px solid var(--fg) !important;
+  border-bottom: 0 !important;
 }
 
 input[type="search"]::-webkit-search-decoration,
@@ -645,6 +645,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 
 .om-inline-search-input:focus {
   border-bottom: 1px solid var(--fg);
+  outline: none;
 }
 
 .om-input-underline-wrapper {
