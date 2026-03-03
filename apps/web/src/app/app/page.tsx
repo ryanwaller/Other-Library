@@ -2441,8 +2441,17 @@ function AppShell({
               </div>
             ) : (
               <>
+                {showScan ? (
+                  <button className="muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: "0 6px", fontSize: "0.85em", height: "32px", alignSelf: "center" }}>
+                    Scan
+                  </button>
+                ) : (
+                  <span className="muted" style={{ whiteSpace: "nowrap", fontSize: "0.85em", alignSelf: "center", padding: "0 6px" }}>
+                    Scan
+                  </span>
+                )}
                 <input
-                  placeholder="Scan or enter ISBN, URL, or title"
+                  placeholder="or enter ISBN, URL, or title"
                   value={addInput}
                   onFocus={() => setAddInputFocused(true)}
                   onBlur={() => setAddInputFocused(false)}
@@ -2455,11 +2464,6 @@ function AppShell({
                   style={{ minWidth: 0, flex: 1 }}
                 />
                 <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
-                  {showScan && (
-                    <button className="muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: "0 6px", fontSize: "0.85em" }}>
-                      Scan
-                    </button>
-                  )}
                   {(addInput.trim() || addInputFocused) ? (
                     <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
                       {addState.busy ? "Working…" : "Go"}
