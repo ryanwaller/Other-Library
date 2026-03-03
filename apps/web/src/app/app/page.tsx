@@ -2453,7 +2453,7 @@ function AppShell({
                     <span className="muted">or</span>
                   </div>
                 )}
-                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                <div className="om-input-underline-wrapper">
                   <input
                     placeholder={showScan ? "enter ISBN, URL, or title" : "Add by ISBN, URL, or title"}
                     value={addInput}
@@ -2465,20 +2465,20 @@ function AppShell({
                       e.preventDefault();
                       smartAddOrSearch();
                     }}
-                    style={{ width: "100%" }}
+                    style={{ width: "100%", margin: 0 }}
                   />
-                </div>
-                <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
-                  {(addInput.trim() || addInputFocused) ? (
-                    <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
-                      {addState.busy ? "Working…" : "Go"}
-                    </button>
-                  ) : null}
-                  {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
-                    <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
-                      Cancel
-                    </button>
-                  ) : null}
+                  <div className="row" style={{ marginLeft: 12, gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
+                    {(addInput.trim() || addInputFocused) ? (
+                      <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
+                        {addState.busy ? "Working…" : "Go"}
+                      </button>
+                    ) : null}
+                    {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
+                      <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             )}
