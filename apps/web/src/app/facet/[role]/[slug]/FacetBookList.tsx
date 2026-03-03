@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import CoverImage, { type CoverCrop } from "../../../../components/CoverImage";
 import PagedBookList from "../../../app/components/PagedBookList";
@@ -28,12 +29,25 @@ export default function FacetBookList({
   books: FacetBook[];
   signedByPath: Record<string, string>;
 }) {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   return (
     <PagedBookList
       items={books}
       viewMode="grid"
-      gridCols={4}
-      containerStyle={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}
+      gridCols={isMobile ? 2 : 4}
+      containerStyle={{ 
+        marginTop: 10, 
+        display: "grid", 
+        gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(180px, 1fr))", 
+        gap: 16 
+      }}
       renderItem={(book) => {
         const title = String((book.title_override ?? "").trim() || book.edition?.title || "(untitled)");
         const authors =

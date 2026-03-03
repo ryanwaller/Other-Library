@@ -9,9 +9,25 @@ import SignInCard from "../components/SignInCard";
 import BulkBar from "./components/BulkBar";
 import LibraryBlock from "./components/LibraryBlock";
 import BookCard from "./components/BookCard";
-import type { CoverCrop } from "../../components/CoverImage";
 import { useBookScanner } from "../../hooks/useBookScanner";
 import dynamic from "next/dynamic";
+import type { CatalogItem, CatalogGroup } from "../../lib/types";
+import { 
+  normalizeKeyPart, 
+  effectiveTitleFor, 
+  effectiveAuthorsFor, 
+  effectiveSubjectsFor, 
+  effectivePublisherFor, 
+  groupKeyFor,
+  tagsFor
+} from "../../lib/book";
+import {
+  normalizeIsbn,
+  looksLikeIsbn,
+  tryParseUrl,
+  parseTitleAndAuthor
+} from "../../lib/isbn";
+
 const BookScannerModal = dynamic(() => import("../../components/BookScannerModal"), { ssr: false });
 
 type EditionMetadata = {
@@ -61,7 +77,6 @@ function parseCsvToObjects(text: string): Array<Record<string, string>> {
     if (ch === "\n") {
       row.push(field);
       field = "";
-      // Skip completely empty trailing row
       if (row.some((v) => (v ?? "").trim() !== "")) rows.push(row);
       row = [];
       continue;
@@ -189,10 +204,6 @@ function parseStructuredNotes(notes: string | null): {
   };
 }
 
-function normalizeKeyPart(input: string): string {
-  return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
 function AppShell({
   session,
   filterTag,
@@ -307,53 +318,6 @@ function AppShell({
     Record<number, { busy: boolean; error: string | null; message: string | null } | undefined>
   >({});
   const [coverInputKeyByBookId, setCoverInputKeyByBookId] = useState<Record<number, number>>({});
-  type CatalogItem = {
-    id: number;
-    library_id: number;
-    created_at: string;
-    visibility: "inherit" | "followers_only" | "public";
-    title_override: string | null;
-    authors_override: string[] | null;
-    subjects_override: string[] | null;
-    publisher_override: string | null;
-    designers_override: string[] | null;
-    group_label: string | null;
-    decade: string | null;
-    cover_original_url: string | null;
-    cover_crop: CoverCrop | null;
-    edition: {
-      id: number;
-      isbn13: string | null;
-      title: string | null;
-      authors: string[] | null;
-      subjects: string[] | null;
-      publisher: string | null;
-      cover_url: string | null;
-      publish_date: string | null;
-    } | null;
-    media: Array<{ id: number; kind: "cover" | "image"; storage_path: string; caption: string | null; created_at: string }>;
-    book_tags: Array<{ tag: { id: number; name: string; kind: "tag" | "category" } | null }>;
-  };
-  type CatalogGroup = {
-    key: string;
-    libraryId: number;
-    primary: CatalogItem;
-    copies: CatalogItem[];
-    copiesCount: number;
-    tagNames: string[];
-    categoryNames: string[];
-    filterAuthors: string[];
-    filterSubjects: string[];
-    filterPublishers: string[];
-    filterDesigners: string[];
-    filterGroups: string[];
-    filterDecades: string[];
-    title: string;
-    visibility: "inherit" | "followers_only" | "public" | "mixed";
-    effectiveVisibility: "public" | "followers_only" | "mixed";
-    latestCreatedAt: number;
-    earliestCreatedAt: number;
-  };
 
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
@@ -378,6 +342,7 @@ function AppShell({
     minWidth: 260
   });
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const [deleteStateByBookId, setDeleteStateByBookId] = useState<Record<number, { busy: boolean; error: string | null; message: string | null } | undefined>>(
     {}
   );
@@ -398,7 +363,6 @@ function AppShell({
   const [addOpen, setAddOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
 
   function exitEditMode() {
     setBulkMode(false);
@@ -489,7 +453,6 @@ function AppShell({
     } catch {
       // ignore
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -608,7 +571,6 @@ function AppShell({
     try {
       let list: Array<{ id: number; name: string; created_at: string; sort_order?: number | null }> = [];
 
-      // Prefer DB ordering if the column exists, but gracefully fall back (older schema).
       const resWithOrder = await supabase.from("libraries").select("id,name,created_at,sort_order").eq("owner_id", userId).order("sort_order", { ascending: true });
       if (!resWithOrder.error) {
         list = (resWithOrder.data ?? []) as any;
@@ -631,7 +593,6 @@ function AppShell({
         list = (res2.data ?? []) as any;
       }
 
-      // Apply local order preference (used even if DB order is present, until we migrate fully).
       try {
         const raw = window.localStorage.getItem("om_libraryOrder");
         const order = (raw ?? "")
@@ -824,48 +785,6 @@ function AppShell({
     };
   }, [userId]);
 
-  function normalizeIsbn(input: string): string {
-    return input
-      .trim()
-      .toUpperCase()
-      .replace(/[^0-9X]/g, "");
-  }
-
-  function looksLikeIsbn(input: string): boolean {
-    const n = normalizeIsbn(input);
-    return n.length === 10 || n.length === 13;
-  }
-
-  function tryParseUrl(input: string): URL | null {
-    const raw = input.trim();
-    if (!raw) return null;
-    try {
-      return new URL(raw);
-    } catch {
-      // allow "www.example.com/..."
-      if (raw.startsWith("www.")) {
-        try {
-          return new URL(`https://${raw}`);
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    }
-  }
-
-  function parseTitleAndAuthor(input: string): { title: string; author: string | null } {
-    const s = input.trim().replace(/\s+/g, " ");
-    if (!s) return { title: "", author: null };
-    const by = s.split(/\s+by\s+/i);
-    if (by.length === 2 && by[0] && by[1]) return { title: by[0].trim(), author: by[1].trim() || null };
-    const dash = s.split(" - ");
-    if (dash.length === 2 && dash[0] && dash[1]) return { title: dash[0].trim(), author: dash[1].trim() || null };
-    const slash = s.split(" / ");
-    if (slash.length === 2 && slash[0] && slash[1]) return { title: slash[0].trim(), author: slash[1].trim() || null };
-    return { title: s, author: null };
-  }
-
   async function addByIsbnValue(isbnValue: string): Promise<number> {
     if (!supabase) throw new Error("Supabase is not configured");
     if (!addLibraryId) throw new Error("Choose a catalog first");
@@ -879,7 +798,6 @@ function AppShell({
       const isbn13 = (edition.isbn13 ?? "").trim();
       if (!isbn13) throw new Error("No ISBN-13 returned by resolver");
 
-      // Find or insert edition (no updates; users can override on user_books later).
       const existing = await supabase.from("editions").select("id").eq("isbn13", isbn13).maybeSingle();
       if (existing.error) throw new Error(existing.error.message);
 
@@ -1208,7 +1126,6 @@ function AppShell({
         }
         done += 1;
         setCsvImportState((s) => ({ ...s, done, message: `Importing… ${done}/${csvRows.length}` }));
-        // Brief delay to mitigate rate limiting and allow UI updates
         await new Promise(res => setTimeout(res, 20));
       }
 
@@ -1371,183 +1288,15 @@ function AppShell({
     setAddPreviewCoverFailed(false);
   }
 
-  async function updateUserBookVisibility(userBookId: number, nextVisibility: "inherit" | "followers_only" | "public") {
-    if (!supabase) return;
-    const { error } = await supabase.from("user_books").update({ visibility: nextVisibility }).eq("id", userBookId);
-    if (error) return;
-    setItems((prev) => prev.map((it) => (it.id === userBookId ? { ...it, visibility: nextVisibility } : it)));
-  }
-
-  async function updateUserBookVisibilityGroup(userBookIds: number[], nextVisibility: "inherit" | "followers_only" | "public") {
-    if (!supabase) return;
-    const ids = Array.from(new Set(userBookIds)).filter((n) => Number.isFinite(n) && n > 0);
-    if (ids.length === 0) return;
-    const { error } = await supabase.from("user_books").update({ visibility: nextVisibility }).in("id", ids);
-    if (error) return;
-    setItems((prev) => prev.map((it) => (ids.includes(it.id) ? { ...it, visibility: nextVisibility } : it)));
-  }
-
-  function safeFileName(name: string): string {
-    return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
-  }
-
-  function selectPendingCover(userBookId: number, files: FileList | null) {
-    const picked = Array.from(files ?? []).filter((f) => f.size > 0);
-    const first = picked[0];
-    setPendingCoverByBookId((prev) => ({ ...prev, [userBookId]: first }));
-    setCoverUploadStateByBookId((prev) => ({
-      ...prev,
-      [userBookId]: first ? { busy: false, error: null, message: `${first.name} selected` } : undefined
-    }));
-  }
-
-  function clearPendingCover(userBookId: number) {
-    setPendingCoverByBookId((prev) => {
-      const next = { ...prev };
-      delete next[userBookId];
-      return next;
-    });
-    setCoverUploadStateByBookId((prev) => {
-      const next = { ...prev };
-      delete next[userBookId];
-      return next;
-    });
-    setCoverInputKeyByBookId((prev) => ({ ...prev, [userBookId]: (prev[userBookId] ?? 0) + 1 }));
-  }
-
-  async function uploadSelectedCover(userBookId: number) {
-    if (!supabase) return;
-    const file = pendingCoverByBookId[userBookId];
-    if (!file) return;
-
-    setCoverUploadStateByBookId((prev) => ({
-      ...prev,
-      [userBookId]: { busy: true, error: null, message: "Uploading cover…" }
-    }));
-
-    const path = `${userId}/${userBookId}/cover-${Date.now()}-${safeFileName(file.name)}`;
-    const up = await supabase.storage.from("user-book-media").upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: file.type || "application/octet-stream"
-    });
-    if (up.error) {
-      setCoverUploadStateByBookId((prev) => ({
-        ...prev,
-        [userBookId]: { busy: false, error: up.error.message, message: "Upload failed" }
-      }));
-      return;
-    }
-
-    const inserted = await supabase
-      .from("user_book_media")
-      .insert({ user_book_id: userBookId, kind: "cover", storage_path: path, caption: null })
-      .select("id")
-      .single();
-    if (inserted.error) {
-      setCoverUploadStateByBookId((prev) => ({
-        ...prev,
-        [userBookId]: { busy: false, error: inserted.error.message, message: "Upload failed" }
-      }));
-      return;
-    }
-
-    await supabase
-      .from("user_book_media")
-      .update({ kind: "image" })
-      .eq("user_book_id", userBookId)
-      .eq("kind", "cover")
-      .neq("id", inserted.data.id);
-
-    await refreshAllBooks();
-    clearPendingCover(userBookId);
-    setCoverUploadStateByBookId((prev) => ({
-      ...prev,
-      [userBookId]: { busy: false, error: null, message: "Cover uploaded" }
-    }));
-  }
-
-  async function deleteEntry(userBookId: number) {
-    if (!supabase) return;
-    if (!window.confirm("Delete this entry?")) return;
-
-    setDeleteStateByBookId((prev) => ({
-      ...prev,
-      [userBookId]: { busy: true, error: null, message: "Deleting…" }
-    }));
-
-    try {
-      const it = items.find((x) => x.id === userBookId) ?? null;
-      const paths = (it?.media ?? [])
-        .map((m) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
-        .filter(Boolean);
-
-      if (paths.length > 0) {
-        const rm = await supabase.storage.from("user-book-media").remove(paths);
-        if (rm.error) {
-          // continue; we'll still delete the DB record
-        }
-      }
-
-      const del = await supabase.from("user_books").delete().eq("id", userBookId);
-      if (del.error) throw new Error(del.error.message);
-
-      await refreshAllBooks();
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
-      setUserBooksCount(count ?? 0);
-
-      setDeleteStateByBookId((prev) => ({
-        ...prev,
-        [userBookId]: { busy: false, error: null, message: "Deleted" }
-      }));
-    } catch (e: any) {
-      setDeleteStateByBookId((prev) => ({
-        ...prev,
-        [userBookId]: { busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" }
-      }));
-    }
-  }
-
-  const filteredItems = useMemo(() => {
-    return items;
-  }, [items]);
-
-  function effectiveTitleFor(it: CatalogItem): string {
-    const e = it.edition;
-    return it.title_override?.trim() ? it.title_override : e?.title ?? "(untitled)";
-  }
-
-  function effectiveAuthorsFor(it: CatalogItem): string[] {
-    const override = (it.authors_override ?? []).filter(Boolean);
-    if (override.length > 0) return override;
-    return (it.edition?.authors ?? []).filter(Boolean);
-  }
-
-  function effectiveSubjectsFor(it: CatalogItem): string[] {
-    if (it.subjects_override !== null && it.subjects_override !== undefined) return (it.subjects_override ?? []).filter(Boolean);
-    return ((it.edition?.subjects ?? []) as string[]).filter(Boolean);
-  }
-
-  function tagsFor(it: CatalogItem): Array<{ name: string; kind: "tag" | "category" }> {
-    return (it.book_tags ?? [])
-      .map((bt) => bt.tag)
-      .filter(Boolean)
-      .map((t) => ({ name: (t as any).name as string, kind: (t as any).kind as "tag" | "category" }))
-      .filter((t) => t.name && (t.kind === "tag" || t.kind === "category"));
-  }
-
-  function effectivePublisherFor(it: CatalogItem): string {
-    const o = (it.publisher_override ?? "").trim();
-    if (o) return o;
-    return (it.edition?.publisher ?? "").trim();
-  }
-
-  function groupKeyFor(it: CatalogItem): string {
-    const eId = it.edition?.id ?? null;
-    if (eId) return `e:${eId}`;
-    const title = normalizeKeyPart(effectiveTitleFor(it));
-    const authors = effectiveAuthorsFor(it).map((a) => normalizeKeyPart(a)).filter(Boolean).join("|");
-    return `m:${title}|${authors}`;
+  async function getOrCreateTagId(name: string, kind: "tag" | "category"): Promise<number> {
+    if (!supabase || !userId) throw new Error("Not signed in");
+    const normalized = name.trim().replace(/\s+/g, " ");
+    const existing = await supabase.from("tags").select("id").eq("owner_id", userId).eq("name", normalized).eq("kind", kind).maybeSingle();
+    if (existing.error) throw new Error(existing.error.message);
+    if (existing.data?.id) return existing.data.id as number;
+    const inserted = await supabase.from("tags").insert({ owner_id: userId, name: normalized, kind }).select("id").single();
+    if (inserted.error) throw new Error(inserted.error.message);
+    return inserted.data.id as number;
   }
 
   function setUrlFilters(next: { tag?: string | null; category?: string | null }) {
@@ -1565,6 +1314,10 @@ function AppShell({
 
     const url = params.toString() ? `/app?${params.toString()}` : "/app";
     router.push(url);
+  }
+
+  function clampNumber(n: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, n));
   }
 
   function openTagMenu() {
@@ -1605,77 +1358,199 @@ function AppShell({
     setCategoryMenu((p) => ({ ...p, open: false }));
   }
 
-  function clampNumber(n: number, min: number, max: number): number {
-    return Math.min(max, Math.max(min, n));
+  async function bulkDeleteSelected() {
+    if (!supabase) return;
+    if (bulkSelectedGroups.length === 0) return;
+    if (!window.confirm(`Delete ${bulkSelectedGroups.length} book(s)? This deletes all selected copies across your catalogs.`)) return;
+    setBulkState({ busy: true, error: null, message: "Deleting…" });
+    try {
+      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
+      const paths = Array.from(
+        new Set(
+          ids
+            .flatMap((id) => (items.find((x) => x.id === id)?.media ?? []))
+            .map((m) => (typeof (m as any)?.storage_path === "string" ? (m as any).storage_path : ""))
+            .filter(Boolean)
+        )
+      );
+      if (paths.length > 0) {
+        await supabase.storage.from("user-book-media").remove(paths);
+      }
+      const del = await supabase.from("user_books").delete().in("id", ids);
+      if (del.error) throw new Error(del.error.message);
+      setBulkSelectedKeys({});
+      await refreshAllBooks();
+      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
+      setUserBooksCount(count ?? 0);
+      setBulkState({ busy: false, error: null, message: "Deleted" });
+      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setBulkState({ busy: false, error: e?.message ?? "Bulk delete failed", message: "Bulk delete failed" });
+    }
   }
 
-  useEffect(() => {
-    if (!tagMenu.open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeTagMenu();
-    };
-    window.addEventListener("keydown", onKey);
-
-    const onPointerDownCapture = (e: PointerEvent) => {
-      const t = e.target as Node | null;
-      if (!t) return;
-      if (tagMenuRef.current?.contains(t)) return;
-      if (tagButtonRef.current?.contains(t)) return;
-      closeTagMenu();
-    };
-    window.addEventListener("pointerdown", onPointerDownCapture, true);
-
-    if (!isMobile) {
-      const onScrollOrResize = () => closeTagMenu();
-      window.addEventListener("scroll", onScrollOrResize);
-      window.addEventListener("resize", onScrollOrResize);
-      return () => {
-        window.removeEventListener("keydown", onKey);
-        window.removeEventListener("pointerdown", onPointerDownCapture, true);
-        window.removeEventListener("scroll", onScrollOrResize);
-        window.removeEventListener("resize", onScrollOrResize);
-      };
+  async function bulkMoveSelected(targetLibraryId: number) {
+    if (!supabase) return;
+    if (bulkSelectedGroups.length === 0) return;
+    setBulkState({ busy: true, error: null, message: "Moving…" });
+    try {
+      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
+      const upd = await supabase.from("user_books").update({ library_id: targetLibraryId }).in("id", ids);
+      if (upd.error) throw new Error(upd.error.message);
+      setBulkSelectedKeys({});
+      await refreshAllBooks();
+      setBulkState({ busy: false, error: null, message: "Moved" });
+      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setBulkState({ busy: false, error: e?.message ?? "Move failed", message: "Move failed" });
     }
+  }
 
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("pointerdown", onPointerDownCapture, true);
-    };
-  }, [tagMenu.open, isMobile]);
+  async function bulkCopySelected(targetLibraryId: number) {
+    if (!supabase) return;
+    if (bulkSelectedGroups.length === 0) return;
+    setBulkState({ busy: true, error: null, message: "Copying…" });
+    try {
+      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
+      const srcRes = await supabase
+        .from("user_books")
+        .select("*")
+        .in("id", ids);
+      if (srcRes.error) throw new Error(srcRes.error.message);
+      const srcRows = (srcRes.data ?? []) as any[];
 
-  useEffect(() => {
-    if (!categoryMenu.open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeCategoryMenu();
-    };
-    window.addEventListener("keydown", onKey);
+      for (const r of srcRows) {
+        const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = r;
+        await supabase.from("user_books").insert({ ...rest, owner_id: userId, library_id: targetLibraryId });
+      }
 
-    const onPointerDownCapture = (e: PointerEvent) => {
-      const t = e.target as Node | null;
-      if (!t) return;
-      if (categoryMenuRef.current?.contains(t)) return;
-      if (categoryButtonRef.current?.contains(t)) return;
-      closeCategoryMenu();
-    };
-    window.addEventListener("pointerdown", onPointerDownCapture, true);
-
-    if (!isMobile) {
-      const onScrollOrResize = () => closeCategoryMenu();
-      window.addEventListener("scroll", onScrollOrResize);
-      window.addEventListener("resize", onScrollOrResize);
-      return () => {
-        window.removeEventListener("keydown", onKey);
-        window.removeEventListener("pointerdown", onPointerDownCapture, true);
-        window.removeEventListener("scroll", onScrollOrResize);
-        window.removeEventListener("resize", onScrollOrResize);
-      };
+      setBulkSelectedKeys({});
+      await refreshAllBooks();
+      setBulkState({ busy: false, error: null, message: `Copied ${srcRows.length}` });
+      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setBulkState({ busy: false, error: e?.message ?? "Copy failed", message: "Copy failed" });
     }
+  }
 
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("pointerdown", onPointerDownCapture, true);
-    };
-  }, [categoryMenu.open, isMobile]);
+  async function bulkAssignCategory() {
+    if (!supabase) return;
+    if (!bulkSelectedGroups.length) return;
+    const name = bulkCategoryName.trim().replace(/\s+/g, " ");
+    if (!name) return;
+    setBulkState({ busy: true, error: null, message: "Applying…" });
+    try {
+      const tagId = await getOrCreateTagId(name, "category");
+      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
+      const rows = ids.map((id) => ({ user_book_id: id, tag_id: tagId }));
+      const up = await supabase.from("user_book_tags").upsert(rows as any, { onConflict: "user_book_id,tag_id" });
+      if (up.error) throw new Error(up.error.message);
+      setBulkCategoryName("");
+      await refreshAllBooks();
+      setBulkState({ busy: false, error: null, message: "Applied" });
+      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setBulkState({ busy: false, error: e?.message ?? "Apply failed", message: "Apply failed" });
+    }
+  }
+
+  async function bulkMakePublic() {
+    if (!supabase) return;
+    if (!bulkSelectedGroups.length) return;
+    setBulkState({ busy: true, error: null, message: "Applying…" });
+    try {
+      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
+      const { error } = await supabase.from("user_books").update({ visibility: "public" }).in("id", ids);
+      if (error) throw new Error(error.message);
+      await refreshAllBooks();
+      setBulkState({ busy: false, error: null, message: "Applied" });
+      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setBulkState({ busy: false, error: e?.message ?? "Apply failed", message: "Apply failed" });
+    }
+  }
+
+  async function bulkMakePrivate() {
+    if (!supabase) return;
+    if (!bulkSelectedGroups.length) return;
+    setBulkState({ busy: true, error: null, message: "Applying…" });
+    try {
+      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
+      const { error } = await supabase.from("user_books").update({ visibility: "followers_only" }).in("id", ids);
+      if (error) throw new Error(error.message);
+      await refreshAllBooks();
+      setBulkState({ busy: false, error: null, message: "Applied" });
+      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setBulkState({ busy: false, error: e?.message ?? "Apply failed", message: "Apply failed" });
+    }
+  }
+
+  async function deleteEntry(userBookId: number) {
+    if (!supabase) return;
+    if (!window.confirm("Delete this entry?")) return;
+    setDeleteStateByBookId((prev) => ({ ...prev, [userBookId]: { busy: true, error: null, message: "Deleting…" } }));
+    try {
+      const it = items.find((x) => x.id === userBookId) ?? null;
+      const paths = (it?.media ?? []).map((m) => m.storage_path).filter(Boolean);
+      if (paths.length > 0) {
+        await supabase.storage.from("user-book-media").remove(paths);
+      }
+      const del = await supabase.from("user_books").delete().eq("id", userBookId);
+      if (del.error) throw new Error(del.error.message);
+      await refreshAllBooks();
+      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
+      setUserBooksCount(count ?? 0);
+      setDeleteStateByBookId((prev) => ({ ...prev, [userBookId]: { busy: false, error: null, message: "Deleted" } }));
+    } catch (e: any) {
+      setDeleteStateByBookId((prev) => ({ ...prev, [userBookId]: { busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" } }));
+    }
+  }
+
+  function toggleBulkKey(key: string) {
+    setBulkSelectedKeys((prev) => {
+      const next = { ...prev };
+      if (next[key]) delete next[key];
+      else next[key] = true;
+      return next;
+    });
+  }
+
+  function selectAll() {
+    const next: Record<string, true> = {};
+    for (const g of displayGroups) {
+      next[g.key] = true;
+    }
+    setBulkSelectedKeys(next);
+  }
+
+  function moveLibrary(libraryId: number, delta: -1 | 1) {
+    setLibraries((prev) => {
+      const idx = prev.findIndex((l) => l.id === libraryId);
+      if (idx < 0) return prev;
+      const nextIdx = idx + delta;
+      if (nextIdx < 0 || nextIdx >= prev.length) return prev;
+      const next = prev.slice();
+      const [moved] = next.splice(idx, 1);
+      next.splice(nextIdx, 0, moved);
+      try {
+        window.localStorage.setItem("om_libraryOrder", next.map((l) => l.id).join(","));
+      } catch { }
+      return next;
+    });
+  }
+
+  function beginEditLibrary(libraryId: number, currentName: string) {
+    setEditingLibraryId(libraryId);
+    setLibraryNameDraft(currentName ?? "");
+  }
+
+  function cancelEditLibrary() {
+    setEditingLibraryId(null);
+    setLibraryNameDraft("");
+  }
+
+  const filteredItems = useMemo(() => items, [items]);
 
   const displayGroups = useMemo(() => {
     const profileVis = profile?.visibility === "public" ? "public" : "followers_only";
@@ -1701,31 +1576,15 @@ function AppShell({
 
     let groups: CatalogGroup[] = Array.from(byKey.entries()).map(([key, copies]) => {
       const sorted = copies.slice().sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
-      const primary = sorted
-        .slice()
-        .sort((a, b) => {
-          const score = (c: CatalogItem): number => {
-            let s = 0;
-            const hasCoverMedia = (c.media ?? []).some((m) => m.kind === "cover");
-            const hasAnyMedia = (c.media ?? []).some((m) => m.kind === "cover" || m.kind === "image");
-            const hasEditionCover = Boolean(c.edition?.cover_url);
-            const hasTitle = Boolean(effectiveTitleFor(c));
-            const hasAuthors = effectiveAuthorsFor(c).length > 0;
-            const hasPublisher = Boolean(effectivePublisherFor(c));
-            const hasSubjects = effectiveSubjectsFor(c).length > 0;
-            if (hasCoverMedia) s += 1000;
-            else if (hasAnyMedia) s += 300;
-            if (hasEditionCover) s += 150;
-            if (hasTitle) s += 20;
-            if (hasAuthors) s += 10;
-            if (hasPublisher) s += 5;
-            if (hasSubjects) s += 3;
-            return s;
-          };
-          const diff = score(b) - score(a);
-          if (diff) return diff;
-          return Date.parse(b.created_at) - Date.parse(a.created_at);
-        })[0]!;
+      const primary = sorted.slice().sort((a, b) => {
+        const score = (c: CatalogItem): number => {
+          let s = 0;
+          if ((c.media ?? []).some((m) => m.kind === "cover")) s += 1000;
+          if (c.edition?.cover_url) s += 150;
+          return s;
+        };
+        return score(b) - score(a);
+      })[0]!;
       const title = effectiveTitleFor(primary);
 
       const tagSet = new Set<string>();
@@ -1763,12 +1622,6 @@ function AppShell({
         }
       }
 
-      const visibility = visSet.size === 1 ? (primary.visibility as any) : "mixed";
-      const effectiveVisibility =
-        effVisSet.size === 1
-          ? ((Array.from(effVisSet.values())[0] as string) === "public" ? "public" : "followers_only")
-          : ("mixed" as const);
-
       return {
         key,
         libraryId: primary.library_id,
@@ -1784,8 +1637,8 @@ function AppShell({
         filterGroups: Array.from(groupsSet.values()),
         filterDecades: Array.from(decadesSet.values()),
         title,
-        visibility,
-        effectiveVisibility,
+        visibility: visSet.size === 1 ? (primary.visibility as any) : "mixed",
+        effectiveVisibility: effVisSet.size === 1 ? ((Array.from(effVisSet.values())[0] as string) === "public" ? "public" : "followers_only") : "mixed",
         latestCreatedAt: Number.isFinite(latest) ? latest : Date.now(),
         earliestCreatedAt: Number.isFinite(earliest) ? earliest : Date.now()
       };
@@ -1808,42 +1661,29 @@ function AppShell({
     }
     if (q) {
       groups = groups.filter((g) => {
-        const e = g.primary.edition;
         const title = (g.title ?? "").toLowerCase();
         const authors = (g.filterAuthors ?? []).join(" ").toLowerCase();
-        const subjects = (g.filterSubjects ?? []).join(" ").toLowerCase();
-        const publishers = (g.filterPublishers ?? []).join(" ").toLowerCase();
-        const designers = (g.filterDesigners ?? []).join(" ").toLowerCase();
         const tags = (g.tagNames ?? []).join(" ").toLowerCase();
-        const isbn = String(e?.isbn13 ?? "").toLowerCase();
-        return (
-          title.includes(q) ||
-          authors.includes(q) ||
-          subjects.includes(q) ||
-          publishers.includes(q) ||
-          designers.includes(q) ||
-          tags.includes(q) ||
-          (q.length >= 6 && isbn.includes(q))
-        );
+        return title.includes(q) || authors.includes(q) || tags.includes(q);
       });
     }
 
-    const titleKey = (g: CatalogGroup) => normalizeKeyPart(g.title);
     groups.sort((a, b) => {
       if (sortMode === "latest") return b.latestCreatedAt - a.latestCreatedAt;
       if (sortMode === "earliest") return a.earliestCreatedAt - b.earliestCreatedAt;
-      const cmp = titleKey(a).localeCompare(titleKey(b));
+      const cmp = normalizeKeyPart(a.title).localeCompare(normalizeKeyPart(b.title));
       return sortMode === "title_asc" ? cmp : -cmp;
     });
 
     return groups;
   }, [filteredItems, filterTag, tagMode, filterAuthor, filterSubject, filterPublisher, filterDesigner, filterGroup, filterDecade, filterCategory, categoryMode, visibilityMode, sortMode, searchQuery, profile?.visibility]);
 
+  const bulkSelectedGroups = useMemo(() => displayGroups.filter((g) => bulkSelectedKeys[g.key]), [displayGroups, bulkSelectedKeys]);
+
   const displayGroupsByLibraryId = useMemo(() => {
     const by: Record<number, CatalogGroup[]> = {};
     for (const g of displayGroups) {
-      const id = Number(g.libraryId);
-      if (!Number.isFinite(id) || id <= 0) continue;
+      const id = g.libraryId;
       if (!by[id]) by[id] = [];
       by[id].push(g);
     }
@@ -1853,9 +1693,7 @@ function AppShell({
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
     for (const it of items) {
-      for (const t of tagsFor(it)) {
-        if (t.kind === "category") set.add(t.name);
-      }
+      for (const t of tagsFor(it)) if (t.kind === "category") set.add(t.name);
     }
     return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
   }, [items]);
@@ -1863,9 +1701,7 @@ function AppShell({
   const availableTags = useMemo(() => {
     const set = new Set<string>();
     for (const it of items) {
-      for (const t of tagsFor(it)) {
-        if (t.kind === "tag") set.add(t.name);
-      }
+      for (const t of tagsFor(it)) if (t.kind === "tag") set.add(t.name);
     }
     return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
   }, [items]);
@@ -1882,341 +1718,7 @@ function AppShell({
     if (!availableTags.some((t) => t === tagMode)) setTagMode("all");
   }, [availableTags, tagMode, filterTag]);
 
-  const bulkSelectedCount = useMemo(() => Object.keys(bulkSelectedKeys).length, [bulkSelectedKeys]);
-  const bulkSelectedGroups = useMemo(() => displayGroups.filter((g) => bulkSelectedKeys[g.key]), [displayGroups, bulkSelectedKeys]);
-
-  function toggleBulkKey(key: string) {
-    setBulkSelectedKeys((prev) => {
-      const next = { ...prev };
-      if (next[key]) delete next[key];
-      else next[key] = true;
-      return next;
-    });
-  }
-
-  function selectAll() {
-    const next: Record<string, true> = {};
-    for (const g of displayGroups) {
-      next[g.key] = true;
-    }
-    setBulkSelectedKeys(next);
-  }
-
-  async function getOrCreateTagId(name: string, kind: "tag" | "category"): Promise<number> {
-    if (!supabase || !userId) throw new Error("Not signed in");
-    const normalized = name.trim().replace(/\s+/g, " ");
-    const existing = await supabase.from("tags").select("id").eq("owner_id", userId).eq("name", normalized).eq("kind", kind).maybeSingle();
-    if (existing.error) throw new Error(existing.error.message);
-    if (existing.data?.id) return existing.data.id as number;
-    const inserted = await supabase.from("tags").insert({ owner_id: userId, name: normalized, kind }).select("id").single();
-    if (inserted.error) throw new Error(inserted.error.message);
-    return inserted.data.id as number;
-  }
-
-  async function bulkDeleteSelected() {
-    if (!supabase) return;
-    if (bulkSelectedGroups.length === 0) return;
-    if (!window.confirm(`Delete ${bulkSelectedGroups.length} book(s)? This deletes all selected copies across your catalogs.`)) return;
-    setBulkState({ busy: true, error: null, message: "Deleting…" });
-    try {
-      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
-      const paths = Array.from(
-        new Set(
-          ids
-            .flatMap((id) => (items.find((x) => x.id === id)?.media ?? []))
-            .map((m) => (typeof (m as any)?.storage_path === "string" ? (m as any).storage_path : ""))
-            .filter(Boolean)
-        )
-      );
-      if (paths.length > 0) {
-        const rm = await supabase.storage.from("user-book-media").remove(paths);
-        if (rm.error) {
-          // continue
-        }
-      }
-      const del = await supabase.from("user_books").delete().in("id", ids);
-      if (del.error) throw new Error(del.error.message);
-      setBulkSelectedKeys({});
-      await refreshAllBooks();
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
-      setUserBooksCount(count ?? 0);
-      setBulkState({ busy: false, error: null, message: "Deleted" });
-      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
-    } catch (e: any) {
-      setBulkState({ busy: false, error: e?.message ?? "Bulk delete failed", message: "Bulk delete failed" });
-    }
-  }
-
-  async function bulkMoveSelected(targetLibraryId: number) {
-    if (!supabase) return;
-    if (bulkSelectedGroups.length === 0) return;
-    if (!Number.isFinite(targetLibraryId) || targetLibraryId <= 0) return;
-    setBulkState({ busy: true, error: null, message: "Moving…" });
-    try {
-      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
-      const upd = await supabase.from("user_books").update({ library_id: targetLibraryId }).in("id", ids);
-      if (upd.error) throw new Error(upd.error.message);
-      setBulkSelectedKeys({});
-      await refreshAllBooks();
-      setBulkState({ busy: false, error: null, message: "Moved" });
-      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
-    } catch (e: any) {
-      setBulkState({ busy: false, error: e?.message ?? "Move failed", message: "Move failed" });
-    }
-  }
-
-  async function bulkCopySelected(targetLibraryId: number) {
-    if (!supabase) return;
-    if (bulkSelectedGroups.length === 0) return;
-    if (!Number.isFinite(targetLibraryId) || targetLibraryId <= 0) return;
-    setBulkState({ busy: true, error: null, message: "Copying…" });
-    try {
-      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
-      const srcRes = await supabase
-        .from("user_books")
-        .select("id,edition_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes")
-        .in("id", ids);
-      if (srcRes.error) throw new Error(srcRes.error.message);
-      const srcRows = (srcRes.data ?? []) as any[];
-
-      const tagRes = await supabase.from("user_book_tags").select("user_book_id,tag_id").in("user_book_id", ids);
-      if (tagRes.error) throw new Error(tagRes.error.message);
-      const tagsByBookId: Record<number, number[]> = {};
-      for (const r of (tagRes.data ?? []) as any[]) {
-        const bid = Number(r.user_book_id);
-        const tid = Number(r.tag_id);
-        if (!Number.isFinite(bid) || !Number.isFinite(tid)) continue;
-        (tagsByBookId[bid] ??= []).push(tid);
-      }
-
-      const mediaRes = await supabase.from("user_book_media").select("user_book_id,kind,storage_path,caption").in("user_book_id", ids);
-      if (mediaRes.error) throw new Error(mediaRes.error.message);
-      const mediaByBookId: Record<number, Array<{ kind: "cover" | "image"; storage_path: string; caption: string | null }>> = {};
-      for (const m of (mediaRes.data ?? []) as any[]) {
-        const bid = Number((m as any).user_book_id);
-        const kind = String((m as any).kind ?? "").trim() as any;
-        const storage_path = String((m as any).storage_path ?? "").trim();
-        const caption = ((m as any).caption ?? null) as any;
-        if (!Number.isFinite(bid) || bid <= 0) continue;
-        if (!storage_path) continue;
-        if (kind !== "cover" && kind !== "image") continue;
-        (mediaByBookId[bid] ??= []).push({ kind, storage_path, caption: typeof caption === "string" ? caption : null });
-      }
-
-      const idMap = new Map<number, number>();
-      let copied = 0;
-      for (const r of srcRows) {
-        const inserted = await supabase.from("user_books").insert({
-          owner_id: userId,
-          library_id: targetLibraryId,
-          edition_id: (r as any).edition_id ?? null,
-          visibility: (r as any).visibility ?? "inherit",
-          status: (r as any).status ?? "owned",
-          borrowable_override: (r as any).borrowable_override ?? null,
-          borrow_request_scope_override: (r as any).borrow_request_scope_override ?? null,
-          title_override: (r as any).title_override ?? null,
-          authors_override: (r as any).authors_override ?? null,
-          editors_override: (r as any).editors_override ?? null,
-          designers_override: (r as any).designers_override ?? null,
-          subjects_override: (r as any).subjects_override ?? null,
-          publisher_override: (r as any).publisher_override ?? null,
-          printer_override: (r as any).printer_override ?? null,
-          materials_override: (r as any).materials_override ?? null,
-          edition_override: (r as any).edition_override ?? null,
-          publish_date_override: (r as any).publish_date_override ?? null,
-          description_override: (r as any).description_override ?? null,
-          location: (r as any).location ?? null,
-          shelf: (r as any).shelf ?? null,
-          notes: (r as any).notes ?? null
-        }).select("id").single();
-        if (inserted.error) throw new Error(inserted.error.message);
-        copied += 1;
-        const newId = Number((inserted.data as any)?.id);
-        const oldId = Number((r as any).id);
-        if (Number.isFinite(oldId) && Number.isFinite(newId) && newId > 0) idMap.set(oldId, newId);
-        const tagIds = (tagsByBookId[oldId] ?? []).filter((t) => Number.isFinite(t) && t > 0);
-        if (Number.isFinite(newId) && Number.isFinite(newId) && newId > 0 && tagIds.length > 0) {
-          const rows = tagIds.map((tagId) => ({ user_book_id: newId, tag_id: tagId }));
-          const insTags = await supabase.from("user_book_tags").insert(rows as any);
-          if (insTags.error) { }
-        }
-      }
-
-      for (const [oldId, newId] of idMap.entries()) {
-        const media = (mediaByBookId[oldId] ?? []).slice();
-        if (media.length === 0) continue;
-        media.sort((a, b) => (a.kind === "cover" ? -1 : 1) - (b.kind === "cover" ? -1 : 1));
-        let coverCopied = false;
-        for (const m of media) {
-          try {
-            const base = safeFileName(String(m.storage_path.split("/").pop() ?? "image"));
-            const destPath = `${userId}/${newId}/${Date.now()}-${base}`;
-            const copiedObj = await supabase.storage.from("user-book-media").copy(m.storage_path, destPath);
-            if (copiedObj.error) continue;
-            const kind: "cover" | "image" = m.kind === "cover" && !coverCopied ? "cover" : "image";
-            if (kind === "cover") coverCopied = true;
-            const ins = await supabase.from("user_book_media").insert({ user_book_id: newId, kind, storage_path: destPath, caption: m.caption ?? null });
-            if (ins.error) { }
-          } catch { }
-        }
-      }
-
-      setBulkSelectedKeys({});
-      await refreshAllBooks();
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
-      setUserBooksCount(count ?? 0);
-      setBulkState({ busy: false, error: null, message: `Copied ${copied}` });
-      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
-    } catch (e: any) {
-      setBulkState({ busy: false, error: e?.message ?? "Copy failed", message: "Copy failed" });
-    }
-  }
-
-  function moveLibrary(libraryId: number, delta: -1 | 1) {
-    setLibraries((prev) => {
-      const idx = prev.findIndex((l) => l.id === libraryId);
-      if (idx < 0) return prev;
-      const nextIdx = idx + delta;
-      if (nextIdx < 0 || nextIdx >= prev.length) return prev;
-      const next = prev.slice();
-      const [moved] = next.splice(idx, 1);
-      next.splice(nextIdx, 0, moved);
-      try {
-        window.localStorage.setItem("om_libraryOrder", next.map((l) => l.id).filter((n) => Number.isFinite(n) && n > 0).join(","));
-      } catch { }
-      return next;
-    });
-  }
-
-  function beginEditLibrary(libraryId: number, currentName: string) {
-    setEditingLibraryId(libraryId);
-    setLibraryNameDraft(currentName ?? "");
-  }
-
-  function cancelEditLibrary() {
-    setEditingLibraryId(null);
-    setLibraryNameDraft("");
-  }
-
-  async function bulkAssignCategory() {
-    if (!supabase) return;
-    if (!bulkSelectedGroups.length) return;
-    const name = bulkCategoryName.trim().replace(/\s+/g, " ");
-    if (!name) return;
-    setBulkState({ busy: true, error: null, message: "Applying…" });
-    try {
-      const tagId = await getOrCreateTagId(name, "category");
-      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
-      const rows = ids.map((id) => ({ user_book_id: id, tag_id: tagId }));
-      const up = await supabase.from("user_book_tags").upsert(rows as any, { onConflict: "user_book_id,tag_id" });
-      if (up.error) throw new Error(up.error.message);
-      setBulkCategoryName("");
-      await refreshAllBooks();
-      setBulkState({ busy: false, error: null, message: "Applied" });
-      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
-    } catch (e: any) {
-      setBulkState({ busy: false, error: e?.message ?? "Apply failed", message: "Apply failed" });
-    }
-  }
-
-  function desiredVisibilityForAction(action: "public" | "private"): "inherit" | "followers_only" | "public" {
-    const profileVis = profile?.visibility === "public" ? "public" : "followers_only";
-    if (action === "public") return profileVis === "public" ? "inherit" : "public";
-    return profileVis === "public" ? "followers_only" : "inherit";
-  }
-
-  async function bulkMakePublic() {
-    if (!supabase) return;
-    if (!bulkSelectedGroups.length) return;
-    setBulkState({ busy: true, error: null, message: "Applying…" });
-    try {
-      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
-      await updateUserBookVisibilityGroup(ids, desiredVisibilityForAction("public"));
-      await refreshAllBooks();
-      setBulkState({ busy: false, error: null, message: "Applied" });
-      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
-    } catch (e: any) {
-      setBulkState({ busy: false, error: e?.message ?? "Apply failed", message: "Apply failed" });
-    }
-  }
-
-  async function bulkMakePrivate() {
-    if (!supabase) return;
-    if (!bulkSelectedGroups.length) return;
-    setBulkState({ busy: true, error: null, message: "Applying…" });
-    try {
-      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
-      await updateUserBookVisibilityGroup(ids, desiredVisibilityForAction("private"));
-      await refreshAllBooks();
-      setBulkState({ busy: false, error: null, message: "Applied" });
-      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
-    } catch (e: any) {
-      setBulkState({ busy: false, error: e?.message ?? "Apply failed", message: "Apply failed" });
-    }
-  }
-
-  const booksContainerStyle = useMemo<CSSProperties>(
-    () => ({
-      display: viewMode === "grid" ? "grid" : "flex",
-      flexDirection: viewMode === "list" ? ("column" as const) : undefined,
-      gridTemplateColumns: viewMode === "grid" ? `repeat(${gridCols}, minmax(0, 1fr))` : undefined,
-      gap: 12
-      }),
-
-    [viewMode, gridCols]
-  );
-
-  function renderGroup(g: CatalogGroup) {
-    const it = g.primary;
-    const e = it.edition;
-    const title = g.title;
-    const effectiveAuthors = effectiveAuthorsFor(it);
-    const tags: string[] = [];
-    const selected = !!bulkSelectedKeys[g.key];
-    const coverUrl =
-      g.copies
-        .map((c) => {
-          const cover = (c.media ?? []).find((m) => m.kind === "cover");
-          if (!cover) return null;
-          return mediaUrlsByPath[cover.storage_path] ?? null;
-        })
-        .find(Boolean) ?? e?.cover_url ?? null;
-    const cropData = it.cover_crop ?? null;
-    const originalSrc = cropData && it.cover_original_url ? (mediaUrlsByPath[it.cover_original_url] ?? coverUrl) : coverUrl;
-    const delState = deleteStateByBookId[it.id];
-    return (
-      <BookCard
-        key={g.key}
-        viewMode={viewMode}
-        bulkMode={bulkMode}
-        selected={selected}
-        onToggleSelected={() => toggleBulkKey(g.key)}
-        title={title}
-        authors={effectiveAuthors}
-        isbn13={e?.isbn13 ?? null}
-        tags={tags}
-        copiesCount={g.copiesCount}
-        href={`/app/books/${it.id}`}
-        coverUrl={coverUrl}
-        cropData={cropData}
-        originalSrc={originalSrc}
-        onDeleteCopy={() => deleteEntry(it.id)}
-        deleteState={delState as any}
-        showDeleteCopy={false}
-        gridCols={gridCols}
-      />
-    );
-  }
-
-  const showAddPanel =
-    addOpen ||
-    Boolean(addUrlPreview) ||
-    addSearchResults.length > 0 ||
-    Boolean(addSearchState.message) ||
-    Boolean(addState.message) ||
-    csvRows.length > 0 ||
-    Boolean(csvImportState.message) ||
-    Boolean(csvImportState.error);
+  const showAddPanel = addOpen || Boolean(addUrlPreview) || addSearchResults.length > 0 || Boolean(addSearchState.message) || Boolean(addState.message) || csvRows.length > 0 || Boolean(csvImportState.message) || Boolean(csvImportState.error);
 
   if (!initialLoadDone) return null;
 
@@ -2236,795 +1738,231 @@ function AppShell({
               setCsvImportState({ busy: false, error: err?.message ?? "CSV load failed", message: "CSV load failed", done: 0, total: 0 });
             });
           }}
-          disabled={csvImportState.busy || addState.busy || addSearchState.busy}
+          disabled={csvImportState.busy}
         />
 
         <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
-        <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <span className="muted">Catalogs</span>
-          <span>{libraries.length}</span>
-          <span className="muted">Books</span>
-          <span>{displayGroups.length}</span>
-          {bulkMode ? (
-            <>
-              <span className="muted">Selected</span>
-              <span>{bulkSelectedCount}</span>
-              {displayGroups.length > 0 && bulkSelectedCount < displayGroups.length ? (
-                <button
-                  type="button"
-                  onClick={selectAll}
-                  style={{ background: "transparent", border: 0, padding: 0, font: "inherit", color: "inherit", textDecoration: "underline", cursor: "pointer" }}
-                >
-                  Select all
-                </button>
-              ) : null}
-              {bulkSelectedCount > 0 ? (
-                <button
-                  type="button"
-                  className="om-clear-filter-btn"
-                  onClick={() => setBulkSelectedKeys({})}
-                  style={{ margin: 0 }}
-                >
-                  clear
-                </button>
-              ) : null}
-            </>
-          ) : null}
-          {libraryState.message ? <span className="muted">{libraryState.message}</span> : libraryState.error ? <span className="muted">{libraryState.error}</span> : null}
-        </div>
-        <div className="row muted" style={{ gap: 10, justifyContent: "flex-end" }}>
-          {(filterTag ?? tagMode) !== "all" || filterAuthor || filterSubject || filterPublisher || (filterCategory ?? categoryMode) !== "all" ? (
-            <>
-              {(() => {
-                const activeCategory = (filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : null;
-                const activeTag = (filterTag ?? tagMode) !== "all" ? String(filterTag ?? tagMode) : null;
-                const pairs: Array<{ label: string; value: string }> = [];
-                if (activeCategory) pairs.push({ label: "Category", value: activeCategory });
-                if (activeTag) pairs.push({ label: "Tag", value: activeTag });
-                if (filterAuthor) pairs.push({ label: "Author", value: filterAuthor });
-                if (filterSubject) pairs.push({ label: "Subject", value: filterSubject });
-                if (filterPublisher) pairs.push({ label: "Publisher", value: filterPublisher });
-                return pairs.length ? (
-                  <span style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
-                    {pairs.map((p) => (
-                      <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 12, alignItems: "baseline" }}>
-                        <span className="muted">{p.label}</span>
-                        <span style={{ color: "var(--fg)" }}>{p.value}</span>
-                      </span>
-                    ))}
-                  </span>
-                ) : null;
-                })()}<button
-                type="button"
-                className="om-clear-filter-btn"
-                onClick={() => {
-                  setTagMode("all");
-                  setCategoryMode("all");
-                  setTagSearch("");
-                  setCategorySearch("");
-                  setSearchQuery("");
-                  setVisibilityMode("all");
-                  closeTagMenu();
-                  closeCategoryMenu();
-                  router.push("/app");
-                }}
-                >clear</button>
-
-            </>
-          ) : null}
-        </div>
-      </div>
-
-      <div 
-        className="row" 
-        style={{ 
-          width: "100%", 
-          margin: 0, 
-          alignItems: "baseline", 
-          justifyContent: "flex-start", 
-          gap: 12, 
-          flexDirection: "row",
-          flexWrap: "nowrap"
-        }}
-      >
-        {/* Toolbar Buttons */}
-        <div 
-          className="row" 
-          style={{ 
-            gap: 12, 
-            alignItems: "baseline", 
-            minWidth: 0, 
-            flex: "0 0 auto", 
-            flexWrap: "nowrap", 
-            margin: 0 
-          }}
-        >
-          <button
-            onClick={() => {
-              const next = !bulkMode;
-              if (next) {
-                setAddOpen(false);
-                setSortOpen(false);
-                setSearchOpen(false);
-                setReorderMode(true);
-                closeTagMenu();
-                closeCategoryMenu();
-              } else {
-                exitEditMode();
-              }
-              setBulkMode(next);
-            }}
-          >
-            {bulkMode ? "Done" : "Edit"}
-          </button>
-          <button
-            type="button"
-            className={sortOpen ? "text-primary" : "muted"}
-            onClick={() => {
-              if (bulkMode) exitEditMode();
-              const next = !sortOpen;
-              setSortOpen(next);
-              if (next) {
-                setAddOpen(false);
-                setSearchOpen(false);
-                closeTagMenu();
-                closeCategoryMenu();
-              }
-            }}
-          >
-            View by
-          </button>
-          <button
-            type="button"
-            className={addOpen ? "text-primary" : "muted"}
-            onClick={() => {
-              if (bulkMode) exitEditMode();
-              const next = !addOpen;
-              setAddOpen(next);
-              if (next) {
-                setSortOpen(false);
-                setSearchOpen(false);
-                closeTagMenu();
-                closeCategoryMenu();
-              } else {
-                cancelAddPreview();
-              }
-            }}
-          >
-            Add
-          </button>
-          {isMobile && (
-            <button
-              type="button"
-              className={searchOpen ? "text-primary" : "muted"}
-              onClick={() => {
-                if (bulkMode) exitEditMode();
-                const next = !searchOpen;
-                setSearchOpen(next);
-                if (next) {
-                  setAddOpen(false);
-                  cancelAddPreview();
-                  setSortOpen(false);
-                  closeTagMenu();
-                  closeCategoryMenu();
-                }
-              }}
-            >
-              Search
-            </button>
-          )}
-        </div>
-
-        {/* Desktop Search row - hidden on mobile */}
-        {!isMobile && (
-          <div 
-            className="row" 
-            style={{ 
-              flex: "1 1 auto", 
-              width: "100%", 
-              gap: 12, 
-              alignItems: "baseline", 
-              margin: 0,
-              flexWrap: "nowrap"
-            }}
-          >
-            <input
-              className="om-inline-search-input"
-              placeholder="Search your catalog"
-              value={searchQuery}
-              onFocus={() => {
-                if (bulkMode) exitEditMode();
-                setAddOpen(false);
-                setSortOpen(false);
-                cancelAddPreview();
-                setSearchFocused(true);
-              }}
-              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
-            />
-
-            {(searchFocused || searchQuery.trim()) ? (
-              <Link
-                href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
-                className="muted"
-                style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}
-              >
-                Search others
-              </Link>
+          <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <span className="muted">Catalogs</span>
+            <span>{libraries.length}</span>
+            <span className="muted">Books</span>
+            <span>{displayGroups.length}</span>
+            {bulkMode && (
+              <>
+                <span className="muted">Selected</span>
+                <span>{bulkSelectedGroups.length}</span>
+                {displayGroups.length > 0 && bulkSelectedGroups.length < displayGroups.length && (
+                  <button type="button" onClick={selectAll} style={{ background: "transparent", border: 0, padding: 0, font: "inherit", color: "inherit", textDecoration: "underline", cursor: "pointer" }}>
+                    Select all
+                  </button>
+                )}
+                {bulkSelectedGroups.length > 0 && (
+                  <button type="button" className="om-clear-filter-btn" onClick={() => setBulkSelectedKeys({})} style={{ margin: 0 }}>clear</button>
+                )}
+              </>
+            )}
+          </div>
+          <div className="row muted" style={{ gap: 10, justifyContent: "flex-end" }}>
+            {(filterTag ?? tagMode) !== "all" || filterAuthor || filterSubject || filterPublisher || (filterCategory ?? categoryMode) !== "all" ? (
+              <>
+                {(() => {
+                  const pairs: any[] = [];
+                  const activeCategory = (filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : null;
+                  const activeTag = (filterTag ?? tagMode) !== "all" ? String(filterTag ?? tagMode) : null;
+                  if (activeCategory) pairs.push({ label: "Category", value: activeCategory });
+                  if (activeTag) pairs.push({ label: "Tag", value: activeTag });
+                  if (filterAuthor) pairs.push({ label: "Author", value: filterAuthor });
+                  if (filterSubject) pairs.push({ label: "Subject", value: filterSubject });
+                  if (filterPublisher) pairs.push({ label: "Publisher", value: filterPublisher });
+                  return pairs.length ? (
+                    <span style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
+                      {pairs.map((p) => (
+                        <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 12, alignItems: "baseline" }}>
+                          <span className="muted">{p.label}</span>
+                          <span style={{ color: "var(--fg)" }}>{p.value}</span>
+                        </span>
+                      ))}
+                    </span>
+                  ) : null;
+                })()}
+                <button type="button" className="om-clear-filter-btn" onClick={() => { setTagMode("all"); setCategoryMode("all"); setSearchQuery(""); router.push("/app"); }}>clear</button>
+              </>
             ) : null}
           </div>
-        )}
+        </div>
+
+        <div className="row" style={{ width: "100%", margin: 0, alignItems: "baseline", justifyContent: "flex-start", gap: 12, flexWrap: "nowrap" }}>
+          <div className="row" style={{ gap: 12, alignItems: "baseline", flex: "0 0 auto", flexWrap: "nowrap", margin: 0 }}>
+            <button onClick={() => { const next = !bulkMode; if (next) { setAddOpen(false); setSortOpen(false); setSearchOpen(false); setReorderMode(true); } else { exitEditMode(); } setBulkMode(next); }}>
+              {bulkMode ? "Done" : "Edit"}
+            </button>
+            <button type="button" className={sortOpen ? "text-primary" : "muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !sortOpen; setSortOpen(next); if (next) { setAddOpen(false); setSearchOpen(false); } }}>
+              View by
+            </button>
+            <button type="button" className={addOpen ? "text-primary" : "muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !addOpen; setAddOpen(next); if (next) { setSortOpen(false); setSearchOpen(false); } else { cancelAddPreview(); } }}>
+              Add
+            </button>
+            {isMobile && (
+              <button type="button" className={searchOpen ? "text-primary" : "muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !searchOpen; setSearchOpen(next); if (next) { setAddOpen(false); cancelAddPreview(); setSortOpen(false); } }}>
+                Search
+              </button>
+            )}
+          </div>
+
+          {!isMobile && (
+            <div className="row" style={{ flex: "1 1 auto", width: "100%", gap: 12, alignItems: "baseline", margin: 0, flexWrap: "nowrap" }}>
+              <input
+                className="om-inline-search-input"
+                placeholder="Search your catalog"
+                value={searchQuery}
+                onFocus={() => { if (bulkMode) exitEditMode(); setAddOpen(false); setSortOpen(false); cancelAddPreview(); setSearchFocused(true); }}
+                onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
+              />
+              {(searchFocused || searchQuery.trim()) && (
+                <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`} className="muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>Search others</Link>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-    </div>
-
-      {/* Mobile Search Panel */}
       {isMobile && searchOpen && (
         <div className="row" style={{ width: "100%", marginTop: 6, alignItems: "baseline", gap: 12, flexWrap: "nowrap" }}>
-          <div className="row" style={{ flex: "1 1 auto", width: "100%", gap: 12, alignItems: "baseline", margin: 0, flexWrap: "nowrap" }}>
+          <input
+            className="om-inline-search-input"
+            placeholder="Search your catalog"
+            value={searchQuery}
+            onFocus={() => { if (bulkMode) exitEditMode(); setAddOpen(false); setSortOpen(false); cancelAddPreview(); setSearchFocused(true); }}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
+          />
+          {(searchFocused || searchQuery.trim()) && (
+            <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`} className="muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>Search others</Link>
+          )}
+        </div>
+      )}
+
+      {showAddPanel && !searchOpen && (
+        <div className="row" style={{ width: "100%", marginTop: 6, flexWrap: "nowrap", gap: 10, alignItems: "baseline" }}>
+          {showScan && (
+            <div className="row" style={{ gap: 6, flex: "0 0 auto", alignItems: "baseline" }}>
+              <button className="muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}>Scan</button>
+              <span className="muted" style={{ fontSize: "0.9em" }}>or</span>
+            </div>
+          )}
+          <div style={{ flex: "1 1 auto", minWidth: 0 }}>
             <input
-              className="om-inline-search-input"
-              placeholder="Search your catalog"
-              value={searchQuery}
-              onFocus={() => {
-                if (bulkMode) exitEditMode();
-                setAddOpen(false);
-                setSortOpen(false);
-                cancelAddPreview();
-                setSearchFocused(true);
-              }}
-              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
+              placeholder={showScan ? "enter ISBN…" : "Add by ISBN, URL, or title"}
+              value={addInput}
+              onFocus={() => { if (bulkMode) exitEditMode(); setAddOpen(true); setSearchOpen(false); setSortOpen(false); setAddInputFocused(true); }}
+              onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
+              onChange={(e) => setAddInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); smartAddOrSearch(); } }}
+              style={{ width: "100%" }}
             />
-            {(searchFocused || searchQuery.trim()) ? (
-              <Link
-                href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
-                className="muted"
-                style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}
-              >
-                Search others
-              </Link>
-            ) : null}
+          </div>
+          <div className="row" style={{ gap: 10, flex: "0 0 auto", justifyContent: "flex-end" }}>
+            {(addInput.trim() || addInputFocused) && (
+              <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
+                {addState.busy ? "…" : "Go"}
+              </button>
+            )}
+            {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message) && (
+              <button onClick={cancelAddPreview} disabled={addState.busy}>Cancel</button>
+            )}
           </div>
         </div>
       )}
 
-      {showAddPanel && !searchOpen ? (
-        <>
-          <div className="row" style={{ width: "100%", marginTop: 6, flexWrap: "nowrap", gap: 0, alignItems: "baseline" }}>
-            {stagedCsvData ? (
-              <div className="row" style={{ flex: 1, gap: 12, alignItems: "baseline" }}>
-                <span style={{ fontWeight: 600 }}>{stagedCsvFilename}</span>
-                <div className="row" style={{ gap: 12, marginLeft: "auto" }}>
-                  <button
-                    onClick={() => {
-                      const objects = parseCsvToObjects(stagedCsvData);
-                      const normalized: any[] = objects
-                        .map((o) => {
-                          const title = (o.title ?? o.Title ?? "").trim();
-                          const isbn13 = (o.ean_isbn13 ?? o.isbn13 ?? o.ISBN13 ?? "").trim();
-                          const isbn10 = (o.upc_isbn10 ?? o.isbn10 ?? o.ISBN10 ?? "").trim();
-                          const isbn = isbn13 || isbn10 || "";
-                          const creators = (o.creators ?? o.creators_name ?? o.author ?? o.authors ?? "").trim();
-                          const authors = creators ? splitListField(creators) : [];
-                          const publisher = (o.publisher ?? "").trim() || null;
-                          const publish_date = (o.publish_date ?? "").trim() || null;
-                          const description = (o.description ?? "").trim() || null;
-                          const category = (o.collection ?? o.category ?? "").trim() || null;
-                          const tags = splitListField((o.tags ?? "").trim());
-                          const notes = (o.notes ?? "").trim() || null;
-                          const group_label = (o.group ?? "").trim() || null;
-                          const object_type = (o.item_type ?? o.object_type ?? "").trim() || null;
-                          const copiesRaw = (o.copies ?? "").trim();
-                          const copiesNum = copiesRaw ? Number(copiesRaw) : 1;
-                          const copies = Number.isFinite(copiesNum) && copiesNum > 1 ? Math.floor(copiesNum) : 1;
-                          return {
-                            title,
-                            isbn: isbn ? isbn : null,
-                            authors,
-                            publisher,
-                            publish_date,
-                            description,
-                            category,
-                            tags,
-                            notes,
-                            group_label,
-                            object_type,
-                            copies
-                          };
-                        })
-                        .filter((r) => Boolean(r.title || r.isbn));
-                      setCsvRows(normalized);
-                      setStagedCsvData(null);
-                      setStagedCsvFilename(null);
-                      window.sessionStorage.removeItem("om_staged_csv_data");
-                      window.sessionStorage.removeItem("om_staged_csv_filename");
-                    }}
-                    disabled={csvImportState.busy}
-                  >
-                    Add CSV
-                  </button>
-                  <button
-                    className="muted"
-                    onClick={() => {
-                      setStagedCsvData(null);
-                      setStagedCsvFilename(null);
-                      window.sessionStorage.removeItem("om_staged_csv_data");
-                      window.sessionStorage.removeItem("om_staged_csv_filename");
-                    }}
-                    disabled={csvImportState.busy}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="row" style={{ width: "100%", gap: 10, alignItems: "baseline", flexWrap: "nowrap" }}>
-                {showScan && (
-                  <div className="row" style={{ gap: 6, flex: "0 0 auto", alignItems: "baseline" }}>
-                    <button 
-                      className="muted" 
-                      onClick={openScanner} 
-                      style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}
-                    >
-                      Scan
-                    </button>
-                    <span className="muted" style={{ fontSize: "0.9em" }}>or</span>
-                  </div>
-                )}
-                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <input
-                    placeholder={showScan ? "enter ISBN…" : "Add by ISBN, URL, or title"}
-                    value={addInput}
-                    onFocus={() => {
-                      if (bulkMode) exitEditMode();
-                      setAddOpen(true);
-                      setSearchOpen(false);
-                      setSortOpen(false);
-                      setAddInputFocused(true);
-                    }}
-                    onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
-                    onChange={(e) => setAddInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter") return;
-                      e.preventDefault();
-                      smartAddOrSearch();
-                    }}
-                    style={{ width: "100%" }}
-                  />
-                </div>
-                <div className="row" style={{ gap: 10, flex: "0 0 auto", justifyContent: "flex-end" }}>
-                  {(addInput.trim() || addInputFocused) ? (
-                    <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
-                      {addState.busy ? "…" : "Go"}
-                    </button>
-                  ) : null}
-                  {addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message ? (
-                    <button onClick={cancelAddPreview} disabled={addState.busy || addSearchState.busy}>
-                      Cancel
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="muted" style={{ marginTop: 4 }}>
-            {addState.message ? (addState.error ? `${addState.message} (${addState.error})` : addState.message) : ""}
-          </div>
-        </>
-      ) : null}
-
-      {addUrlPreview ? (
-        <div style={{ marginTop: 10 }} className="card">
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-            <div style={{ width: 62, flex: "0 0 auto" }}>
-              {addUrlPreview.cover_url && !addPreviewCoverFailed ? (
-                <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
-                  <img
-                    src={`/api/image-proxy?url=${encodeURIComponent(addUrlPreview.cover_url)}`}
-                    alt=""
-                    width={60}
-                    style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
-                    onLoad={(e) => {
-                      if (e.currentTarget.naturalWidth < 100 || e.currentTarget.naturalHeight < 100) {
-                        setAddPreviewCoverFailed(true);
-                      }
-                    }}
-                    onError={() => setAddPreviewCoverFailed(true)}
-                  />
-                </div>
-              ) : (
-                <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
+      {sortOpen && (
+        <div className="om-filter-row" style={{ marginTop: 16, marginBottom: 14, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, alignItems: "center" }}>
+          <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
+            <option value="grid">grid</option>
+            <option value="list">list</option>
+          </select>
+          {viewMode === "grid" && (
+            <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
+              <option value={1}>1</option>
+              <option value={2}>2</option>
+              {!isMobile && (
+                <>
+                  <option value={4}>4</option>
+                  <option value={8}>8</option>
+                </>
               )}
-            </div>
-            <div style={{ flex: "1 1 auto" }}>
-              <div>{(addUrlPreview.title ?? "").trim() || "—"}</div>
-              <div className="muted" style={{ marginTop: 4 }}>
-                {(addUrlPreview.authors ?? []).filter(Boolean).join(", ") || "—"}
-              </div>
-              <div className="muted" style={{ marginTop: 4 }}>
-                {[addUrlPreview.publisher ?? "", addUrlPreview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
-              </div>
-              <div className="muted" style={{ marginTop: 4 }}>
-                {addUrlPreview.isbn13 || addUrlPreview.isbn10 ? `ISBN: ${addUrlPreview.isbn13 ?? addUrlPreview.isbn10}` : "No ISBN found"}
-                {" "}
-                · sources: {(addUrlPreview.sources ?? []).join(", ") || "—"}
-              </div>
-              <div className="muted" style={{ marginTop: 4 }}>
-                {addUrlMeta.domain ? `${addUrlMeta.domain_kind ?? "generic"} · ${addUrlMeta.domain}` : ""}
-                {addUrlMeta.final_url ? (
-                  <>
-                    {" "}
-                    ·{" "}
-                    <a href={addUrlMeta.final_url} target="_blank" rel="noreferrer">
-                      open
-                    </a>
-                  </>
-                ) : null}
-              </div>
-            </div>
-            <div style={{ flex: "0 0 auto" }}>
-              <div className="row" style={{ gap: 8 }}>
-                <button
-                  onClick={async () => {
-                    if (!addUrlPreview) return;
-                    setAddState({ busy: true, error: null, message: "Adding…" });
-                    try {
-                      const isbn = String(addUrlPreview.isbn13 ?? addUrlPreview.isbn10 ?? "").trim();
-                      let id: number;
-                      if (isbn) id = await addByIsbnValue(isbn);
-                      else
-                        id = await addManualValue({
-                          title: (addUrlPreview.title ?? "").trim() || addInput.trim(),
-                          authors: (addUrlPreview.authors ?? []).filter(Boolean),
-                          publisher: addUrlPreview.publisher ?? null,
-                          publish_date: addUrlPreview.publish_date ?? null,
-                          description: addUrlPreview.description ?? null
-                        });
-                      if (addUrlPreview.cover_url) {
-                        await importCoverForBook(id, addUrlPreview.cover_url);
-                        await refreshAllBooks();
-                      }
-                      setAddInput("");
-                      cancelAddPreview();
-                      setAddState({ busy: false, error: null, message: "Added" });
-                      window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
-                    } catch (e: any) {
-                      setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
-                    }
-                  }}
-                  disabled={addState.busy}
-                >
-                  Add
-                </button>
-                <button onClick={cancelAddPreview} disabled={addState.busy}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {addSearchResults.length > 0 ? (
-        <div style={{ marginTop: 10 }}>
-          {addSearchResults.map((r, idx) => {
-            const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
-            const title = (r.title ?? "").trim() || "—";
-            const authors = (r.authors ?? []).filter(Boolean).join(", ");
-            const pub = [r.publisher ?? "", r.publish_date ?? (r.publish_year ? String(r.publish_year) : "")].filter(Boolean).join(" · ");
-            return (
-              <div key={`${r.source}:${bestIsbn || title}:${idx}`} className="card" style={{ marginTop: 8 }}>
-                <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                  <div style={{ width: 62, flex: "0 0 auto" }}>
-                    {r.cover_url ? (
-                      <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
-                        <img
-                          src={`/api/image-proxy?url=${encodeURIComponent(String(r.cover_url))}`}
-                          alt=""
-                          width={60}
-                          style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
-                          onLoad={(e) => {
-                            if (e.currentTarget.naturalWidth < 100 || e.currentTarget.naturalHeight < 100) {
-                              e.currentTarget.style.display = "none";
-                            }
-                          }}
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="om-cover-slot" style={{ width: 60, height: "auto" }} />
-                    )}
-
-                  </div>
-                  <div style={{ flex: "1 1 auto" }}>
-                    <div>{title}</div>
-                    <div className="muted" style={{ marginTop: 4 }}>
-                      {authors || "—"}
-                      {pub ? ` · ${pub}` : ""}
-                    </div>
-                    <div className="muted" style={{ marginTop: 4 }}>
-                      {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"} · {r.source}
-                    </div>
-                  </div>
-                  <div style={{ flex: "0 0 auto" }}>
-                    <button
-                      onClick={async () => {
-                        setAddState({ busy: true, error: null, message: "Adding…" });
-                        try {
-                          let id: number;
-                          if (bestIsbn) id = await addByIsbnValue(bestIsbn);
-                          else
-                            id = await addManualValue({
-                              title: (r.title ?? addInput).trim() || addInput.trim(),
-                              authors: (r.authors ?? []).filter(Boolean),
-                              publisher: r.publisher ?? null,
-                              publish_date: r.publish_date ?? null,
-                              description: null
-                            });
-                          if (r.cover_url) {
-                            await importCoverForBook(id, r.cover_url);
-                            await refreshAllBooks();
-                          }
-                          setAddInput("");
-                          cancelAddPreview();
-                          setAddState({ busy: false, error: null, message: "Added" });
-                          window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
-                        } catch (e: any) {
-                          setAddState({ busy: false, error: e?.message ?? "Add failed", message: "Add failed" });
-                        }
-                      }}
-                      disabled={addState.busy}
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          <div className="muted" style={{ marginTop: 6 }}>
-            {addSearchState.message ? (addSearchState.error ? `${addSearchState.message} (${addSearchState.error})` : addSearchState.message) : ""}
-          </div>
-        </div>
-      ) : addSearchState.message ? (
-        <div className="muted" style={{ marginTop: 8 }}>
-          {addSearchState.error ? `${addSearchState.message} (${addSearchState.error})` : addSearchState.message}
-        </div>
-      ) : null}
-
-      {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || csvRows.length > 0) && libraries.length > 0 ? (
-        <div className="row" style={{ marginTop: 6, alignItems: "baseline", gap: 10 }}>
-          <span className="muted">Add to catalog</span>
-          {libraries.length > 1 ? (
-            <select
-              value={addLibraryId ?? ""}
-              onChange={(e) => {
-                const id = Number(e.target.value);
-                setAddLibraryId(id);
-                try {
-                  window.localStorage.setItem("om_addLibraryId", String(id));
-                } catch { }
-              }}
-              disabled={libraryState.busy || !addLibraryId}
-            >
-              {libraries.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
             </select>
-          ) : (
-            <span className="muted">{libraries[0]?.name}</span>
           )}
+          <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
+            <option value="latest">latest</option>
+            <option value="earliest">earliest</option>
+            <option value="title_asc">title A-Z</option>
+            <option value="title_desc">title Z-A</option>
+          </select>
+          <button ref={tagButtonRef} onClick={() => (tagMenu.open ? closeTagMenu() : openTagMenu())} className={`om-filter-control${tagMenu.open ? " is-open" : ""}`} style={{ minWidth: 120 }}>
+            <span>{(filterTag ?? tagMode ?? "tag")}</span>
+            <span className="om-filter-caret" />
+          </button>
+          <button ref={categoryButtonRef} onClick={() => (categoryMenu.open ? closeCategoryMenu() : openCategoryMenu())} className={`om-filter-control${categoryMenu.open ? " is-open" : ""}`} style={{ minWidth: 160 }}>
+            <span>{((filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : "category")}</span>
+            <span className="om-filter-caret" />
+          </button>
+          <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
+            <option value="all">all</option>
+            <option value="public">public</option>
+            <option value="private">private</option>
+          </select>
         </div>
-      ) : null}
+      )}
 
-      {csvRows.length > 0 || csvImportState.message || csvImportState.error ? (
-        <div className="row" style={{ marginTop: 6, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-          {csvRows.length > 0 ? (
-            <>
-              <label className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <input type="checkbox" checked={csvApplyOverrides} onChange={(e) => setCsvApplyOverrides(e.target.checked)} />
-                use CSV metadata as overrides
-              </label>
-              <button onClick={importCsvRows} disabled={csvImportState.busy || !addLibraryId}>
-                {csvImportState.busy ? "Importing…" : `Import ${csvRows.length}`}
-              </button>
-              <button onClick={clearCsvImport} disabled={csvImportState.busy}>
-                Clear
-              </button>
-            </>
-          ) : null}
-          {csvImportState.message ? <span className="muted">{csvImportState.message}</span> : csvImportState.error ? <span className="muted">{csvImportState.error}</span> : null}
+      {tagMenu.open && (
+        <div ref={tagMenuRef} className="om-popover" style={{ position: "fixed", top: tagMenu.top, left: tagMenu.left, minWidth: tagMenu.minWidth, maxHeight: 320, overflow: "auto", zIndex: 1001 }}>
+          <input placeholder="Search…" value={tagSearch} onChange={(e) => setTagSearch(e.target.value)} style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <button onClick={() => { setUrlFilters({ tag: null }); closeTagMenu(); }} style={{ textAlign: "left" }}>all</button>
+            {availableTags.filter(t => t.toLowerCase().includes(tagSearch.trim().toLowerCase())).slice(0, 400).map(t => (
+              <button key={t} onClick={() => { setUrlFilters({ tag: t }); closeTagMenu(); }} style={{ textAlign: "left" }}>{t}</button>
+            ))}
+          </div>
         </div>
-      ) : null}
+      )}
 
-      <div style={{ marginTop: 16 }}>
-        {sortOpen ? (
-          <div
-            className="om-filter-row"
-            style={{
-              marginTop: 16,
-              marginBottom: 14,
-              flexWrap: isMobile ? "wrap" : "nowrap",
-              gap: 10,
-              alignItems: "center",
-              overflowX: isMobile ? ("visible" as const) : "auto",
-              paddingBottom: 4
-            }}
-          >
-            <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
-              <option value="grid">grid</option>
-              <option value="list">list</option>
-            </select>
-            {viewMode === "grid" ? (
-              <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                {!isMobile && (
-                  <>
-                    <option value={4}>4</option>
-                    <option value={8}>8</option>
-                  </>
-                )}
-              </select>
-            ) : null}
-            <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
-              <option value="latest">latest</option>
-              <option value="earliest">earliest</option>
-              <option value="title_asc">title A-Z</option>
-              <option value="title_desc">title Z-A</option>
-            </select>
-            <button
-              ref={tagButtonRef}
-              onClick={() => (tagMenu.open ? closeTagMenu() : openTagMenu())}
-              className={`om-filter-control${tagMenu.open ? " is-open" : ""}`}
-              style={{ minWidth: 120 }}
-              aria-haspopup="menu"
-              aria-expanded={tagMenu.open}
-            >
-              <span>
-                {(() => {
-                  const active = (filterTag ?? tagMode ?? "all").trim();
-                  return `${active && active !== "all" ? active : "tag"}`;
-                })()}
-              </span>
-              <span className="om-filter-caret" aria-hidden="true" />
-            </button>
-            <button
-              ref={categoryButtonRef}
-              onClick={() => (categoryMenu.open ? closeCategoryMenu() : openCategoryMenu())}
-              className={`om-filter-control${categoryMenu.open ? " is-open" : ""}`}
-              style={{ minWidth: 160 }}
-              aria-haspopup="menu"
-              aria-expanded={categoryMenu.open}
-            >
-              <span>{(filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : "category"}</span>
-              <span className="om-filter-caret" aria-hidden="true" />
-            </button>
-            <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
-              <option value="all">all</option>
-              <option value="public">public</option>
-              <option value="private">private</option>
-            </select>
+      {categoryMenu.open && (
+        <div ref={categoryMenuRef} className="om-popover" style={{ position: "fixed", top: categoryMenu.top, left: categoryMenu.left, minWidth: categoryMenu.minWidth, maxHeight: 320, overflow: "auto", zIndex: 1001 }}>
+          <input placeholder="Search…" value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <button onClick={() => { setUrlFilters({ category: null }); closeCategoryMenu(); }} style={{ textAlign: "left" }}>all</button>
+            {availableCategories.filter(c => c.toLowerCase().includes(categorySearch.trim().toLowerCase())).slice(0, 400).map(c => (
+              <button key={c} onClick={() => { setUrlFilters({ category: c }); closeCategoryMenu(); }} style={{ textAlign: "left" }}>{c}</button>
+            ))}
           </div>
-        ) : null}
+        </div>
+      )}
 
-        {tagMenu.open ? (
-          <div
-            ref={tagMenuRef}
-            className="om-popover"
-            style={{ position: "fixed", top: tagMenu.top, left: tagMenu.left, minWidth: tagMenu.minWidth, maxHeight: 320, overflow: "auto", zIndex: 1001 }}
-          >
-            <input
-              placeholder="Search…"
-              value={tagSearch}
-              onChange={(e) => setTagSearch(e.target.value)}
-              style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }}
-              autoFocus={!isMobile}
-            />
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <button
-                onClick={() => {
-                  setUrlFilters({ tag: null });
-                  closeTagMenu();
-                }}
-                style={{ textAlign: "left" }}
-              >
-                all
-              </button>
-              {availableTags
-                .filter((t) => t.toLowerCase().includes(tagSearch.trim().toLowerCase()))
-                .slice(0, 400)
-                .map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => {
-                      setUrlFilters({ tag: t });
-                      closeTagMenu();
-                    }}
-                    style={{ textAlign: "left" }}
-                  >
-                    {t}
-                  </button>
-                ))}
-            </div>
-          </div>
-        ) : null}
-
-        {categoryMenu.open ? (
-          <div
-            ref={categoryMenuRef}
-            className="om-popover"
-            style={{ position: "fixed", top: categoryMenu.top, left: categoryMenu.left, minWidth: categoryMenu.minWidth, maxHeight: 320, overflow: "auto", zIndex: 1001 }}
-          >
-            <input
-              placeholder="Search…"
-              value={categorySearch}
-              onChange={(e) => setCategorySearch(e.target.value)}
-              style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }}
-              autoFocus={!isMobile}
-            />
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <button
-                onClick={() => {
-                  setUrlFilters({ category: null });
-                  closeCategoryMenu();
-                }}
-                style={{ textAlign: "left" }}
-              >
-                all
-              </button>
-              {availableCategories
-                .filter((c) => c.toLowerCase().includes(categorySearch.trim().toLowerCase()))
-                .slice(0, 400)
-                .map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => {
-                      setUrlFilters({ category: c });
-                      closeCategoryMenu();
-                    }}
-                    style={{ textAlign: "left" }}
-                  >
-                    {c}
-                  </button>
-                ))}
-            </div>
-          </div>
-        ) : null}
-
-        <BulkBar
-          bulkMode={bulkMode}
-          bulkState={bulkState}
-          selectedGroupsCount={bulkSelectedGroups.length}
-          libraries={libraries.map((l) => ({ id: l.id, name: l.name }))}
-          bulkCategoryName={bulkCategoryName}
-          setBulkCategoryName={setBulkCategoryName}
-          onClearSelected={() => setBulkSelectedKeys({})}
-          onBulkDeleteSelected={bulkDeleteSelected}
-          onBulkMakePublic={bulkMakePublic}
-          onBulkMakePrivate={bulkMakePrivate}
-          onBulkAssignCategory={bulkAssignCategory}
-          onBulkMoveSelected={bulkMoveSelected}
-          onBulkCopySelected={bulkCopySelected}
-          onAnyMenuOpen={() => {
-            closeTagMenu();
-            closeCategoryMenu();
-          }}
-        />
-      </div>
+      <BulkBar
+        bulkMode={bulkMode}
+        bulkState={bulkState}
+        selectedGroupsCount={bulkSelectedGroups.length}
+        libraries={libraries.map((l) => ({ id: l.id, name: l.name }))}
+        bulkCategoryName={bulkCategoryName}
+        setBulkCategoryName={setBulkCategoryName}
+        onClearSelected={() => setBulkSelectedKeys({})}
+        onBulkDeleteSelected={bulkDeleteSelected}
+        onBulkMakePublic={bulkMakePublic}
+        onBulkMakePrivate={bulkMakePrivate}
+        onBulkAssignCategory={bulkAssignCategory}
+        onBulkMoveSelected={bulkMoveSelected}
+        onBulkCopySelected={bulkCopySelected}
+        onAnyMenuOpen={() => { closeTagMenu(); closeCategoryMenu(); }}
+      />
 
       <div style={{ marginTop: 32 }} />
 
       {libraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];
-        const isEditing = editingLibraryId === lib.id;
+        const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
         return (
           <div key={lib.id}>
             <LibraryBlock
@@ -3034,9 +1972,9 @@ function AppShell({
               index={idx}
               total={libraries.length}
               busy={libraryState.busy}
-              isEditing={isEditing}
+              isEditing={editingLibraryId === lib.id}
               nameDraft={libraryNameDraft}
-              reorderMode={bulkMode}
+              reorderMode={reorderMode}
               manageMode={bulkMode}
               onStartEdit={beginEditLibrary}
               onNameDraftChange={setLibraryNameDraft}
@@ -3044,40 +1982,41 @@ function AppShell({
               onCancelEdit={cancelEditLibrary}
               onDelete={deleteLibrary}
               collapsed={!!collapsedByLibraryId[lib.id]}
-              onToggleCollapsed={(id) => {
-                setCollapsedByLibraryId((prev) => {
-                  const next = { ...prev };
-                  if (next[id]) delete next[id];
-                  else next[id] = true;
-                  return next;
-                });
-              }}
+              onToggleCollapsed={(id) => setCollapsedByLibraryId(prev => { const n = { ...prev }; if (n[id]) delete n[id]; else n[id] = true; return n; })}
               onMoveUp={(id) => moveLibrary(id, -1)}
               onMoveDown={(id) => moveLibrary(id, 1)}
               viewMode={viewMode}
-              gridCols={gridCols}
+              gridCols={effectiveCols}
               searchQuery={searchQuery}
-              renderBooks={(limit) => {
-                if (groups.length === 0) {
-                  return (
-                    <div className="muted" style={{ marginTop: 10 }}>
-                      No books yet.
-                    </div>
-                  );
-                }
-                return (
-                  <div style={{ marginTop: 10, ...booksContainerStyle }}>
-                    {groups.slice(0, limit).map(renderGroup)}
-                  </div>
-                );
-              }}
+              renderBooks={(limit) => (
+                <div style={{ marginTop: 10, display: viewMode === "grid" ? "grid" : "flex", flexDirection: viewMode === "list" ? "column" : undefined, gridTemplateColumns: viewMode === "grid" ? `repeat(${effectiveCols}, minmax(0, 1fr))` : undefined, gap: 12 }}>
+                  {groups.slice(0, limit).map(g => (
+                    <BookCard
+                      key={g.key}
+                      viewMode={viewMode}
+                      bulkMode={bulkMode}
+                      selected={!!bulkSelectedKeys[g.key]}
+                      onToggleSelected={() => toggleBulkKey(g.key)}
+                      title={g.title}
+                      authors={g.filterAuthors}
+                      isbn13={g.primary.edition?.isbn13 ?? null}
+                      tags={g.tagNames}
+                      copiesCount={g.copiesCount}
+                      href={`/app/books/${g.primary.id}`}
+                      coverUrl={g.primary.media.find(m => m.kind === 'cover')?.storage_path ? (mediaUrlsByPath[g.primary.media.find(m => m.kind === 'cover')!.storage_path] ?? null) : (g.primary.edition?.cover_url ?? null)}
+                      cropData={g.primary.cover_crop}
+                      onDeleteCopy={() => deleteEntry(g.primary.id)}
+                      deleteState={deleteStateByBookId[g.primary.id]}
+                      gridCols={effectiveCols}
+                    />
+                  ))}
+                </div>
+              )}
             />
-            {idx < libraries.length - 1 ? <hr className="om-hr" /> : null}
+            {idx < libraries.length - 1 && <hr className="om-hr" />}
           </div>
         );
       })}
-
-      <hr className="om-hr" />
 
       <div style={{ marginTop: 24 }} className="card">
         <div className="row" style={{ marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, width: "100%", alignItems: "baseline" }}>
@@ -3087,75 +2026,17 @@ function AppShell({
             onFocus={() => setNewLibraryFocused(true)}
             onBlur={() => setNewLibraryFocused(false)}
             onChange={(e) => setNewLibraryName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              createLibrary(newLibraryName);
-            }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); createLibrary(newLibraryName); } }}
             style={{ minWidth: 0, flex: 1 }}
           />
-          {(newLibraryName.trim() || newLibraryFocused) ? (
-            <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy} style={{ marginLeft: "auto" }}>
-              Add
-            </button>
-          ) : null}
-        </div>
-        <div className="muted" style={{ marginTop: 4 }}>
-          {libraryState.message ? (libraryState.error ? `${libraryState.message} (${libraryState.error})` : libraryState.message) : libraryState.error ?? ""}
+          {(newLibraryName.trim() || newLibraryFocused) && (
+            <button onClick={() => createLibrary(newLibraryName)} disabled={libraryState.busy} style={{ marginLeft: "auto" }}>Add</button>
+          )}
         </div>
       </div>
       <div style={{ height: 24 }} />
-      <BookScannerModal
-        open={scannerOpen}
-        onClose={closeScanner}
-        onResult={(query) => {
-          setAddInput(query);
-          smartAddOrSearch(query);
-        }}
-      />
+      <BookScannerModal open={scannerOpen} onClose={closeScanner} onResult={(query) => { setAddInput(query); smartAddOrSearch(query); }} />
     </>
-  );
-}
-
-export default function AppPage() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [sessionLoaded, setSessionLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!supabase) {
-      setSessionLoaded(true);
-      return;
-    }
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setSessionLoaded(true);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      setSessionLoaded(true);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  return (
-    <main className="container">
-      {!supabase ? (
-        <div className="card">
-          <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: 8 }}>
-            Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
-          </div>
-        </div>
-      ) : !sessionLoaded ? (
-        <div className="card">Loading…</div>
-      ) : session ? (
-        <Suspense fallback={<div className="card">Loading…</div>}>
-          <AppWithFilters session={session} />
-        </Suspense>
-      ) : (
-        <SignInCard note="Followers-only by default; public is optional later." />
-      )}
-    </main>
   );
 }
 
@@ -3185,5 +2066,36 @@ function AppWithFilters({ session }: { session: Session }) {
       openAddPanel={openAddPanel}
       openCsvPicker={openCsvPicker}
     />
+  );
+}
+
+export default function AppPage() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) { setSessionLoaded(true); return; }
+    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setSessionLoaded(true); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => { setSession(newSession); setSessionLoaded(true); });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  return (
+    <main className="container">
+      {!supabase ? (
+        <div className="card">
+          <div>Supabase is not configured.</div>
+          <div className="muted" style={{ marginTop: 8 }}>Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.</div>
+        </div>
+      ) : !sessionLoaded ? (
+        <div className="card">Loading…</div>
+      ) : session ? (
+        <Suspense fallback={<div className="card">Loading…</div>}>
+          <AppWithFilters session={session} />
+        </Suspense>
+      ) : (
+        <SignInCard note="Followers-only by default; public is optional later." />
+      )}
+    </main>
   );
 }

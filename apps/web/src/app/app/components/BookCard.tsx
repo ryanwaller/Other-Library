@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useEffect, type MouseEvent } from "react";
-import CoverImage, { type CoverCrop } from "../../../components/CoverImage";
+import CoverImage from "../../../components/CoverImage";
+import type { CatalogItem } from "../../../lib/types";
+import { effectiveTitleFor } from "../../../lib/book";
 
 export type BookCardViewMode = "grid" | "list";
 
@@ -15,8 +17,6 @@ export default function BookCard({
   title,
   authors,
   isbn13,
-  tags,
-  copiesCount,
   href,
   coverUrl,
   cropData,
@@ -24,7 +24,6 @@ export default function BookCard({
   onDeleteCopy,
   deleteState,
   hideCopyCount,
-  showDeleteCopy = true,
   gridCols
 }: {
   viewMode: BookCardViewMode;
@@ -38,7 +37,7 @@ export default function BookCard({
   copiesCount: number;
   href: string;
   coverUrl: string | null;
-  cropData?: CoverCrop | null;
+  cropData?: any | null;
   originalSrc?: string | null;
   onDeleteCopy: () => void;
   deleteState: { busy: boolean; error: string | null; message: string | null } | undefined;
@@ -47,7 +46,8 @@ export default function BookCard({
   gridCols?: number;
 }) {
   const router = useRouter();
-  const openAuthorFilter = (event: MouseEvent, author: string) => {
+
+  function openAuthorFilter(event: MouseEvent | React.KeyboardEvent, author: string) {
     event.preventDefault();
     event.stopPropagation();
     router.push(`/app?author=${encodeURIComponent(author)}`);
@@ -72,8 +72,6 @@ export default function BookCard({
     return authors;
   }, [gridCols, authors, isMobile]);
 
-  const authorLine = truncatedAuthors.length > 0 ? truncatedAuthors.join(", ") : "";
-
   const coverEl = (
     <div className="om-cover-slot" style={{ height: "auto", width: "100%" }}>
       <CoverImage
@@ -90,7 +88,7 @@ export default function BookCard({
     return (
       <div className="card" style={{ display: "grid", gridTemplateColumns: bulkMode ? "26px 70px 1fr" : "70px 1fr", gap: 12, alignItems: "start" }}>
         {bulkMode ? <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" /> : null}
-        <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link">
+        <Link href={href} style={{ display: "block" }} className="om-book-card-link">
           <div className="om-cover-slot" style={{ width: 70, height: "auto" }}>
             <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto" }} objectFit="contain" />
           </div>
@@ -124,26 +122,6 @@ export default function BookCard({
               isbn13 || ""
             )}
           </div>
-          {tags.length > 0 ? (
-            <div className="muted" style={{ marginTop: 6 }}>
-              {tags.slice(0, 6).map((t, idx) => (
-                <span key={t}>
-                  <Link href={`/app?tag=${encodeURIComponent(t)}`}>{t}</Link>
-                  {idx < Math.min(tags.length, 6) - 1 ? <span>, </span> : null}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10 }}>
-            {showDeleteCopy ? (
-              <>
-                <button onClick={onDeleteCopy} disabled={deleteState?.busy ?? false} title="Deletes one copy">
-                  Delete copy
-                </button>
-                <span className="muted">{deleteState?.message ? (deleteState?.error ? `${deleteState?.message} (${deleteState?.error})` : deleteState?.message) : ""}</span>
-              </>
-            ) : null}
-          </div>
         </div>
       </div>
     );
@@ -168,18 +146,26 @@ export default function BookCard({
                 <span className="om-book-title">{title}</span>
               </Link>
             </div>
-            {authorLine ? (
-              <div className="muted" style={{ marginTop: 6 }}>
-                {authorLine}
-              </div>
-            ) : null}
-
-            {showDeleteCopy ? (
-              <div className="row" style={{ marginTop: 10, justifyContent: "space-between" }}>
-                <span className="muted">{deleteState?.message ? (deleteState?.error ? `${deleteState?.message} (${deleteState?.error})` : deleteState?.message) : ""}</span>
-                <button onClick={onDeleteCopy} disabled={deleteState?.busy ?? false} title="Deletes one copy">
-                  Delete copy
-                </button>
+            {authors.length > 0 ? (
+              <div className="om-book-secondary">
+                {truncatedAuthors.map((author, index) => (
+                  <span key={author}>
+                    {gridCols === 8 && authors.length > 1 ? (
+                      <span>{author}</span>
+                    ) : isMobile && author === "+ more" ? (
+                      <span className="muted">{author}</span>
+                    ) : (
+                      <Link
+                        href={`/app?author=${encodeURIComponent(author)}`}
+                        onClick={(e) => openAuthorFilter(e, author)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        {author}
+                      </Link>
+                    )}
+                    {index < truncatedAuthors.length - 1 ? <span>, </span> : null}
+                  </span>
+                ))}
               </div>
             ) : null}
           </div>
@@ -187,7 +173,7 @@ export default function BookCard({
       ) : (
         <div
           className="om-book-card-link"
-          style={{ display: "flex", flexDirection: "column", height: "100%", color: "inherit", cursor: "pointer" }}
+          style={{ display: "block", color: "inherit", cursor: "pointer" }}
           role="link"
           tabIndex={0}
           onClick={() => router.push(href)}
@@ -203,7 +189,7 @@ export default function BookCard({
             <div className="row" style={{ justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
               <span className="om-book-title">{title}</span>
             </div>
-            {authorLine ? (
+            {truncatedAuthors.length > 0 ? (
               <div className="om-book-secondary">
                 {truncatedAuthors.map((author, index) => (
                   <span key={author}>

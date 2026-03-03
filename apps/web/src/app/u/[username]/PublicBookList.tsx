@@ -4,34 +4,14 @@ import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { bookIdSlug } from "../../../lib/slug";
 import AddToLibraryButton from "./AddToLibraryButton";
-import CoverImage, { type CoverCrop } from "../../../components/CoverImage";
+import CoverImage from "../../../components/CoverImage";
 import PagedBookList from "../../app/components/PagedBookList";
-
-type PublicBook = {
-  id: number;
-  library_id: number;
-  visibility: "inherit" | "followers_only" | "public";
-  title_override: string | null;
-  authors_override: string[] | null;
-  subjects_override: string[] | null;
-  publisher_override: string | null;
-  cover_original_url: string | null;
-  cover_crop: CoverCrop | null;
-  edition: { 
-    id: number; 
-    isbn13: string | null; 
-    title: string | null; 
-    authors: string[] | null; 
-    cover_url: string | null;
-    subjects: string[] | null;
-    publisher: string | null;
-    publish_date: string | null;
-    description: string | null;
-  } | null;
-  media: Array<{ kind: "cover" | "image"; storage_path: string }>;
-};
-
-type CatalogGroup = { key: string; libraryId: number; primary: PublicBook; copies: PublicBook[] };
+import type { PublicBook, CatalogGroup } from "../../../lib/types";
+import { 
+  effectiveTitleFor, 
+  effectiveAuthorsFor, 
+  groupKeyFor 
+} from "../../../lib/book";
 
 type SortMode = "latest" | "earliest" | "title_asc" | "title_desc";
 
@@ -45,44 +25,17 @@ type Props = {
   initialFilters: { author?: string; subject?: string; tag?: string; category?: string; publisher?: string };
 };
 
-function normalizeKeyPart(input: string): string {
-  return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function effectiveTitleFor(b: PublicBook): string {
-  const e = b.edition;
-  return (b.title_override ?? "").trim() || e?.title || "(untitled)";
-}
-
-function effectiveAuthorsFor(b: PublicBook): string[] {
-  const override = (b.authors_override ?? []).filter(Boolean);
-  if (override.length > 0) return override;
-  return (b.edition?.authors ?? []).filter(Boolean);
-}
-
-function groupKeyFor(b: PublicBook): string {
-  const eId = b.edition?.id ?? null;
-  if (eId) return `e:${eId}`;
-  const title = normalizeKeyPart(effectiveTitleFor(b));
-  const authors = effectiveAuthorsFor(b)
-    .map((a) => normalizeKeyPart(a))
-    .filter(Boolean)
-    .join("|");
-  return `m:${title}|${authors}`;
-}
-
 export default function PublicBookList({
   libraries,
   allBooks,
   username,
-  profileId,
   signedMap,
   showLibraryBlocks,
   initialFilters
 }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [gridCols, setGridCols] = useState<2 | 4 | 8>(4);
+  const [gridCols, setGridCols] = useState<1 | 2 | 4 | 8>(2);
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [sortOpen, setSortOpen] = useState(false);
 
@@ -93,6 +46,11 @@ export default function PublicBookList({
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    setGridCols((prev) => (prev > 2 ? 2 : prev));
+  }, [isMobile]);
 
   // Use state for filters so we can clear them instantly
   const [activeFilters, setActiveFilters] = useState(initialFilters);
@@ -134,7 +92,8 @@ export default function PublicBookList({
     }
 
     const groups: CatalogGroup[] = Array.from(byKey.entries()).map(([key, copies]) => {
-      const primary = copies.slice().sort((a, b) => {
+      const sorted = copies.slice().sort((a, b) => b.id - a.id); // Default stable sort
+      const primary = sorted.slice().sort((a, b) => {
         const score = (x: PublicBook) => {
           let s = 0;
           if (x.media.some(m => m.kind === 'cover')) s += 1000;
@@ -143,7 +102,27 @@ export default function PublicBookList({
         };
         return score(b) - score(a);
       })[0]!;
-      return { key, libraryId: primary.library_id, primary, copies };
+
+      return { 
+        key, 
+        libraryId: primary.library_id, 
+        primary, 
+        copies: sorted,
+        copiesCount: sorted.length,
+        tagNames: [], // Not populated in this view currently
+        categoryNames: [],
+        filterAuthors: effectiveAuthorsFor(primary),
+        filterSubjects: (primary.subjects_override ?? primary.edition?.subjects ?? []) as string[],
+        filterPublishers: [primary.publisher_override || primary.edition?.publisher || ""],
+        filterDesigners: (primary.designers_override ?? []) as string[],
+        filterGroups: [primary.group_label || ""],
+        filterDecades: [primary.decade || ""],
+        title: effectiveTitleFor(primary),
+        visibility: primary.visibility,
+        effectiveVisibility: primary.visibility === "inherit" ? "public" : primary.visibility as any,
+        latestCreatedAt: 0,
+        earliestCreatedAt: 0
+      };
     });
 
     // 3. Sort groups
@@ -152,20 +131,22 @@ export default function PublicBookList({
     } else if (sortMode === "earliest") {
       groups.sort((a, b) => a.primary.id - b.primary.id);
     } else if (sortMode === "title_asc") {
-      groups.sort((a, b) => effectiveTitleFor(a.primary).localeCompare(effectiveTitleFor(b.primary)));
+      groups.sort((a, b) => a.title.localeCompare(b.title));
     } else if (sortMode === "title_desc") {
-      groups.sort((a, b) => effectiveTitleFor(b.primary).localeCompare(effectiveTitleFor(a.primary)));
+      groups.sort((a, b) => b.title.localeCompare(a.title));
     }
 
     return groups;
   }, [allBooks, activeFilters, searchQuery, sortMode]);
 
+  const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
+
   const containerStyle = useMemo((): React.CSSProperties => {
     if (viewMode === "list") {
       return { display: "flex", flexDirection: "column", gap: 8 };
     }
-    return { display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: 12 };
-  }, [viewMode, gridCols]);
+    return { display: "grid", gridTemplateColumns: `repeat(${effectiveCols}, 1fr)`, gap: 12 };
+  }, [viewMode, effectiveCols]);
 
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
 
@@ -178,6 +159,7 @@ export default function PublicBookList({
     const truncatedAuthors = isMobile && authors.length > 2
       ? [...authors.slice(0, 2), "+ more"]
       : authors;
+
     const coverUrl =
       g.copies
         .map((c) => {
@@ -315,7 +297,7 @@ export default function PublicBookList({
         </div>
       </div>
 
-      <div className="row" style={{ width: "100%", margin: 0, alignItems: "baseline", gap: 12 }}>
+      <div className="row" style={{ margin: 0, alignItems: "baseline", gap: 12 }}>
         <button
           type="button"
           className={sortOpen ? "text-primary" : "muted"}
@@ -339,7 +321,8 @@ export default function PublicBookList({
             <option value="list">list</option>
           </select>
           {viewMode === "grid" && (
-            <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as 2 | 4 | 8)}>
+            <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as 1 | 2 | 4 | 8)}>
+              <option value={1}>1</option>
               <option value={2}>2</option>
               {!isMobile && (
                 <>

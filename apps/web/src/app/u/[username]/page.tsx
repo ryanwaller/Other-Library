@@ -4,42 +4,9 @@ import Link from "next/link";
 import FollowControls from "./FollowControls";
 import AddToLibraryProvider from "./AddToLibraryProvider";
 import PublicBookList from "./PublicBookList";
+import type { PublicBook } from "../../../lib/types";
 
 export const dynamic = "force-dynamic";
-
-type PublicBook = {
-  id: number;
-  library_id: number;
-  visibility: "inherit" | "followers_only" | "public";
-  title_override: string | null;
-  authors_override: string[] | null;
-  subjects_override: string[] | null;
-  publisher_override: string | null;
-  cover_original_url: string | null;
-  cover_crop: {
-    x?: number;
-    y?: number;
-    width?: number;
-    height?: number;
-    zoom: number;
-    rotation: number;
-    brightness: number;
-    contrast: number;
-    mode?: "transform";
-  } | null;
-  edition: { 
-    id: number; 
-    isbn13: string | null; 
-    title: string | null; 
-    authors: string[] | null; 
-    cover_url: string | null;
-    subjects: string[] | null;
-    publisher: string | null;
-    publish_date: string | null;
-    description: string | null;
-  } | null;
-  media: Array<{ kind: "cover" | "image"; storage_path: string }>;
-};
 
 export default async function PublicProfilePage({ 
   params,
@@ -115,7 +82,7 @@ export default async function PublicProfilePage({
 
   const booksRes = await supabase
     .from("user_books")
-    .select("id,library_id,visibility,title_override,authors_override,subjects_override,publisher_override,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path)")
+    .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path)")
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
     .limit(1000);

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { bookIdSlug } from "../../../lib/slug";
 import CoverImage, { type CoverCrop } from "../../../components/CoverImage";
@@ -33,12 +34,24 @@ export default function PublicPagedBookList({
   username: string;
   signedMap: Record<string, string>;
 }) {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   return (
     <PagedBookList
       items={books}
       viewMode="grid"
-      gridCols={4}
-      containerStyle={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}
+      gridCols={isMobile ? 2 : 4}
+      containerStyle={{ 
+        display: "grid", 
+        gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(180px, 1fr))", 
+        gap: 12 
+      }}
       renderItem={(b) => {
         const e = b.edition;
         const title = ((b.title_override ?? "").trim() || e?.title || "(untitled)") as string;
