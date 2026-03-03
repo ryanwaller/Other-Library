@@ -2305,8 +2305,30 @@ function AppShell({
         </div>
       </div>
 
-      <div className="row" style={{ width: "100%", margin: 0, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-        <div className="row" style={{ width: "100%", gap: 12, alignItems: "baseline", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap", margin: 0 }}>
+      <div 
+        className="row" 
+        style={{ 
+          width: "100%", 
+          margin: 0, 
+          alignItems: "baseline", 
+          justifyContent: "flex-start", 
+          gap: 10, 
+          flexDirection: isMobile ? "column-reverse" : "row",
+          flexWrap: "nowrap"
+        }}
+      >
+        {/* Buttons row - will be below search on mobile */}
+        <div 
+          className="row" 
+          style={{ 
+            gap: 12, 
+            alignItems: "baseline", 
+            minWidth: 0, 
+            flex: isMobile ? "0 0 auto" : "0 0 auto", 
+            flexWrap: "nowrap", 
+            margin: 0 
+          }}
+        >
           <button
             onClick={() => {
               setBulkMode((prev) => {
@@ -2348,6 +2370,20 @@ function AppShell({
           >
             Add to catalog
           </button>
+        </div>
+
+        {/* Search row - will be on top on mobile */}
+        <div 
+          className="row" 
+          style={{ 
+            flex: "1 1 auto", 
+            width: "100%", 
+            gap: 12, 
+            alignItems: "baseline", 
+            margin: 0,
+            flexWrap: "nowrap"
+          }}
+        >
           <input
             className="om-inline-search-input"
             placeholder="Search your catalog"
@@ -2357,16 +2393,16 @@ function AppShell({
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
           />
+          {(searchFocused || searchQuery.trim()) ? (
+            <Link
+              href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
+              className="muted"
+              style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}
+            >
+              Search others
+            </Link>
+          ) : null}
         </div>
-        {(searchFocused || searchQuery.trim()) ? (
-          <Link
-            href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
-            className="muted"
-            style={{ whiteSpace: "nowrap", flex: "0 0 auto", marginTop: isMobile ? 6 : 0 }}
-          >
-            Search others
-          </Link>
-        ) : null}
       </div>
     </div>
 
