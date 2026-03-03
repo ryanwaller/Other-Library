@@ -2874,7 +2874,7 @@ export default function BookDetailPage() {
                       )}
                       <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                         <input
-                          className="om-inline-control"
+                          className="om-inline-search-input"
                           placeholder={showScan ? "enter ISBN, URL, or title" : "Scan or enter ISBN, URL, or title"}
                           value={lookupInput}
                           onFocus={() => setLookupInputFocused(true)}
@@ -3007,7 +3007,6 @@ export default function BookDetailPage() {
                         const previewFinalUrl = importMeta.final_url ?? undefined;
                         return (
                           <div style={{ marginTop: 10 }}>
-                            <div className="muted">Preview</div>
                             <div style={{ marginTop: 6 }} className="om-lookup-item">
                               <div className="om-lookup-row">
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
@@ -3048,9 +3047,6 @@ export default function BookDetailPage() {
                                   <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     {[preview.publisher ?? "", preview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
                                     {preview.trim_width && preview.trim_height ? ` · ${preview.trim_width} × ${preview.trim_height} ${preview.trim_unit ?? ""}`.trim() : ""}
-                                  </div>
-                                  <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    {preview.isbn13 || preview.isbn10 ? `ISBN: ${preview.isbn13 ?? preview.isbn10}` : "No ISBN found"}
                                   </div>
                                   {(importMeta.domain || previewFinalUrl) && (
                                     <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
