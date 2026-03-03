@@ -229,30 +229,32 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       <ScrollToTopOnMount />
       <AddToLibraryProvider editionIds={editionId ? [editionId] : []}>
         <div className="card">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <div>
-              <div className="om-avatar-lockup">
-                {avatarUrl ? (
-                  <Link href={`/u/${profile.username}`} className="om-avatar-link" aria-label="Open profile">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-public" />
-                  </Link>
-                ) : null}
-                <Link href={`/u/${profile.username}`}>{profile.username}</Link>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+            <div className="row" style={{ gap: 12, alignItems: "center" }}>
+              {avatarUrl ? (
+                <div style={{ width: 48, height: 48, borderRadius: 999, overflow: "hidden", border: "1px solid var(--border-avatar)" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img alt="" src={avatarUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                </div>
+              ) : (
+                <div style={{ width: 48, height: 48, borderRadius: 999, border: "1px solid var(--border-avatar)", background: "var(--bg-muted)" }} />
+              )}
+              <div>
+                <div style={{ fontSize: "1em" }}>{profile.display_name || `@${profile.username}`}</div>
+                {profile.display_name ? <div className="muted">@{profile.username}</div> : null}
               </div>
             </div>
-            <div className="muted">public</div>
           </div>
-          {profile.display_name ? <div style={{ marginTop: 6 }}>{profile.display_name}</div> : null}
-          <div className="row muted" style={{ marginTop: 8, justifyContent: "flex-start", alignItems: "baseline", gap: 18, flexWrap: "wrap" }}>
+
+          <div className="row muted" style={{ marginTop: 12, gap: 16 }}>
             <span style={{ display: "inline-flex", gap: 10 }}>
-              <Link href={`/u/${profile.username}/followers`} style={{ textDecoration: "none" }}>
+              <Link href={`/u/${profile.username}/followers`} className="muted">
                 Followers
               </Link>
               <span>{followersCount ?? "—"}</span>
             </span>
             <span style={{ display: "inline-flex", gap: 10 }}>
-              <Link href={`/u/${profile.username}/following`} style={{ textDecoration: "none" }}>
+              <Link href={`/u/${profile.username}/following`} className="muted">
                 Following
               </Link>
               <span>{followingCount ?? "—"}</span>

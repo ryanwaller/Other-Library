@@ -17,9 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <GlobalNav />
-        <div className="om-page-transition">
-          {children}
-        </div>
+        {children}
       </body>
     </html>
   );

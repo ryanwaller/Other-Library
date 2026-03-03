@@ -861,28 +861,14 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 
 .om-book-secondary a {
   color: var(--muted);
-  text-decoration-color: var(--muted);
-}
-
-.om-book-card:hover .om-book-secondary a {
-  color: var(--muted);
-  text-decoration-color: var(--muted);
-}
-
-.om-book-secondary a:hover {
-  color: var(--muted);
-  text-decoration-color: var(--muted);
 }
 
 .om-book-secondary a:visited {
   color: var(--muted);
-  text-decoration-color: var(--muted);
 }
 
-.muted a,
-.muted a:hover {
+.muted a {
   color: inherit;
-  text-decoration-color: currentColor;
 }
 
 .om-row-baseline {
