@@ -44,19 +44,60 @@ function isbn10to13(isbn10: string): string | null {
   return prefix + check;
 }
 
-function extractIsbn13(text: string): string | null {
-  const matches = text.match(/[\d][\d\s\-]{8,}[\d]/g) ?? [];
-  for (const m of matches) {
-    const digits = m.replace(/\D/g, "");
-    if (digits.length === 13 && (digits.startsWith("978") || digits.startsWith("979"))) {
-      return digits;
-    }
-    if (digits.length === 10) {
-      const isbn13 = isbn10to13(digits);
-      if (isbn13) return isbn13;
+// Generic terms that are not useful as book title queries
+const GENERIC_TERMS = new Set([
+  "book", "books", "paperback", "hardcover", "hardback", "audiobook", "audio book",
+  "ebook", "e-book", "e book", "novel", "fiction", "nonfiction", "non-fiction",
+  "literature", "publication", "publications", "isbn", "author", "reading",
+  "cover", "book cover", "text", "document",
+]);
+
+// Book retailer/catalog domains in preference order
+const BOOK_DOMAINS = [
+  "amazon.com", "amazon.co.uk", "amazon.ca",
+  "goodreads.com",
+  "books.google.com",
+  "openlibrary.org",
+  "worldcat.org",
+  "barnesandnoble.com",
+  "bookshop.org",
+];
+
+function isBookTitleEntity(description: string): boolean {
+  const lower = description.toLowerCase().trim();
+  if (GENERIC_TERMS.has(lower)) return false;
+  // Require at least two characters and not purely numeric
+  if (lower.length < 3 || /^\d+$/.test(lower)) return false;
+  return true;
+}
+
+function extractIsbn13FromUrl(url: string): string | null {
+  // Patterns: /dp/XXXXXXXXXX, /isbn/XXXXXXXXXX, /books/XXXXXXXXXX, ?isbn=...
+  const patterns = [
+    /\/dp\/(\d{9}[\dX]|\d{13})/i,
+    /\/isbn\/(\d{9}[\dX]|\d{13})/i,
+    /\/books?\/(\d{9}[\dX]|\d{13})/i,
+    /[?&]isbn=(\d{9}[\dX]|\d{13})/i,
+  ];
+  for (const re of patterns) {
+    const m = url.match(re);
+    if (m) {
+      const raw = m[1]!.replace(/[^\dX]/gi, "");
+      if (raw.length === 13 && (raw.startsWith("978") || raw.startsWith("979"))) return raw;
+      if (raw.length === 10) return isbn10to13(raw);
     }
   }
   return null;
+}
+
+function domainPriority(url: string): number {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    const idx = BOOK_DOMAINS.findIndex((d) => host === d || host.endsWith("." + d));
+    return idx === -1 ? BOOK_DOMAINS.length : idx;
+  } catch {
+    return BOOK_DOMAINS.length;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -88,6 +129,7 @@ export async function POST(req: NextRequest) {
         requests: [
           {
             image: { content: image },
+            // WEB_DETECTION only — visual web matching, not OCR (Tesseract handles that)
             features: [{ type: "WEB_DETECTION", maxResults: 10 }],
           },
         ],
@@ -100,44 +142,53 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await res.json() as VisionResponse;
+    console.log("[vision-scan] raw response:", JSON.stringify(data, null, 2));
+
     const web = data.responses?.[0]?.webDetection;
     if (!web) {
       return NextResponse.json({ ok: false, error: "No web detection result" });
     }
 
-    // 1. Try to extract ISBN-13 from page URLs and image URLs
-    const urls = [
-      ...(web.pagesWithMatchingImages ?? []).map((p) => p.url),
+    // 1. webEntities — highest-scoring entity that looks like a book title
+    const titleEntity = (web.webEntities ?? [])
+      .filter((e) => e.score >= 0.5 && e.description && isBookTitleEntity(e.description))
+      .sort((a, b) => b.score - a.score)[0];
+    if (titleEntity?.description) {
+      return NextResponse.json({
+        ok: true,
+        query: titleEntity.description,
+        confidence: titleEntity.score,
+        source: "webEntities",
+      });
+    }
+
+    // 2. bestGuessLabels — fallback if no useful entity
+    const bestLabel = (web.bestGuessLabels ?? [])
+      .map((l) => l.label ?? "")
+      .find((l) => l.length > 0 && isBookTitleEntity(l));
+    if (bestLabel) {
+      return NextResponse.json({ ok: true, query: bestLabel, confidence: 0.5, source: "bestGuessLabels" });
+    }
+
+    // 3. pagesWithMatchingImages — extract title from page titles, preferring book domains
+    const pages = (web.pagesWithMatchingImages ?? [])
+      .filter((p) => p.pageTitle)
+      .sort((a, b) => domainPriority(a.url) - domainPriority(b.url));
+    for (const page of pages) {
+      const title = page.pageTitle!.trim();
+      if (title.length > 3 && isBookTitleEntity(title)) {
+        return NextResponse.json({ ok: true, query: title, confidence: 0.4, source: "pageTitle" });
+      }
+    }
+
+    // 4. fullMatchingImages + partialMatchingImages — extract ISBNs from URL patterns
+    const imageUrls = [
       ...(web.fullMatchingImages ?? []).map((i) => i.url),
       ...(web.partialMatchingImages ?? []).map((i) => i.url),
     ];
-    for (const url of urls) {
-      const isbn = extractIsbn13(url);
-      if (isbn) return NextResponse.json({ ok: true, isbn, source: "url" });
-    }
-
-    // 2. Try to extract ISBN from entity descriptions and page titles
-    const texts = [
-      ...(web.webEntities ?? []).map((e) => e.description ?? ""),
-      ...(web.bestGuessLabels ?? []).map((l) => l.label ?? ""),
-      ...(web.pagesWithMatchingImages ?? []).map((p) => p.pageTitle ?? ""),
-    ];
-    for (const t of texts) {
-      const isbn = extractIsbn13(t);
-      if (isbn) return NextResponse.json({ ok: true, isbn, source: "text" });
-    }
-
-    // 3. Build a text search query from best guess label + top entities
-    const bestLabel = web.bestGuessLabels?.[0]?.label ?? "";
-    const topEntities = (web.webEntities ?? [])
-      .filter((e) => e.score >= 0.5 && e.description)
-      .slice(0, 3)
-      .map((e) => e.description!);
-    const query = bestLabel || topEntities.join(" ");
-    const confidence = web.webEntities?.[0]?.score ?? 0;
-
-    if (query) {
-      return NextResponse.json({ ok: true, query, confidence, source: "entities" });
+    for (const url of imageUrls) {
+      const isbn = extractIsbn13FromUrl(url);
+      if (isbn) return NextResponse.json({ ok: true, isbn, source: "imageUrl" });
     }
 
     return NextResponse.json({ ok: false, error: "No usable result" });
