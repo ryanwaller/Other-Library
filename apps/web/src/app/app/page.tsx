@@ -2441,22 +2441,20 @@ function AppShell({
               </div>
             ) : (
               <>
-                {showScan ? (
-                  <button 
-                    className="muted" 
-                    onClick={openScanner} 
-                    style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}
-                  >
-                    Scan
-                  </button>
-                ) : (
-                  <span className="muted" style={{ whiteSpace: "nowrap" }}>
-                    Scan
-                  </span>
+                {showScan && (
+                  <>
+                    <button 
+                      className="muted" 
+                      onClick={openScanner} 
+                      style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}
+                    >
+                      Scan
+                    </button>
+                    <span className="muted">or</span>
+                  </>
                 )}
-                <span className="muted">or</span>
                 <input
-                  placeholder="enter ISBN, URL, or title"
+                  placeholder={showScan ? "enter ISBN, URL, or title" : "Add by ISBN, URL, or title"}
                   value={addInput}
                   onFocus={() => setAddInputFocused(true)}
                   onBlur={() => setAddInputFocused(false)}
