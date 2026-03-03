@@ -35,9 +35,10 @@ export default function PublicBookList({
 }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [gridCols, setGridCols] = useState<1 | 2 | 4 | 8>(2);
+  const [gridCols, setGridCols] = useState<1 | 2 | 4 | 8>(4);
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [sortOpen, setSortOpen] = useState(false);
+  const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, boolean>>({});
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -348,17 +349,41 @@ export default function PublicBookList({
           {libraries.map((lib) => {
             const libGroups = filteredGroups.filter(g => g.libraryId === lib.id);
             if (libGroups.length === 0) return null;
+            const collapsed = !!collapsedByLibraryId[lib.id];
+            const toggle = () => setCollapsedByLibraryId(prev => {
+              const next = { ...prev };
+              if (next[lib.id]) delete next[lib.id]; else next[lib.id] = true;
+              return next;
+            });
             return (
-              <div key={lib.id}>
-                <div style={{ marginBottom: 10 }}>{lib.name}</div>
-                <PagedBookList
-                  items={libGroups}
-                  viewMode={viewMode}
-                  gridCols={gridCols}
-                  searchQuery={searchQuery}
-                  containerStyle={containerStyle}
-                  renderItem={renderBook}
-                />
+              <div key={lib.id} className="card" style={{ marginTop: 0 }}>
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap" }}>
+                  <div className="row" style={{ gap: 10, flex: 1, alignItems: "baseline", flexWrap: "nowrap", minWidth: 0 }}>
+                    <button
+                      onClick={toggle}
+                      aria-label={collapsed ? "Expand catalog" : "Collapse catalog"}
+                      style={{ padding: 0, width: 16, minWidth: 16, display: "inline-flex", justifyContent: "center", alignItems: "center", border: "none", background: "transparent", cursor: "pointer", transform: "translateY(-2px)" }}
+                    >
+                      <span className="om-catalog-caret" data-collapsed={collapsed ? "true" : "false"} aria-hidden="true" />
+                    </button>
+                    <button onClick={toggle} style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left" }}>
+                      {lib.name}
+                    </button>
+                    <span className="muted" style={{ marginLeft: 4, whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
+                      {libGroups.length}&nbsp;&nbsp;book{libGroups.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                </div>
+                {!collapsed && (
+                  <PagedBookList
+                    items={libGroups}
+                    viewMode={viewMode}
+                    gridCols={gridCols}
+                    searchQuery={searchQuery}
+                    containerStyle={containerStyle}
+                    renderItem={renderBook}
+                  />
+                )}
               </div>
             );
           })}

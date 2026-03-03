@@ -105,11 +105,8 @@ export default function AlsoOwnedBy({
   return (
     <div style={{ marginTop: 14 }} className="card">
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <div>Also in</div>
+        <div>Also owned by</div>
         <div className="muted">{owners.length}</div>
-      </div>
-      <div className="muted" style={{ marginTop: 8 }}>
-        Public libraries are shown to everyone; followers-only libraries are shown only to approved followers (when you’re signed in).
       </div>
       {owners.length === 0 ? (
         <div className="muted" style={{ marginTop: 8 }}>
