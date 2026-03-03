@@ -900,22 +900,26 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 }
 
 .om-inline-control {
+  display: block;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   border: 0 !important;
   border-bottom: 0 !important;
   padding: 0 !important;
-  margin: 0;
+  margin: 0 !important;
   background: transparent;
   color: inherit;
   font: inherit;
   line-height: inherit;
   text-decoration: none !important;
-  box-shadow: none;
+  box-shadow: none !important;
   appearance: none;
   -webkit-appearance: none;
-  min-height: calc(1em * var(--text-line));
+  min-height: 1.4em;
+  height: auto;
+  outline: none !important;
+  vertical-align: baseline !important;
 }
 
 .om-inline-control::placeholder {
@@ -1043,7 +1047,7 @@ summary::-webkit-details-marker {
   border: 0 !important;
   border-bottom: 0 !important;
   padding: 0 !important;
-  margin: 0;
+  margin: 0 !important;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -1051,6 +1055,8 @@ summary::-webkit-details-marker {
   box-shadow: none;
   appearance: none;
   -webkit-appearance: none;
+  outline: none !important;
+  vertical-align: baseline !important;
 }
 
 .om-token-input:focus,

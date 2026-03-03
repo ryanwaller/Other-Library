@@ -2672,7 +2672,9 @@ export default function BookDetailPage() {
                         </div>
                       ) : (
                         <>
-                          <button onClick={doneEditMode} disabled={busy || saveState.busy}>Save</button>
+                          <button onClick={doneEditMode} disabled={busy || saveState.busy}>
+                            {saveState.busy ? "Saving..." : "Save"}
+                          </button>
                           <button onClick={cancelEditMode} disabled={busy || saveState.busy} className="muted">Cancel</button>
                           <button onClick={() => setDeleteConfirm(true)} disabled={busy || saveState.busy} className="muted">Delete</button>
                         </>
