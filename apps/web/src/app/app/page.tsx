@@ -3027,10 +3027,6 @@ function AppShell({
               manageMode={bulkMode}
               onStartEdit={beginEditLibrary}
               onNameDraftChange={setLibraryNameDraft}
-              onNameDraftKeyDown={(e) => {
-                if (e.key === "Enter") saveLibraryName(lib.id, libraryNameDraft);
-                if (e.key === "Escape") cancelEditLibrary();
-              }}
               onSaveName={saveLibraryName}
               onCancelEdit={cancelEditLibrary}
               onDelete={deleteLibrary}
