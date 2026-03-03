@@ -2305,8 +2305,8 @@ function AppShell({
         </div>
       </div>
 
-      <div className="row" style={{ margin: 0, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
-        <div className="row" style={{ gap: 12, alignItems: "baseline", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap" }}>
+      <div className="row" style={{ width: "100%", margin: 0, alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: isMobile ? "wrap" : "nowrap" }}>
+        <div className="row" style={{ width: "100%", gap: 12, alignItems: "baseline", minWidth: 0, flex: "1 1 auto", flexWrap: isMobile ? "wrap" : "nowrap", margin: 0 }}>
           <button
             onClick={() => {
               setBulkMode((prev) => {
@@ -2372,7 +2372,7 @@ function AppShell({
 
       {showAddPanel ? (
         <>
-          <div className="row" style={{ marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, width: "100%", alignItems: "baseline" }}>
+          <div className="row" style={{ width: "100%", marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, alignItems: "baseline" }}>
             {stagedCsvData ? (
               <div className="row" style={{ flex: 1, gap: 12, alignItems: "baseline" }}>
                 <span style={{ fontWeight: 600 }}>{stagedCsvFilename}</span>

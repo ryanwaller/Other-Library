@@ -315,7 +315,7 @@ export default function PublicBookList({
         </div>
       </div>
 
-      <div className="row" style={{ margin: 0, alignItems: "baseline", gap: 12 }}>
+      <div className="row" style={{ width: "100%", margin: 0, alignItems: "baseline", gap: 12 }}>
         <button
           type="button"
           className={sortOpen ? "text-primary" : "muted"}

@@ -629,6 +629,22 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   border: none;
   background: transparent;
   padding: 12px 0;
+  width: 100%;
+}
+
+.om-inline-search-input {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0 0 9px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+
+.om-inline-search-input:focus {
+  border-bottom: 1px solid var(--fg);
 }
 
 .muted {
