@@ -121,19 +121,30 @@ export async function POST(req: NextRequest) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
 
+  const requestBody = {
+    requests: [
+      {
+        image: { content: image },
+        // WEB_DETECTION only — visual web matching, not OCR (Tesseract handles that)
+        features: [{ type: "WEB_DETECTION", maxResults: 10 }],
+      },
+    ],
+  };
+
+  console.log("[vision-scan] sending request:", JSON.stringify({
+    requests: [
+      {
+        image: { content: `<base64 ${image.length} chars>` },
+        features: requestBody.requests[0]!.features,
+      },
+    ],
+  }, null, 2));
+
   try {
     const res = await fetch(`${VISION_ENDPOINT}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        requests: [
-          {
-            image: { content: image },
-            // WEB_DETECTION only — visual web matching, not OCR (Tesseract handles that)
-            features: [{ type: "WEB_DETECTION", maxResults: 10 }],
-          },
-        ],
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
 
