@@ -10,6 +10,9 @@ import BulkBar from "./components/BulkBar";
 import LibraryBlock from "./components/LibraryBlock";
 import BookCard from "./components/BookCard";
 import type { CoverCrop } from "../../components/CoverImage";
+import { useBookScanner } from "../../hooks/useBookScanner";
+import dynamic from "next/dynamic";
+const BookScannerModal = dynamic(() => import("../../components/BookScannerModal"), { ssr: false });
 
 type EditionMetadata = {
   isbn10?: string | null;
@@ -220,6 +223,11 @@ function AppShell({
   const [profile, setProfile] = useState<{ username: string; visibility: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userBooksCount, setUserBooksCount] = useState<number | null>(null);
+  const { scannerOpen, openScanner, closeScanner } = useBookScanner();
+  const [showScan, setShowScan] = useState(false);
+  useEffect(() => {
+    setShowScan(navigator.maxTouchPoints > 0 && window.isSecureContext);
+  }, []);
   const [addInput, setAddInput] = useState("");
   const [addInputFocused, setAddInputFocused] = useState(false);
   const [addState, setAddState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
@@ -1316,8 +1324,8 @@ function AppShell({
     }
   }
 
-  async function smartAddOrSearch() {
-    const value = addInput.trim();
+  async function smartAddOrSearch(override?: string) {
+    const value = (override ?? addInput).trim();
     if (!value) return;
     setAddState({ busy: false, error: null, message: null });
     setAddUrlPreview(null);
@@ -2434,7 +2442,7 @@ function AppShell({
             ) : (
               <>
                 <input
-                  placeholder="Add by ISBN, URL, or title"
+                  placeholder="Scan or enter ISBN, URL, or title"
                   value={addInput}
                   onFocus={() => setAddInputFocused(true)}
                   onBlur={() => setAddInputFocused(false)}
@@ -2447,8 +2455,13 @@ function AppShell({
                   style={{ minWidth: 0, flex: 1 }}
                 />
                 <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
+                  {showScan && (
+                    <button className="muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: "0 6px", fontSize: "0.85em" }}>
+                      Scan
+                    </button>
+                  )}
                   {(addInput.trim() || addInputFocused) ? (
-                    <button onClick={smartAddOrSearch} disabled={addState.busy || !addInput.trim()}>
+                    <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
                       {addState.busy ? "Working…" : "Go"}
                     </button>
                   ) : null}
@@ -2950,6 +2963,14 @@ function AppShell({
         </div>
       </div>
       <div style={{ height: 24 }} />
+      <BookScannerModal
+        open={scannerOpen}
+        onClose={closeScanner}
+        onResult={(query) => {
+          setAddInput(query);
+          smartAddOrSearch(query);
+        }}
+      />
     </>
   );
 }

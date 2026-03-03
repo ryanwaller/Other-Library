@@ -13,11 +13,13 @@
   "dependencies": {
     "@om/shared": "0.0.0",
     "@supabase/supabase-js": "^2.49.0",
+    "@zxing/browser": "^0.1.5",
     "image-size": "^1.2.1",
     "next": "^15.0.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "react-easy-crop": "^5.0.0"
+    "react-easy-crop": "^5.0.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/image-size": "^0.7.0",

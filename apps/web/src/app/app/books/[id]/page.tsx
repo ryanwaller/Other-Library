@@ -15,6 +15,9 @@ import CoverImage, { type CoverCrop } from "../../../../components/CoverImage";
 import ExpandableContent from "../../../../components/ExpandableContent";
 import CustomSlider from "../../../../components/CustomSlider";
 import CoverEditor, { type EditorState } from "./components/CoverEditor";
+import { useBookScanner } from "../../../../hooks/useBookScanner";
+import dynamic from "next/dynamic";
+const BookScannerModal = dynamic(() => import("../../../../components/BookScannerModal"), { ssr: false });
 
 type FacetRole =
   | "author"
@@ -450,6 +453,11 @@ export default function BookDetailPage() {
     publisher: []
   });
 
+  const { scannerOpen, openScanner, closeScanner } = useBookScanner();
+  const [showScan, setShowScan] = useState(false);
+  useEffect(() => {
+    setShowScan(navigator.maxTouchPoints > 0 && window.isSecureContext);
+  }, []);
   const [lookupInput, setLookupInput] = useState("");
   const [linkState, setLinkState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
@@ -2224,8 +2232,8 @@ export default function BookDetailPage() {
     }
   }
 
-  async function smartLookup() {
-    const value = lookupInput.trim();
+  async function smartLookup(override?: string) {
+    const value = (override ?? lookupInput).trim();
     if (!value) return;
 
     setSearchResults([]);
@@ -2850,14 +2858,19 @@ export default function BookDetailPage() {
                   <div className="om-lookup-controls" style={{ marginTop: 8 }}>
                     <input
                       className="om-inline-control"
-                      placeholder="Find by ISBN, URL, or title."
+                      placeholder="Scan or enter ISBN, URL, or title"
                       value={lookupInput}
                       onChange={(e) => setLookupInput(e.target.value)}
                       onKeyDown={(e) => onEnter(e, smartLookup)}
                       style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
                     />
+                    {showScan && (
+                      <button className="muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: "0 6px", fontSize: "0.85em" }}>
+                        Scan
+                      </button>
+                    )}
                     <button
-                      onClick={smartLookup}
+                      onClick={() => smartLookup()}
                       disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
                       style={{ whiteSpace: "nowrap" }}
                     >
@@ -4177,6 +4190,14 @@ export default function BookDetailPage() {
         </div>
       )}
 
+      <BookScannerModal
+        open={scannerOpen}
+        onClose={closeScanner}
+        onResult={(query) => {
+          setLookupInput(query);
+          smartLookup(query);
+        }}
+      />
     </main>
   );
 }
