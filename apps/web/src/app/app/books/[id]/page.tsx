@@ -2855,7 +2855,7 @@ export default function BookDetailPage() {
 
               {isOwner && findMoreOpen ? (
                 <div style={{ marginTop: 14 }}>
-                  <div className="om-lookup-controls" style={{ marginTop: 8, gridTemplateColumns: showScan ? "auto auto 1fr auto" : "1fr auto" }}>
+                  <div className="om-lookup-controls" style={{ marginTop: 8, gridTemplateColumns: showScan ? "auto auto 1fr auto" : "1fr auto", gap: 12 }}>
                     {showScan && (
                       <>
                         <button 
@@ -2868,14 +2868,16 @@ export default function BookDetailPage() {
                         <span className="muted">or</span>
                       </>
                     )}
-                    <input
-                      className="om-inline-control"
-                      placeholder={showScan ? "enter ISBN, URL, or title" : "Scan or enter ISBN, URL, or title"}
-                      value={lookupInput}
-                      onChange={(e) => setLookupInput(e.target.value)}
-                      onKeyDown={(e) => onEnter(e, smartLookup)}
-                      style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
-                    />
+                    <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                      <input
+                        className="om-inline-control"
+                        placeholder={showScan ? "enter ISBN, URL, or title" : "Scan or enter ISBN, URL, or title"}
+                        value={lookupInput}
+                        onChange={(e) => setLookupInput(e.target.value)}
+                        onKeyDown={(e) => onEnter(e, smartLookup)}
+                        style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
+                      />
+                    </div>
                     <button
                       onClick={() => smartLookup()}
                       disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}

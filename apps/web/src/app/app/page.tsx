@@ -2372,7 +2372,7 @@ function AppShell({
 
       {showAddPanel ? (
         <>
-          <div className="row" style={{ width: "100%", marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap", gap: 8, alignItems: "baseline" }}>
+          <div className="row" style={{ width: "100%", marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap", gap: 0, alignItems: "baseline" }}>
             {stagedCsvData ? (
               <div className="row" style={{ flex: 1, gap: 12, alignItems: "baseline" }}>
                 <span style={{ fontWeight: 600 }}>{stagedCsvFilename}</span>
@@ -2440,9 +2440,9 @@ function AppShell({
                 </div>
               </div>
             ) : (
-              <>
+              <div className="row" style={{ width: "100%", gap: 12, alignItems: "baseline" }}>
                 {showScan && (
-                  <>
+                  <div className="row" style={{ gap: 12, flex: "0 0 auto", alignItems: "baseline" }}>
                     <button 
                       className="muted" 
                       onClick={openScanner} 
@@ -2451,21 +2451,23 @@ function AppShell({
                       Scan
                     </button>
                     <span className="muted">or</span>
-                  </>
+                  </div>
                 )}
-                <input
-                  placeholder={showScan ? "enter ISBN, URL, or title" : "Add by ISBN, URL, or title"}
-                  value={addInput}
-                  onFocus={() => setAddInputFocused(true)}
-                  onBlur={() => setAddInputFocused(false)}
-                  onChange={(e) => setAddInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key !== "Enter") return;
-                    e.preventDefault();
-                    smartAddOrSearch();
-                  }}
-                  style={{ minWidth: 0, flex: 1 }}
-                />
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <input
+                    placeholder={showScan ? "enter ISBN, URL, or title" : "Add by ISBN, URL, or title"}
+                    value={addInput}
+                    onFocus={() => setAddInputFocused(true)}
+                    onBlur={() => setAddInputFocused(false)}
+                    onChange={(e) => setAddInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
+                      e.preventDefault();
+                      smartAddOrSearch();
+                    }}
+                    style={{ width: "100%" }}
+                  />
+                </div>
                 <div className="row" style={{ marginLeft: "auto", gap: 12, flex: "0 0 auto", justifyContent: "flex-end" }}>
                   {(addInput.trim() || addInputFocused) ? (
                     <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
@@ -2478,7 +2480,7 @@ function AppShell({
                     </button>
                   ) : null}
                 </div>
-              </>
+              </div>
             )}
           </div>
           <div className="muted" style={{ marginTop: 4 }}>
