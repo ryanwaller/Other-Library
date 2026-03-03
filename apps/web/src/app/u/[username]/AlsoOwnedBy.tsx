@@ -22,14 +22,21 @@ export default function AlsoOwnedBy({
 }) {
   const [rows, setRows] = useState<Array<AlsoOwnedRow & { copies: number }>>([]);
   const [busy, setBusy] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatarUrlsByPath, setAvatarUrlsByPath] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      if (!supabase) return;
-      if (!editionId) return;
+      if (!supabase) {
+        setInitialized(true);
+        return;
+      }
+      if (!editionId) {
+        setInitialized(true);
+        return;
+      }
       setBusy(true);
       setError(null);
       try {
@@ -62,6 +69,7 @@ export default function AlsoOwnedBy({
         const paths = Array.from(new Set(grouped.map((r) => r.owner?.avatar_path).filter(Boolean))) as string[];
         if (paths.length === 0) {
           setAvatarUrlsByPath({});
+          setInitialized(true);
           return;
         }
         const signed = await supabase.storage.from("avatars").createSignedUrls(paths, 60 * 30);
@@ -75,13 +83,14 @@ export default function AlsoOwnedBy({
         setError(e?.message ?? "Failed to load");
       } finally {
         setBusy(false);
+        setInitialized(true);
       }
     })();
 
     return () => {
       alive = false;
     };
-  }, [editionId, excludeUserBookId]);
+  }, [editionId, excludeUserBookId, excludeOwnerId]);
 
   const owners = useMemo(() => {
     return rows
@@ -90,15 +99,14 @@ export default function AlsoOwnedBy({
       .sort((a, b) => (a.owner?.username ?? "").localeCompare(b.owner?.username ?? ""));
   }, [rows]);
 
-  if (!supabase) return null;
-  if (!editionId) return null;
-  if (!busy && !error && owners.length === 0) return null;
+  if (!supabase || !editionId) return null;
+  if (!initialized || busy || error || owners.length === 0) return null;
 
   return (
     <div style={{ marginTop: 14 }} className="card">
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>Also in</div>
-        <div className="muted">{busy ? "Loading…" : error ? error : `${owners.length}`}</div>
+        <div className="muted">{owners.length}</div>
       </div>
       <div className="muted" style={{ marginTop: 8 }}>
         Public libraries are shown to everyone; followers-only libraries are shown only to approved followers (when you’re signed in).
