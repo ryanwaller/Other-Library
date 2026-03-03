@@ -2389,10 +2389,11 @@ function AppShell({
             placeholder="Search your catalog"
             value={searchQuery}
             onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
           />
+
           {(searchFocused || searchQuery.trim()) ? (
             <Link
               href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`}
@@ -2494,7 +2495,7 @@ function AppShell({
                     placeholder={showScan ? "enter ISBN, URL, or title" : "Add by ISBN, URL, or title"}
                     value={addInput}
                     onFocus={() => setAddInputFocused(true)}
-                    onBlur={() => setAddInputFocused(false)}
+                    onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
                     onChange={(e) => setAddInput(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key !== "Enter") return;

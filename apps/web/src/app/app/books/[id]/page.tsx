@@ -459,6 +459,7 @@ export default function BookDetailPage() {
     setShowScan(navigator.maxTouchPoints > 0 && window.isSecureContext);
   }, []);
   const [lookupInput, setLookupInput] = useState("");
+  const [lookupInputFocused, setLookupInputFocused] = useState(false);
   const [linkState, setLinkState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -2874,17 +2875,21 @@ export default function BookDetailPage() {
                           className="om-inline-control"
                           placeholder={showScan ? "enter ISBN, URL, or title" : "Scan or enter ISBN, URL, or title"}
                           value={lookupInput}
+                          onFocus={() => setLookupInputFocused(true)}
+                          onBlur={() => setTimeout(() => setLookupInputFocused(false), 150)}
                           onChange={(e) => setLookupInput(e.target.value)}
                           onKeyDown={(e) => onEnter(e, smartLookup)}
                           style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
                         />
-                        <button
-                          onClick={() => smartLookup()}
-                          disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
-                          style={{ whiteSpace: "nowrap", marginLeft: 12 }}
-                        >
-                          Find
-                        </button>
+                        {(lookupInput.trim() || lookupInputFocused) ? (
+                          <button
+                            onClick={() => smartLookup()}
+                            disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
+                            style={{ whiteSpace: "nowrap", marginLeft: 12 }}
+                          >
+                            Find
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   </div>
