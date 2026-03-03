@@ -48,17 +48,46 @@ function extractTitleLines(text: string): string[] {
 const FG = "#e8e8ea";   // matches --fg dark
 const MUTED = "#a8a8ad"; // matches --muted dark
 
-/** Capture a downscaled JPEG frame from the video element, returned as raw base64. */
-function captureScaledFrame(video: HTMLVideoElement, maxDim = 640): string {
+/**
+ * Capture a downscaled JPEG frame from the video element.
+ * Returns null if the frame is nearly black (camera not yet initialized/exposed).
+ */
+function captureScaledFrame(video: HTMLVideoElement, maxDim = 640): string | null {
   const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
   const w = Math.round(video.videoWidth * scale);
   const h = Math.round(video.videoHeight * scale);
+  if (!w || !h) return null;
+
   const tmp = document.createElement("canvas");
   tmp.width = w;
   tmp.height = h;
-  tmp.getContext("2d")!.drawImage(video, 0, 0, w, h);
+  const ctx = tmp.getContext("2d")!;
+  ctx.drawImage(video, 0, 0, w, h);
+
+  // Sample a grid of pixels to compute average brightness (0–255).
+  // Skip the frame if nearly black — camera still initializing or not focused.
+  const step = Math.max(1, Math.floor(Math.min(w, h) / 20));
+  const pixels = ctx.getImageData(0, 0, w, h).data;
+  let total = 0;
+  let count = 0;
+  for (let y = 0; y < h; y += step) {
+    for (let x = 0; x < w; x += step) {
+      const i = (y * w + x) * 4;
+      total += (pixels[i]! + pixels[i + 1]! + pixels[i + 2]!) / 3;
+      count++;
+    }
+  }
+  const avgBrightness = count > 0 ? total / count : 0;
+
   // strip "data:image/jpeg;base64," prefix
-  return tmp.toDataURL("image/jpeg", 0.8).split(",")[1]!;
+  const base64 = tmp.toDataURL("image/jpeg", 0.85).split(",")[1]!;
+  console.log(`[vision] frame ${w}x${h} brightness=${avgBrightness.toFixed(1)} base64=${base64.length} chars`);
+
+  if (avgBrightness < 10) {
+    console.log("[vision] skipping blank frame");
+    return null;
+  }
+  return base64;
 }
 
 export default function BookScannerModal({ open, onClose, onResult }: Props) {
@@ -210,7 +239,8 @@ export default function BookScannerModal({ open, onClose, onResult }: Props) {
           })
           .catch(() => null);
 
-        // Layer 1.5: Google Vision WEB_DETECTION — start after 2 s, every 4 s
+        // Layer 1.5: Google Vision WEB_DETECTION — start after 4 s, every 4 s
+        // (4 s gives the camera time to initialize, focus, and adjust exposure)
         timers.push(
           setTimeout(() => {
             if (!activeRef.current) return;
@@ -220,6 +250,7 @@ export default function BookScannerModal({ open, onClose, onResult }: Props) {
               if (!vid || !vid.videoWidth) return;
               try {
                 const image = captureScaledFrame(vid);
+                if (!image) return; // blank frame — camera not ready yet
                 const res = await fetch("/api/vision-scan", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
@@ -237,7 +268,7 @@ export default function BookScannerModal({ open, onClose, onResult }: Props) {
               } catch { /* network error, ignore */ }
             }, 4000);
             intervals.push(id);
-          }, 2000)
+          }, 4000)
         );
 
         // Layer 2: OCR ISBN text — start after 3 s
