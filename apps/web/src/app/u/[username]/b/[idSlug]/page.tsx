@@ -231,18 +231,20 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
         <div className="card">
           <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
             <div className="row" style={{ gap: 12, alignItems: "center" }}>
-              {avatarUrl ? (
-                <div style={{ width: 48, height: 48, borderRadius: 999, overflow: "hidden", border: "1px solid var(--border-avatar)" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt="" src={avatarUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                </div>
-              ) : (
-                <div style={{ width: 48, height: 48, borderRadius: 999, border: "1px solid var(--border-avatar)", background: "var(--bg-muted)" }} />
-              )}
-              <div>
+              <Link href={`/u/${profile.username}`} className="om-avatar-link" aria-label="Open profile">
+                {avatarUrl ? (
+                  <div style={{ width: 48, height: 48, borderRadius: 999, overflow: "hidden", border: "1px solid var(--border-avatar)" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img alt="" src={avatarUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                ) : (
+                  <div style={{ width: 48, height: 48, borderRadius: 999, border: "1px solid var(--border-avatar)", background: "var(--bg-muted)" }} />
+                )}
+              </Link>
+              <Link href={`/u/${profile.username}`} style={{ textDecoration: "none", color: "inherit" }}>
                 <div style={{ fontSize: "1em" }}>{profile.display_name || `@${profile.username}`}</div>
                 {profile.display_name ? <div className="muted">@{profile.username}</div> : null}
-              </div>
+              </Link>
             </div>
           </div>
 

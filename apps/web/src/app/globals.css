@@ -78,6 +78,15 @@ body {
   text-size-adjust: 100%;
 }
 
+.om-page-fade-in {
+  animation: fadeIn 150ms ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 a, 
 button.muted,
 button.om-filter-link,
