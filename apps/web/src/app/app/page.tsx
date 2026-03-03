@@ -1288,6 +1288,81 @@ function AppShell({
     setAddPreviewCoverFailed(false);
   }
 
+  async function addEditionData(data: {
+    isbn10?: string | null;
+    isbn13?: string | null;
+    title?: string | null;
+    authors?: string[];
+    publisher?: string | null;
+    publish_date?: string | null;
+    description?: string | null;
+    subjects?: string[];
+    cover_url?: string | null;
+  }): Promise<number> {
+    if (!supabase) throw new Error("Supabase is not configured");
+    if (!addLibraryId) throw new Error("Choose a catalog first");
+    const isbn13 = (data.isbn13 ?? "").trim();
+    let editionId: number | undefined;
+    if (isbn13) {
+      const existing = await supabase.from("editions").select("id").eq("isbn13", isbn13).maybeSingle();
+      if (existing.error) throw new Error(existing.error.message);
+      editionId = existing.data?.id as number | undefined;
+      if (!editionId) {
+        const inserted = await supabase.from("editions").insert({
+          isbn10: data.isbn10 ?? null,
+          isbn13,
+          title: data.title ?? null,
+          authors: data.authors ?? [],
+          publisher: data.publisher ?? null,
+          publish_date: data.publish_date ?? null,
+          description: data.description ?? null,
+          subjects: data.subjects ?? [],
+          cover_url: data.cover_url ?? null,
+        }).select("id").single();
+        if (inserted.error) throw new Error(inserted.error.message);
+        editionId = inserted.data.id;
+      }
+    }
+    const insertPayload: Record<string, unknown> = { owner_id: userId, library_id: addLibraryId, edition_id: editionId ?? null };
+    if (!editionId) {
+      insertPayload.title_override = data.title ?? null;
+      insertPayload.authors_override = (data.authors ?? []).length > 0 ? data.authors : null;
+      insertPayload.publisher_override = data.publisher ?? null;
+      insertPayload.publish_date_override = data.publish_date ?? null;
+    }
+    const created = await supabase.from("user_books").insert(insertPayload).select("id").single();
+    if (created.error) throw new Error(created.error.message);
+    await refreshAllBooks();
+    const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
+    setUserBooksCount(count ?? 0);
+    return created.data.id as number;
+  }
+
+  async function confirmAddFromPreview() {
+    if (!addUrlPreview) return;
+    setAddState({ busy: true, error: null, message: "Adding…" });
+    try {
+      const id = await addEditionData(addUrlPreview);
+      setAddInput("");
+      cancelAddPreview();
+      router.push(`/app/books/${id}`);
+    } catch (e: any) {
+      setAddState({ busy: false, error: e?.message ?? "Failed to add book", message: e?.message ?? "Failed to add book" });
+    }
+  }
+
+  async function addFromSearchResultItem(result: typeof addSearchResults[number]) {
+    setAddState({ busy: true, error: null, message: "Adding…" });
+    try {
+      const id = await addEditionData(result);
+      setAddInput("");
+      cancelAddPreview();
+      router.push(`/app/books/${id}`);
+    } catch (e: any) {
+      setAddState({ busy: false, error: e?.message ?? "Failed to add book", message: e?.message ?? "Failed to add book" });
+    }
+  }
+
   async function getOrCreateTagId(name: string, kind: "tag" | "category"): Promise<number> {
     if (!supabase || !userId) throw new Error("Not signed in");
     const normalized = name.trim().replace(/\s+/g, " ");
@@ -1846,6 +1921,7 @@ function AppShell({
       )}
 
       {showAddPanel && !searchOpen && (
+        <>
         <div className="row" style={{ width: "100%", marginTop: 6, flexWrap: "nowrap", gap: 10, alignItems: "baseline" }}>
           {showScan && (
             <div className="row" style={{ gap: 6, flex: "0 0 auto", alignItems: "baseline" }}>
@@ -1875,6 +1951,60 @@ function AppShell({
             )}
           </div>
         </div>
+
+        {(addState.message || addSearchState.message) && (
+          <div className="muted" style={{ marginTop: 6 }}>
+            {addState.message || addSearchState.message}
+          </div>
+        )}
+
+        {addUrlPreview && (
+          <div className="card" style={{ marginTop: 8, display: "flex", gap: 12, alignItems: "flex-start" }}>
+            {addUrlPreview.cover_url && !addPreviewCoverFailed && (
+              <img
+                src={addUrlPreview.cover_url}
+                alt={addUrlPreview.title ?? "Book cover"}
+                style={{ width: 56, flexShrink: 0, objectFit: "contain" }}
+                onError={() => setAddPreviewCoverFailed(true)}
+              />
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div>{addUrlPreview.title ?? "(no title)"}</div>
+              {addUrlPreview.authors.length > 0 && (
+                <div className="muted">{addUrlPreview.authors.join(", ")}</div>
+              )}
+              {(addUrlPreview.publisher || addUrlPreview.publish_date) && (
+                <div className="muted" style={{ fontSize: "0.875em" }}>
+                  {[addUrlPreview.publisher, addUrlPreview.publish_date?.slice(0, 4)].filter(Boolean).join(" · ")}
+                </div>
+              )}
+            </div>
+            <button onClick={confirmAddFromPreview} disabled={addState.busy}>
+              {addState.busy ? "…" : "Add to catalog"}
+            </button>
+          </div>
+        )}
+
+        {addSearchResults.length > 0 && (
+          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+            {addSearchResults.map((result, i) => (
+              <div key={i} className="card" style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                {result.cover_url && (
+                  <img src={result.cover_url} alt={result.title ?? ""} style={{ width: 48, flexShrink: 0, objectFit: "contain" }} />
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div>{result.title ?? "(no title)"}</div>
+                  {result.authors.length > 0 && <div className="muted">{result.authors.join(", ")}</div>}
+                  {result.publish_year && <div className="muted" style={{ fontSize: "0.875em" }}>{result.publish_year}</div>}
+                </div>
+                <button onClick={() => addFromSearchResultItem(result)} disabled={addState.busy}>
+                  {addState.busy ? "…" : "Add"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        </>
       )}
 
       {sortOpen && (
