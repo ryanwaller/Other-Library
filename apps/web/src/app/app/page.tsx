@@ -2634,6 +2634,8 @@ function AppShell({
                             await importCoverForBook(id, r.cover_url);
                             await refreshAllBooks();
                           }
+                          setAddInput("");
+                          cancelAddPreview();
                           setAddState({ busy: false, error: null, message: "Added" });
                           window.setTimeout(() => setAddState({ busy: false, error: null, message: null }), 1200);
                         } catch (e: any) {
