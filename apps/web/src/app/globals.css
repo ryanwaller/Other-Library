@@ -825,18 +825,17 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 
 /* Lookup results (book detail) */
 .om-lookup-row {
-  display: grid;
-  grid-template-columns: 62px minmax(0, 1fr) auto;
+  display: flex;
   gap: 12px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .om-lookup-main {
+  flex: 1;
   min-width: 0;
 }
 
 .om-lookup-actions {
-  justify-self: end;
   min-width: 88px;
 }
 
@@ -1111,7 +1110,7 @@ summary::-webkit-details-marker {
   }
 
   .om-lookup-row {
-    grid-template-columns: 62px minmax(0, 1fr);
+    flex-wrap: wrap;
     gap: 10px;
   }
 
@@ -1119,7 +1118,6 @@ summary::-webkit-details-marker {
     width: 100%;
     display: flex;
     justify-content: flex-end;
-    grid-column: 1 / -1;
     min-width: 0;
   }
 
