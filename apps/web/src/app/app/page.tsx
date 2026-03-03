@@ -2864,10 +2864,14 @@ function AppShell({
             </select>
             {viewMode === "grid" ? (
               <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
-                {isMobile ? <option value={1}>1</option> : null}
+                <option value={1}>1</option>
                 <option value={2}>2</option>
-                {!isMobile ? <option value={4}>4</option> : null}
-                {!isMobile ? <option value={8}>8</option> : null}
+                {!isMobile && (
+                  <>
+                    <option value={4}>4</option>
+                    <option value={8}>8</option>
+                  </>
+                )}
               </select>
             ) : null}
             <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>

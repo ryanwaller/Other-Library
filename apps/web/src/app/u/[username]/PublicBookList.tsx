@@ -341,8 +341,12 @@ export default function PublicBookList({
           {viewMode === "grid" && (
             <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as 2 | 4 | 8)}>
               <option value={2}>2</option>
-              {!isMobile && <option value={4}>4</option>}
-              {!isMobile && <option value={8}>8</option>}
+              {!isMobile && (
+                <>
+                  <option value={4}>4</option>
+                  <option value={8}>8</option>
+                </>
+              )}
             </select>
           )}
           <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)}>
