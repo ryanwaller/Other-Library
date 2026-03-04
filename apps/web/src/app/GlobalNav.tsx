@@ -243,6 +243,8 @@ export default function GlobalNav() {
   }, [unreadThreads, unreadLatestStatus]);
 
   if (!supabase) return null;
+  const adminActive = (pathname ?? "").startsWith("/admin");
+  const settingsActive = (pathname ?? "").startsWith("/app/settings");
 
   return (
     <div className="container">
@@ -294,8 +296,16 @@ export default function GlobalNav() {
               </div>
             ) : null}
 
-            {sessionUserId && isAdmin ? <Link href="/admin">Admin</Link> : null}
-            {sessionUserId && <Link href="/app/settings">Settings</Link>}
+            {sessionUserId && isAdmin ? (
+              <Link href="/admin" style={adminActive ? { textDecoration: "underline" } : undefined}>
+                Admin
+              </Link>
+            ) : null}
+            {sessionUserId ? (
+              <Link href="/app/settings" style={settingsActive ? { textDecoration: "underline" } : undefined}>
+                Settings
+              </Link>
+            ) : null}
             {sessionUserId && <button onClick={signOut}>Sign out</button>}
             {!sessionUserId && <Link href="/">Sign in</Link>}
           </div>

@@ -93,6 +93,7 @@ async function cropToBlob(imageSrc: string, crop: Area, outputSize = 512): Promi
 
 export default function SettingsPage() {
   const router = useRouter();
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [profileReady, setProfileReady] = useState(false);
@@ -173,6 +174,7 @@ export default function SettingsPage() {
     error: null,
     message: null
   });
+  const [tab, setTab] = useState<"profile" | "follows" | "borrows" | "bulk" | "account">("profile");
 
   useEffect(() => {
     if (!supabase) return;
@@ -538,352 +540,362 @@ export default function SettingsPage() {
         <div className="card" style={{ minHeight: 240 }} />
       ) : (
         <div className="card">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <div>Settings</div>
-            <div className="text-muted">{busy ? "Loading…" : error ? error : ""}</div>
-          </div>
-
-          <div style={{ marginTop: 16 }} className="card">
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <div>Profile</div>
-              <div className="text-muted">
-                {profileSaveState.message
-                  ? profileSaveState.error
-                    ? `${profileSaveState.message} (${profileSaveState.error})`
-                    : profileSaveState.message
-                  : ""}
-              </div>
+          <div className="row admin-tabbar-row" style={{ justifyContent: "flex-start", width: "100%", flexWrap: "nowrap" }}>
+            <div className="admin-tabbar" style={{ flexWrap: "nowrap", overflowX: "auto", whiteSpace: "nowrap" }}>
+              <button type="button" onClick={() => setTab("profile")} aria-current={tab === "profile" ? "page" : undefined}>Profile</button>
+              <button type="button" onClick={() => setTab("follows")} aria-current={tab === "follows" ? "page" : undefined}>Follows</button>
+              <button type="button" onClick={() => setTab("borrows")} aria-current={tab === "borrows" ? "page" : undefined}>Borrows</button>
+              <button type="button" onClick={() => setTab("bulk")} aria-current={tab === "bulk" ? "page" : undefined}>Bulk update</button>
+              <button type="button" onClick={() => setTab("account")} aria-current={tab === "account" ? "page" : undefined}>Account</button>
             </div>
+          </div>
+          {(busy || error) ? <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>{busy ? "Loading…" : error}</div> : null}
+          <hr className="om-hr" />
 
-            <div className="row" style={{ marginTop: "var(--space-10)" }}>
-              <div style={{ width: 120 }} className="text-muted">
-                Photo
-              </div>
-              <div className="row" style={{ gap: "var(--space-10)", alignItems: "center", flexWrap: "wrap" }}>
-                {avatarUrl ? (
-                  <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      alt=""
-                      src={avatarUrl}
-                      style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border-avatar)" }}
-                    />
-                  </a>
-                ) : (
-                  <div style={{ width: 28, height: 28, borderRadius: 999, border: "1px solid var(--border-avatar)" }} />
-                )}
-                <input type="file" accept="image/*" onChange={(e) => setPendingAvatar((e.target.files ?? [])[0] ?? null)} />
-                <button onClick={uploadAvatar} disabled={!pendingAvatar || avatarState.busy}>
-                  {avatarState.busy ? "Uploading…" : "Submit"}
-                </button>
-                {pendingAvatar ? (
-                  <button
-                    onClick={() => {
-                      setPendingAvatar(null);
-                      setPendingAvatarPreviewUrl((prev) => {
-                        if (prev) URL.revokeObjectURL(prev);
-                        return null;
-                      });
-                      setAvatarCroppedAreaPixels(null);
-                      setAvatarCrop({ x: 0, y: 0 });
-                      setAvatarZoom(1);
-                      setAvatarState({ busy: false, error: null, message: null });
-                    }}
-                    disabled={avatarState.busy}
-                  >
-                    Clear
-                  </button>
-                ) : null}
+          {tab === "profile" ? (
+            <div className="card">
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <div>Profile</div>
                 <div className="text-muted">
-                  {avatarState.message ? (avatarState.error ? `${avatarState.message} (${avatarState.error})` : avatarState.message) : ""}
+                  {profileSaveState.message
+                    ? profileSaveState.error
+                      ? `${profileSaveState.message} (${profileSaveState.error})`
+                      : profileSaveState.message
+                    : ""}
                 </div>
               </div>
-            </div>
 
-            {pendingAvatarPreviewUrl ? (
-              <div style={{ marginTop: "var(--space-10)" }}>
-                <div style={{ position: "relative", width: 280, height: 180, border: "1px solid var(--border-avatar)", background: "black" }}>
-                  <Cropper
-                    image={pendingAvatarPreviewUrl}
-                    crop={avatarCrop}
-                    zoom={avatarZoom}
-                    aspect={1}
-                    cropShape="round"
-                    showGrid={false}
-                    onCropChange={setAvatarCrop}
-                    onZoomChange={(z: number) => setAvatarZoom(clamp(Number(z), 1, 3))}
-                    onCropComplete={(_area: Area, areaPixels: Area) => setAvatarCroppedAreaPixels(areaPixels)}
-                  />
+              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "center" }}>
+                <div style={{ width: 120 }} className="text-muted">
+                  Photo
                 </div>
-                <div className="row" style={{ marginTop: "var(--space-10)", gap: "var(--space-10)", alignItems: "center", flexWrap: "wrap" }}>
-                  <span className="text-muted">Zoom</span>
-                  <input
-                    type="range"
-                    min={1}
-                    max={3}
-                    step={0.01}
-                    value={avatarZoom}
-                    onChange={(e) => setAvatarZoom(clamp(Number(e.target.value), 1, 3))}
-                    style={{ width: 220 }}
-                  />
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <div className="row" style={{ gap: "var(--space-10)", alignItems: "center", flexWrap: "wrap" }}>
+                    {avatarUrl ? (
+                      <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          alt=""
+                          src={avatarUrl}
+                          style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border-avatar)" }}
+                        />
+                      </a>
+                    ) : (
+                      <div style={{ width: 28, height: 28, borderRadius: 999, border: "1px solid var(--border-avatar)" }} />
+                    )}
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => setPendingAvatar((e.target.files ?? [])[0] ?? null)}
+                    />
+                    <button
+                      type="button"
+                      className="text-muted"
+                      style={{ textDecoration: "underline" }}
+                      onClick={() => avatarInputRef.current?.click()}
+                    >
+                      Upload
+                    </button>
+                    {pendingAvatar ? (
+                      <button
+                        type="button"
+                        className="text-muted"
+                        style={{ textDecoration: "underline" }}
+                        onClick={() => void uploadAvatar()}
+                        disabled={avatarState.busy}
+                      >
+                        {avatarState.busy ? "Saving…" : "Save"}
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
+                    {avatarState.message ? (avatarState.error ? `${avatarState.message} (${avatarState.error})` : avatarState.message) : ""}
+                  </div>
                 </div>
               </div>
-            ) : null}
 
-            <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
-              <div style={{ width: 120 }} className="text-muted">
-                Username
-              </div>
-              <input
-                value={profileForm.username}
-                onChange={(e) => setProfileForm((p) => ({ ...p, username: e.target.value }))}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
-                  saveProfile();
-                }}
-                placeholder="username"
-                style={{ width: 220 }}
-              />
-              <div className="text-muted">
-                {profile && normalized && normalized !== profile.username ? usernameAvailability.message ?? "" : ""}
-              </div>
-            </div>
-
-            <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
-              <div style={{ width: 120 }} className="text-muted">
-                Display name
-              </div>
-              <input
-                value={profileForm.display_name}
-                onChange={(e) => setProfileForm((p) => ({ ...p, display_name: e.target.value }))}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
-                  saveProfile();
-                }}
-                placeholder="(optional)"
-                style={{ width: 360 }}
-              />
-            </div>
-
-            <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "flex-start" }}>
-              <div style={{ width: 120 }} className="text-muted">
-                Bio
-              </div>
-              <textarea
-                value={profileForm.bio}
-                onChange={(e) => setProfileForm((p) => ({ ...p, bio: e.target.value }))}
-                placeholder="(optional)"
-                style={{ width: 360, height: 110 }}
-              />
-            </div>
-
-            <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
-              <div style={{ width: 120 }} className="text-muted">
-                Library visibility
-              </div>
-              <select
-                value={profileForm.visibility}
-                onChange={(e) => setProfileForm((p) => ({ ...p, visibility: (e.target.value === "public" ? "public" : "followers_only") as any }))}
-              >
-                <option value="followers_only">followers_only</option>
-                <option value="public">public</option>
-              </select>
-              <div className="text-muted">
-                {profileForm.visibility === "public" ? "Anyone can view /u/username" : "Only approved followers (and public book overrides)."}
-              </div>
-            </div>
-
-            <div className="row" style={{ marginTop: "var(--space-md)" }}>
-              <button onClick={saveProfile} disabled={profileSaveState.busy || usernameSaveBlocked}>
-                {profileSaveState.busy ? "Saving…" : "Save profile"}
-              </button>
-              {profile ? (
-                <a href={`/u/${profile.username}`} target="_blank" rel="noreferrer" className="text-muted">
-                  View public profile
-                </a>
+              {pendingAvatarPreviewUrl ? (
+                <div style={{ marginTop: "var(--space-10)" }}>
+                  <div style={{ position: "relative", width: 280, height: 180, border: "1px solid var(--border-avatar)", background: "black" }}>
+                    <Cropper
+                      image={pendingAvatarPreviewUrl}
+                      crop={avatarCrop}
+                      zoom={avatarZoom}
+                      aspect={1}
+                      cropShape="round"
+                      showGrid={false}
+                      onCropChange={setAvatarCrop}
+                      onZoomChange={(z: number) => setAvatarZoom(clamp(Number(z), 1, 3))}
+                      onCropComplete={(_area: Area, areaPixels: Area) => setAvatarCroppedAreaPixels(areaPixels)}
+                    />
+                  </div>
+                  <div className="row" style={{ marginTop: "var(--space-10)", gap: "var(--space-10)", alignItems: "center", flexWrap: "wrap" }}>
+                    <span className="text-muted">Zoom</span>
+                    <input
+                      type="range"
+                      min={1}
+                      max={3}
+                      step={0.01}
+                      value={avatarZoom}
+                      onChange={(e) => setAvatarZoom(clamp(Number(e.target.value), 1, 3))}
+                    />
+                  </div>
+                </div>
               ) : null}
-            </div>
-          </div>
 
-          <hr className="om-hr" />
-
-          <div style={{ marginTop: 16 }} className="card">
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <div>Follows</div>
-              <div className="text-muted">requests + approvals</div>
-            </div>
-            <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
-              Manage who can see followers-only content.
-            </div>
-            <div style={{ marginTop: "var(--space-10)" }}>
-              <Link href="/app/follows">Open follow settings</Link>
-            </div>
-          </div>
-
-          <hr className="om-hr" />
-
-          <div style={{ marginTop: 16 }} className="card">
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <div>Borrowing</div>
-              <div className="text-muted">defaults</div>
-            </div>
-            <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
-              <div style={{ width: 170 }} className="text-muted">
-                Borrowable by default
+              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">Username</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <input
+                    value={profileForm.username}
+                    onChange={(e) => setProfileForm((p) => ({ ...p, username: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
+                      e.preventDefault();
+                      saveProfile();
+                    }}
+                    placeholder="username"
+                  />
+                  <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
+                    {profile && normalized && normalized !== profile.username ? usernameAvailability.message ?? "" : ""}
+                  </div>
+                </div>
               </div>
-              <select
-                value={profileForm.borrowable_default ? "yes" : "no"}
-                onChange={(e) => setProfileForm((p) => ({ ...p, borrowable_default: e.target.value === "yes" }))}
-              >
-                <option value="no">no</option>
-                <option value="yes">yes</option>
-              </select>
-            </div>
-            <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
-              <div style={{ width: 170 }} className="text-muted">
-                Who can request
+
+              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">Display name</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <input
+                    value={profileForm.display_name}
+                    onChange={(e) => setProfileForm((p) => ({ ...p, display_name: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
+                      e.preventDefault();
+                      saveProfile();
+                    }}
+                    placeholder="(optional)"
+                  />
+                </div>
               </div>
-              <select
-                value={profileForm.borrow_request_scope}
-                onChange={(e) =>
-                  setProfileForm((p) => ({
-                    ...p,
-                    borrow_request_scope: (e.target.value === "anyone"
-                      ? "anyone"
-                      : e.target.value === "following"
-                        ? "following"
-                        : "followers") as any
-                  }))
-                }
-              >
-                <option value="followers">followers</option>
-                <option value="following">following</option>
-                <option value="anyone">anyone</option>
-              </select>
-              <div className="text-muted">
-                {profileForm.borrow_request_scope === "anyone"
-                  ? "Any signed-in user."
-                  : profileForm.borrow_request_scope === "following"
-                    ? "Only people you follow."
-                    : "Only approved followers."}
+
+              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "flex-start" }}>
+                <div style={{ width: 120 }} className="text-muted">Bio</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <textarea
+                    value={profileForm.bio}
+                    onChange={(e) => setProfileForm((p) => ({ ...p, bio: e.target.value }))}
+                    placeholder="(optional)"
+                    style={{ height: 110 }}
+                  />
+                </div>
+              </div>
+
+              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">Library visibility</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <select
+                    value={profileForm.visibility}
+                    onChange={(e) => setProfileForm((p) => ({ ...p, visibility: (e.target.value === "public" ? "public" : "followers_only") as any }))}
+                  >
+                    <option value="followers_only">followers_only</option>
+                    <option value="public">public</option>
+                  </select>
+                  <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
+                    {profileForm.visibility === "public" ? "Anyone can view /u/username" : "Only approved followers (and public book overrides)."}
+                  </div>
+                </div>
+              </div>
+
+              <div className="row" style={{ marginTop: "var(--space-md)", gap: "var(--space-md)" }}>
+                <button onClick={saveProfile} disabled={profileSaveState.busy || usernameSaveBlocked}>
+                  {profileSaveState.busy ? "Saving…" : "Save profile"}
+                </button>
+                {profile ? (
+                  <a href={`/u/${profile.username}`} target="_blank" rel="noreferrer" className="text-muted">
+                    View public profile
+                  </a>
+                ) : null}
               </div>
             </div>
-            <div style={{ marginTop: "var(--space-10)" }}>
-              <Link href="/app/borrow-requests">View borrow requests</Link>
-            </div>
-          </div>
+          ) : null}
 
-          <hr className="om-hr" />
-
-          <div style={{ marginTop: 16 }} className="card" id="bulk-update">
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <div>Bulk update</div>
-              <div className="text-muted">catalog import</div>
+          {tab === "follows" ? (
+            <div className="card">
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <div>Follows</div>
+                <div className="text-muted">requests + approvals</div>
+              </div>
+              <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
+                Manage who can see followers-only content.
+              </div>
+              <div style={{ marginTop: "var(--space-10)" }}>
+                <Link href="/app/follows">Open follow settings</Link>
+              </div>
             </div>
-            <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
-              Upload CSV files from your catalog workspace.
-            </div>
-            <div style={{ marginTop: "var(--space-10)" }}>
-              <input
-                ref={csvInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                style={{ display: "none" }}
-                onChange={async (e) => {
-                  const f = (e.target.files ?? [])[0];
-                  if (!f) return;
-                  try {
-                    const text = await f.text();
-                    window.sessionStorage.setItem("om_staged_csv_data", text);
-                    window.sessionStorage.setItem("om_staged_csv_filename", f.name);
-                    router.push("/app?add=1");
-                  } catch (err) {
-                    console.error("Failed to read CSV", err);
-                    window.alert("Failed to read CSV file.");
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => csvInputRef.current?.click()}
-              >
-                Add CSV
-              </button>
-            </div>
-          </div>
+          ) : null}
 
-          <hr className="om-hr" />
+          {tab === "borrows" ? (
+            <div className="card">
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <div>Borrows</div>
+                <div className="text-muted">defaults</div>
+              </div>
+              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+                <div style={{ width: 170 }} className="text-muted">Borrowable by default</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <select
+                    value={profileForm.borrowable_default ? "yes" : "no"}
+                    onChange={(e) => setProfileForm((p) => ({ ...p, borrowable_default: e.target.value === "yes" }))}
+                  >
+                    <option value="no">no</option>
+                    <option value="yes">yes</option>
+                  </select>
+                </div>
+              </div>
+              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+                <div style={{ width: 170 }} className="text-muted">Who can request</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <select
+                    value={profileForm.borrow_request_scope}
+                    onChange={(e) =>
+                      setProfileForm((p) => ({
+                        ...p,
+                        borrow_request_scope: (e.target.value === "anyone"
+                          ? "anyone"
+                          : e.target.value === "following"
+                            ? "following"
+                            : "followers") as any
+                      }))
+                    }
+                  >
+                    <option value="followers">followers</option>
+                    <option value="following">following</option>
+                    <option value="anyone">anyone</option>
+                  </select>
+                  <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
+                    {profileForm.borrow_request_scope === "anyone"
+                      ? "Any signed-in user."
+                      : profileForm.borrow_request_scope === "following"
+                        ? "Only people you follow."
+                        : "Only approved followers."}
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: "var(--space-10)" }}>
+                <Link href="/app/borrow-requests">View borrow requests</Link>
+              </div>
+            </div>
+          ) : null}
 
-          <div style={{ marginTop: 16 }} className="card">
-            <div className="row" style={{ justifyContent: "space-between" }}>
+          {tab === "bulk" ? (
+            <div className="card" id="bulk-update">
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <div>Bulk update</div>
+                <div className="text-muted">catalog import</div>
+              </div>
+              <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
+                Upload CSV files from your catalog workspace.
+              </div>
+              <div style={{ marginTop: "var(--space-10)" }}>
+                <input
+                  ref={csvInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  style={{ display: "none" }}
+                  onChange={async (e) => {
+                    const f = (e.target.files ?? [])[0];
+                    if (!f) return;
+                    try {
+                      const text = await f.text();
+                      window.sessionStorage.setItem("om_staged_csv_data", text);
+                      window.sessionStorage.setItem("om_staged_csv_filename", f.name);
+                      router.push("/app?add=1");
+                    } catch (err) {
+                      console.error("Failed to read CSV", err);
+                      window.alert("Failed to read CSV file.");
+                    }
+                  }}
+                />
+                <button type="button" onClick={() => csvInputRef.current?.click()}>Add CSV</button>
+              </div>
+            </div>
+          ) : null}
+
+          {tab === "account" ? (
+            <div className="card">
               <div>Account</div>
-              <div className="text-muted"></div>
-            </div>
 
-            <div style={{ marginTop: "var(--space-10)" }} className="text-muted">
-              Email
-            </div>
-            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "baseline" }}>
-              <input
-                value={emailDraft}
-                onChange={(e) => setEmailDraft(e.target.value)}
-                placeholder="you@example.com"
-                style={{ width: 360 }}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
-                  saveEmail();
-                }}
-              />
-              <button onClick={saveEmail} disabled={emailState.busy || !emailDraft.trim()}>
-                {emailState.busy ? "Saving…" : "Save email"}
-              </button>
-              <div className="text-muted">{emailState.message ? (emailState.error ? `${emailState.message} (${emailState.error})` : emailState.message) : ""}</div>
-            </div>
+              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">Email</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <input
+                    value={emailDraft}
+                    onChange={(e) => setEmailDraft(e.target.value)}
+                    placeholder="you@example.com"
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
+                      e.preventDefault();
+                      saveEmail();
+                    }}
+                  />
+                  <div className="row" style={{ marginTop: "var(--space-sm)", alignItems: "baseline" }}>
+                    <button onClick={saveEmail} disabled={emailState.busy || !emailDraft.trim()}>
+                      {emailState.busy ? "Saving…" : "Save email"}
+                    </button>
+                    <div className="text-muted">{emailState.message ? (emailState.error ? `${emailState.message} (${emailState.error})` : emailState.message) : ""}</div>
+                  </div>
+                </div>
+              </div>
 
-            <div style={{ marginTop: "var(--space-md)" }} className="text-muted">
-              Change password
-            </div>
-            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "baseline", flexWrap: "wrap", gap: "var(--space-10)" }}>
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Current password"
-                style={{ width: 220 }}
-              />
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" style={{ width: 220 }} />
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm"
-                style={{ width: 220 }}
-              />
-              <button onClick={savePassword} disabled={passwordState.busy}>
-                {passwordState.busy ? "Saving…" : "Save password"}
-              </button>
-              <div className="text-muted">
-                {passwordState.message ? (passwordState.error ? `${passwordState.message} (${passwordState.error})` : passwordState.message) : ""}
+              <div className="row" style={{ marginTop: "var(--space-md)", alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">Current password</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Current password" />
+                </div>
+              </div>
+              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">New password</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" />
+                </div>
+              </div>
+              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">Confirm</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm" />
+                </div>
+              </div>
+              <div className="row" style={{ marginTop: "var(--space-sm)", alignItems: "baseline" }}>
+                <button onClick={savePassword} disabled={passwordState.busy}>
+                  {passwordState.busy ? "Saving…" : "Save password"}
+                </button>
+                <div className="text-muted">
+                  {passwordState.message ? (passwordState.error ? `${passwordState.message} (${passwordState.error})` : passwordState.message) : ""}
+                </div>
+              </div>
+
+              <div style={{ marginTop: "var(--space-md)" }} className="text-muted">
+                Delete account
+              </div>
+              <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
+                This is permanent. Type <span style={{ fontWeight: 600 }}>DELETE</span> to confirm.
+              </div>
+              <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">Confirm</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="DELETE" />
+                  <div className="row" style={{ marginTop: "var(--space-sm)", alignItems: "baseline" }}>
+                    <button onClick={deleteAccount} disabled={deleteState.busy}>
+                      {deleteState.busy ? "Deleting…" : "Delete account"}
+                    </button>
+                    <div className="text-muted">{deleteState.message ? (deleteState.error ? `${deleteState.message} (${deleteState.error})` : deleteState.message) : ""}</div>
+                  </div>
+                </div>
               </div>
             </div>
-
-            <div style={{ marginTop: "var(--space-md)" }} className="text-muted">
-              Delete account
-            </div>
-            <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
-              This is permanent. Type <span style={{ fontWeight: 600 }}>DELETE</span> to confirm.
-            </div>
-            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "baseline", gap: "var(--space-10)", flexWrap: "wrap" }}>
-              <input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="DELETE" style={{ width: 160 }} />
-              <button onClick={deleteAccount} disabled={deleteState.busy}>
-                {deleteState.busy ? "Deleting…" : "Delete account"}
-              </button>
-              <div className="text-muted">{deleteState.message ? (deleteState.error ? `${deleteState.message} (${deleteState.error})` : deleteState.message) : ""}</div>
-            </div>
-          </div>
+          ) : null}
         </div>
       )}
     </main>

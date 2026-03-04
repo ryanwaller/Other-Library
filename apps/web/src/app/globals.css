@@ -161,6 +161,14 @@ button.muted:focus-visible {
 .om-settings-page input:not([type="file"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]) {
   line-height: inherit;
   padding: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.om-settings-page textarea,
+.om-settings-page select {
+  width: 100% !important;
+  max-width: none !important;
 }
 
 .om-book-card-link {
