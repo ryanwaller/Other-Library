@@ -191,14 +191,14 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
             {incomingRows.length === 0 ? (
               <div className="text-muted">No requests yet.</div>
             ) : (
-              incomingRows.map((r) => {
+              incomingRows.map((r, idx) => {
                 const requester = profilesById[r.requester_id];
                 const avatarUrl = avatarUrlByUserId[r.requester_id] ?? null;
                 const book = booksById[r.user_book_id];
                 const title = (book?.title_override ?? "").trim() || book?.edition?.title || "(untitled)";
                 const preview = oneLinePreview(r.message);
                 return (
-                  <div key={r.id} className="om-list-row">
+                  <div key={r.id} className="om-list-row" style={idx === incomingRows.length - 1 ? { borderBottom: "none" } : undefined}>
                     <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-md)" }}>
                       <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
                         <Link href={`/u/${requester?.username || r.requester_id}`} className="om-avatar-link">
@@ -243,7 +243,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
             {outgoingRows.length === 0 ? (
               <div className="text-muted">None.</div>
             ) : (
-              outgoingRows.map((r) => {
+              outgoingRows.map((r, idx) => {
                 const owner = profilesById[r.owner_id];
                 const me = userId ? profilesById[userId] : null;
                 const avatarUrl = (userId ? avatarUrlByUserId[userId] : null) ?? null;
@@ -251,7 +251,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                 const title = (book?.title_override ?? "").trim() || book?.edition?.title || "(untitled)";
                 const preview = oneLinePreview(r.message);
                 return (
-                  <div key={r.id} className="om-list-row">
+                  <div key={r.id} className="om-list-row" style={idx === outgoingRows.length - 1 ? { borderBottom: "none" } : undefined}>
                     <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-md)" }}>
                       <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
                         <Link href={me?.username ? `/u/${me.username}` : "/app/settings?tab=profile"} className="om-avatar-link">

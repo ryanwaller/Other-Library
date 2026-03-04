@@ -445,7 +445,7 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
             )}
           </div>
 
-          <div className="om-list-row">
+          <div className="om-list-row" style={{ borderBottom: "none" }}>
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Rejected requests</div>
               <div className="text-muted">{outgoingRejected.length}</div>
