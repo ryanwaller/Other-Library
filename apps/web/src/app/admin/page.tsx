@@ -457,7 +457,7 @@ export default function AdminPage() {
                 Invites
               </button>
             </div>
-            <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0, flex: "1 1 auto", marginLeft: "var(--space-xl)", flexWrap: "nowrap", alignItems: "baseline" }}>
+            <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0, flex: "1 1 auto", marginLeft: "var(--space-16)", flexWrap: "nowrap", alignItems: "baseline" }}>
               <input
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
