@@ -128,7 +128,7 @@ export default async function PublicProfilePage({
         bio={profile.bio}
       />
 
-      <div style={{ marginTop: 24 }}>
+      <div style={{ marginTop: "var(--space-lg)" }}>
         <AddToLibraryProvider editionIds={editionIds}>
           <PublicBookList
             libraries={libraries}

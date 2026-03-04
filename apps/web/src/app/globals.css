@@ -50,6 +50,7 @@
   --space-lg: 24px;
   --space-32: 32px;
   --space-xl: 48px;
+  --catalog-top-gap: var(--space-lg);
 }
 
 @media (prefers-color-scheme: dark) {

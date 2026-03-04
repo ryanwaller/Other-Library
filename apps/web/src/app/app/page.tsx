@@ -1810,7 +1810,7 @@ function AppShell({
 
   return (
     <>
-      <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
+      <div style={{ marginTop: "var(--space-16)", display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
         <input
           ref={csvInputRef}
           type="file"
@@ -2146,7 +2146,7 @@ function AppShell({
         onAnyMenuOpen={() => { closeTagMenu(); closeCategoryMenu(); }}
       />
 
-      <div style={{ marginTop: 32 }} />
+      <div style={{ marginTop: "var(--catalog-top-gap)" }} />
 
       {libraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];

@@ -350,7 +350,7 @@ export default function PublicBookList({
         </div>
       )}
 
-      <div style={{ marginTop: 32 }} />
+      <div style={{ marginTop: "var(--catalog-top-gap)" }} />
 
       {showLibraryBlocks ? (
         <div style={{ display: "flex", flexDirection: "column" }}>
