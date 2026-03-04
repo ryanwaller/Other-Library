@@ -95,7 +95,7 @@ export default function BookCard({
         </Link>
         <div>
           <div>
-            <Link href={href} className="om-book-card-link">
+            <Link href={href} className="om-book-card-link" style={{ color: "inherit", textDecoration: "none" }}>
               <span className="om-book-title">{title}</span>
             </Link>
           </div>
@@ -142,7 +142,7 @@ export default function BookCard({
           </Link>
           <div style={{ marginTop: "var(--space-md)" }}>
             <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-10)", alignItems: "baseline" }}>
-              <Link href={href} style={{ textDecoration: "none" }} className="om-book-card-link">
+              <Link href={href} style={{ color: "inherit", textDecoration: "none" }} className="om-book-card-link">
                 <span className="om-book-title">{title}</span>
               </Link>
             </div>
@@ -177,7 +177,7 @@ export default function BookCard({
           </Link>
           <div style={{ marginTop: "var(--space-14)" }}>
             <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-10)", alignItems: "baseline" }}>
-              <Link href={href} style={{ textDecoration: "none" }} className="om-book-card-link">
+              <Link href={href} style={{ color: "inherit", textDecoration: "none" }} className="om-book-card-link">
                 <span className="om-book-title">{title}</span>
               </Link>
             </div>
