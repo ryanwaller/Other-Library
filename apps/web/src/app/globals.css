@@ -749,7 +749,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 .om-hr, .divider {
   border: 0;
   border-top: 1px solid var(--border);
-  margin: var(--space-md) 0;
+  margin: var(--space-16) 0;
   width: 100%;
 }
 

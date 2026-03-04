@@ -3747,11 +3747,9 @@ export default function BookDetailPage() {
 
               {isOwner ? (
                 <>
-                  <div style={{ marginTop: 16 }}>
-                    <hr className="om-hr" />
-                  </div>
+                  <hr className="divider" />
 
-                  <div style={{ marginTop: 16 }} className="om-edit-label">
+                  <div className="om-edit-label">
                     Book info
                   </div>
                   <div style={{ marginTop: "var(--space-8)" }}>
@@ -4062,8 +4060,8 @@ export default function BookDetailPage() {
           </div>
 
           {(isOwner && editMode) || imageMedia.length > 0 ? (
-            <div style={{ gridColumn: "1 / -1", marginTop: 16 }}>
-              <hr className="om-hr" style={{ marginBottom: 16 }} />
+            <div style={{ gridColumn: "1 / -1" }}>
+              <hr className="divider" />
               {isOwner && editMode ? (
                 <details style={{ marginTop: "var(--space-8)", border: "none", outline: "none", boxShadow: "none" }}>
                   <summary className="text-muted" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none", cursor: "pointer" }}>Add images…</summary>
@@ -4142,8 +4140,13 @@ export default function BookDetailPage() {
               ) : null}
             </div>
           ) : null}
-        <div style={{ marginTop: 16 }}>
-          {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} /> : null}
+        <div style={{ marginTop: 0 }}>
+          {editionId ? (
+            <>
+              <hr className="divider" />
+              <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} />
+            </>
+          ) : null}
         </div>
         </div>
       )}
