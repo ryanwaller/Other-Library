@@ -211,6 +211,8 @@ function AppShell({
   filterSubject,
   filterPublisher,
   filterDesigner,
+  filterEditor,
+  filterMaterial,
   filterGroup,
   filterDecade,
   filterCategory,
@@ -223,6 +225,8 @@ function AppShell({
   filterSubject: string | null;
   filterPublisher: string | null;
   filterDesigner: string | null;
+  filterEditor: string | null;
+  filterMaterial: string | null;
   filterGroup: string | null;
   filterDecade: string | null;
   filterCategory: string | null;
@@ -1875,7 +1879,7 @@ function AppShell({
               )}
               <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                 <input
-                  placeholder={showScan ? "enter ISBN…" : "Add by ISBN, URL, or title/author"}
+                  placeholder={showScan ? "enter ISBN…" : "Enter ISBN, URL, or title/author"}
                   value={addInput}
                   onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); }}
                   onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
@@ -1884,16 +1888,18 @@ function AppShell({
                   style={{ width: "100%" }}
                 />
               </div>
-              <div className="row" style={{ gap: 10, flex: "0 0 auto" }}>
-                {(addInput.trim() || addInputFocused) && (
-                  <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
-                    {addState.busy ? "…" : "Go"}
-                  </button>
-                )}
-                {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message) && (
-                  <button onClick={cancelAddPreview} disabled={addState.busy}>Cancel</button>
-                )}
-              </div>
+              {((addInput.trim() || addInputFocused) || (addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message)) && (
+                <div className="row" style={{ gap: 10, flex: "0 0 auto" }}>
+                  {(addInput.trim() || addInputFocused) && (
+                    <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
+                      {addState.busy ? "…" : "Go"}
+                    </button>
+                  )}
+                  {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message) && (
+                    <button onClick={cancelAddPreview} disabled={addState.busy}>Cancel</button>
+                  )}
+                </div>
+              )}
             </div>
             <div className="row" style={{ width: "100%", margin: 0, gap: 12, alignItems: "baseline", flexWrap: "nowrap" }}>
               <button onClick={() => { const next = !bulkMode; if (next) { setAddOpen(false); setSortOpen(false); setSearchOpen(false); setReorderMode(true); } else { exitEditMode(); } setBulkMode(next); }}>
@@ -1911,6 +1917,9 @@ function AppShell({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ minWidth: 0, flex: 1 }}
               />
+              {(searchFocused || searchQuery.trim()) && (
+                <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`} className="muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>Search others</Link>
+              )}
             </div>
           </>
         ) : (
@@ -1924,7 +1933,7 @@ function AppShell({
               )}
               <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                 <input
-                  placeholder={showScan ? "enter ISBN…" : "Add by ISBN, URL, or title/author"}
+                  placeholder={showScan ? "enter ISBN…" : "Enter ISBN, URL, or title/author"}
                   value={addInput}
                   onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); }}
                   onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
@@ -2222,6 +2231,8 @@ function AppWithFilters({ session }: { session: Session }) {
   const filterSubject = searchParams.get("subject");
   const filterPublisher = searchParams.get("publisher");
   const filterDesigner = searchParams.get("designer");
+  const filterEditor = searchParams.get("editor");
+  const filterMaterial = searchParams.get("material");
   const filterGroup = searchParams.get("group");
   const filterDecade = searchParams.get("decade");
   const filterCategory = searchParams.get("category");
@@ -2235,6 +2246,8 @@ function AppWithFilters({ session }: { session: Session }) {
       filterSubject={filterSubject}
       filterPublisher={filterPublisher}
       filterDesigner={filterDesigner}
+      filterEditor={filterEditor}
+      filterMaterial={filterMaterial}
       filterGroup={filterGroup}
       filterDecade={filterDecade}
       filterCategory={filterCategory}
