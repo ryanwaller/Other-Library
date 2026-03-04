@@ -605,6 +605,40 @@ function AppShell({
       setItems([]);
       return;
     }
+    try {
+      const serverHome = await catalogApi<{ ok: true; books: any[] }>(
+        `/api/catalog/home?catalog_ids=${encodeURIComponent(ids.join(","))}`,
+        { method: "GET" }
+      );
+      if (Array.isArray(serverHome.books)) {
+        const serverRows = serverHome.books as any[];
+        setItems(serverRows as any);
+        const serverPaths = Array.from(
+          new Set([
+            ...serverRows
+              .flatMap((r) => (Array.isArray(r.media) ? r.media : []))
+              .map((m: any) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
+              .filter(Boolean),
+            ...serverRows
+              .filter((r: any) => r.cover_crop && typeof r.cover_original_url === "string" && r.cover_original_url)
+              .map((r: any) => r.cover_original_url as string)
+          ])
+        );
+        const serverMissing = serverPaths.filter((p) => !mediaUrlsByPath[p]);
+        if (serverMissing.length > 0) {
+          const signedServer = await supabase.storage.from("user-book-media").createSignedUrls(serverMissing, 60 * 60);
+          if (!signedServer.error && signedServer.data) {
+            const nextMap: Record<string, string> = {};
+            for (const s of signedServer.data) if (s.path && s.signedUrl) nextMap[s.path] = s.signedUrl;
+            setMediaUrlsByPath((prev) => ({ ...prev, ...nextMap }));
+          }
+        }
+        return;
+      }
+    } catch {
+      // fall through to client-side queries
+    }
+
     let rows: any[] = [];
     let primaryError: any = null;
     const fullSelect =
@@ -673,80 +707,70 @@ function AppShell({
     if (!supabase) return [];
     setLibraryState({ busy: true, error: null, message: null });
     try {
+      let list: LibrarySummary[] = [];
       try {
         const listRes = await catalogApi<{ ok: true; catalogs: LibrarySummary[] }>("/api/catalog/list", { method: "GET" });
         const apiList = Array.isArray(listRes.catalogs) ? listRes.catalogs : [];
         if (apiList.length > 0) {
-          setLibraries(apiList);
-          try {
-            const raw = window.localStorage.getItem("om_addLibraryId");
-            const parsed = raw ? Number(raw) : NaN;
-            if (Number.isFinite(parsed) && parsed > 0 && apiList.some((l) => l.id === parsed)) {
-              setAddLibraryId(parsed);
-            } else {
-              setAddLibraryId(apiList[0]?.id ?? null);
-            }
-          } catch {
-            setAddLibraryId(apiList[0]?.id ?? null);
-          }
-          setLibraryState({ busy: false, error: null, message: null });
-          return apiList;
+          list = apiList;
         }
       } catch {
         // fall through to client-side queries
       }
 
-      let ownedList: LibrarySummary[] = [];
-      const resWithOrder = await supabase
-        .from("libraries")
-        .select("id,name,created_at,sort_order,owner_id")
-        .eq("owner_id", userId)
-        .order("sort_order", { ascending: true });
-      if (!resWithOrder.error) {
-        ownedList = ((resWithOrder.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
-      } else {
-        const msg = (resWithOrder.error.message ?? "").toLowerCase();
-        if (msg.includes("sort_order") && msg.includes("does not exist")) {
-          const res = await supabase
-            .from("libraries")
-            .select("id,name,created_at,owner_id")
-            .eq("owner_id", userId)
-            .order("created_at", { ascending: true });
-          if (res.error) throw new Error(res.error.message);
-          ownedList = ((res.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
+      if (list.length === 0) {
+        let ownedList: LibrarySummary[] = [];
+        const resWithOrder = await supabase
+          .from("libraries")
+          .select("id,name,created_at,sort_order,owner_id")
+          .eq("owner_id", userId)
+          .order("sort_order", { ascending: true });
+        if (!resWithOrder.error) {
+          ownedList = ((resWithOrder.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
         } else {
-          throw new Error(resWithOrder.error.message);
+          const msg = (resWithOrder.error.message ?? "").toLowerCase();
+          if (msg.includes("sort_order") && msg.includes("does not exist")) {
+            const res = await supabase
+              .from("libraries")
+              .select("id,name,created_at,owner_id")
+              .eq("owner_id", userId)
+              .order("created_at", { ascending: true });
+            if (res.error) throw new Error(res.error.message);
+            ownedList = ((res.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
+          } else {
+            throw new Error(resWithOrder.error.message);
+          }
         }
-      }
 
-      let sharedList: LibrarySummary[] = [];
-      try {
-        const sharedRes = await catalogApi<{ ok: true; shared: Array<{ catalog_id: number; role: "owner" | "editor"; catalog: { id: number; name: string } | null }> }>(
-          "/api/catalog/shared",
-          { method: "GET" }
-        );
-        const acceptedShared = Array.isArray(sharedRes.shared) ? sharedRes.shared : [];
-        sharedList = acceptedShared
-          .map((r) => {
-            const cid = Number(r.catalog?.id ?? r.catalog_id);
-            if (!Number.isFinite(cid) || cid <= 0) return null;
-            return {
-              id: cid,
-              name: String(r.catalog?.name ?? `Catalog ${cid}`),
-              created_at: new Date(0).toISOString(),
-              sort_order: null,
-              owner_id: null,
-              myRole: r.role === "owner" ? "owner" : "editor"
-            } satisfies LibrarySummary;
-          })
-          .filter(Boolean) as LibrarySummary[];
-      } catch {
-        sharedList = [];
-      }
+        let sharedList: LibrarySummary[] = [];
+        try {
+          const sharedRes = await catalogApi<{ ok: true; shared: Array<{ catalog_id: number; role: "owner" | "editor"; catalog: { id: number; name: string } | null }> }>(
+            "/api/catalog/shared",
+            { method: "GET" }
+          );
+          const acceptedShared = Array.isArray(sharedRes.shared) ? sharedRes.shared : [];
+          sharedList = acceptedShared
+            .map((r) => {
+              const cid = Number(r.catalog?.id ?? r.catalog_id);
+              if (!Number.isFinite(cid) || cid <= 0) return null;
+              return {
+                id: cid,
+                name: String(r.catalog?.name ?? `Catalog ${cid}`),
+                created_at: new Date(0).toISOString(),
+                sort_order: null,
+                owner_id: null,
+                myRole: r.role === "owner" ? "owner" : "editor"
+              } satisfies LibrarySummary;
+            })
+            .filter(Boolean) as LibrarySummary[];
+        } catch {
+          sharedList = [];
+        }
 
-      const byId = new Map<number, LibrarySummary>();
-      for (const l of [...ownedList, ...sharedList]) byId.set(Number(l.id), l);
-      let list = Array.from(byId.values());
+        const byId = new Map<number, LibrarySummary>();
+        for (const l of [...ownedList, ...sharedList]) byId.set(Number(l.id), l);
+        list = Array.from(byId.values());
+      }
 
       if (list.length === 0) {
         const created = await supabase.from("libraries").insert({ owner_id: userId, name: "Your catalog" }).select("id").single();
