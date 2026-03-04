@@ -205,6 +205,12 @@ function SettingsPageContent() {
       inviter: { id: string; username: string | null } | null;
     }>
   >([]);
+  const [ownedSharedCatalogs, setOwnedSharedCatalogs] = useState<
+    Array<{
+      catalog: { id: number; name: string };
+      members: Array<{ user_id: string; username: string | null; accepted_at: string | null }>;
+    }>
+  >([]);
 
   useEffect(() => {
     const raw = String(searchParams.get("tab") ?? "").trim().toLowerCase();
@@ -217,6 +223,7 @@ function SettingsPageContent() {
     if (!accessToken) {
       setPendingSharedCatalogs([]);
       setAcceptedSharedCatalogs([]);
+      setOwnedSharedCatalogs([]);
       return;
     }
     setSharedCatalogsBusy(true);
@@ -230,9 +237,11 @@ function SettingsPageContent() {
       if (!res.ok) throw new Error(String(json?.error ?? "request_failed"));
       setPendingSharedCatalogs(Array.isArray(json?.pending) ? (json.pending as any[]) : []);
       setAcceptedSharedCatalogs(Array.isArray(json?.shared) ? (json.shared as any[]) : []);
+      setOwnedSharedCatalogs(Array.isArray(json?.owned_shared) ? (json.owned_shared as any[]) : []);
     } catch (e: any) {
       setPendingSharedCatalogs([]);
       setAcceptedSharedCatalogs([]);
+      setOwnedSharedCatalogs([]);
       setSharedCatalogsError(e?.message ?? "Failed to load shared catalogs");
     } finally {
       setSharedCatalogsBusy(false);
@@ -1036,6 +1045,38 @@ function SettingsPageContent() {
                       >
                         Leave
                       </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <hr className="om-hr" />
+
+              <div className="row om-settings-row" style={{ alignItems: "baseline", justifyContent: "space-between" }}>
+                <div className="text-muted">Shared by you</div>
+                <div className="text-muted">{ownedSharedCatalogs.length}</div>
+              </div>
+              {ownedSharedCatalogs.length === 0 ? (
+                <div className="text-muted">None.</div>
+              ) : (
+                <div className="om-list">
+                  {ownedSharedCatalogs.map((row, idx) => (
+                    <div
+                      key={row.catalog.id}
+                      className="om-list-row"
+                      style={idx === ownedSharedCatalogs.length - 1 ? { borderBottom: "none" } : undefined}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div>{row.catalog.name}</div>
+                        <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
+                          {row.members
+                            .map((m) => {
+                              const name = (m.username ?? "").trim() || m.user_id;
+                              return m.accepted_at ? name : `${name} (pending)`;
+                            })
+                            .join(", ")}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
