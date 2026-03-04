@@ -52,7 +52,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; u
       fail(400, "invalid_json");
     }
     const role = String(body?.role ?? "").trim().toLowerCase();
-    if (role !== "editor" && role !== "viewer") fail(400, "invalid_role");
+    if (role !== "editor") fail(400, "invalid_role");
 
     const admin = requireAdminClient();
     const own = await admin.from("libraries").select("owner_id").eq("id", catalogId).maybeSingle();

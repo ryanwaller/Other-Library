@@ -189,7 +189,7 @@ function SettingsPageContent() {
     Array<{
       id: string;
       catalog_id: number;
-      role: "owner" | "editor" | "viewer";
+      role: "owner" | "editor";
       invited_at: string;
       catalog: { id: number; name: string } | null;
       inviter: { id: string; username: string | null } | null;
@@ -199,7 +199,7 @@ function SettingsPageContent() {
     Array<{
       id: string;
       catalog_id: number;
-      role: "owner" | "editor" | "viewer";
+      role: "owner" | "editor";
       accepted_at: string | null;
       catalog: { id: number; name: string } | null;
       inviter: { id: string; username: string | null } | null;

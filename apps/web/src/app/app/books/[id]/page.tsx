@@ -323,6 +323,7 @@ export default function BookDetailPage() {
 
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
+  const [memberCanEdit, setMemberCanEdit] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [findMoreOpen, setFindMoreOpen] = useState(false);
   const [coverToolsOpen, setCoverToolsOpen] = useState(false);
@@ -609,6 +610,33 @@ export default function BookDetailPage() {
   }, [bookId]);
 
   useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!supabase || !userId || !book?.library_id) {
+        if (alive) setMemberCanEdit(false);
+        return;
+      }
+      if (book.owner_id === userId) {
+        if (alive) setMemberCanEdit(true);
+        return;
+      }
+      const res = await supabase
+        .from("catalog_members")
+        .select("role")
+        .eq("catalog_id", book.library_id)
+        .eq("user_id", userId)
+        .not("accepted_at", "is", null)
+        .maybeSingle();
+      if (!alive) return;
+      const role = String((res.data as any)?.role ?? "").toLowerCase();
+      setMemberCanEdit(!res.error && (role === "owner" || role === "editor"));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [userId, book?.library_id, book?.owner_id]);
+
+  useEffect(() => {
     if (!editMode) return;
     const el = descriptionTextareaRef.current;
     if (!el) return;
@@ -647,22 +675,28 @@ export default function BookDetailPage() {
         setLibraries([]);
         return;
       }
-      if (!book || book.owner_id !== userId) {
+      if (!book || !(book.owner_id === userId || memberCanEdit)) {
         setLibraries([]);
         return;
       }
-      const res = await supabase.from("libraries").select("id,name,created_at").eq("owner_id", userId).order("created_at", { ascending: true });
+      const ownRes = await supabase.from("libraries").select("id,name,created_at").eq("owner_id", userId).order("created_at", { ascending: true });
       if (!alive) return;
-      if (res.error) {
+      if (!ownRes.error) {
+        setLibraries((ownRes.data ?? []) as any);
+        return;
+      }
+      const currentRes = await supabase.from("libraries").select("id,name,created_at").eq("id", book.library_id).maybeSingle();
+      if (!alive) return;
+      if (currentRes.error || !currentRes.data) {
         setLibraries([]);
         return;
       }
-      setLibraries((res.data ?? []) as any);
+      setLibraries([currentRes.data as any]);
     })();
     return () => {
       alive = false;
     };
-  }, [userId, book?.owner_id]);
+  }, [userId, book?.owner_id, book?.library_id, memberCanEdit]);
 
   async function refresh() {
     if (!supabase) return;
@@ -1033,7 +1067,7 @@ export default function BookDetailPage() {
     return parseAuthorsInput(formDesigners);
   }, [facetDraft.designer, formDesigners]);
 
-  const isOwner = Boolean(book && userId && book.owner_id === userId);
+  const isOwner = Boolean(book && userId && (book.owner_id === userId || memberCanEdit));
 
   const copiesLabel = useMemo(() => {
     if (!book?.owner_id) return "Copies";
@@ -1511,7 +1545,7 @@ export default function BookDetailPage() {
 
   async function saveEdits(): Promise<boolean> {
     if (!supabase || !book || !userId) return false;
-    if (book.owner_id !== userId) return false;
+    if (!isOwner) return false;
     setSaveState({ busy: true, error: null, message: "Saving…" });
     const title_override = formTitle.trim() ? formTitle.trim() : null;
     const authors_override = uniqStrings(facetDraft.author ?? parseAuthorsInput(formAuthors));
@@ -1626,7 +1660,7 @@ export default function BookDetailPage() {
 
   async function deleteBook() {
     if (!supabase || !book || !userId) return;
-    if (book.owner_id !== userId) return;
+    if (!isOwner) return;
     setDeleteState({ busy: true, error: null, message: "Deleting…" });
     try {
       const paths = (book.media ?? [])
@@ -1663,7 +1697,7 @@ export default function BookDetailPage() {
 
   async function moveToLibrary(nextLibraryId: number) {
     if (!supabase || !book || !userId) return;
-    if (book.owner_id !== userId) return;
+    if (!isOwner) return;
     if (!nextLibraryId || !Number.isFinite(nextLibraryId)) return;
     setLibraryMoveState({ busy: true, error: null, message: "Moving…" });
     try {
@@ -1685,7 +1719,7 @@ export default function BookDetailPage() {
 
   async function updateCopies(): Promise<boolean> {
     if (!supabase || !book || !userId) return false;
-    if (book.owner_id !== userId) return false;
+    if (!isOwner) return false;
     const libId = formLibraryId ?? (book as any).library_id ?? null;
     if (!libId) return false;
     const desired = Number(copiesDraft);
@@ -1811,7 +1845,7 @@ export default function BookDetailPage() {
 
   async function uploadCover() {
     if (!supabase || !book || !userId) return;
-    if (book.owner_id !== userId) return;
+    if (!isOwner) return;
 
     setCoverState({ busy: true, error: null, message: "Saving…" });
     try {
@@ -1919,7 +1953,7 @@ export default function BookDetailPage() {
 
   async function importCoverFromUrl(url: string) {
     if (!supabase || !book || !userId) return;
-    if (book.owner_id !== userId) return;
+    if (!isOwner) return;
     const value = url.trim();
     if (!value) return;
 
@@ -1986,7 +2020,7 @@ export default function BookDetailPage() {
 
   async function setAsCover(mediaId: number) {
     if (!supabase || !book || !userId) return;
-    if (book.owner_id !== userId) return;
+    if (!isOwner) return;
     setCoverState({ busy: true, error: null, message: "Setting cover…" });
     const demote = await supabase.from("user_book_media").update({ kind: "image" }).eq("user_book_id", book.id).eq("kind", "cover");
     if (demote.error) {
@@ -2004,7 +2038,7 @@ export default function BookDetailPage() {
 
   async function deleteCover() {
     if (!supabase || !book || !userId) return;
-    if (book.owner_id !== userId) return;
+    if (!isOwner) return;
     setCoverState({ busy: true, error: null, message: "Deleting cover…" });
     try {
       // Clear cover columns
@@ -2046,7 +2080,7 @@ export default function BookDetailPage() {
 
   async function deleteMedia(mediaId: number, storagePath: string) {
     if (!supabase || !book || !userId) return;
-    if (book.owner_id !== userId) return;
+    if (!isOwner) return;
     if (!window.confirm("Delete this image?")) return;
     const rm = await supabase.storage.from("user-book-media").remove([storagePath]);
     if (rm.error) {
@@ -2075,7 +2109,7 @@ export default function BookDetailPage() {
 
   async function uploadImages() {
     if (!supabase || !book || !userId) return;
-    if (book.owner_id !== userId) return;
+    if (!isOwner) return;
     if (pendingImages.length === 0) return;
 
     setImagesState({ busy: true, done: 0, total: pendingImages.length, error: null, message: "Uploading…" });
@@ -2363,7 +2397,7 @@ export default function BookDetailPage() {
 
   async function linkEditionByIsbn(isbn: string, coverUrlHint?: string | null) {
     if (!supabase || !book || !userId) return;
-    if (book.owner_id !== userId) return;
+    if (!isOwner) return;
 
     const value = isbn.trim();
     if (!value) return;
@@ -2468,7 +2502,7 @@ export default function BookDetailPage() {
 
   async function applyMerge(selections: Record<string, string | null>) {
     if (!supabase || !book || !userId) return;
-    if (book.owner_id !== userId) return;
+    if (!isOwner) return;
 
     setMergeUndoSnapshot(null);
     const preFields: Record<string, unknown> = {
@@ -2610,7 +2644,7 @@ export default function BookDetailPage() {
 
   async function undoMerge() {
     if (!supabase || !book || !userId || !mergeUndoSnapshot) return;
-    if (book.owner_id !== userId) return;
+    if (!isOwner) return;
     setMergeState({ busy: true, error: null, message: "Undoing…" });
     try {
       const { fields, coverMedia, hadCoverMerge } = mergeUndoSnapshot;

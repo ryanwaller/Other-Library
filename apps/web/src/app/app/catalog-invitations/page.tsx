@@ -8,7 +8,7 @@ import SignInCard from "../../components/SignInCard";
 type PendingInvite = {
   id: string;
   catalog_id: number;
-  role: "owner" | "editor" | "viewer";
+  role: "owner" | "editor";
   invited_at: string;
   catalog: { id: number; name: string } | null;
   inviter: { id: string; username: string | null } | null;

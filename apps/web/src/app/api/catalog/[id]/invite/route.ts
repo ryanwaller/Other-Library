@@ -25,8 +25,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
     const identifier = String(body?.username ?? body?.email ?? body?.identifier ?? "").trim();
     if (!identifier) fail(400, "missing_username_or_email");
-    const role = String(body?.role ?? "viewer").trim().toLowerCase();
-    if (role !== "viewer" && role !== "editor") fail(400, "invalid_role");
+    const role = String(body?.role ?? "editor").trim().toLowerCase();
+    if (role !== "editor") fail(400, "invalid_role");
 
     const targetUserId = await resolveUserIdByIdentifier(identifier);
     const admin = requireAdminClient();

@@ -5,7 +5,7 @@ type MembershipRow = {
   id: string;
   catalog_id: number;
   user_id: string;
-  role: "owner" | "editor" | "viewer";
+  role: "owner" | "editor";
   invited_by: string | null;
   invited_at: string;
   accepted_at: string | null;

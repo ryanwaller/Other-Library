@@ -50,7 +50,7 @@ type LibrarySummary = {
   created_at: string;
   sort_order?: number | null;
   owner_id?: string | null;
-  myRole?: "owner" | "editor" | "viewer";
+  myRole?: "owner" | "editor";
   memberPreviews?: Array<{ userId: string; username: string; avatarUrl: string | null }>;
 };
 
@@ -58,7 +58,7 @@ type CatalogMemberView = {
   id: string;
   catalog_id: number;
   user_id: string;
-  role: "owner" | "editor" | "viewer";
+  role: "owner" | "editor";
   invited_by: string | null;
   invited_at: string;
   accepted_at: string | null;
@@ -676,11 +676,11 @@ function AppShell({
       if (!mem.error) {
         const memberRows = ((mem.data ?? []) as any[]).filter((r) => Number.isFinite(Number(r.catalog_id)));
         const catalogIds = Array.from(new Set(memberRows.map((r) => Number(r.catalog_id)).filter((n) => Number.isFinite(n) && n > 0)));
-        const roleByCatalog = new Map<number, "owner" | "editor" | "viewer">();
+        const roleByCatalog = new Map<number, "owner" | "editor">();
         for (const r of memberRows) {
           const role = String(r.role ?? "").toLowerCase();
           const id = Number(r.catalog_id);
-          if (id > 0 && (role === "owner" || role === "editor" || role === "viewer")) {
+          if (id > 0 && (role === "owner" || role === "editor")) {
             roleByCatalog.set(id, role as any);
           }
         }
@@ -1928,7 +1928,7 @@ function AppShell({
     try {
       await catalogApi(`/api/catalog/${catalogId}/invite`, {
         method: "POST",
-        body: JSON.stringify({ identifier: draft, role: "viewer" })
+        body: JSON.stringify({ identifier: draft, role: "editor" })
       });
       setMembersByCatalogId((prev) => ({
         ...prev,
@@ -1977,7 +1977,7 @@ function AppShell({
     }
   }
 
-  async function updateCatalogMemberRole(catalogId: number, memberUserId: string, role: "editor" | "viewer") {
+  async function updateCatalogMemberRole(catalogId: number, memberUserId: string, role: "editor") {
     try {
       await catalogApi(`/api/catalog/${catalogId}/member/${encodeURIComponent(memberUserId)}`, {
         method: "PATCH",
@@ -2592,30 +2592,6 @@ function AppShell({
             {bulkMode && editingLibraryId === lib.id ? (
               <div className="card" style={{ marginTop: "var(--space-sm)" }}>
                 <div className="text-muted">Members</div>
-                <div className="row" style={{ marginTop: "var(--space-sm)", alignItems: "baseline", flexWrap: "nowrap" }}>
-                  <input
-                    placeholder="Invite by username or email"
-                    value={memberState.inviteInput}
-                    onChange={(e) =>
-                      setMembersByCatalogId((prev) => ({
-                        ...prev,
-                        [lib.id]: { ...memberState, inviteInput: e.target.value }
-                      }))
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter") return;
-                      e.preventDefault();
-                      void inviteCatalogMember(lib.id);
-                    }}
-                    style={{ minWidth: 0, flex: 1 }}
-                  />
-                  {iAmOwner ? (
-                    <button onClick={() => void inviteCatalogMember(lib.id)} disabled={memberState.inviteBusy || !memberState.inviteInput.trim()}>
-                      {memberState.inviteBusy ? "Inviting…" : "Invite"}
-                    </button>
-                  ) : null}
-                </div>
-                {memberState.error ? <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{memberState.error}</div> : null}
 
                 <div style={{ marginTop: "var(--space-md)" }}>
                   {acceptedMembers.map((m) => {
@@ -2634,23 +2610,10 @@ function AppShell({
                           <span>{display}</span>
                         </div>
                         <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
-                          {isRowOwner ? (
-                            <span className="text-muted">owner</span>
-                          ) : canModify ? (
-                            <select
-                              value={m.role}
-                              onChange={(e) => void updateCatalogMemberRole(lib.id, m.user_id, (e.target.value === "editor" ? "editor" : "viewer") as any)}
-                              style={{ width: "auto", minWidth: 0 }}
-                            >
-                              <option value="editor">editor</option>
-                              <option value="viewer">viewer</option>
-                            </select>
-                          ) : (
-                            <span className="text-muted">{m.role}</span>
-                          )}
+                          {isRowOwner ? <span className="text-muted">owner</span> : <span className="text-muted">editor</span>}
                           {canModify ? (
                             <button className="text-muted" onClick={() => void removeCatalogMember(lib.id, m.user_id)}>
-                              Remove
+                              Delete
                             </button>
                           ) : null}
                         </div>
@@ -2667,12 +2630,44 @@ function AppShell({
                       return (
                         <div key={m.id} className="row" style={{ justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-sm)" }}>
                           <span>{display}</span>
-                          <span className="text-muted">pending</span>
+                          <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
+                            <span className="text-muted">pending</span>
+                            {iAmOwner ? (
+                              <button className="text-muted" onClick={() => void removeCatalogMember(lib.id, m.user_id)}>
+                                Cancel
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
                       );
                     })}
                   </div>
                 ) : null}
+
+                {iAmOwner ? (
+                  <div className="row" style={{ marginTop: "var(--space-md)", alignItems: "baseline", flexWrap: "nowrap" }}>
+                    <input
+                      placeholder="Invite by username or email"
+                      value={memberState.inviteInput}
+                      onChange={(e) =>
+                        setMembersByCatalogId((prev) => ({
+                          ...prev,
+                          [lib.id]: { ...memberState, inviteInput: e.target.value }
+                        }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        void inviteCatalogMember(lib.id);
+                      }}
+                      style={{ minWidth: 0, flex: 1 }}
+                    />
+                    <button onClick={() => void inviteCatalogMember(lib.id)} disabled={memberState.inviteBusy || !memberState.inviteInput.trim()}>
+                      {memberState.inviteBusy ? "Inviting…" : "Invite"}
+                    </button>
+                  </div>
+                ) : null}
+                {memberState.error ? <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{memberState.error}</div> : null}
               </div>
             ) : null}
             {idx < libraries.length - 1 && <hr className="om-hr" />}
