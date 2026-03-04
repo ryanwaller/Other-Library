@@ -765,17 +765,10 @@ function SettingsPageContent() {
                     <option value="following">following</option>
                     <option value="anyone">anyone</option>
                   </select>
-                  <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
-                    {profileForm.borrow_request_scope === "anyone"
-                      ? "Any signed-in user."
-                      : profileForm.borrow_request_scope === "following"
-                        ? "Only people you follow."
-                        : "Only approved followers."}
-                  </div>
-                  <div style={{ marginTop: "var(--space-lg)" }}>
-                    <BorrowRequestsPanel embedded />
-                  </div>
                 </div>
+              </div>
+              <div style={{ marginTop: "var(--space-lg)" }}>
+                <BorrowRequestsPanel embedded />
               </div>
             </div>
           ) : null}
