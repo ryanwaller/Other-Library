@@ -128,9 +128,9 @@ export default function BookCard({
   }
 
   return (
-    <div className="card om-book-card">
+    <div className="om-book-card">
       {bulkMode ? (
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-xs)" }}>
           <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" />
         </div>
       ) : null}
