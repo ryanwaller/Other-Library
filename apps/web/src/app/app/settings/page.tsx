@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useRef } from "react";
 import type { Session } from "@supabase/supabase-js";
 import Cropper, { type Area } from "react-easy-crop";
@@ -92,15 +91,12 @@ async function cropToBlob(imageSrc: string, crop: Area, outputSize = 512): Promi
 }
 
 export default function SettingsPage() {
-  const router = useRouter();
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [profileReady, setProfileReady] = useState(false);
   const userId = session?.user?.id ?? null;
   const sessionEmail = session?.user?.email ?? null;
-
-  const csvInputRef = useRef<HTMLInputElement | null>(null);
 
   const [profile, setProfile] = useState<{
     username: string;
@@ -174,7 +170,7 @@ export default function SettingsPage() {
     error: null,
     message: null
   });
-  const [tab, setTab] = useState<"profile" | "follows" | "borrows" | "bulk" | "account">("profile");
+  const [tab, setTab] = useState<"profile" | "account">("profile");
 
   useEffect(() => {
     if (!supabase) return;
@@ -543,9 +539,6 @@ export default function SettingsPage() {
           <div className="row admin-tabbar-row" style={{ justifyContent: "flex-start", width: "100%", flexWrap: "nowrap" }}>
             <div className="admin-tabbar" style={{ flexWrap: "nowrap", overflowX: "auto", whiteSpace: "nowrap" }}>
               <button type="button" onClick={() => setTab("profile")} aria-current={tab === "profile" ? "page" : undefined}>Profile</button>
-              <button type="button" onClick={() => setTab("follows")} aria-current={tab === "follows" ? "page" : undefined}>Follows</button>
-              <button type="button" onClick={() => setTab("borrows")} aria-current={tab === "borrows" ? "page" : undefined}>Borrows</button>
-              <button type="button" onClick={() => setTab("bulk")} aria-current={tab === "bulk" ? "page" : undefined}>Bulk update</button>
               <button type="button" onClick={() => setTab("account")} aria-current={tab === "account" ? "page" : undefined}>Account</button>
             </div>
           </div>
@@ -554,21 +547,16 @@ export default function SettingsPage() {
 
           {tab === "profile" ? (
             <div className="card">
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <div>Profile</div>
-                <div className="text-muted">
-                  {profileSaveState.message
-                    ? profileSaveState.error
-                      ? `${profileSaveState.message} (${profileSaveState.error})`
-                      : profileSaveState.message
-                    : ""}
-                </div>
+              <div className="text-muted">
+                {profileSaveState.message
+                  ? profileSaveState.error
+                    ? `${profileSaveState.message} (${profileSaveState.error})`
+                    : profileSaveState.message
+                  : ""}
               </div>
 
-              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "center" }}>
-                <div style={{ width: 120 }} className="text-muted">
-                  Photo
-                </div>
+              <div className="row om-settings-row" style={{ alignItems: "center" }}>
+                <div style={{ width: 120 }} className="text-muted">Avatar</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <div className="row" style={{ gap: "var(--space-10)", alignItems: "center", flexWrap: "wrap" }}>
                     {avatarUrl ? (
@@ -645,7 +633,7 @@ export default function SettingsPage() {
                 </div>
               ) : null}
 
-              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Username</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <input
@@ -664,7 +652,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Display name</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <input
@@ -680,7 +668,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "flex-start" }}>
+              <div className="row om-settings-row" style={{ alignItems: "flex-start" }}>
                 <div style={{ width: 120 }} className="text-muted">Bio</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <textarea
@@ -692,7 +680,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Library visibility</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <select
@@ -708,7 +696,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="row" style={{ marginTop: "var(--space-md)", gap: "var(--space-md)" }}>
+              <div className="row om-settings-row" style={{ gap: "var(--space-md)" }}>
                 <button onClick={saveProfile} disabled={profileSaveState.busy || usernameSaveBlocked}>
                   {profileSaveState.busy ? "Saving…" : "Save profile"}
                 </button>
@@ -721,113 +709,9 @@ export default function SettingsPage() {
             </div>
           ) : null}
 
-          {tab === "follows" ? (
-            <div className="card">
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <div>Follows</div>
-                <div className="text-muted">requests + approvals</div>
-              </div>
-              <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
-                Manage who can see followers-only content.
-              </div>
-              <div style={{ marginTop: "var(--space-10)" }}>
-                <Link href="/app/follows">Open follow settings</Link>
-              </div>
-            </div>
-          ) : null}
-
-          {tab === "borrows" ? (
-            <div className="card">
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <div>Borrows</div>
-                <div className="text-muted">defaults</div>
-              </div>
-              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
-                <div style={{ width: 170 }} className="text-muted">Borrowable by default</div>
-                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <select
-                    value={profileForm.borrowable_default ? "yes" : "no"}
-                    onChange={(e) => setProfileForm((p) => ({ ...p, borrowable_default: e.target.value === "yes" }))}
-                  >
-                    <option value="no">no</option>
-                    <option value="yes">yes</option>
-                  </select>
-                </div>
-              </div>
-              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
-                <div style={{ width: 170 }} className="text-muted">Who can request</div>
-                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <select
-                    value={profileForm.borrow_request_scope}
-                    onChange={(e) =>
-                      setProfileForm((p) => ({
-                        ...p,
-                        borrow_request_scope: (e.target.value === "anyone"
-                          ? "anyone"
-                          : e.target.value === "following"
-                            ? "following"
-                            : "followers") as any
-                      }))
-                    }
-                  >
-                    <option value="followers">followers</option>
-                    <option value="following">following</option>
-                    <option value="anyone">anyone</option>
-                  </select>
-                  <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
-                    {profileForm.borrow_request_scope === "anyone"
-                      ? "Any signed-in user."
-                      : profileForm.borrow_request_scope === "following"
-                        ? "Only people you follow."
-                        : "Only approved followers."}
-                  </div>
-                </div>
-              </div>
-              <div style={{ marginTop: "var(--space-10)" }}>
-                <Link href="/app/borrow-requests">View borrow requests</Link>
-              </div>
-            </div>
-          ) : null}
-
-          {tab === "bulk" ? (
-            <div className="card" id="bulk-update">
-              <div className="row" style={{ justifyContent: "space-between" }}>
-                <div>Bulk update</div>
-                <div className="text-muted">catalog import</div>
-              </div>
-              <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
-                Upload CSV files from your catalog workspace.
-              </div>
-              <div style={{ marginTop: "var(--space-10)" }}>
-                <input
-                  ref={csvInputRef}
-                  type="file"
-                  accept=".csv,text/csv"
-                  style={{ display: "none" }}
-                  onChange={async (e) => {
-                    const f = (e.target.files ?? [])[0];
-                    if (!f) return;
-                    try {
-                      const text = await f.text();
-                      window.sessionStorage.setItem("om_staged_csv_data", text);
-                      window.sessionStorage.setItem("om_staged_csv_filename", f.name);
-                      router.push("/app?add=1");
-                    } catch (err) {
-                      console.error("Failed to read CSV", err);
-                      window.alert("Failed to read CSV file.");
-                    }
-                  }}
-                />
-                <button type="button" onClick={() => csvInputRef.current?.click()}>Add CSV</button>
-              </div>
-            </div>
-          ) : null}
-
           {tab === "account" ? (
             <div className="card">
-              <div>Account</div>
-
-              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Email</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <input
@@ -849,25 +733,25 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="row" style={{ marginTop: "var(--space-md)", alignItems: "baseline" }}>
-                <div style={{ width: 120 }} className="text-muted">Current password</div>
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">Password</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Current password" />
                 </div>
               </div>
-              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">New password</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" />
                 </div>
               </div>
-              <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Confirm</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm" />
                 </div>
               </div>
-              <div className="row" style={{ marginTop: "var(--space-sm)", alignItems: "baseline" }}>
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <button onClick={savePassword} disabled={passwordState.busy}>
                   {passwordState.busy ? "Saving…" : "Save password"}
                 </button>
@@ -876,16 +760,14 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div style={{ marginTop: "var(--space-md)" }} className="text-muted">
-                Delete account
-              </div>
-              <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
-                This is permanent. Type <span style={{ fontWeight: 600 }}>DELETE</span> to confirm.
-              </div>
-              <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "baseline" }}>
-                <div style={{ width: 120 }} className="text-muted">Confirm</div>
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">This is permanent. Type DELETE to confirm.</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="DELETE" />
+                  <input
+                    value={deleteConfirm}
+                    onChange={(e) => setDeleteConfirm(e.target.value)}
+                    placeholder="This is permanent. Type DELETE to confirm."
+                  />
                   <div className="row" style={{ marginTop: "var(--space-sm)", alignItems: "baseline" }}>
                     <button onClick={deleteAccount} disabled={deleteState.busy}>
                       {deleteState.busy ? "Deleting…" : "Delete account"}

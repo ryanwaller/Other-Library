@@ -171,6 +171,14 @@ button.muted:focus-visible {
   max-width: none !important;
 }
 
+.om-settings-page {
+  --settings-row-gap: var(--space-10);
+}
+
+.om-settings-row {
+  margin-top: var(--settings-row-gap) !important;
+}
+
 .om-book-card-link {
   text-decoration: none;
 }
