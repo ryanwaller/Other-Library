@@ -3636,28 +3636,6 @@ export default function BookDetailPage() {
                   </div>
                 ) : null}
 
-                {editMode || Boolean((book?.group_label ?? "").trim()) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
-                    <div style={{ minWidth: 110 }} className="muted">
-                      Group
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <input
-                          className="om-inline-control"
-                          value={formGroupLabel}
-                          onChange={(e) => setFormGroupLabel(e.target.value)}
-                          onKeyDown={(e) => onEnter(e, () => void saveEdits())}
-                          placeholder="Add group"
-                        />
-                      ) : (
-                        <Link href={`/app?group=${encodeURIComponent((book?.group_label ?? "").trim())}`}>
-                          {(book?.group_label ?? "").trim()}
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
 
                 {editMode || Boolean((book?.object_type ?? "").trim()) ? (
                   <div className="row om-row-baseline" style={{ marginTop: 8 }}>
@@ -4011,74 +3989,78 @@ export default function BookDetailPage() {
                       )}
                     </div>
 
-                    {publicBookUrl ? (
-                      <div style={{ marginTop: 16 }}>
-                        <div className="om-edit-label">URL</div>
-                        <div className="row" style={{ marginTop: 6, gap: 10, flexWrap: "nowrap", alignItems: "flex-end" }}>
-                          <a
-                            href={publicBookUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{ flex: "1 1 auto", minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}
-                          >
-                            {publicBookUrl.replace(/^https?:\/\//, "")}
-                          </a>
-                          {shareState.message === "Copied" ? (
-                            <span style={{ flex: "0 0 auto", marginLeft: 2 }}>Copied</span>
-                          ) : (
-                            <button onClick={copyPublicLink} style={{ flex: "0 0 auto", marginLeft: 2 }}>
-                              Copy
-                            </button>
-                          )}
-                        </div>
-                        {shareState.error ? (
-                          <div className="muted" style={{ marginTop: 6, textAlign: "right" }}>
-                            {shareState.message} ({shareState.error})
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
                   </div>
 
                   {editMode || Boolean((formLocation ?? "").trim()) || Boolean((formShelf ?? "").trim()) ? (
-                    <div style={{ marginTop: 8 }}>
-                      {editMode || Boolean((formLocation ?? "").trim()) ? (
-                        <div className="row om-row-baseline" style={{ marginTop: 8 }}>
-                          <div style={{ minWidth: 110 }} className="muted">
-                            Location
+                    <>
+                      <div style={{ marginTop: 16 }} className="om-edit-label">Place</div>
+                      <div style={{ marginTop: 8 }}>
+                        {editMode || Boolean((formLocation ?? "").trim()) ? (
+                          <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                            <div style={{ minWidth: 110 }} className="muted">
+                              Location
+                            </div>
+                            <div style={{ flex: "1 1 auto" }}>
+                              {editMode ? (
+                                <input
+                                  className="om-inline-control"
+                                  value={formLocation}
+                                  onChange={(e) => setFormLocation(e.target.value)}
+                                  placeholder="Home, Studio…"
+                                />
+                              ) : (
+                                (formLocation ?? "").trim()
+                              )}
+                            </div>
                           </div>
-                          <div style={{ flex: "1 1 auto" }}>
-                            {editMode ? (
-                              <input
-                                className="om-inline-control"
-                                value={formLocation}
-                                onChange={(e) => setFormLocation(e.target.value)}
-                                placeholder="Home, Studio…"
-                              />
-                            ) : (
-                              (formLocation ?? "").trim()
-                            )}
-                          </div>
-                        </div>
-                      ) : null}
+                        ) : null}
 
-                      {editMode || Boolean((formShelf ?? "").trim()) ? (
-                        <div className="row om-row-baseline" style={{ marginTop: 8 }}>
-                          <div style={{ minWidth: 110 }} className="muted">
-                            Shelf
+                        {editMode || Boolean((formShelf ?? "").trim()) ? (
+                          <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                            <div style={{ minWidth: 110 }} className="muted">
+                              Shelf
+                            </div>
+                            <div style={{ flex: "1 1 auto" }}>
+                              {editMode ? (
+                                <input
+                                  className="om-inline-control"
+                                  value={formShelf}
+                                  onChange={(e) => setFormShelf(e.target.value)}
+                                  placeholder="Shelf #"
+                                />
+                              ) : (
+                                (formShelf ?? "").trim()
+                              )}
+                            </div>
                           </div>
-                          <div style={{ flex: "1 1 auto" }}>
-                            {editMode ? (
-                              <input
-                                className="om-inline-control"
-                                value={formShelf}
-                                onChange={(e) => setFormShelf(e.target.value)}
-                                placeholder="Shelf #"
-                              />
-                            ) : (
-                              (formShelf ?? "").trim()
-                            )}
-                          </div>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {publicBookUrl ? (
+                    <div style={{ marginTop: 16 }}>
+                      <div className="om-edit-label">URL</div>
+                      <div className="row" style={{ marginTop: 6, gap: 10, flexWrap: "nowrap", alignItems: "flex-end" }}>
+                        <a
+                          href={publicBookUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ flex: "1 1 auto", minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}
+                        >
+                          {publicBookUrl.replace(/^https?:\/\//, "")}
+                        </a>
+                        {shareState.message === "Copied" ? (
+                          <span style={{ flex: "0 0 auto", marginLeft: 2 }}>Copied</span>
+                        ) : (
+                          <button onClick={copyPublicLink} style={{ flex: "0 0 auto", marginLeft: 2 }}>
+                            Copy
+                          </button>
+                        )}
+                      </div>
+                      {shareState.error ? (
+                        <div className="muted" style={{ marginTop: 6, textAlign: "right" }}>
+                          {shareState.message} ({shareState.error})
                         </div>
                       ) : null}
                     </div>
