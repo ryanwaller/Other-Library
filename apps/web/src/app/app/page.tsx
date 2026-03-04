@@ -1977,7 +1977,7 @@ function AppShell({
               )}
               <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                 <input
-                  placeholder={showScan ? "enter ISBN…" : "Enter ISBN, URL, or title/author"}
+                  placeholder={showScan ? "enter ISBN…" : "Add by ISBN, URL, or title/author"}
                   value={addInput}
                   onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); }}
                   onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
