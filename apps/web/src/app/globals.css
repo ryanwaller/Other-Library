@@ -760,6 +760,16 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   border-bottom: 1px solid var(--border);
 }
 
+.om-follows-panel .om-avatar-lockup,
+.om-borrow-requests-panel .om-avatar-lockup {
+  align-items: center;
+}
+
+.om-follows-panel .om-avatar-img,
+.om-borrow-requests-panel .om-avatar-img {
+  transform: translateY(-2px);
+}
+
 .om-thread {
   display: flex;
   flex-direction: column;

@@ -178,7 +178,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
   const content = !session ? (
     <SignInCard note="Sign in to manage borrow requests." />
   ) : (
-    <>
+    <div className="om-borrow-requests-panel">
           <div
             className="row"
             style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: embedded ? "var(--space-xl)" : undefined }}
@@ -203,7 +203,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                       className="row"
                       style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}
                     >
-                      <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1, alignItems: "baseline" }}>
+                      <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
                         <Link href={`/u/${requester?.username || r.requester_id}`} className="om-avatar-link">
                           {avatarUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -259,7 +259,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                       className="row"
                       style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}
                     >
-                      <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1, alignItems: "baseline" }}>
+                      <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
                         <Link href={me?.username ? `/u/${me.username}` : "/app/settings?tab=profile"} className="om-avatar-link">
                           {avatarUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -292,7 +292,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
               })
             )}
           </div>
-        </>
+        </div>
       );
   if (embedded) return content;
   return <main className="container">{content}</main>;

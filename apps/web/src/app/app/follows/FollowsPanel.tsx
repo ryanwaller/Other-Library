@@ -264,7 +264,7 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
   const content = !session ? (
     <SignInCard note="Sign in to manage follow requests." />
   ) : (
-    <div className="card">
+    <div className="card om-follows-panel">
           <div className="text-muted">{busy ? "Loading…" : error ? error : ""}</div>
           {actionError ? (
             <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
