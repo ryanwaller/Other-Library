@@ -62,12 +62,11 @@ export default function LibraryBlock({
         <div className="row" style={{ gap: 10, flex: 1, alignItems: "baseline", flexWrap: "nowrap", minWidth: 0 }}>
           <button
             onClick={() => {
-              if (reorderMode) return;
               onToggleCollapsed(libraryId);
             }}
-            disabled={busy || reorderMode}
+            disabled={busy}
             aria-label={collapsed ? "Expand catalog" : "Collapse catalog"}
-            title={reorderMode ? undefined : collapsed ? "Expand" : "Collapse"}
+            title={collapsed ? "Expand" : "Collapse"}
             style={{
               padding: 0,
               width: 16,
@@ -78,7 +77,7 @@ export default function LibraryBlock({
               border: "none",
               background: "transparent",
               textDecoration: "none",
-              cursor: busy || reorderMode ? "default" : "pointer",
+              cursor: busy ? "default" : "pointer",
               transform: "translateY(-2px)"
             }}
           >
@@ -139,7 +138,7 @@ export default function LibraryBlock({
             </span>
           ) : (
             <div className="row" style={{ flex: 1, justifyContent: "space-between", alignItems: "baseline", minWidth: 0 }}>
-              {manageMode && !reorderMode ? (
+              {manageMode ? (
                 <button
                   onClick={() => onStartEdit(libraryId, libraryName)}
                   className="om-library-edit-trigger"
@@ -156,7 +155,25 @@ export default function LibraryBlock({
                   {libraryName}
                 </button>
               ) : (
-                <span style={{ paddingBottom: 9, borderBottom: "1px solid transparent" }}>{libraryName}</span>
+                <button
+                  onClick={() => {
+                    onToggleCollapsed(libraryId);
+                  }}
+                  disabled={busy}
+                  style={{
+                    padding: "0 0 9px",
+                    border: "none",
+                    borderBottom: "1px solid transparent",
+                    background: "transparent",
+                    textDecoration: "none",
+                    textAlign: "left",
+                    font: "inherit",
+                    color: "inherit",
+                    cursor: busy ? "default" : "pointer"
+                  }}
+                >
+                  {libraryName}
+                </button>
               )}
               <span className="muted" style={{ marginLeft: 12, whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
                 {bookCount}&nbsp;&nbsp;book{bookCount === 1 ? "" : "s"}
