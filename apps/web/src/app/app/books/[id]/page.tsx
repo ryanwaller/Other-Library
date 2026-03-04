@@ -471,11 +471,12 @@ export default function BookDetailPage() {
     error: null,
     message: null
   });
+  const lookupPageSize = 8;
   const [searchResults, setSearchResults] = useState<MetadataSearchResult[]>([]);
-  const [lookupLimit, setLookupLimit] = useState(8);
+  const [lookupLimit, setLookupLimit] = useState(lookupPageSize);
 
   useEffect(() => {
-    setLookupLimit(8);
+    setLookupLimit(lookupPageSize);
   }, [searchResults]);
 
   const [importState, setImportState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
@@ -3006,11 +3007,18 @@ export default function BookDetailPage() {
                           );
                         })}
                       </div>
-                      {searchResults.length > lookupLimit ? (
+                      {searchResults.length > lookupLimit || lookupLimit > lookupPageSize ? (
                         <div className="row" style={{ marginTop: "var(--space-md)", justifyContent: "center" }}>
-                          <button onClick={() => setLookupLimit((prev) => prev + 8)} className="text-muted">
-                            Load more
-                          </button>
+                          {searchResults.length > lookupLimit ? (
+                            <button onClick={() => setLookupLimit((prev) => prev + lookupPageSize)} className="text-muted">
+                              Load more
+                            </button>
+                          ) : null}
+                          {lookupLimit > lookupPageSize ? (
+                            <button onClick={() => setLookupLimit(lookupPageSize)} className="text-muted">
+                              See less
+                            </button>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>

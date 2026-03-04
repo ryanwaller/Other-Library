@@ -18,10 +18,14 @@ export function usePagination(viewMode: "grid" | "list", gridCols: number, searc
   }, [initialLimit, searchQuery]);
 
   const loadMore = () => setLimit((prev) => prev + initialLimit);
+  const seeLess = () => setLimit(initialLimit);
+  const canSeeLess = limit > initialLimit;
 
   return {
     limit,
     loadMore,
+    seeLess,
+    canSeeLess,
     initialLimit
   };
 }

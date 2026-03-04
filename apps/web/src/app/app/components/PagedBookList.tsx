@@ -20,7 +20,7 @@ export default function PagedBookList<T>({
   containerStyle?: React.CSSProperties;
   noItemsMessage?: string;
 }) {
-  const { limit, loadMore } = usePagination(viewMode, gridCols, searchQuery);
+  const { limit, loadMore, seeLess, canSeeLess } = usePagination(viewMode, gridCols, searchQuery);
 
   if (items.length === 0) {
     return (
@@ -35,11 +35,18 @@ export default function PagedBookList<T>({
       <div style={containerStyle}>
         {items.slice(0, limit).map(renderItem)}
       </div>
-      {items.length > limit && (
+      {(items.length > limit || canSeeLess) && (
         <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: 24, justifyContent: "center" }}>
-          <button onClick={loadMore} className="text-muted">
-            Load more
-          </button>
+          {items.length > limit ? (
+            <button onClick={loadMore} className="text-muted">
+              Load more
+            </button>
+          ) : null}
+          {canSeeLess ? (
+            <button onClick={seeLess} className="text-muted">
+              See less
+            </button>
+          ) : null}
         </div>
       )}
     </>

@@ -293,10 +293,11 @@ function AppShell({
     error: null,
     message: null
   });
-  const [addSearchLimit, setAddSearchLimit] = useState(8);
+  const addSearchPageSize = 8;
+  const [addSearchLimit, setAddSearchLimit] = useState(addSearchPageSize);
 
   useEffect(() => {
-    setAddSearchLimit(8);
+    setAddSearchLimit(addSearchPageSize);
   }, [addSearchResults]);
 
   function clearFilter(key: string) {
@@ -2089,11 +2090,18 @@ function AppShell({
                 </div>
               </div>
             ))}
-            {addSearchResults.length > addSearchLimit ? (
+            {addSearchResults.length > addSearchLimit || addSearchLimit > addSearchPageSize ? (
               <div className="row" style={{ marginTop: "var(--space-md)", justifyContent: "center" }}>
-                <button onClick={() => setAddSearchLimit((prev) => prev + 8)} className="text-muted">
-                  Load more
-                </button>
+                {addSearchResults.length > addSearchLimit ? (
+                  <button onClick={() => setAddSearchLimit((prev) => prev + addSearchPageSize)} className="text-muted">
+                    Load more
+                  </button>
+                ) : null}
+                {addSearchLimit > addSearchPageSize ? (
+                  <button onClick={() => setAddSearchLimit(addSearchPageSize)} className="text-muted">
+                    See less
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>

@@ -54,7 +54,7 @@ export default function LibraryBlock({
 }) {
   const hasNameChanges = nameDraft.trim() !== libraryName.trim();
 
-  const { limit, loadMore } = usePagination(viewMode, gridCols, searchQuery);
+  const { limit, loadMore, seeLess, canSeeLess } = usePagination(viewMode, gridCols, searchQuery);
 
   return (
     <div className="card" style={{ marginTop: index === 0 ? 0 : "var(--space-14)" }}>
@@ -207,11 +207,18 @@ export default function LibraryBlock({
       {!collapsed && (
         <>
           {renderBooks(limit)}
-          {bookCount > limit && (
+          {(bookCount > limit || canSeeLess) && (
             <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: 24, justifyContent: "center" }}>
-              <button onClick={loadMore} className="text-muted">
-                Load more
-              </button>
+              {bookCount > limit ? (
+                <button onClick={loadMore} className="text-muted">
+                  Load more
+                </button>
+              ) : null}
+              {canSeeLess ? (
+                <button onClick={seeLess} className="text-muted">
+                  See less
+                </button>
+              ) : null}
             </div>
           )}
         </>
