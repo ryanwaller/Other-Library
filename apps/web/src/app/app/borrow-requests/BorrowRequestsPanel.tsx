@@ -95,12 +95,13 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
           ...nextOutgoingRows.map((r) => r.owner_id)
         ].filter(Boolean))
       );
+      const profileIds = Array.from(new Set([...counterpartyIds, userId].filter(Boolean)));
       const bookIds = Array.from(
         new Set([...nextIncomingRows, ...nextOutgoingRows].map((r) => r.user_book_id).filter((n) => Number.isFinite(n)))
       );
 
-      if (counterpartyIds.length > 0) {
-        const pr = await supabase.from("profiles").select("id,username,avatar_path").in("id", counterpartyIds);
+      if (profileIds.length > 0) {
+        const pr = await supabase.from("profiles").select("id,username,avatar_path").in("id", profileIds);
         if (!pr.error) {
           const map: Record<string, ProfileLite> = {};
           for (const p of (pr.data as any[]) ?? []) {
@@ -214,7 +215,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                           {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
                         </div>
                       </div>
-                      <div className="text-muted" style={{ whiteSpace: "nowrap" }}>{statusLabel(r.status)}</div>
+                      <div className="text-muted" style={{ whiteSpace: "nowrap", alignSelf: "baseline" }}>{statusLabel(r.status)}</div>
                     </div>
 
                     {preview ? (
@@ -244,7 +245,8 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
             ) : (
               outgoingRows.map((r) => {
                 const owner = profilesById[r.owner_id];
-                const avatarUrl = avatarUrlByUserId[r.owner_id] ?? null;
+                const me = userId ? profilesById[userId] : null;
+                const avatarUrl = (userId ? avatarUrlByUserId[userId] : null) ?? null;
                 const book = booksById[r.user_book_id];
                 const title = (book?.title_override ?? "").trim() || book?.edition?.title || "(untitled)";
                 const preview = oneLinePreview(r.message);
@@ -252,7 +254,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                   <div key={r.id} className="om-list-row">
                     <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
                       <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
-                        <Link href={`/u/${owner?.username || r.owner_id}`} className="om-avatar-link">
+                        <Link href={me?.username ? `/u/${me.username}` : "/app/settings?tab=profile"} className="om-avatar-link">
                           {avatarUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img alt="" src={avatarUrl} className="om-avatar-img" />
@@ -265,7 +267,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                           {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
                         </div>
                       </div>
-                      <div className="text-muted" style={{ whiteSpace: "nowrap" }}>{statusLabel(r.status)}</div>
+                      <div className="text-muted" style={{ whiteSpace: "nowrap", alignSelf: "baseline" }}>{statusLabel(r.status)}</div>
                     </div>
 
                     {preview ? (

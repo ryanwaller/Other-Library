@@ -776,9 +776,8 @@ function SettingsPageContent() {
           {tab === "catalog" ? (
             <div className="card">
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
-                <div style={{ width: 120 }} className="text-muted">CSV</div>
+                <div style={{ width: 120 }} className="text-muted">Import</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <div className="text-muted">Upload CSV files from your catalog workspace.</div>
                   <input
                     ref={csvInputRef}
                     type="file"
@@ -798,9 +797,14 @@ function SettingsPageContent() {
                       }
                     }}
                   />
-                  <div style={{ marginTop: "var(--space-sm)" }}>
-                    <button type="button" onClick={() => csvInputRef.current?.click()}>Add CSV</button>
-                  </div>
+                  <button
+                    type="button"
+                    className="text-muted"
+                    style={{ padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}
+                    onClick={() => csvInputRef.current?.click()}
+                  >
+                    Upload CSV file
+                  </button>
                 </div>
               </div>
             </div>
