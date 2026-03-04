@@ -57,7 +57,7 @@ export default function LibraryBlock({
   const { limit, loadMore } = usePagination(viewMode, gridCols, searchQuery);
 
   return (
-    <div className="card" style={{ marginTop: "var(--space-14)" }}>
+    <div className="card" style={{ marginTop: index === 0 ? 0 : "var(--space-14)" }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap" }}>
         <div className="row" style={{ gap: "var(--space-10)", flex: 1, alignItems: "baseline", flexWrap: "nowrap", minWidth: 0 }}>
           <button
