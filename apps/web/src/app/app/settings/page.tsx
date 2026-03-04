@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useRef } from "react";
 import type { Session } from "@supabase/supabase-js";
 import Cropper, { type Area } from "react-easy-crop";
@@ -91,7 +92,9 @@ async function cropToBlob(imageSrc: string, crop: Area, outputSize = 512): Promi
 }
 
 export default function SettingsPage() {
+  const router = useRouter();
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const csvInputRef = useRef<HTMLInputElement | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [profileReady, setProfileReady] = useState(false);
@@ -170,7 +173,7 @@ export default function SettingsPage() {
     error: null,
     message: null
   });
-  const [tab, setTab] = useState<"profile" | "account">("profile");
+  const [tab, setTab] = useState<"profile" | "requests" | "defaults" | "catalog" | "account">("profile");
 
   useEffect(() => {
     if (!supabase) return;
@@ -539,6 +542,9 @@ export default function SettingsPage() {
           <div className="row admin-tabbar-row" style={{ justifyContent: "flex-start", width: "100%", flexWrap: "nowrap" }}>
             <div className="admin-tabbar" style={{ flexWrap: "nowrap", overflowX: "auto", whiteSpace: "nowrap" }}>
               <button type="button" onClick={() => setTab("profile")} aria-current={tab === "profile" ? "page" : undefined}>Profile</button>
+              <button type="button" onClick={() => setTab("requests")} aria-current={tab === "requests" ? "page" : undefined}>Requests &amp; Approvals</button>
+              <button type="button" onClick={() => setTab("defaults")} aria-current={tab === "defaults" ? "page" : undefined}>Defaults</button>
+              <button type="button" onClick={() => setTab("catalog")} aria-current={tab === "catalog" ? "page" : undefined}>Catalog Import</button>
               <button type="button" onClick={() => setTab("account")} aria-current={tab === "account" ? "page" : undefined}>Account</button>
             </div>
           </div>
@@ -705,6 +711,105 @@ export default function SettingsPage() {
                     View public profile
                   </a>
                 ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {tab === "requests" ? (
+            <div className="card">
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">Visibility</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <div className="text-muted">Manage who can see followers-only content.</div>
+                  <div style={{ marginTop: "var(--space-sm)" }}>
+                    <Link href="/app/follows">Open follow settings</Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {tab === "defaults" ? (
+            <div className="card">
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">Borrowable by default</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <select
+                    value={profileForm.borrowable_default ? "yes" : "no"}
+                    onChange={(e) => setProfileForm((p) => ({ ...p, borrowable_default: e.target.value === "yes" }))}
+                  >
+                    <option value="no">no</option>
+                    <option value="yes">yes</option>
+                  </select>
+                </div>
+              </div>
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">Who can request</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <select
+                    value={profileForm.borrow_request_scope}
+                    onChange={(e) =>
+                      setProfileForm((p) => ({
+                        ...p,
+                        borrow_request_scope: (e.target.value === "anyone"
+                          ? "anyone"
+                          : e.target.value === "following"
+                            ? "following"
+                            : "followers") as any
+                      }))
+                    }
+                  >
+                    <option value="followers">followers</option>
+                    <option value="following">following</option>
+                    <option value="anyone">anyone</option>
+                  </select>
+                  <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
+                    {profileForm.borrow_request_scope === "anyone"
+                      ? "Any signed-in user."
+                      : profileForm.borrow_request_scope === "following"
+                        ? "Only people you follow."
+                        : "Only approved followers."}
+                  </div>
+                </div>
+              </div>
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">Requests</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <Link href="/app/borrow-requests">View borrow requests</Link>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {tab === "catalog" ? (
+            <div className="card">
+              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
+                <div style={{ width: 120 }} className="text-muted">CSV</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <div className="text-muted">Upload CSV files from your catalog workspace.</div>
+                  <input
+                    ref={csvInputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    style={{ display: "none" }}
+                    onChange={async (e) => {
+                      const f = (e.target.files ?? [])[0];
+                      if (!f) return;
+                      try {
+                        const text = await f.text();
+                        window.sessionStorage.setItem("om_staged_csv_data", text);
+                        window.sessionStorage.setItem("om_staged_csv_filename", f.name);
+                        router.push("/app?add=1");
+                      } catch (err) {
+                        console.error("Failed to read CSV", err);
+                        window.alert("Failed to read CSV file.");
+                      }
+                    }}
+                  />
+                  <div style={{ marginTop: "var(--space-sm)" }}>
+                    <button type="button" onClick={() => csvInputRef.current?.click()}>Add CSV</button>
+                  </div>
+                </div>
               </div>
             </div>
           ) : null}
