@@ -165,7 +165,6 @@ export default function LibraryBlock({
                     border: "none",
                     borderBottom: "1px solid transparent",
                     background: "transparent",
-                    textDecoration: "none",
                     textAlign: "left",
                     font: "inherit",
                     color: "inherit",
