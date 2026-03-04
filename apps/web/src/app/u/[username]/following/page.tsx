@@ -2,6 +2,7 @@ import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../lib/supabaseServer";
 import FollowControls from "../FollowControls";
+import IdentityRow from "../../../components/IdentityRow";
 
 export const dynamic = "force-dynamic";
 
@@ -93,19 +94,14 @@ export default async function PublicFollowingPage({ params }: { params: Promise<
         ) : (
           rows.map((p) => {
             const avatarUrl = p.avatar_path ? signedMap[p.avatar_path] ?? null : null;
-            const label = (p.display_name ?? "").trim() ? `${p.username} (${p.display_name})` : p.username;
             return (
               <div key={p.id} className="card" style={{ marginTop: 10 }}>
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <div className="om-avatar-lockup">
-                    {avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img alt="" src={avatarUrl} className="om-avatar-img" />
-                    ) : null}
-                    <Link href={`/u/${p.username}`}>{label}</Link>
-                  </div>
-                  <FollowControls profileId={p.id} profileUsername={p.username} compact />
-                </div>
+                <IdentityRow
+                  avatarUrl={avatarUrl}
+                  displayName={p.display_name}
+                  username={p.username}
+                  rightSlot={<FollowControls profileId={p.id} profileUsername={p.username} compact />}
+                />
               </div>
             );
           })

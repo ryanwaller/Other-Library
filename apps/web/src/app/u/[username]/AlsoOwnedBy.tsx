@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
+import IdentityRow from "../../components/IdentityRow";
 
 type AlsoOwnedRow = {
   id: number;
@@ -115,22 +116,19 @@ export default function AlsoOwnedBy({
           None found.
         </div>
       ) : (
-        <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
           {owners.map((r) => {
             const username = r.owner?.username ?? "";
             const avatarPath = r.owner?.avatar_path ?? null;
             const avatarUrl = avatarPath ? avatarUrlsByPath[avatarPath] ?? null : null;
             return (
-              <Link key={r.owner_id} href={`/u/${username}`} className="card om-avatar-lockup" style={{ textDecoration: "none" }}>
-                {avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img alt="" src={avatarUrl} className="om-avatar-img" />
-                ) : (
-                  <span className="om-avatar-img" style={{ display: "inline-block" }} />
-                )}
-                <span>{username}</span>
-                <span className="muted">{r.copies > 1 ? `(${r.copies})` : ""}</span>
-              </Link>
+              <IdentityRow
+                key={r.owner_id}
+                avatarUrl={avatarUrl}
+                displayName={null}
+                username={username}
+                rightSlot={<span className="muted">{r.copies > 1 ? `(${r.copies})` : ""}</span>}
+              />
             );
           })}
         </div>

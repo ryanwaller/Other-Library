@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
+import IdentityRow from "../../components/IdentityRow";
 
 type BorrowRequest = {
   id: number;
@@ -167,31 +168,18 @@ export default function BorrowRequestsPage() {
                 const preview = oneLinePreview(r.message);
                 return (
                   <div key={r.id} className="om-list-row">
-                    <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
-                      <div className="om-avatar-lockup">
-                        {avatarUrl ? (
-                          <Link href={requester?.username ? `/u/${requester.username}` : "/app"} aria-label="Open requester profile" className="om-avatar-link">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              alt=""
-                              src={avatarUrl}
-                              className="om-avatar-img"
-                            />
-                          </Link>
-                        ) : (
-                          <div className="om-avatar-img" />
-                        )}
-                        <div>
-                          {requester?.username ? <Link href={`/u/${requester.username}`}>{requester.username}</Link> : <span className="muted">{r.requester_id}</span>}
+                    <IdentityRow
+                      avatarUrl={avatarUrl}
+                      displayName={null}
+                      username={requester?.username || r.requester_id}
+                      rightSlot={
+                        <div className="muted" style={{ whiteSpace: "nowrap" }}>
+                          {r.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
+                          {r.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
+                          {r.status === "pending" ? <span>…</span> : null}
                         </div>
-                      </div>
-
-                      <div className="muted" style={{ whiteSpace: "nowrap" }}>
-                        {r.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
-                        {r.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
-                        {r.status === "pending" ? <span>…</span> : null}
-                      </div>
-                    </div>
+                      }
+                    />
 
                     <div style={{ marginTop: 8 }}>
                       {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}

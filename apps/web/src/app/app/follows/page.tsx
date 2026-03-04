@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
+import IdentityRow from "../../components/IdentityRow";
 
 type FollowRow = {
   follower_id: string;
@@ -285,23 +286,24 @@ export default function FollowsPage() {
                   const username = profileUsername(pid);
                   const name = profileLabel(pid);
                   const avatarUrl = avatarUrlFor(pid);
+                  if (!username) return null;
                   return (
-                    <div key={`${r.follower_id}:${r.followee_id}`} className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
-                      <div className="om-avatar-lockup">
-                        {avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} className="om-avatar-img" />
-                        ) : null}
-                        {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
-                      </div>
-                      <div className="row">
-                        <button onClick={() => approve(pid)} disabled={actionBusyKey !== null}>
-                          {actionBusyKey === `approve:${pid}` ? "Approving…" : "Approve"}
-                        </button>
-                        <button onClick={() => reject(pid)} disabled={actionBusyKey !== null} style={{ marginLeft: 8 }}>
-                          {actionBusyKey === `reject:${pid}` ? "Rejecting…" : "Reject"}
-                        </button>
-                      </div>
+                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: 8 }}>
+                      <IdentityRow
+                        avatarUrl={avatarUrl}
+                        displayName={profilesById[pid]?.display_name ?? null}
+                        username={username}
+                        rightSlot={
+                          <div className="row">
+                            <button onClick={() => approve(pid)} disabled={actionBusyKey !== null}>
+                              {actionBusyKey === `approve:${pid}` ? "Approving…" : "Approve"}
+                            </button>
+                            <button onClick={() => reject(pid)} disabled={actionBusyKey !== null} style={{ marginLeft: 8 }}>
+                              {actionBusyKey === `reject:${pid}` ? "Rejecting…" : "Reject"}
+                            </button>
+                          </div>
+                        }
+                      />
                     </div>
                   );
                 })}
@@ -326,37 +328,38 @@ export default function FollowsPage() {
                   const name = profileLabel(pid);
                   const avatarUrl = avatarUrlFor(pid);
                   const outgoingStatus = myOutgoingStatusFor(pid);
+                  if (!username) return null;
                   return (
-                    <div key={`${r.follower_id}:${r.followee_id}`} className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
-                      <div className="om-avatar-lockup">
-                        {avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} className="om-avatar-img" />
-                        ) : null}
-                        {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
-                      </div>
-                      <div className="row">
-                        {outgoingStatus === null ? (
-                          <button onClick={() => requestFollow(pid)} disabled={actionBusyKey !== null} style={{ marginRight: 8 }}>
-                            {actionBusyKey === `follow:${pid}` ? "Requesting…" : "Follow back"}
-                          </button>
-                        ) : outgoingStatus === "approved" ? (
-                          <span className="muted" style={{ marginRight: 8 }}>
-                            Following
-                          </span>
-                        ) : outgoingStatus === "pending" ? (
-                          <span className="muted" style={{ marginRight: 8 }}>
-                            Requested
-                          </span>
-                        ) : (
-                          <button onClick={() => requestAgain(pid)} disabled={actionBusyKey !== null} style={{ marginRight: 8 }}>
-                            {actionBusyKey === `again:${pid}` ? "Requesting…" : "Request again"}
-                          </button>
-                        )}
-                        <button onClick={() => reject(pid)} disabled={actionBusyKey !== null}>
-                          {actionBusyKey === `reject:${pid}` ? "Removing…" : "Remove"}
-                        </button>
-                      </div>
+                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: 8 }}>
+                      <IdentityRow
+                        avatarUrl={avatarUrl}
+                        displayName={profilesById[pid]?.display_name ?? null}
+                        username={username}
+                        rightSlot={
+                          <div className="row">
+                            {outgoingStatus === null ? (
+                              <button onClick={() => requestFollow(pid)} disabled={actionBusyKey !== null} style={{ marginRight: 8 }}>
+                                {actionBusyKey === `follow:${pid}` ? "Requesting…" : "Follow back"}
+                              </button>
+                            ) : outgoingStatus === "approved" ? (
+                              <span className="muted" style={{ marginRight: 8 }}>
+                                Following
+                              </span>
+                            ) : outgoingStatus === "pending" ? (
+                              <span className="muted" style={{ marginRight: 8 }}>
+                                Requested
+                              </span>
+                            ) : (
+                              <button onClick={() => requestAgain(pid)} disabled={actionBusyKey !== null} style={{ marginRight: 8 }}>
+                                {actionBusyKey === `again:${pid}` ? "Requesting…" : "Request again"}
+                              </button>
+                            )}
+                            <button onClick={() => reject(pid)} disabled={actionBusyKey !== null}>
+                              {actionBusyKey === `reject:${pid}` ? "Removing…" : "Remove"}
+                            </button>
+                          </div>
+                        }
+                      />
                     </div>
                   );
                 })}
@@ -380,20 +383,21 @@ export default function FollowsPage() {
                   const username = profileUsername(pid);
                   const name = profileLabel(pid);
                   const avatarUrl = avatarUrlFor(pid);
+                  if (!username) return null;
                   return (
-                    <div key={`${r.follower_id}:${r.followee_id}`} className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
-                      <div className="om-avatar-lockup">
-                        {avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} className="om-avatar-img" />
-                        ) : null}
-                        {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
-                      </div>
-                      <div className="row">
-                        <button onClick={() => removeFollowee(pid)} disabled={actionBusyKey !== null}>
-                          {actionBusyKey === `unfollow:${pid}` ? "Unfollowing…" : "Unfollow"}
-                        </button>
-                      </div>
+                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: 8 }}>
+                      <IdentityRow
+                        avatarUrl={avatarUrl}
+                        displayName={profilesById[pid]?.display_name ?? null}
+                        username={username}
+                        rightSlot={
+                          <div className="row">
+                            <button onClick={() => removeFollowee(pid)} disabled={actionBusyKey !== null}>
+                              {actionBusyKey === `unfollow:${pid}` ? "Unfollowing…" : "Unfollow"}
+                            </button>
+                          </div>
+                        }
+                      />
                     </div>
                   );
                 })}
@@ -417,20 +421,21 @@ export default function FollowsPage() {
                   const username = profileUsername(pid);
                   const name = profileLabel(pid);
                   const avatarUrl = avatarUrlFor(pid);
+                  if (!username) return null;
                   return (
-                    <div key={`${r.follower_id}:${r.followee_id}`} className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
-                      <div className="om-avatar-lockup">
-                        {avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} className="om-avatar-img" />
-                        ) : null}
-                        {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
-                      </div>
-                      <div className="row">
-                        <button onClick={() => removeFollowee(pid)} disabled={actionBusyKey !== null}>
-                          {actionBusyKey === `unfollow:${pid}` ? "Canceling…" : "Cancel request"}
-                        </button>
-                      </div>
+                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: 8 }}>
+                      <IdentityRow
+                        avatarUrl={avatarUrl}
+                        displayName={profilesById[pid]?.display_name ?? null}
+                        username={username}
+                        rightSlot={
+                          <div className="row">
+                            <button onClick={() => removeFollowee(pid)} disabled={actionBusyKey !== null}>
+                              {actionBusyKey === `unfollow:${pid}` ? "Canceling…" : "Cancel request"}
+                            </button>
+                          </div>
+                        }
+                      />
                     </div>
                   );
                 })}
@@ -454,20 +459,21 @@ export default function FollowsPage() {
                   const username = profileUsername(pid);
                   const name = profileLabel(pid);
                   const avatarUrl = avatarUrlFor(pid);
+                  if (!username) return null;
                   return (
-                    <div key={`${r.follower_id}:${r.followee_id}`} className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
-                      <div className="om-avatar-lockup">
-                        {avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={avatarUrl} className="om-avatar-img" />
-                        ) : null}
-                        {username ? <Link href={`/u/${username}`}>{name}</Link> : <span className="muted">{name}</span>}
-                      </div>
-                      <div className="row">
-                        <button onClick={() => requestAgain(pid)} disabled={actionBusyKey !== null}>
-                          {actionBusyKey === `again:${pid}` ? "Requesting…" : "Request again"}
-                        </button>
-                      </div>
+                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: 8 }}>
+                      <IdentityRow
+                        avatarUrl={avatarUrl}
+                        displayName={profilesById[pid]?.display_name ?? null}
+                        username={username}
+                        rightSlot={
+                          <div className="row">
+                            <button onClick={() => requestAgain(pid)} disabled={actionBusyKey !== null}>
+                              {actionBusyKey === `again:${pid}` ? "Requesting…" : "Request again"}
+                            </button>
+                          </div>
+                        }
+                      />
                     </div>
                   );
                 })}

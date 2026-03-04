@@ -6,6 +6,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
 import SignInCard from "../../../components/SignInCard";
 import Link from "next/link";
+import IdentityRow from "../../../components/IdentityRow";
 
 function notifyBorrowRequestsChanged() {
   window.dispatchEvent(new Event("om:borrow-requests-changed"));
@@ -295,31 +296,19 @@ export default function MessageThreadPage() {
 
       {req && (
         <div className="card">
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-            <div className="om-avatar-lockup">
-              {otherAvatarUrl ? (
-                <a href={otherAvatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar" className="om-avatar-link">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt=""
-                    src={otherAvatarUrl}
-                    className="om-avatar-img"
-                  />
-                </a>
-              ) : (
-                <div className="om-avatar-img" />
-              )}
-              <div>
-                <span className="muted">{isOwner ? "request from " : "request to "}</span>
-                {other?.username ? <Link href={`/u/${other.username}`}>{other.username}</Link> : <span className="muted">{otherUserId ?? ""}</span>}
+          <IdentityRow
+            avatarUrl={otherAvatarUrl}
+            displayName={null}
+            username={other?.username || otherUserId || ""}
+            label={isOwner ? "request from" : "request to"}
+            rightSlot={
+              <div className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                {req.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
+                {req.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
+                {req.status === "pending" ? <span>…</span> : null}
               </div>
-            </div>
-            <div className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              {req.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
-              {req.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
-              {req.status === "pending" ? <span>…</span> : null}
-            </div>
-          </div>
+            }
+          />
 
           <div style={{ marginTop: 8 }}>
             <span className="muted">{book?.object_type || "book"}: </span>
