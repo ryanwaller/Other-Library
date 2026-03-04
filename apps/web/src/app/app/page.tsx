@@ -612,28 +612,30 @@ function AppShell({
       );
       if (Array.isArray(serverHome.books)) {
         const serverRows = serverHome.books as any[];
-        setItems(serverRows as any);
-        const serverPaths = Array.from(
-          new Set([
-            ...serverRows
-              .flatMap((r) => (Array.isArray(r.media) ? r.media : []))
-              .map((m: any) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
-              .filter(Boolean),
-            ...serverRows
-              .filter((r: any) => r.cover_crop && typeof r.cover_original_url === "string" && r.cover_original_url)
-              .map((r: any) => r.cover_original_url as string)
-          ])
-        );
-        const serverMissing = serverPaths.filter((p) => !mediaUrlsByPath[p]);
-        if (serverMissing.length > 0) {
-          const signedServer = await supabase.storage.from("user-book-media").createSignedUrls(serverMissing, 60 * 60);
-          if (!signedServer.error && signedServer.data) {
-            const nextMap: Record<string, string> = {};
-            for (const s of signedServer.data) if (s.path && s.signedUrl) nextMap[s.path] = s.signedUrl;
-            setMediaUrlsByPath((prev) => ({ ...prev, ...nextMap }));
+        if (serverRows.length > 0) {
+          setItems(serverRows as any);
+          const serverPaths = Array.from(
+            new Set([
+              ...serverRows
+                .flatMap((r) => (Array.isArray(r.media) ? r.media : []))
+                .map((m: any) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
+                .filter(Boolean),
+              ...serverRows
+                .filter((r: any) => r.cover_crop && typeof r.cover_original_url === "string" && r.cover_original_url)
+                .map((r: any) => r.cover_original_url as string)
+            ])
+          );
+          const serverMissing = serverPaths.filter((p) => !mediaUrlsByPath[p]);
+          if (serverMissing.length > 0) {
+            const signedServer = await supabase.storage.from("user-book-media").createSignedUrls(serverMissing, 60 * 60);
+            if (!signedServer.error && signedServer.data) {
+              const nextMap: Record<string, string> = {};
+              for (const s of signedServer.data) if (s.path && s.signedUrl) nextMap[s.path] = s.signedUrl;
+              setMediaUrlsByPath((prev) => ({ ...prev, ...nextMap }));
+            }
           }
+          return;
         }
-        return;
       }
     } catch {
       // fall through to client-side queries

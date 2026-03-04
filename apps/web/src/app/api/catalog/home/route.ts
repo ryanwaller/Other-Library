@@ -8,6 +8,12 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const idsRaw = String(url.searchParams.get("catalog_ids") ?? "").trim();
 
+    const ownedRes = await admin.from("libraries").select("id").eq("owner_id", current.id);
+    if (ownedRes.error) throw new Error(ownedRes.error.message);
+    const ownedIds = Array.from(
+      new Set(((ownedRes.data ?? []) as any[]).map((l) => Number(l.id)).filter((id) => Number.isFinite(id) && id > 0))
+    );
+
     const membershipsRes = await admin
       .from("catalog_members")
       .select("catalog_id,role,accepted_at")
@@ -23,7 +29,7 @@ export async function GET(req: Request) {
       new Set(membershipRows.map((r) => r.catalog_id).filter((id) => Number.isFinite(id) && id > 0))
     );
 
-    let catalogIds = membershipIds;
+    let catalogIds = Array.from(new Set([...ownedIds, ...membershipIds]));
     if (idsRaw) {
       const requested = Array.from(
         new Set(
