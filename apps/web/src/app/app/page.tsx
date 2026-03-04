@@ -1469,6 +1469,24 @@ function AppShell({
     setCategoryMenu((p) => ({ ...p, open: false }));
   }
 
+  useEffect(() => {
+    if (!tagMenu.open && !categoryMenu.open) return;
+    const onPointerDown = (ev: PointerEvent) => {
+      const target = ev.target as Node | null;
+      if (!target) return;
+
+      const inTag = !!tagMenuRef.current?.contains(target) || !!tagButtonRef.current?.contains(target);
+      const inCategory = !!categoryMenuRef.current?.contains(target) || !!categoryButtonRef.current?.contains(target);
+      if (inTag || inCategory) return;
+
+      closeTagMenu();
+      closeCategoryMenu();
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [tagMenu.open, categoryMenu.open]);
+
   async function bulkDeleteSelected() {
     if (!supabase) return;
     if (bulkSelectedGroups.length === 0) return;
@@ -2111,7 +2129,7 @@ function AppShell({
         <div className="om-filter-row" style={{ marginTop: 16, marginBottom: "var(--space-14)", flexWrap: isMobile ? "wrap" : "nowrap", gap: "var(--space-10)", alignItems: "center" }}>
           <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
             <option value="grid">grid</option>
-            {isMobile && <option value="list">list</option>}
+            <option value="list">list</option>
           </select>
           {viewMode === "grid" && (
             <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
