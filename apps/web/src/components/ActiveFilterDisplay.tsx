@@ -25,8 +25,8 @@ export default function ActiveFilterDisplay({ pairs, onClearAll, clearAllHref }:
   if (!pairs || pairs.length === 0) return null;
 
   return (
-    <div className="row muted" style={{ gap: 24, justifyContent: "flex-end", alignItems: "baseline" }}>
-      <span style={{ display: "inline-flex", gap: 32, flexWrap: "wrap", alignItems: "baseline" }}>
+    <div className="row text-muted" style={{ gap: "var(--space-lg)", justifyContent: "flex-end", alignItems: "baseline" }}>
+      <span style={{ display: "inline-flex", gap: "var(--space-32)", flexWrap: "wrap", alignItems: "baseline" }}>
         {pairs.map((p, idx) => (
           <span key={`${p.label}:${p.value}:${idx}`} className="row" style={{ gap: "var(--space-md)", alignItems: "baseline" }}>
             <span className="text-muted" style={{ marginRight: 2 }}>{p.label}</span>
@@ -50,7 +50,7 @@ export default function ActiveFilterDisplay({ pairs, onClearAll, clearAllHref }:
       </span>
       
       {(onClearAll || clearAllHref) && pairs.length > 1 && (
-        <span style={{ marginLeft: 16 }}>
+        <span style={{ marginLeft: "var(--space-16)" }}>
           {onClearAll ? (
             <button
               type="button"

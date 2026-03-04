@@ -46,7 +46,9 @@
   --space-10: 10px;
   --space-md: 12px;
   --space-14: 14px;
+  --space-16: 16px;
   --space-lg: 24px;
+  --space-32: 32px;
   --space-xl: 48px;
 }
 
@@ -70,7 +72,9 @@
     --space-10: 10px;
     --space-md: 12px;
     --space-14: 14px;
+    --space-16: 16px;
     --space-lg: 24px;
+    --space-32: 32px;
     --space-xl: 48px;
   }
 }

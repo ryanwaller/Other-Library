@@ -267,7 +267,7 @@ export default function PublicBookList({
           <span className="text-muted">Books</span>
           <span>{filteredGroups.length}</span>
         </div>
-        <div className="row muted" style={{ gap: "var(--space-10)", justifyContent: "flex-end", margin: 0 }}>
+        <div className="row text-muted" style={{ gap: "var(--space-10)", justifyContent: "flex-end", margin: 0 }}>
           <ActiveFilterDisplay
             pairs={(() => {
               const pairs: FilterPair[] = [];

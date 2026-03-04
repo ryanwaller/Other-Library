@@ -1848,7 +1848,7 @@ function AppShell({
               </>
             )}
           </div>
-          <div className="row muted" style={{ gap: "var(--space-10)", justifyContent: "flex-end" }}>
+          <div className="row text-muted" style={{ gap: "var(--space-10)", justifyContent: "flex-end" }}>
             <ActiveFilterDisplay
               pairs={(() => {
                 const pairs: FilterPair[] = [];

@@ -62,7 +62,7 @@ export default function PublicProfileHeader({
         </div>
       </div>
 
-      <div className="row muted" style={{ marginTop: "var(--space-md)", gap: 16 }}>
+      <div className="row text-muted" style={{ marginTop: "var(--space-md)", gap: 16 }}>
         <span style={{ display: "inline-flex", gap: "var(--space-10)" }}>
           <Link href={`/u/${username}/followers`} className="text-muted">
             Followers
