@@ -677,7 +677,7 @@ function SettingsPageContent() {
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Username</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)" }}>
+                  <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
                     <input
                       value={profileForm.username}
                       onChange={(e) => {
@@ -945,7 +945,7 @@ function SettingsPageContent() {
                       placeholder="Confirm"
                       style={{ flex: "1 1 auto", minWidth: 0 }}
                     />
-                    {passwordFocused ? (
+                    {(passwordFocused || currentPassword.trim() || newPassword.trim() || confirmPassword.trim()) ? (
                       <button
                         className="text-muted"
                         style={{ whiteSpace: "nowrap", textDecoration: "underline" }}

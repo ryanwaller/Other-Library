@@ -199,8 +199,11 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                 const preview = oneLinePreview(r.message);
                 return (
                   <div key={r.id} className="om-list-row" style={idx === incomingRows.length - 1 ? { borderBottom: "none" } : undefined}>
-                    <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-md)" }}>
-                      <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
+                    <div
+                      className="row"
+                      style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}
+                    >
+                      <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1, alignItems: "baseline" }}>
                         <Link href={`/u/${requester?.username || r.requester_id}`} className="om-avatar-link">
                           {avatarUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -215,7 +218,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                           {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
                         </div>
                       </div>
-                      <div className="text-muted" style={{ whiteSpace: "nowrap", alignSelf: "flex-start" }}>{statusLabel(r.status)}</div>
+                      <div className="text-muted" style={{ whiteSpace: "nowrap", alignSelf: "baseline", lineHeight: "inherit" }}>{statusLabel(r.status)}</div>
                     </div>
 
                     {preview ? (
@@ -252,8 +255,11 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                 const preview = oneLinePreview(r.message);
                 return (
                   <div key={r.id} className="om-list-row" style={idx === outgoingRows.length - 1 ? { borderBottom: "none" } : undefined}>
-                    <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-md)" }}>
-                      <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
+                    <div
+                      className="row"
+                      style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}
+                    >
+                      <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1, alignItems: "baseline" }}>
                         <Link href={me?.username ? `/u/${me.username}` : "/app/settings?tab=profile"} className="om-avatar-link">
                           {avatarUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -267,7 +273,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                           {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
                         </div>
                       </div>
-                      <div className="text-muted" style={{ whiteSpace: "nowrap", alignSelf: "flex-start" }}>{statusLabel(r.status)}</div>
+                      <div className="text-muted" style={{ whiteSpace: "nowrap", alignSelf: "baseline", lineHeight: "inherit" }}>{statusLabel(r.status)}</div>
                     </div>
 
                     {preview ? (
