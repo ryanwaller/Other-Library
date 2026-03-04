@@ -605,16 +605,36 @@ function AppShell({
       setItems([]);
       return;
     }
-    const { data, error } = await supabase
-      .from("user_books")
-      .select(
-        "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
-      )
-      .in("library_id", ids)
-      .order("created_at", { ascending: false })
-      .limit(800);
-    if (error) return;
-    const rows = (data ?? []) as any[];
+    let rows: any[] = [];
+    let primaryError: any = null;
+    const fullSelect =
+      "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+    const basicSelect =
+      "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+
+    const first = await supabase.from("user_books").select(fullSelect).in("library_id", ids).order("created_at", { ascending: false }).limit(800);
+    if (!first.error) {
+      rows = (first.data ?? []) as any[];
+    } else {
+      primaryError = first.error;
+      const fallbackOwnerOnly = await supabase
+        .from("user_books")
+        .select(basicSelect)
+        .eq("owner_id", userId)
+        .in("library_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(800);
+      if (!fallbackOwnerOnly.error) {
+        rows = (fallbackOwnerOnly.data ?? []) as any[];
+      } else {
+        const fallbackShared = await supabase.from("user_books").select(basicSelect).in("library_id", ids).order("created_at", { ascending: false }).limit(800);
+        if (!fallbackShared.error) rows = (fallbackShared.data ?? []) as any[];
+      }
+    }
+
+    if (rows.length === 0 && primaryError) {
+      console.warn("refreshAllBooks fallback used due primary query error", primaryError.message ?? primaryError);
+    }
     setItems(rows as any);
 
     const paths = Array.from(
@@ -822,6 +842,22 @@ function AppShell({
       setLibraryState({ busy: false, error: null, message: null });
       return list;
     } catch (e: any) {
+      try {
+        const ownerFallback = await supabase
+          .from("libraries")
+          .select("id,name,created_at,owner_id")
+          .eq("owner_id", userId)
+          .order("created_at", { ascending: true });
+        if (!ownerFallback.error) {
+          const ownerList = ((ownerFallback.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const })) as LibrarySummary[];
+          setLibraries(ownerList);
+          setAddLibraryId(ownerList[0]?.id ?? null);
+          setLibraryState({ busy: false, error: null, message: null });
+          return ownerList;
+        }
+      } catch {
+        // ignore
+      }
       setLibraries([]);
       setAddLibraryId(null);
       setLibraryState({ busy: false, error: e?.message ?? "Failed to load catalogs", message: null });
