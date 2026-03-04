@@ -234,6 +234,7 @@ function AppShell({
   openAddPanel: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const tagButtonRef = useRef<HTMLButtonElement | null>(null);
   const categoryButtonRef = useRef<HTMLButtonElement | null>(null);
   const tagMenuRef = useRef<HTMLDivElement | null>(null);
@@ -291,6 +292,13 @@ function AppShell({
     error: null,
     message: null
   });
+
+  function clearFilter(key: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(key);
+    const qs = params.toString();
+    router.push(`/app${qs ? `?${qs}` : ""}`);
+  }
   type CsvImportRow = {
     title: string;
     isbn: string | null;
@@ -1840,29 +1848,65 @@ function AppShell({
             )}
           </div>
           <div className="row muted" style={{ gap: 10, justifyContent: "flex-end" }}>
-            {(filterTag ?? tagMode) !== "all" || filterAuthor || filterSubject || filterPublisher || (filterCategory ?? categoryMode) !== "all" ? (
+            {(filterTag ?? tagMode) !== "all" || filterAuthor || filterSubject || filterPublisher || filterDesigner || filterEditor || filterMaterial || filterGroup || filterDecade || (filterCategory ?? categoryMode) !== "all" ? (
               <>
                 {(() => {
-                  const pairs: any[] = [];
+                  const pairs: Array<{ label: string; value: string; key: string }> = [];
                   const activeCategory = (filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : null;
                   const activeTag = (filterTag ?? tagMode) !== "all" ? String(filterTag ?? tagMode) : null;
-                  if (activeCategory) pairs.push({ label: "Category", value: activeCategory });
-                  if (activeTag) pairs.push({ label: "Tag", value: activeTag });
-                  if (filterAuthor) pairs.push({ label: "Author", value: filterAuthor });
-                  if (filterSubject) pairs.push({ label: "Subject", value: filterSubject });
-                  if (filterPublisher) pairs.push({ label: "Publisher", value: filterPublisher });
+                  
+                  if (activeCategory) pairs.push({ label: "Category", value: activeCategory, key: "category" });
+                  if (activeTag) pairs.push({ label: "Tag", value: activeTag, key: "tag" });
+                  if (filterAuthor) pairs.push({ label: "Author", value: filterAuthor, key: "author" });
+                  if (filterEditor) pairs.push({ label: "Editor", value: filterEditor, key: "editor" });
+                  if (filterDesigner) pairs.push({ label: "Designer", value: filterDesigner, key: "designer" });
+                  if (filterSubject) pairs.push({ label: "Subject", value: filterSubject, key: "subject" });
+                  if (filterPublisher) pairs.push({ label: "Publisher", value: filterPublisher, key: "publisher" });
+                  if (filterMaterial) pairs.push({ label: "Material", value: filterMaterial, key: "material" });
+                  if (filterGroup) pairs.push({ label: "Group", value: filterGroup, key: "group" });
+                  if (filterDecade) pairs.push({ label: "Decade", value: filterDecade, key: "decade" });
+
                   return pairs.length ? (
-                    <span style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
+                    <span style={{ display: "inline-flex", gap: 16, flexWrap: "wrap", alignItems: "baseline" }}>
                       {pairs.map((p) => (
-                        <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 12, alignItems: "baseline" }}>
+                        <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 6, alignItems: "baseline" }}>
                           <span className="muted">{p.label}</span>
                           <span style={{ color: "var(--fg)" }}>{p.value}</span>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              if (p.key === "tag") setTagMode("all");
+                              if (p.key === "category") setCategoryMode("all");
+                              clearFilter(p.key);
+                            }}
+                            className="muted"
+                            style={{ fontSize: "0.85em", marginLeft: 2 }}
+                          >
+                            (clear)
+                          </button>
                         </span>
                       ))}
                     </span>
                   ) : null;
                 })()}
-                <button type="button" className="om-clear-filter-btn" onClick={() => { setTagMode("all"); setCategoryMode("all"); setSearchQuery(""); router.push("/app"); }}>clear</button>
+                {(() => {
+                  const activeCount = [
+                    (filterTag ?? tagMode) !== "all",
+                    filterAuthor,
+                    filterSubject,
+                    filterPublisher,
+                    filterDesigner,
+                    filterEditor,
+                    filterMaterial,
+                    filterGroup,
+                    filterDecade,
+                    (filterCategory ?? categoryMode) !== "all"
+                  ].filter(Boolean).length;
+                  
+                  return activeCount > 1 ? (
+                    <button type="button" className="om-clear-filter-btn" onClick={() => { setTagMode("all"); setCategoryMode("all"); setSearchQuery(""); router.push("/app"); }}>clear all</button>
+                  ) : null;
+                })()}
               </>
             ) : null}
           </div>
