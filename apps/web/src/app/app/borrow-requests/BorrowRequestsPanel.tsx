@@ -199,7 +199,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                 const preview = oneLinePreview(r.message);
                 return (
                   <div key={r.id} className="om-list-row">
-                    <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-md)" }}>
                       <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
                         <Link href={`/u/${requester?.username || r.requester_id}`} className="om-avatar-link">
                           {avatarUrl ? (
@@ -215,7 +215,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                           {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
                         </div>
                       </div>
-                      <div className="text-muted" style={{ whiteSpace: "nowrap", alignSelf: "baseline" }}>{statusLabel(r.status)}</div>
+                      <div className="text-muted" style={{ whiteSpace: "nowrap", alignSelf: "flex-start" }}>{statusLabel(r.status)}</div>
                     </div>
 
                     {preview ? (
@@ -252,7 +252,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                 const preview = oneLinePreview(r.message);
                 return (
                   <div key={r.id} className="om-list-row">
-                    <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-md)" }}>
                       <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
                         <Link href={me?.username ? `/u/${me.username}` : "/app/settings?tab=profile"} className="om-avatar-link">
                           {avatarUrl ? (
@@ -267,7 +267,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                           {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
                         </div>
                       </div>
-                      <div className="text-muted" style={{ whiteSpace: "nowrap", alignSelf: "baseline" }}>{statusLabel(r.status)}</div>
+                      <div className="text-muted" style={{ whiteSpace: "nowrap", alignSelf: "flex-start" }}>{statusLabel(r.status)}</div>
                     </div>
 
                     {preview ? (
