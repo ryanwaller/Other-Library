@@ -293,6 +293,11 @@ function AppShell({
     error: null,
     message: null
   });
+  const [addSearchLimit, setAddSearchLimit] = useState(8);
+
+  useEffect(() => {
+    setAddSearchLimit(8);
+  }, [addSearchResults]);
 
   function clearFilter(key: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -2055,7 +2060,7 @@ function AppShell({
 
         {addSearchResults.length > 0 && (
           <div>
-            {addSearchResults.map((result, i) => (
+            {addSearchResults.slice(0, addSearchLimit).map((result, i) => (
               <div key={i} className="om-lookup-item">
                 <div className="om-lookup-row">
                   <div style={{ width: 62, flex: "0 0 auto" }}>
@@ -2084,6 +2089,13 @@ function AppShell({
                 </div>
               </div>
             ))}
+            {addSearchResults.length > addSearchLimit ? (
+              <div className="row" style={{ marginTop: "var(--space-md)", justifyContent: "center" }}>
+                <button onClick={() => setAddSearchLimit((prev) => prev + 8)} className="text-muted">
+                  Load more
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
 
