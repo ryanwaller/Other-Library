@@ -457,7 +457,7 @@ export default function AdminPage() {
                 Invites
               </button>
             </div>
-            <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0, flex: "1 1 auto", marginLeft: "var(--space-lg)" }}>
+            <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0, flex: "1 1 auto", marginLeft: "var(--space-xl)", flexWrap: "nowrap", alignItems: "baseline" }}>
               <input
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
@@ -469,6 +469,7 @@ export default function AdminPage() {
               {(inviteEmailFocused || inviteEmail.trim()) ? (
                 <button
                   className="om-inline-link-muted"
+                  style={{ whiteSpace: "nowrap", flexShrink: 0 }}
                   onClick={async () => {
                     setBusy(true);
                     setError(null);
@@ -517,7 +518,7 @@ export default function AdminPage() {
             </div>
           ) : null}
 
-          <div className="row admin-filter-row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)" }}>
+          <div className="row admin-filter-row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)", marginTop: "var(--space-lg)" }}>
             <div className="row admin-filter-left" style={{ gap: "var(--space-8)", alignItems: "center", flex: "1 1 auto", minWidth: 0 }}>
               {tab === "users" ? (
                 <>
@@ -603,7 +604,7 @@ export default function AdminPage() {
           </div>
 
           {searchOpen ? (
-            <div className="row admin-search-row" style={{ marginTop: "var(--space-10)", gap: "var(--space-8)", alignItems: "center", justifyContent: "flex-end" }}>
+            <div className="row admin-search-row" style={{ marginTop: "var(--space-10)", marginBottom: "var(--space-lg)", gap: "var(--space-8)", alignItems: "center", justifyContent: "flex-end" }}>
               {tab === "users" ? (
                 <>
                   <input
@@ -682,7 +683,7 @@ export default function AdminPage() {
             </div>
           ) : null}
 
-          <div className="om-list">
+          <div className="om-list" style={{ marginTop: searchOpen ? 0 : "var(--space-lg)" }}>
             {tab === "users"
               ? (usersData?.users ?? []).map((u) => {
                   const primary = u.username?.trim() ? u.username : (u.email ?? "(no email)");
