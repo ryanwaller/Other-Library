@@ -527,11 +527,7 @@ export default function SettingsPage() {
   }
 
   if (!authReady) {
-    return (
-      <main className="container om-settings-page">
-        <div className="card" style={{ minHeight: 240 }} />
-      </main>
-    );
+    return null;
   }
 
   return (
