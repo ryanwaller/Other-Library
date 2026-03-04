@@ -1895,16 +1895,22 @@ function AppShell({
                 )}
               </div>
             </div>
-            <div className="row" style={{ width: "100%", margin: 0, justifyContent: "flex-end", gap: 12, alignItems: "baseline", flexWrap: "nowrap" }}>
+            <div className="row" style={{ width: "100%", margin: 0, gap: 12, alignItems: "baseline", flexWrap: "nowrap" }}>
               <button onClick={() => { const next = !bulkMode; if (next) { setAddOpen(false); setSortOpen(false); setSearchOpen(false); setReorderMode(true); } else { exitEditMode(); } setBulkMode(next); }}>
                 {bulkMode ? "Done" : "Edit"}
               </button>
               <button type="button" className={sortOpen ? "text-primary" : "muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !sortOpen; setSortOpen(next); if (next) { setSearchOpen(false); } }}>
                 View by
               </button>
-              <button type="button" className={searchOpen ? "text-primary" : "muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !searchOpen; setSearchOpen(next); if (next) { setSortOpen(false); } }}>
-                Search
-              </button>
+              <input
+                className="om-inline-search-input"
+                placeholder="Search your catalog"
+                value={searchQuery}
+                onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); cancelAddPreview(); setSearchFocused(true); }}
+                onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ minWidth: 0, flex: 1 }}
+              />
             </div>
           </>
         ) : (
@@ -1951,7 +1957,7 @@ function AppShell({
         )}
       </div>
 
-      {searchOpen && (
+      {!isMobile && searchOpen && (
         <div className="row" style={{ width: "100%", marginTop: 6, alignItems: "baseline", gap: 12, flexWrap: "nowrap" }}>
           <input
             className="om-inline-search-input"
