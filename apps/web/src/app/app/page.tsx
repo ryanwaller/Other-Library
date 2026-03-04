@@ -44,6 +44,28 @@ type EditionMetadata = {
   raw?: Record<string, unknown>;
 };
 
+type LibrarySummary = {
+  id: number;
+  name: string;
+  created_at: string;
+  sort_order?: number | null;
+  owner_id?: string | null;
+  myRole?: "owner" | "editor" | "viewer";
+  memberPreviews?: Array<{ userId: string; username: string; avatarUrl: string | null }>;
+};
+
+type CatalogMemberView = {
+  id: string;
+  catalog_id: number;
+  user_id: string;
+  role: "owner" | "editor" | "viewer";
+  invited_by: string | null;
+  invited_at: string;
+  accepted_at: string | null;
+  profile: { id: string; username: string; display_name: string | null; avatar_path: string | null; email: string | null } | null;
+  avatar_url: string | null;
+};
+
 function parseCsvToObjects(text: string): Array<Record<string, string>> {
   const src = (text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const rows: string[][] = [];
@@ -366,7 +388,7 @@ function AppShell({
     {}
   );
 
-  const [libraries, setLibraries] = useState<Array<{ id: number; name: string; created_at: string; sort_order?: number | null }>>([]);
+  const [libraries, setLibraries] = useState<LibrarySummary[]>([]);
   const [addLibraryId, setAddLibraryId] = useState<number | null>(null);
   const [editingLibraryId, setEditingLibraryId] = useState<number | null>(null);
   const [libraryNameDraft, setLibraryNameDraft] = useState("");
@@ -377,6 +399,18 @@ function AppShell({
     error: null,
     message: null
   });
+  const [membersByCatalogId, setMembersByCatalogId] = useState<
+    Record<
+      number,
+      {
+        busy: boolean;
+        error: string | null;
+        members: CatalogMemberView[];
+        inviteInput: string;
+        inviteBusy: boolean;
+      }
+    >
+  >({});
 
   const [bulkMode, setBulkMode] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -564,14 +598,19 @@ function AppShell({
     setTagMode(normalized);
   }, [filterTag]);
 
-  async function refreshAllBooks() {
+  async function refreshAllBooks(targetLibraryIds?: number[]) {
     if (!supabase) return;
+    const ids = Array.from(new Set((targetLibraryIds ?? libraries.map((l) => l.id)).filter((n) => Number.isFinite(n) && n > 0)));
+    if (ids.length === 0) {
+      setItems([]);
+      return;
+    }
     const { data, error } = await supabase
       .from("user_books")
       .select(
         "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
       )
-      .eq("owner_id", userId)
+      .in("library_id", ids)
       .order("created_at", { ascending: false })
       .limit(800);
     if (error) return;
@@ -601,32 +640,132 @@ function AppShell({
     setMediaUrlsByPath((prev) => ({ ...prev, ...nextMap }));
   }
 
-  async function refreshLibraries() {
-    if (!supabase) return;
+  async function refreshLibraries(): Promise<LibrarySummary[]> {
+    if (!supabase) return [];
     setLibraryState({ busy: true, error: null, message: null });
     try {
-      let list: Array<{ id: number; name: string; created_at: string; sort_order?: number | null }> = [];
-
-      const resWithOrder = await supabase.from("libraries").select("id,name,created_at,sort_order").eq("owner_id", userId).order("sort_order", { ascending: true });
+      let ownedList: LibrarySummary[] = [];
+      const resWithOrder = await supabase
+        .from("libraries")
+        .select("id,name,created_at,sort_order,owner_id")
+        .eq("owner_id", userId)
+        .order("sort_order", { ascending: true });
       if (!resWithOrder.error) {
-        list = (resWithOrder.data ?? []) as any;
+        ownedList = ((resWithOrder.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
       } else {
         const msg = (resWithOrder.error.message ?? "").toLowerCase();
         if (msg.includes("sort_order") && msg.includes("does not exist")) {
-          const res = await supabase.from("libraries").select("id,name,created_at").eq("owner_id", userId).order("created_at", { ascending: true });
+          const res = await supabase
+            .from("libraries")
+            .select("id,name,created_at,owner_id")
+            .eq("owner_id", userId)
+            .order("created_at", { ascending: true });
           if (res.error) throw new Error(res.error.message);
-          list = (res.data ?? []) as any;
+          ownedList = ((res.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
         } else {
           throw new Error(resWithOrder.error.message);
         }
       }
 
+      let sharedList: LibrarySummary[] = [];
+      const mem = await supabase
+        .from("catalog_members")
+        .select("catalog_id,role,accepted_at")
+        .eq("user_id", userId)
+        .not("accepted_at", "is", null);
+      if (!mem.error) {
+        const memberRows = ((mem.data ?? []) as any[]).filter((r) => Number.isFinite(Number(r.catalog_id)));
+        const catalogIds = Array.from(new Set(memberRows.map((r) => Number(r.catalog_id)).filter((n) => Number.isFinite(n) && n > 0)));
+        const roleByCatalog = new Map<number, "owner" | "editor" | "viewer">();
+        for (const r of memberRows) {
+          const role = String(r.role ?? "").toLowerCase();
+          const id = Number(r.catalog_id);
+          if (id > 0 && (role === "owner" || role === "editor" || role === "viewer")) {
+            roleByCatalog.set(id, role as any);
+          }
+        }
+        if (catalogIds.length > 0) {
+          const libs = await supabase.from("libraries").select("id,name,created_at,sort_order,owner_id").in("id", catalogIds);
+          if (!libs.error) {
+            sharedList = ((libs.data ?? []) as any[]).map((l) => ({
+              ...l,
+              myRole: roleByCatalog.get(Number(l.id))
+            }));
+          }
+        }
+      }
+
+      const byId = new Map<number, LibrarySummary>();
+      for (const l of [...ownedList, ...sharedList]) byId.set(Number(l.id), l);
+      let list = Array.from(byId.values());
+
       if (list.length === 0) {
         const created = await supabase.from("libraries").insert({ owner_id: userId, name: "Your catalog" }).select("id").single();
         if (created.error) throw new Error(created.error.message);
-        const res2 = await supabase.from("libraries").select("id,name,created_at").eq("owner_id", userId).order("created_at", { ascending: true });
+        const createdId = Number((created.data as any)?.id ?? 0);
+        if (createdId > 0) {
+          await supabase.from("catalog_members").upsert(
+            { catalog_id: createdId, user_id: userId, role: "owner", invited_by: userId, accepted_at: new Date().toISOString() },
+            { onConflict: "catalog_id,user_id" }
+          );
+        }
+        const res2 = await supabase
+          .from("libraries")
+          .select("id,name,created_at,owner_id")
+          .eq("owner_id", userId)
+          .order("created_at", { ascending: true });
         if (res2.error) throw new Error(res2.error.message);
-        list = (res2.data ?? []) as any;
+        list = ((res2.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
+      }
+
+      const libraryIds = list.map((l) => l.id).filter((n) => Number.isFinite(n) && n > 0);
+      if (libraryIds.length > 0) {
+        const membersRes = await supabase
+          .from("catalog_members")
+          .select("catalog_id,user_id,accepted_at")
+          .in("catalog_id", libraryIds)
+          .not("accepted_at", "is", null);
+        const memberRows = (membersRes.error ? [] : ((membersRes.data ?? []) as any[])).filter((r) => String(r.user_id) !== userId);
+        const memberIds = Array.from(new Set(memberRows.map((r) => String(r.user_id)).filter(Boolean)));
+        let profileById: Record<string, { username: string; avatar_path: string | null }> = {};
+        if (memberIds.length > 0) {
+          const pr = await supabase.from("profiles").select("id,username,avatar_path").in("id", memberIds);
+          if (!pr.error) {
+            profileById = Object.fromEntries(
+              ((pr.data ?? []) as any[]).map((p) => [String(p.id), { username: String(p.username ?? ""), avatar_path: p.avatar_path ? String(p.avatar_path) : null }])
+            );
+          }
+        }
+
+        const avatarByPath: Record<string, string> = {};
+        for (const p of Object.values(profileById)) {
+          if (!p.avatar_path || avatarByPath[p.avatar_path]) continue;
+          const signed = await supabase.storage.from("avatars").createSignedUrl(p.avatar_path, 60 * 30);
+          if (signed.data?.signedUrl) avatarByPath[p.avatar_path] = signed.data.signedUrl;
+        }
+
+        const membersByCatalog: Record<number, Array<{ userId: string; username: string; avatarUrl: string | null; acceptedAt: string }>> = {};
+        for (const r of memberRows) {
+          const cid = Number(r.catalog_id);
+          const uid = String(r.user_id);
+          const prof = profileById[uid];
+          if (!prof?.username) continue;
+          if (!membersByCatalog[cid]) membersByCatalog[cid] = [];
+          membersByCatalog[cid].push({
+            userId: uid,
+            username: prof.username,
+            avatarUrl: prof.avatar_path ? avatarByPath[prof.avatar_path] ?? null : null,
+            acceptedAt: String(r.accepted_at ?? "")
+          });
+        }
+
+        list = list.map((l) => ({
+          ...l,
+          memberPreviews: (membersByCatalog[l.id] ?? [])
+            .sort((a, b) => Date.parse(a.acceptedAt) - Date.parse(b.acceptedAt))
+            .slice(0, 3)
+            .map((m) => ({ userId: m.userId, username: m.username, avatarUrl: m.avatarUrl }))
+        }));
       }
 
       try {
@@ -661,10 +800,12 @@ function AppShell({
       }
 
       setLibraryState({ busy: false, error: null, message: null });
+      return list;
     } catch (e: any) {
       setLibraries([]);
       setAddLibraryId(null);
       setLibraryState({ busy: false, error: e?.message ?? "Failed to load catalogs", message: null });
+      return [];
     }
   }
 
@@ -676,6 +817,13 @@ function AppShell({
     try {
       const created = await supabase.from("libraries").insert({ owner_id: userId, name: n }).select("id").single();
       if (created.error) throw new Error(created.error.message);
+      const createdId = Number((created.data as any)?.id ?? 0);
+      if (createdId > 0) {
+        await supabase.from("catalog_members").upsert(
+          { catalog_id: createdId, user_id: userId, role: "owner", invited_by: userId, accepted_at: new Date().toISOString() },
+          { onConflict: "catalog_id,user_id" }
+        );
+      }
       await refreshLibraries();
       const id = (created.data as any)?.id as number | undefined;
       if (id) {
@@ -813,7 +961,8 @@ function AppShell({
       if (!alive) return;
       setUserBooksCount(count ?? 0);
 
-      await Promise.all([refreshLibraries(), refreshAllBooks()]);
+      const libs = await refreshLibraries();
+      await refreshAllBooks(libs.map((l) => l.id));
       if (alive) setInitialLoadDone(true);
     })();
     return () => {
@@ -1469,6 +1618,89 @@ function AppShell({
     setCategoryMenu((p) => ({ ...p, open: false }));
   }
 
+  async function catalogApi<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const token = session.access_token;
+    if (!token) throw new Error("not_authenticated");
+    const res = await fetch(path, {
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        ...(init.headers ?? {}),
+        authorization: `Bearer ${token}`
+      }
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(String(json?.error ?? "request_failed"));
+    return json as T;
+  }
+
+  async function loadCatalogMembers(catalogId: number) {
+    if (!supabase) return;
+    setMembersByCatalogId((prev) => ({
+      ...prev,
+      [catalogId]: {
+        busy: true,
+        error: null,
+        members: prev[catalogId]?.members ?? [],
+        inviteInput: prev[catalogId]?.inviteInput ?? "",
+        inviteBusy: prev[catalogId]?.inviteBusy ?? false
+      }
+    }));
+    try {
+      const res = await catalogApi<{ ok: true; members: any[] }>(`/api/catalog/${catalogId}/members`, { method: "GET" });
+      const rows = (res.members ?? []) as any[];
+      const nextMembers: CatalogMemberView[] = [];
+      for (const row of rows) {
+        const avatarPath = row?.profile?.avatar_path ? String(row.profile.avatar_path) : null;
+        let avatarUrl: string | null = null;
+        if (avatarPath) {
+          const signed = await supabase.storage.from("avatars").createSignedUrl(avatarPath, 60 * 30);
+          avatarUrl = signed.data?.signedUrl ?? null;
+        }
+        nextMembers.push({
+          id: String(row.id),
+          catalog_id: Number(row.catalog_id),
+          user_id: String(row.user_id),
+          role: String(row.role) as any,
+          invited_by: row.invited_by ? String(row.invited_by) : null,
+          invited_at: String(row.invited_at),
+          accepted_at: row.accepted_at ? String(row.accepted_at) : null,
+          profile: row.profile
+            ? {
+                id: String(row.profile.id),
+                username: String(row.profile.username ?? ""),
+                display_name: row.profile.display_name ? String(row.profile.display_name) : null,
+                avatar_path: avatarPath,
+                email: row.profile.email ? String(row.profile.email) : null
+              }
+            : null,
+          avatar_url: avatarUrl
+        });
+      }
+      setMembersByCatalogId((prev) => ({
+        ...prev,
+        [catalogId]: {
+          busy: false,
+          error: null,
+          members: nextMembers,
+          inviteInput: prev[catalogId]?.inviteInput ?? "",
+          inviteBusy: false
+        }
+      }));
+    } catch (e: any) {
+      setMembersByCatalogId((prev) => ({
+        ...prev,
+        [catalogId]: {
+          busy: false,
+          error: e?.message ?? "Failed to load members",
+          members: prev[catalogId]?.members ?? [],
+          inviteInput: prev[catalogId]?.inviteInput ?? "",
+          inviteBusy: false
+        }
+      }));
+    }
+  }
+
   useEffect(() => {
     if (!tagMenu.open && !categoryMenu.open) return;
     const onPointerDown = (ev: PointerEvent) => {
@@ -1672,11 +1904,100 @@ function AppShell({
   function beginEditLibrary(libraryId: number, currentName: string) {
     setEditingLibraryId(libraryId);
     setLibraryNameDraft(currentName ?? "");
+    void loadCatalogMembers(libraryId);
   }
 
   function cancelEditLibrary() {
     setEditingLibraryId(null);
     setLibraryNameDraft("");
+  }
+
+  async function inviteCatalogMember(catalogId: number) {
+    const draft = (membersByCatalogId[catalogId]?.inviteInput ?? "").trim();
+    if (!draft) return;
+    setMembersByCatalogId((prev) => ({
+      ...prev,
+      [catalogId]: {
+        busy: prev[catalogId]?.busy ?? false,
+        error: null,
+        members: prev[catalogId]?.members ?? [],
+        inviteInput: prev[catalogId]?.inviteInput ?? "",
+        inviteBusy: true
+      }
+    }));
+    try {
+      await catalogApi(`/api/catalog/${catalogId}/invite`, {
+        method: "POST",
+        body: JSON.stringify({ identifier: draft, role: "viewer" })
+      });
+      setMembersByCatalogId((prev) => ({
+        ...prev,
+        [catalogId]: {
+          busy: prev[catalogId]?.busy ?? false,
+          error: null,
+          members: prev[catalogId]?.members ?? [],
+          inviteInput: "",
+          inviteBusy: false
+        }
+      }));
+      await loadCatalogMembers(catalogId);
+      await refreshLibraries();
+      window.dispatchEvent(new Event("om:catalog-members-changed"));
+    } catch (e: any) {
+      setMembersByCatalogId((prev) => ({
+        ...prev,
+        [catalogId]: {
+          busy: prev[catalogId]?.busy ?? false,
+          error: e?.message ?? "Invite failed",
+          members: prev[catalogId]?.members ?? [],
+          inviteInput: prev[catalogId]?.inviteInput ?? "",
+          inviteBusy: false
+        }
+      }));
+    }
+  }
+
+  async function removeCatalogMember(catalogId: number, memberUserId: string) {
+    try {
+      await catalogApi(`/api/catalog/${catalogId}/member/${encodeURIComponent(memberUserId)}`, { method: "DELETE" });
+      await loadCatalogMembers(catalogId);
+      await refreshLibraries();
+      window.dispatchEvent(new Event("om:catalog-members-changed"));
+    } catch (e: any) {
+      setMembersByCatalogId((prev) => ({
+        ...prev,
+        [catalogId]: {
+          busy: prev[catalogId]?.busy ?? false,
+          error: e?.message ?? "Remove failed",
+          members: prev[catalogId]?.members ?? [],
+          inviteInput: prev[catalogId]?.inviteInput ?? "",
+          inviteBusy: prev[catalogId]?.inviteBusy ?? false
+        }
+      }));
+    }
+  }
+
+  async function updateCatalogMemberRole(catalogId: number, memberUserId: string, role: "editor" | "viewer") {
+    try {
+      await catalogApi(`/api/catalog/${catalogId}/member/${encodeURIComponent(memberUserId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ role })
+      });
+      await loadCatalogMembers(catalogId);
+      await refreshLibraries();
+      window.dispatchEvent(new Event("om:catalog-members-changed"));
+    } catch (e: any) {
+      setMembersByCatalogId((prev) => ({
+        ...prev,
+        [catalogId]: {
+          busy: prev[catalogId]?.busy ?? false,
+          error: e?.message ?? "Role update failed",
+          members: prev[catalogId]?.members ?? [],
+          inviteInput: prev[catalogId]?.inviteInput ?? "",
+          inviteBusy: prev[catalogId]?.inviteBusy ?? false
+        }
+      }));
+    }
   }
 
   const filteredItems = useMemo(() => items, [items]);
@@ -2212,11 +2533,17 @@ function AppShell({
       {libraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];
         const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
+        const memberState = membersByCatalogId[lib.id] ?? { busy: false, error: null, members: [], inviteInput: "", inviteBusy: false };
+        const acceptedMembers = memberState.members.filter((m) => m.accepted_at);
+        const pendingMembers = memberState.members.filter((m) => !m.accepted_at);
+        const selfMember = memberState.members.find((m) => m.user_id === userId) ?? null;
+        const iAmOwner = (selfMember?.role ?? lib.myRole) === "owner";
         return (
           <div key={lib.id}>
             <LibraryBlock
               libraryId={lib.id}
               libraryName={lib.name}
+              memberPreviews={lib.memberPreviews ?? []}
               bookCount={groups.length}
               index={idx}
               total={libraries.length}
@@ -2262,6 +2589,92 @@ function AppShell({
                 </div>
               )}
             />
+            {bulkMode && editingLibraryId === lib.id ? (
+              <div className="card" style={{ marginTop: "var(--space-sm)" }}>
+                <div className="text-muted">Members</div>
+                <div className="row" style={{ marginTop: "var(--space-sm)", alignItems: "baseline", flexWrap: "nowrap" }}>
+                  <input
+                    placeholder="Invite by username or email"
+                    value={memberState.inviteInput}
+                    onChange={(e) =>
+                      setMembersByCatalogId((prev) => ({
+                        ...prev,
+                        [lib.id]: { ...memberState, inviteInput: e.target.value }
+                      }))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
+                      e.preventDefault();
+                      void inviteCatalogMember(lib.id);
+                    }}
+                    style={{ minWidth: 0, flex: 1 }}
+                  />
+                  {iAmOwner ? (
+                    <button onClick={() => void inviteCatalogMember(lib.id)} disabled={memberState.inviteBusy || !memberState.inviteInput.trim()}>
+                      {memberState.inviteBusy ? "Inviting…" : "Invite"}
+                    </button>
+                  ) : null}
+                </div>
+                {memberState.error ? <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{memberState.error}</div> : null}
+
+                <div style={{ marginTop: "var(--space-md)" }}>
+                  {acceptedMembers.map((m) => {
+                    const display = (m.profile?.display_name ?? "").trim() || m.profile?.username || m.user_id;
+                    const isRowOwner = m.role === "owner";
+                    const canModify = iAmOwner && !isRowOwner;
+                    return (
+                      <div key={m.id} className="row" style={{ justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-sm)" }}>
+                        <div className="om-avatar-lockup">
+                          {m.avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img alt="" src={m.avatar_url} className="om-avatar-img" />
+                          ) : (
+                            <div className="om-avatar-img" style={{ background: "var(--placeholder-bg)" }} />
+                          )}
+                          <span>{display}</span>
+                        </div>
+                        <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
+                          {isRowOwner ? (
+                            <span className="text-muted">owner</span>
+                          ) : canModify ? (
+                            <select
+                              value={m.role}
+                              onChange={(e) => void updateCatalogMemberRole(lib.id, m.user_id, (e.target.value === "editor" ? "editor" : "viewer") as any)}
+                              style={{ width: "auto", minWidth: 0 }}
+                            >
+                              <option value="editor">editor</option>
+                              <option value="viewer">viewer</option>
+                            </select>
+                          ) : (
+                            <span className="text-muted">{m.role}</span>
+                          )}
+                          {canModify ? (
+                            <button className="text-muted" onClick={() => void removeCatalogMember(lib.id, m.user_id)}>
+                              Remove
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {pendingMembers.length > 0 ? (
+                  <div style={{ marginTop: "var(--space-md)" }}>
+                    <div className="text-muted">Pending invitations</div>
+                    {pendingMembers.map((m) => {
+                      const display = (m.profile?.display_name ?? "").trim() || m.profile?.username || m.profile?.email || m.user_id;
+                      return (
+                        <div key={m.id} className="row" style={{ justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-sm)" }}>
+                          <span>{display}</span>
+                          <span className="text-muted">pending</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             {idx < libraries.length - 1 && <hr className="om-hr" />}
           </div>
         );

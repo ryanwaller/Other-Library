@@ -6,6 +6,7 @@ import { usePagination } from "../hooks/usePagination";
 export default function LibraryBlock({
   libraryId,
   libraryName,
+  memberPreviews,
   bookCount,
   index,
   total,
@@ -30,6 +31,7 @@ export default function LibraryBlock({
 }: {
   libraryId: number;
   libraryName: string;
+  memberPreviews?: Array<{ userId: string; username: string; avatarUrl: string | null }>;
   bookCount: number;
   index: number;
   total: number;
@@ -174,6 +176,18 @@ export default function LibraryBlock({
                   {libraryName}
                 </button>
               )}
+              {(memberPreviews ?? []).length > 0 ? (
+                <span className="om-member-stack" aria-label="Shared catalog members">
+                  {(memberPreviews ?? []).slice(0, 3).map((m) =>
+                    m.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={m.userId} alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar" />
+                    ) : (
+                      <span key={m.userId} className="om-member-stack-avatar" title={m.username} />
+                    )
+                  )}
+                </span>
+              ) : null}
               <span className="text-muted" style={{ marginLeft: "var(--space-md)", whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
                 {bookCount}&nbsp;&nbsp;book{bookCount === 1 ? "" : "s"}
               </span>

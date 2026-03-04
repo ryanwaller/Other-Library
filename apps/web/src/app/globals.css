@@ -308,6 +308,26 @@ button.muted:focus-visible {
   transform: translateY(-1px);
 }
 
+.om-member-stack {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-sm);
+}
+
+.om-member-stack-avatar {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border-avatar);
+  background: var(--placeholder-bg);
+  object-fit: cover;
+  display: inline-block;
+}
+
+.om-member-stack-avatar + .om-member-stack-avatar {
+  margin-left: -4px;
+}
+
 .om-nav-badge {
   display: inline-flex;
   align-items: center;

@@ -37,6 +37,7 @@ export default function GlobalNav() {
   const [me, setMe] = useState<{ username: string; avatar_path: string | null; role?: string | null; status?: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<number>(0);
+  const [pendingCatalogInvites, setPendingCatalogInvites] = useState<number>(0);
   const [unreadThreads, setUnreadThreads] = useState<number>(0);
   const [unreadLatestId, setUnreadLatestId] = useState<number | null>(null);
   const [unreadLatestStatus, setUnreadLatestStatus] = useState<string | null>(null);
@@ -90,6 +91,34 @@ export default function GlobalNav() {
       alive = false;
       if (timer) window.clearInterval(timer);
       window.removeEventListener("om:follows-changed", refreshPending);
+    };
+  }, [sessionUserId]);
+
+  useEffect(() => {
+    let alive = true;
+    let timer: number | null = null;
+
+    async function refreshPendingCatalogInvites() {
+      if (!supabase || !sessionUserId) {
+        setPendingCatalogInvites(0);
+        return;
+      }
+      const res = await supabase
+        .from("catalog_members")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", sessionUserId)
+        .is("accepted_at", null);
+      if (!alive) return;
+      setPendingCatalogInvites(res.error ? 0 : (res.count ?? 0));
+    }
+
+    refreshPendingCatalogInvites();
+    timer = window.setInterval(refreshPendingCatalogInvites, 30_000);
+    window.addEventListener("om:catalog-members-changed", refreshPendingCatalogInvites);
+    return () => {
+      alive = false;
+      if (timer) window.clearInterval(timer);
+      window.removeEventListener("om:catalog-members-changed", refreshPendingCatalogInvites);
     };
   }, [sessionUserId]);
 
@@ -275,6 +304,14 @@ export default function GlobalNav() {
               <Link href="/app/follows" aria-label={`${pendingRequests} pending follow requests`} style={{ textDecoration: "none" }}>
                 <span className="om-nav-badge om-nav-badge--circle" style={{ background: "#b00020" }}>
                   {pendingRequests}
+                </span>
+              </Link>
+            ) : null}
+
+            {sessionUserId && pendingCatalogInvites > 0 ? (
+              <Link href="/app/catalog-invitations" aria-label={`${pendingCatalogInvites} pending catalog invitations`} style={{ textDecoration: "none" }}>
+                <span className="om-nav-badge om-nav-badge--circle" style={{ background: "#b00020" }}>
+                  {pendingCatalogInvites}
                 </span>
               </Link>
             ) : null}
