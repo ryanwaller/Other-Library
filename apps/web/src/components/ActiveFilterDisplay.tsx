@@ -28,7 +28,7 @@ export default function ActiveFilterDisplay({ pairs, onClearAll, clearAllHref }:
     <div className="row muted" style={{ gap: 24, justifyContent: "flex-end", alignItems: "baseline" }}>
       <span style={{ display: "inline-flex", gap: 32, flexWrap: "wrap", alignItems: "baseline" }}>
         {pairs.map((p, idx) => (
-          <span key={`${p.label}:${p.value}:${idx}`} className="row" style={{ gap: 12, alignItems: "baseline" }}>
+          <span key={`${p.label}:${p.value}:${idx}`} className="row" style={{ gap: "var(--space-md)", alignItems: "baseline" }}>
             <span className="muted" style={{ marginRight: 2 }}>{p.label}</span>
             <span style={{ color: "var(--fg)", marginRight: 4 }}>{p.value}</span>
             {p.onClear ? (

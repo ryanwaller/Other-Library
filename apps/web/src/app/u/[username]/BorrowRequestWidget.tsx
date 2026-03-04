@@ -174,7 +174,7 @@ export default function BorrowRequestWidget({
     return (
       <div>
         <div className="muted">Borrow request: {existing.status}.</div>
-        <div className="row" style={{ marginTop: 8 }}>
+        <div className="row" style={{ marginTop: "var(--space-8)" }}>
           {existing.status === "pending" ? (
             <button onClick={cancelRequest} disabled={state.busy}>
               {state.busy ? "…" : "Cancel request"}
@@ -208,7 +208,7 @@ export default function BorrowRequestWidget({
         </div>
       ) : (
         <>
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: "var(--space-8)" }}>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -217,7 +217,7 @@ export default function BorrowRequestWidget({
               style={{ width: "100%" }}
             />
           </div>
-          <div className="row" style={{ marginTop: 8 }}>
+          <div className="row" style={{ marginTop: "var(--space-8)" }}>
             <button onClick={requestBorrow} disabled={!canRequest || state.busy || !message.trim()}>
               {state.busy ? "Sending…" : "Send request"}
             </button>

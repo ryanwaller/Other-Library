@@ -505,7 +505,7 @@ export default function SettingsPage() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: 8 }}>
+          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -536,11 +536,11 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="row" style={{ marginTop: 10 }}>
+            <div className="row" style={{ marginTop: "var(--space-10)" }}>
               <div style={{ width: 120 }} className="muted">
                 Photo
               </div>
-              <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <div className="row" style={{ gap: "var(--space-10)", alignItems: "center", flexWrap: "wrap" }}>
                 {avatarUrl ? (
                   <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -582,7 +582,7 @@ export default function SettingsPage() {
             </div>
 
             {pendingAvatarPreviewUrl ? (
-              <div style={{ marginTop: 10 }}>
+              <div style={{ marginTop: "var(--space-10)" }}>
                 <div style={{ position: "relative", width: 280, height: 180, border: "1px solid var(--border-avatar)", background: "black" }}>
                   <Cropper
                     image={pendingAvatarPreviewUrl}
@@ -596,7 +596,7 @@ export default function SettingsPage() {
                     onCropComplete={(_area: Area, areaPixels: Area) => setAvatarCroppedAreaPixels(areaPixels)}
                   />
                 </div>
-                <div className="row" style={{ marginTop: 10, gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <div className="row" style={{ marginTop: "var(--space-10)", gap: "var(--space-10)", alignItems: "center", flexWrap: "wrap" }}>
                   <span className="muted">Zoom</span>
                   <input
                     type="range"
@@ -611,7 +611,7 @@ export default function SettingsPage() {
               </div>
             ) : null}
 
-            <div className="row" style={{ marginTop: 10 }}>
+            <div className="row" style={{ marginTop: "var(--space-10)" }}>
               <div style={{ width: 120 }} className="muted">
                 Username
               </div>
@@ -631,7 +631,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="row" style={{ marginTop: 10 }}>
+            <div className="row" style={{ marginTop: "var(--space-10)" }}>
               <div style={{ width: 120 }} className="muted">
                 Display name
               </div>
@@ -648,7 +648,7 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="row" style={{ marginTop: 10, alignItems: "flex-start" }}>
+            <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "flex-start" }}>
               <div style={{ width: 120 }} className="muted">
                 Bio
               </div>
@@ -660,7 +660,7 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="row" style={{ marginTop: 10 }}>
+            <div className="row" style={{ marginTop: "var(--space-10)" }}>
               <div style={{ width: 120 }} className="muted">
                 Library visibility
               </div>
@@ -676,7 +676,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="row" style={{ marginTop: 12 }}>
+            <div className="row" style={{ marginTop: "var(--space-md)" }}>
               <button onClick={saveProfile} disabled={profileSaveState.busy || usernameSaveBlocked}>
                 {profileSaveState.busy ? "Saving…" : "Save profile"}
               </button>
@@ -695,10 +695,10 @@ export default function SettingsPage() {
               <div>Follows</div>
               <div className="muted">requests + approvals</div>
             </div>
-            <div className="muted" style={{ marginTop: 8 }}>
+            <div className="muted" style={{ marginTop: "var(--space-8)" }}>
               Manage who can see followers-only content.
             </div>
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: "var(--space-10)" }}>
               <Link href="/app/follows">Open follow settings</Link>
             </div>
           </div>
@@ -710,7 +710,7 @@ export default function SettingsPage() {
               <div>Borrowing</div>
               <div className="muted">defaults</div>
             </div>
-            <div className="row" style={{ marginTop: 10 }}>
+            <div className="row" style={{ marginTop: "var(--space-10)" }}>
               <div style={{ width: 170 }} className="muted">
                 Borrowable by default
               </div>
@@ -722,7 +722,7 @@ export default function SettingsPage() {
                 <option value="yes">yes</option>
               </select>
             </div>
-            <div className="row" style={{ marginTop: 10 }}>
+            <div className="row" style={{ marginTop: "var(--space-10)" }}>
               <div style={{ width: 170 }} className="muted">
                 Who can request
               </div>
@@ -751,7 +751,7 @@ export default function SettingsPage() {
                     : "Only approved followers."}
               </div>
             </div>
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: "var(--space-10)" }}>
               <Link href="/app/borrow-requests">View borrow requests</Link>
             </div>
           </div>
@@ -763,10 +763,10 @@ export default function SettingsPage() {
               <div>Bulk update</div>
               <div className="muted">catalog import</div>
             </div>
-            <div className="muted" style={{ marginTop: 8 }}>
+            <div className="muted" style={{ marginTop: "var(--space-8)" }}>
               Upload CSV files from your catalog workspace.
             </div>
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: "var(--space-10)" }}>
               <input
                 ref={csvInputRef}
                 type="file"
@@ -803,10 +803,10 @@ export default function SettingsPage() {
               <div className="muted"></div>
             </div>
 
-            <div style={{ marginTop: 10 }} className="muted">
+            <div style={{ marginTop: "var(--space-10)" }} className="muted">
               Email
             </div>
-            <div className="row" style={{ marginTop: 8 }}>
+            <div className="row" style={{ marginTop: "var(--space-8)" }}>
               <input
                 value={emailDraft}
                 onChange={(e) => setEmailDraft(e.target.value)}
@@ -824,10 +824,10 @@ export default function SettingsPage() {
               <div className="muted">{emailState.message ? (emailState.error ? `${emailState.message} (${emailState.error})` : emailState.message) : ""}</div>
             </div>
 
-            <div style={{ marginTop: 12 }} className="muted">
+            <div style={{ marginTop: "var(--space-md)" }} className="muted">
               Change password
             </div>
-            <div className="row" style={{ marginTop: 8, alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "center", flexWrap: "wrap", gap: "var(--space-10)" }}>
               <input
                 type="password"
                 value={currentPassword}
@@ -851,13 +851,13 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div style={{ marginTop: 12 }} className="muted">
+            <div style={{ marginTop: "var(--space-md)" }} className="muted">
               Delete account
             </div>
-            <div className="muted" style={{ marginTop: 6 }}>
+            <div className="muted" style={{ marginTop: "var(--space-sm)" }}>
               This is permanent. Type <span style={{ fontWeight: 600 }}>DELETE</span> to confirm.
             </div>
-            <div className="row" style={{ marginTop: 8, alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "center", gap: "var(--space-10)", flexWrap: "wrap" }}>
               <input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="DELETE" style={{ width: 160 }} />
               <button onClick={deleteAccount} disabled={deleteState.busy}>
                 {deleteState.busy ? "Deleting…" : "Delete account"}

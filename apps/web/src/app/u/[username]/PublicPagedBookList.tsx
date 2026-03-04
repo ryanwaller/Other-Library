@@ -50,7 +50,7 @@ export default function PublicPagedBookList({
       containerStyle={{ 
         display: "grid", 
         gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(180px, 1fr))", 
-        gap: 12 
+        gap: "var(--space-md)" 
       }}
       renderItem={(b) => {
         const e = b.edition;
@@ -70,7 +70,7 @@ export default function PublicPagedBookList({
                 <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
               </div>
             </Link>
-            <div style={{ marginTop: 8 }}>
+            <div style={{ marginTop: "var(--space-8)" }}>
               <Link href={href} className="om-book-title">
                 {title}
               </Link>

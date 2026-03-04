@@ -236,7 +236,7 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
   const label = compact ? "＋" : "＋ Add";
 
   return (
-    <span className="row" style={{ gap: 8, flexWrap: "nowrap", alignItems: "center", minHeight: 24 }}>
+    <span className="row" style={{ gap: "var(--space-8)", flexWrap: "nowrap", alignItems: "center", minHeight: 24 }}>
       {editionId && count > 0 ? (
         <>
           <Link href={idToOpen ? `/app/books/${idToOpen}` : "/app"} style={{ textDecoration: "none" }}>

@@ -43,7 +43,7 @@ export default function PublicProfileHeader({
   return (
     <div className="card">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-        <div className="row" style={{ gap: 12, alignItems: "center" }}>
+        <div className="row" style={{ gap: "var(--space-md)", alignItems: "center" }}>
           {isLinked ? (
             <>
               <Link href={`/u/${username}`} className="om-avatar-link" aria-label="Open profile">
@@ -62,14 +62,14 @@ export default function PublicProfileHeader({
         </div>
       </div>
 
-      <div className="row muted" style={{ marginTop: 12, gap: 16 }}>
-        <span style={{ display: "inline-flex", gap: 10 }}>
+      <div className="row muted" style={{ marginTop: "var(--space-md)", gap: 16 }}>
+        <span style={{ display: "inline-flex", gap: "var(--space-10)" }}>
           <Link href={`/u/${username}/followers`} className="muted">
             Followers
           </Link>
           <span>{followerCount ?? "—"}</span>
         </span>
-        <span style={{ display: "inline-flex", gap: 10 }}>
+        <span style={{ display: "inline-flex", gap: "var(--space-10)" }}>
           <Link href={`/u/${username}/following`} className="muted">
             Following
           </Link>
@@ -78,7 +78,7 @@ export default function PublicProfileHeader({
         {followButton}
       </div>
       {bio && (
-        <div className="muted" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
+        <div className="muted" style={{ marginTop: "var(--space-8)", whiteSpace: "pre-wrap" }}>
           {bio}
         </div>
       )}

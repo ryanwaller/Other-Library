@@ -42,7 +42,10 @@
 
   --space-xs: 4px;
   --space-sm: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
   --space-md: 12px;
+  --space-14: 14px;
   --space-lg: 24px;
   --space-xl: 48px;
 }
@@ -60,6 +63,15 @@
     --bg-muted: var(--placeholder-bg);
 
     --border-avatar: #2a2a2e;
+
+    --space-xs: 4px;
+    --space-sm: 6px;
+    --space-8: 8px;
+    --space-10: 10px;
+    --space-md: 12px;
+    --space-14: 14px;
+    --space-lg: 24px;
+    --space-xl: 48px;
   }
 }
 

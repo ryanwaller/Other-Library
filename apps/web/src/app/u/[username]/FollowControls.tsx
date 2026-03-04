@@ -105,7 +105,7 @@ export default function FollowControls({
   const containerStyle = {
     marginTop: compact || inline ? 0 : 10,
     display: "inline-flex",
-    gap: 10,
+    gap: "var(--space-10)",
     alignItems: "baseline" as const,
     flexWrap: "wrap" as const
   };
@@ -140,7 +140,7 @@ export default function FollowControls({
         </button>
       )}
       {error ? (
-        <span className="muted" style={{ marginLeft: 10 }}>
+        <span className="muted" style={{ marginLeft: "var(--space-10)" }}>
           {error}
         </span>
       ) : null}

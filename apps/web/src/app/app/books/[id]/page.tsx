@@ -2650,7 +2650,7 @@ export default function BookDetailPage() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: 8 }}>
+          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -2670,15 +2670,15 @@ export default function BookDetailPage() {
         </div>
       ) : (
         <div className="card">
-          <div className="om-book-detail-grid" style={{ marginTop: 10, rowGap: 24, columnGap: 14, alignItems: "start" }}>
+          <div className="om-book-detail-grid" style={{ marginTop: "var(--space-10)", rowGap: 24, columnGap: 14, alignItems: "start" }}>
             <div style={{ gridColumn: "1 / -1", marginBottom: 16 }}>
-              <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: 10 }}>
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: "var(--space-10)" }}>
                 {/* Left group: primary action + updates indicator */}
                 {isOwner ? (
-                  <div className="row" style={{ gap: 12, alignItems: "baseline", flexWrap: "nowrap" }}>
+                  <div className="row" style={{ gap: "var(--space-md)", alignItems: "baseline", flexWrap: "nowrap" }}>
                     {editMode ? (
                       deleteConfirm ? (
-                        <div className="row" style={{ gap: 12, alignItems: "baseline", flexWrap: "nowrap" }}>
+                        <div className="row" style={{ gap: "var(--space-md)", alignItems: "baseline", flexWrap: "nowrap" }}>
                           <span className="muted">Are you sure?</span>
                           <button onClick={() => deleteBook()} disabled={deleteState.busy}>Yes</button>
                           <button onClick={() => setDeleteConfirm(false)} disabled={deleteState.busy} className="muted">No</button>
@@ -2754,7 +2754,7 @@ export default function BookDetailPage() {
                   </div>
                 ) : null}
               </div>
-              <div className="muted" style={{ marginTop: 6, textAlign: "right" }}>
+              <div className="muted" style={{ marginTop: "var(--space-sm)", textAlign: "right" }}>
                 {mergeState.message
                   ? mergeState.error
                     ? `${mergeState.message} (${mergeState.error})`
@@ -2773,23 +2773,23 @@ export default function BookDetailPage() {
               </div>
 
               {isOwner && mergePanelOpen && mergeAllSources.length > 0 ? (
-                <div style={{ marginTop: 14, paddingBottom: 24 }}>
+                <div style={{ marginTop: "var(--space-14)", paddingBottom: 24 }}>
                   {/* Sources column header */}
-                  <div style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 8, marginBottom: 0, alignItems: "baseline" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: "var(--space-8)", marginBottom: 0, alignItems: "baseline" }}>
                     <span />
                     <span />
                     <span className="muted" style={{ textAlign: "right" }}>Sources</span>
                   </div>
-                  {/* Field rows — spacing matches metadata list (marginTop: 8) */}
+                  {/* Field rows — spacing matches metadata list (marginTop: "var(--space-8)") */}
                   {mergeFieldGroups.flatMap((group): ReactNode[] => {
                     if (group.isArray) {
                       // Cover gets a special image-grid row
                       if (group.key === "cover") {
                         const userHasCover = (book?.media ?? []).some((m) => m.kind === "cover");
                         return [(
-                          <div key="cover-row" style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 8, marginTop: 8, alignItems: "start" }}>
+                          <div key="cover-row" style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: "var(--space-8)", marginTop: "var(--space-8)", alignItems: "start" }}>
                             <span className="muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>Cover</span>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-8)" }}>
                               {group.candidates.map((cand) => {
                                 const selKey = `cover::${cand.value}`;
                                 const stored = mergeSelections[selKey];
@@ -2834,10 +2834,10 @@ export default function BookDetailPage() {
                           <div
                             key={selKey}
                             onClick={() => setMergeSelections((s) => ({ ...s, [selKey]: isChecked ? null : cand.value }))}
-                            style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 8, marginTop: 8, alignItems: "baseline", cursor: "pointer" }}
+                            style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: "var(--space-8)", marginTop: "var(--space-8)", alignItems: "baseline", cursor: "pointer" }}
                           >
                             <span className="muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{i === 0 ? group.label : ""}</span>
-                            <span style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
+                            <span style={{ display: "flex", alignItems: "baseline", gap: "var(--space-sm)", minWidth: 0 }}>
                               <span style={{ flexShrink: 0, width: "1em", display: "inline-block" }}>{isChecked ? "+" : "–"}</span>
                               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, opacity: isChecked ? 1 : 0.45 }}>{cand.value}</span>
                             </span>
@@ -2854,10 +2854,10 @@ export default function BookDetailPage() {
                         <div
                           key={group.key}
                           onClick={() => setMergeSelections((s) => ({ ...s, [group.key]: isChecked ? null : cand.value }))}
-                          style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 8, marginTop: 8, alignItems: "baseline", cursor: "pointer" }}
+                          style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: "var(--space-8)", marginTop: "var(--space-8)", alignItems: "baseline", cursor: "pointer" }}
                         >
                           <span className="muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{group.label}</span>
-                          <span style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0 }}>
+                          <span style={{ display: "flex", alignItems: "baseline", gap: "var(--space-sm)", minWidth: 0 }}>
                             <span style={{ flexShrink: 0, width: "1em", display: "inline-block" }}>{isChecked ? "+" : "–"}</span>
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, opacity: isChecked ? 1 : 0.45 }}>{cand.value}</span>
                           </span>
@@ -2870,11 +2870,11 @@ export default function BookDetailPage() {
               ) : null}
 
               {isOwner && findMoreOpen ? (
-                <div style={{ marginTop: 14 }}>
-                  <div className="om-lookup-controls" style={{ marginTop: 8, gridTemplateColumns: "1fr", gap: 0 }}>
-                    <div className="row" style={{ width: "100%", gap: 12, alignItems: "baseline" }}>
+                <div style={{ marginTop: "var(--space-14)" }}>
+                  <div className="om-lookup-controls" style={{ marginTop: "var(--space-8)", gridTemplateColumns: "1fr", gap: 0 }}>
+                    <div className="row" style={{ width: "100%", gap: "var(--space-md)", alignItems: "baseline" }}>
                       {showScan && (
-                        <div className="row" style={{ gap: 12, flex: "0 0 auto", alignItems: "baseline" }}>
+                        <div className="row" style={{ gap: "var(--space-md)", flex: "0 0 auto", alignItems: "baseline" }}>
                           <button 
                             className="muted" 
                             onClick={openScanner} 
@@ -2901,14 +2901,14 @@ export default function BookDetailPage() {
                         <button
                           onClick={() => smartLookup()}
                           disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
-                          style={{ whiteSpace: "nowrap", marginLeft: 12 }}
+                          style={{ whiteSpace: "nowrap", marginLeft: "var(--space-md)" }}
                         >
                           Find
                         </button>
                       ) : null}
                     </div>
                   </div>
-                  <div className="muted" style={{ marginTop: 6 }}>
+                  <div className="muted" style={{ marginTop: "var(--space-sm)" }}>
                     {importState.busy || searchState.busy
                       ? "Working…"
                       : importState.error
@@ -2919,9 +2919,9 @@ export default function BookDetailPage() {
                   </div>
 
                   {searchResults.length > 0 ? (
-                    <div style={{ marginTop: 10 }}>
+                    <div style={{ marginTop: "var(--space-10)" }}>
                       <div className="muted">Title/author results</div>
-                      <div style={{ marginTop: 6 }}>
+                      <div style={{ marginTop: "var(--space-sm)" }}>
                         {searchResults.slice(0, lookupLimit).map((r, idx) => {
                           const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
                           const hasIsbn = Boolean(bestIsbn);
@@ -2967,7 +2967,7 @@ export default function BookDetailPage() {
                                   </div>
                                 </div>
                                 <div className="om-lookup-actions">
-                                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-8)", alignItems: "flex-end" }}>
                                     {hasIsbn ? (
                                       <button
                                         onClick={() => {
@@ -3004,7 +3004,7 @@ export default function BookDetailPage() {
                         })}
                       </div>
                       {searchResults.length > lookupLimit ? (
-                        <div className="row" style={{ marginTop: 12, justifyContent: "center" }}>
+                        <div className="row" style={{ marginTop: "var(--space-md)", justifyContent: "center" }}>
                           <button onClick={() => setLookupLimit((prev) => prev + 10)} className="muted">
                             Load more
                           </button>
@@ -3019,8 +3019,8 @@ export default function BookDetailPage() {
                         const previewCoverUrl = preview.cover_url ?? undefined;
                         const previewFinalUrl = importMeta.final_url ?? undefined;
                         return (
-                          <div style={{ marginTop: 10 }}>
-                            <div style={{ marginTop: 6 }} className="om-lookup-item">
+                          <div style={{ marginTop: "var(--space-10)" }}>
+                            <div style={{ marginTop: "var(--space-sm)" }} className="om-lookup-item">
                               <div className="om-lookup-row">
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
                                   {previewCoverUrl ? (
@@ -3071,7 +3071,7 @@ export default function BookDetailPage() {
                                   )}
                                 </div>
                                 <div className="om-lookup-actions">
-                                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-8)", alignItems: "flex-end" }}>
                                     {(() => {
                                       const importPreviewIsbn = String(preview.isbn13 ?? preview.isbn10 ?? "").trim();
                                       const importPreviewHasIsbn = Boolean(importPreviewIsbn);
@@ -3186,7 +3186,7 @@ export default function BookDetailPage() {
                       });
                     }
                   }}
-                  style={{ marginTop: 10, border: "none", outline: "none", boxShadow: "none" }}
+                  style={{ marginTop: "var(--space-10)", border: "none", outline: "none", boxShadow: "none" }}
                 >
                   <summary className="om-disclosure-summary" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none", display: "flex", width: "100%" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
@@ -3219,9 +3219,9 @@ export default function BookDetailPage() {
                         <div style={{ marginTop: 0 }}>
                           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                             {/* Trim size — crop-local state; syncs to metadata when a real unit is selected */}
-                            <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+                            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
                               <div className="muted" style={{ minWidth: 110 }}>Trim size</div>
-                              <div className="row" style={{ gap: 6, alignItems: "center" }}>
+                              <div className="row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
                                 <input
                                   type="number"
                                   value={cropTrimWidth}
@@ -3253,7 +3253,7 @@ export default function BookDetailPage() {
                               </div>
                             </div>
 
-                            <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
+                            <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
                               <div className="muted" style={{ minWidth: 110 }}>Zoom</div>
                               <CustomSlider
                                 min={1}
@@ -3264,7 +3264,7 @@ export default function BookDetailPage() {
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
-                            <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
+                            <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
                               <div className="muted" style={{ minWidth: 110 }}>Rotate</div>
                               <CustomSlider
                                 min={-180}
@@ -3275,7 +3275,7 @@ export default function BookDetailPage() {
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
-                            <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
+                            <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
                               <div className="muted" style={{ minWidth: 110 }}>Bright</div>
                               <CustomSlider
                                 min={0.5}
@@ -3286,7 +3286,7 @@ export default function BookDetailPage() {
                                 style={{ flex: "1 1 auto" }}
                               />
                             </div>
-                            <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
+                            <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
                               <div className="muted" style={{ minWidth: 110 }}>Contrast</div>
                               <CustomSlider
                                 min={0.5}
@@ -3300,12 +3300,12 @@ export default function BookDetailPage() {
                           </div>
                         </div>
                       ) : coverUrl ? (
-                        <div className="muted" style={{ marginTop: 8 }}>Click Replace or wait for cover to load.</div>
+                        <div className="muted" style={{ marginTop: "var(--space-8)" }}>Click Replace or wait for cover to load.</div>
                       ) : (
-                        <div className="muted" style={{ marginTop: 8 }}>No cover image. Click “Add cover” to upload.</div>
+                        <div className="muted" style={{ marginTop: "var(--space-8)" }}>No cover image. Click “Add cover” to upload.</div>
                       )}
                       {coverToolsOpen && (
-                        <div className="row" style={{ marginTop: 12, gap: 16 }}>
+                        <div className="row" style={{ marginTop: "var(--space-md)", gap: 16 }}>
                           <label 
                             className="muted" 
                             style={{ cursor: "pointer", textDecoration: "underline" }}
@@ -3345,7 +3345,7 @@ export default function BookDetailPage() {
                         </div>
                       )}
                       {coverState.message ? (
-                        <div className="muted" style={{ marginTop: 6 }}>
+                        <div className="muted" style={{ marginTop: "var(--space-sm)" }}>
                           {coverState.error ? `${coverState.message} (${coverState.error})` : coverState.message}
                         </div>
                       ) : null}
@@ -3370,9 +3370,9 @@ export default function BookDetailPage() {
                 )}
               </div>
 
-              <div style={{ marginTop: 14 }}>
+              <div style={{ marginTop: "var(--space-14)" }}>
                 {editMode || facetView.author.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Authors
                     </div>
@@ -3396,7 +3396,7 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || facetView.editor.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Editors
                     </div>
@@ -3420,7 +3420,7 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || facetView.designer.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Designers
                     </div>
@@ -3444,7 +3444,7 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || facetView.printer.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Printer
                     </div>
@@ -3469,7 +3469,7 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || facetView.material.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Materials
                     </div>
@@ -3494,7 +3494,7 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || Boolean((formEditionOverride ?? "").trim()) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Edition
                     </div>
@@ -3515,7 +3515,7 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || facetView.publisher.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Publisher
                     </div>
@@ -3540,7 +3540,7 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || Boolean(effectivePublishDate) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Publish date
                     </div>
@@ -3560,7 +3560,7 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || Boolean(book?.pages) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Pages
                     </div>
@@ -3581,13 +3581,13 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || Boolean((book as any)?.trim_width) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Trim size
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
                       {editMode ? (
-                        <div className="row" style={{ gap: 6, alignItems: "center" }}>
+                        <div className="row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
                           <input
                             className="om-inline-control"
                             type="number"
@@ -3628,7 +3628,7 @@ export default function BookDetailPage() {
 
 
                 {editMode || Boolean((book?.object_type ?? "").trim()) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Object type
                     </div>
@@ -3649,7 +3649,7 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || Boolean((book?.decade ?? "").trim()) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Decade
                     </div>
@@ -3677,7 +3677,7 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || facetView.subject.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       Subjects
                     </div>
@@ -3707,7 +3707,7 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || Boolean(book?.edition?.isbn13 ?? book?.edition?.isbn10) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="muted">
                       ISBN
                     </div>
@@ -3716,7 +3716,7 @@ export default function BookDetailPage() {
                 ) : null}
 
                 {editMode || Boolean(effectiveDescription.trim()) ? (
-                  <div style={{ marginTop: 8 }}>
+                  <div style={{ marginTop: "var(--space-8)" }}>
                     <div className="muted">Description</div>
                     {editMode ? (
                       <textarea
@@ -3725,10 +3725,10 @@ export default function BookDetailPage() {
                         value={formDescription}
                         onChange={(e) => setFormDescription(e.target.value)}
                         rows={1}
-                        style={{ overflow: "hidden", resize: "none", marginTop: 6 }}
+                        style={{ overflow: "hidden", resize: "none", marginTop: "var(--space-sm)" }}
                       />
                     ) : (
-                      <div style={{ marginTop: 6 }}>
+                      <div style={{ marginTop: "var(--space-sm)" }}>
                         <ExpandableContent
                           items={effectiveDescription.trim().split(/\s+/)}
                           limit={100}
@@ -3754,7 +3754,7 @@ export default function BookDetailPage() {
                   <div style={{ marginTop: 16 }} className="om-edit-label">
                     Book info
                   </div>
-                  <div style={{ marginTop: 8 }}>
+                  <div style={{ marginTop: "var(--space-8)" }}>
                     <div className="row om-row-baseline">
                       <div style={{ minWidth: 110 }} className="muted">
                         Catalog
@@ -3777,7 +3777,7 @@ export default function BookDetailPage() {
                               </option>
                             ))}
                           </select>
-                          <div className="muted" style={{ marginLeft: 10 }}>
+                          <div className="muted" style={{ marginLeft: "var(--space-10)" }}>
                             {libraryMoveState.message ? (libraryMoveState.error ? `${libraryMoveState.message} (${libraryMoveState.error})` : libraryMoveState.message) : ""}
                           </div>
                         </>
@@ -3786,7 +3786,7 @@ export default function BookDetailPage() {
                       )}
                     </div>
 
-                    <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                       <div style={{ minWidth: 110 }} className="muted">
                         {copiesLabel}
                       </div>
@@ -3800,7 +3800,7 @@ export default function BookDetailPage() {
                             onChange={(e) => setCopiesDraft(e.target.value)}
                             style={{ width: 90 }}
                           />
-                          <div className="muted" style={{ marginLeft: 10 }}>
+                          <div className="muted" style={{ marginLeft: "var(--space-10)" }}>
                             {copiesUpdateState.message
                               ? copiesUpdateState.error
                                 ? `${copiesUpdateState.message} (${copiesUpdateState.error})`
@@ -3819,7 +3819,7 @@ export default function BookDetailPage() {
                       )}
                     </div>
                     {editMode || facetView.category.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                         <div style={{ minWidth: 110 }} className="muted">
                           Categories
                         </div>
@@ -3840,7 +3840,7 @@ export default function BookDetailPage() {
                     ) : null}
 
                     {editMode || facetView.tag.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                         <div style={{ minWidth: 110 }} className="muted">
                           Tags
                         </div>
@@ -3861,7 +3861,7 @@ export default function BookDetailPage() {
                     ) : null}
 
                     {editMode || Boolean((formNotes ?? "").trim()) ? (
-                      <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                         <div style={{ minWidth: 110 }} className="muted">
                           Notes
                         </div>
@@ -3888,7 +3888,7 @@ export default function BookDetailPage() {
                   <div style={{ marginTop: 16 }} className="om-edit-label">
                     Privacy &amp; lending
                   </div>
-                  <div style={{ marginTop: 8 }}>
+                  <div style={{ marginTop: "var(--space-8)" }}>
                     <div className="row om-row-baseline">
                       <div style={{ minWidth: 110 }} className="muted">
                         Visibility
@@ -3925,7 +3925,7 @@ export default function BookDetailPage() {
                       )}
                     </div>
 
-                    <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                       <div style={{ minWidth: 110 }} className="muted">
                         Status
                       </div>
@@ -3946,7 +3946,7 @@ export default function BookDetailPage() {
                       )}
                     </div>
 
-                    <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                       <div style={{ minWidth: 110 }} className="muted">
                         Borrowable
                       </div>
@@ -3984,9 +3984,9 @@ export default function BookDetailPage() {
                   {editMode || Boolean((formLocation ?? "").trim()) || Boolean((formShelf ?? "").trim()) ? (
                     <>
                       <div style={{ marginTop: 16 }} className="om-edit-label">Place</div>
-                      <div style={{ marginTop: 8 }}>
+                      <div style={{ marginTop: "var(--space-8)" }}>
                         {editMode || Boolean((formLocation ?? "").trim()) ? (
-                          <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                          <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                             <div style={{ minWidth: 110 }} className="muted">
                               Location
                             </div>
@@ -4006,7 +4006,7 @@ export default function BookDetailPage() {
                         ) : null}
 
                         {editMode || Boolean((formShelf ?? "").trim()) ? (
-                          <div className="row om-row-baseline" style={{ marginTop: 8 }}>
+                          <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                             <div style={{ minWidth: 110 }} className="muted">
                               Shelf
                             </div>
@@ -4031,7 +4031,7 @@ export default function BookDetailPage() {
                   {publicBookUrl ? (
                     <div style={{ marginTop: 16 }}>
                       <div className="om-edit-label">URL</div>
-                      <div className="row" style={{ marginTop: 6, gap: 10, flexWrap: "nowrap", alignItems: "flex-end" }}>
+                      <div className="row" style={{ marginTop: "var(--space-sm)", gap: "var(--space-10)", flexWrap: "nowrap", alignItems: "flex-end" }}>
                         <a
                           href={publicBookUrl}
                           target="_blank"
@@ -4049,7 +4049,7 @@ export default function BookDetailPage() {
                         )}
                       </div>
                       {shareState.error ? (
-                        <div className="muted" style={{ marginTop: 6, textAlign: "right" }}>
+                        <div className="muted" style={{ marginTop: "var(--space-sm)", textAlign: "right" }}>
                           {shareState.message} ({shareState.error})
                         </div>
                       ) : null}
@@ -4065,37 +4065,37 @@ export default function BookDetailPage() {
             <div style={{ gridColumn: "1 / -1", marginTop: 16 }}>
               <hr className="om-hr" style={{ marginBottom: 16 }} />
               {isOwner && editMode ? (
-                <details style={{ marginTop: 8, border: "none", outline: "none", boxShadow: "none" }}>
+                <details style={{ marginTop: "var(--space-8)", border: "none", outline: "none", boxShadow: "none" }}>
                   <summary className="muted" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none", cursor: "pointer" }}>Add images…</summary>
-                  <div style={{ marginTop: 8 }}>
+                  <div style={{ marginTop: "var(--space-8)" }}>
                     <input key={imagesInputKey} type="file" accept="image/*" multiple onChange={(ev) => selectPendingImages(ev.target.files)} />
 
                     {pendingImages.length > 0 ? (
-                      <div className="muted" style={{ marginTop: 8 }}>
+                      <div className="muted" style={{ marginTop: "var(--space-8)" }}>
                         <div>Selected (not uploaded yet):</div>
-                        <div style={{ marginTop: 6 }}>
+                        <div style={{ marginTop: "var(--space-sm)" }}>
                           {pendingImages.map((f) => (
                             <div key={`${f.name}:${f.size}:${f.lastModified}`}>{f.name}</div>
                           ))}
                         </div>
-                        <div className="row" style={{ marginTop: 8 }}>
+                        <div className="row" style={{ marginTop: "var(--space-8)" }}>
                           <button onClick={uploadImages} disabled={imagesState.busy}>
                             {imagesState.busy ? "Uploading…" : "Submit"}
                           </button>
                           <button onClick={clearPendingImages} disabled={imagesState.busy} className="muted">
                             Clear
                           </button>
-                          <div className="muted" style={{ marginLeft: 10 }}>
+                          <div className="muted" style={{ marginLeft: "var(--space-10)" }}>
                             {imagesState.message ? (imagesState.error ? `${imagesState.message} (${imagesState.error})` : imagesState.message) : ""}
                           </div>
                         </div>
                       </div>
                     ) : imagesState.message ? (
-                      <div className="muted" style={{ marginTop: 6 }}>
+                      <div className="muted" style={{ marginTop: "var(--space-sm)" }}>
                         {imagesState.error ? `${imagesState.message} (${imagesState.error})` : imagesState.message}
                       </div>
                     ) : (
-                      <div className="muted" style={{ marginTop: 6 }}>
+                      <div className="muted" style={{ marginTop: "var(--space-sm)" }}>
                         Select one or more images, then click Submit.
                       </div>
                     )}
@@ -4104,7 +4104,7 @@ export default function BookDetailPage() {
               ) : null}
 
               {imageMedia.length > 0 ? (
-                <div className="om-images-grid" style={{ marginTop: 10 }}>
+                <div className="om-images-grid" style={{ marginTop: "var(--space-10)" }}>
                   {imageMedia.map((m, idx) => {
                     const url = mediaUrlsByPath[m.storage_path];
                     return (
@@ -4122,7 +4122,7 @@ export default function BookDetailPage() {
                           <div className="om-cover-slot" style={{ width: "100%", height: isNarrow ? 140 : 180, padding: 0 }} />
                         )}
                         {editMode ? (
-                          <div className="row" style={{ marginTop: 8, justifyContent: "space-between" }}>
+                          <div className="row" style={{ marginTop: "var(--space-8)", justifyContent: "space-between" }}>
                             <button onClick={() => setAsCover(m.id)} disabled={coverState.busy}>
                               Use as cover
                             </button>
@@ -4136,7 +4136,7 @@ export default function BookDetailPage() {
                   })}
                 </div>
               ) : editMode ? (
-                <div className="muted" style={{ marginTop: 8 }}>
+                <div className="muted" style={{ marginTop: "var(--space-8)" }}>
                   No images yet.
                 </div>
               ) : null}

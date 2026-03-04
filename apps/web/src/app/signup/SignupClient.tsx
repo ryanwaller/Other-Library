@@ -52,7 +52,7 @@ export default function SignupClient() {
   return (
     <main className="container">
       <div className="card">
-        <div style={{ marginBottom: 8 }}>Sign up (invite-only)</div>
+        <div style={{ marginBottom: "var(--space-8)" }}>Sign up (invite-only)</div>
         {!supabase ? (
           <div className="muted">
             Supabase is not configured. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
@@ -63,15 +63,15 @@ export default function SignupClient() {
               <div>Invite token</div>
               <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="Token" />
             </div>
-            <div className="row" style={{ marginTop: 8 }}>
+            <div className="row" style={{ marginTop: "var(--space-8)" }}>
               <div>Email</div>
               <input value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
-            <div className="row" style={{ marginTop: 8 }}>
+            <div className="row" style={{ marginTop: "var(--space-8)" }}>
               <div>Password</div>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
-            <div className="row" style={{ marginTop: 12, gap: 10 }}>
+            <div className="row" style={{ marginTop: "var(--space-md)", gap: "var(--space-10)" }}>
               <button type="submit" disabled={busy || !token.trim() || !email.trim() || !password.trim()}>
                 {busy ? "Creating…" : "Create account"}
               </button>
@@ -83,12 +83,12 @@ export default function SignupClient() {
               </Link>
             </div>
             {message ? (
-              <div className="muted" style={{ marginTop: 8 }}>
+              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
                 {message}
               </div>
             ) : null}
             {error ? (
-              <div className="muted" style={{ marginTop: 8 }}>
+              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
                 {error}
               </div>
             ) : null}

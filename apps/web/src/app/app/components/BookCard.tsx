@@ -86,7 +86,7 @@ export default function BookCard({
 
   if (viewMode === "list") {
     return (
-      <div className="card" style={{ display: "grid", gridTemplateColumns: bulkMode ? "26px 70px 1fr" : "70px 1fr", gap: 12, alignItems: "start" }}>
+      <div className="card" style={{ display: "grid", gridTemplateColumns: bulkMode ? "26px 70px 1fr" : "70px 1fr", gap: "var(--space-md)", alignItems: "start" }}>
         {bulkMode ? <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" /> : null}
         <Link href={href} style={{ display: "block" }} className="om-book-card-link">
           <div className="om-cover-slot" style={{ width: 70, height: "auto" }}>
@@ -140,8 +140,8 @@ export default function BookCard({
           <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link">
             {coverEl}
           </Link>
-          <div style={{ marginTop: 12 }}>
-            <div className="row" style={{ justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+          <div style={{ marginTop: "var(--space-md)" }}>
+            <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-10)", alignItems: "baseline" }}>
               <Link href={href} style={{ textDecoration: "none" }} className="om-book-card-link">
                 <span className="om-book-title">{title}</span>
               </Link>
@@ -175,8 +175,8 @@ export default function BookCard({
           <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link">
             {coverEl}
           </Link>
-          <div style={{ marginTop: 14 }}>
-            <div className="row" style={{ justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
+          <div style={{ marginTop: "var(--space-14)" }}>
+            <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-10)", alignItems: "baseline" }}>
               <Link href={href} style={{ textDecoration: "none" }} className="om-book-card-link">
                 <span className="om-book-title">{title}</span>
               </Link>

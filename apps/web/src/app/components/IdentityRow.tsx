@@ -45,7 +45,7 @@ export default function IdentityRow({
         </div>
       </div>
       {rightSlot && (
-        <div style={{ flex: "0 0 auto", marginLeft: 12 }}>
+        <div style={{ flex: "0 0 auto", marginLeft: "var(--space-md)" }}>
           {rightSlot}
         </div>
       )}

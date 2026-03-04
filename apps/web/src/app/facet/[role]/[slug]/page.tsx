@@ -186,7 +186,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
   return (
     <main className="container">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-        <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap", alignItems: "center" }}>
           <span className="muted">Catalogs</span>
           <span>{catalogsCount}</span>
           <span className="muted">Books</span>
@@ -197,7 +197,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
         />
       </div>
 
-      <hr className="om-hr" style={{ marginTop: 10 }} />
+      <hr className="om-hr" style={{ marginTop: "var(--space-10)" }} />
 
       {groups.length === 0 ? (
         <div className="card muted">No books in this facet yet.</div>
@@ -205,7 +205,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
         groups.map((group, index) => (
           <div key={group.libraryId} style={{ marginTop: index === 0 ? 0 : 12 }}>
             {index > 0 ? <hr className="om-hr" /> : null}
-            <div className="row" style={{ gap: 10, marginTop: 8, marginBottom: 10 }}>
+            <div className="row" style={{ gap: "var(--space-10)", marginTop: "var(--space-8)", marginBottom: "var(--space-10)" }}>
               <span>{group.name}</span>
               <span className="muted">
                 {group.rows.length} book{group.rows.length === 1 ? "" : "s"}

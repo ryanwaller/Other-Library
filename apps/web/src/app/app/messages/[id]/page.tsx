@@ -250,7 +250,7 @@ export default function MessageThreadPage() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: 8 }}>
+          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -290,7 +290,7 @@ export default function MessageThreadPage() {
 
   return (
     <main className="container">
-      <div className="muted" style={{ marginBottom: 12 }}>
+      <div className="muted" style={{ marginBottom: "var(--space-md)" }}>
         <Link href="/app/messages">Back</Link>
       </div>
 
@@ -302,7 +302,7 @@ export default function MessageThreadPage() {
             username={other?.username || otherUserId || ""}
             label={isOwner ? "request from" : "request to"}
             rightSlot={
-              <div className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <div className="muted" style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-sm)" }}>
                 {req.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
                 {req.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
                 {req.status === "pending" ? <span>…</span> : null}
@@ -310,14 +310,14 @@ export default function MessageThreadPage() {
             }
           />
 
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: "var(--space-8)" }}>
             <span className="muted">{book?.object_type || "book"}: </span>
             <Link href={`/app/books/${req.user_book_id}`}>{title}</Link>
           </div>
         </div>
       )}
 
-      <div className="om-thread" style={{ marginTop: 14 }}>
+      <div className="om-thread" style={{ marginTop: "var(--space-14)" }}>
         {req?.message ? (
           <div className="om-thread-msg">
             <div className="muted">{requesterName}</div>
@@ -326,7 +326,7 @@ export default function MessageThreadPage() {
         ) : null}
 
         {thread.length === 0 ? null : (
-          <div style={{ marginTop: req?.message ? 10 : 0, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ marginTop: req?.message ? 10 : 0, display: "flex", flexDirection: "column", gap: "var(--space-10)" }}>
             {thread.map((m) => {
               const ev = parseEventMessage(m.message);
               if (ev) {
@@ -354,7 +354,7 @@ export default function MessageThreadPage() {
         )}
       </div>
 
-      <div style={{ marginTop: 14 }}>
+      <div style={{ marginTop: "var(--space-14)" }}>
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -369,8 +369,8 @@ export default function MessageThreadPage() {
           style={{ width: "100%" }}
         />
 
-        <div className="row" style={{ marginTop: 10, justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-          <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+        <div className="row" style={{ marginTop: "var(--space-10)", justifyContent: "space-between", gap: "var(--space-10)", flexWrap: "wrap" }}>
+          <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap" }}>
             <button
               onClick={send}
               disabled={sendState.busy || !draft.trim() || !req || (req.status !== "pending" && req.status !== "approved" && req.status !== "rejected")}
@@ -380,7 +380,7 @@ export default function MessageThreadPage() {
             <span className="muted">{sendState.message ? (sendState.error ? `${sendState.message} (${sendState.error})` : sendState.message) : ""}</span>
           </div>
 
-          <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+          <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap" }}>
             {req?.status === "pending" && isOwner ? (
               <>
                 <button onClick={() => setStatus("approved")} disabled={statusState.busy}>

@@ -390,7 +390,7 @@ export default function BookScannerModal({ open, onClose, onResult }: Props) {
           <div style={{ color: FG }}>
             Found: <em>&ldquo;{titleSuggestion}&rdquo;</em> — search this?
           </div>
-          <div style={{ marginTop: 6, display: "flex", gap: 12 }}>
+          <div style={{ marginTop: "var(--space-sm)", display: "flex", gap: "var(--space-md)" }}>
             <button onClick={() => handleResult(titleSuggestion)} style={{ color: FG }}>
               Yes
             </button>
@@ -422,7 +422,7 @@ export default function BookScannerModal({ open, onClose, onResult }: Props) {
           }}
         >
           <div style={{ color: MUTED }}>Try the barcode on the back cover</div>
-          <div style={{ marginTop: 6 }}>
+          <div style={{ marginTop: "var(--space-sm)" }}>
             <button onClick={onClose} style={{ color: MUTED }}>
               Type instead
             </button>

@@ -35,17 +35,17 @@ export default function AcceptInviteClient() {
   return (
     <main className="container">
       <div className="card">
-        <div style={{ marginBottom: 8 }}>Accept invite</div>
+        <div style={{ marginBottom: "var(--space-8)" }}>Accept invite</div>
         {!token ? (
           <div className="muted">Missing token.</div>
         ) : (
           <>
             <div className="muted">Token: {tokenShort}</div>
-            <div className="muted" style={{ marginTop: 8 }}>
+            <div className="muted" style={{ marginTop: "var(--space-8)" }}>
               {busy ? "Checking…" : error ? error : status ? (status.ok ? "Invite valid." : `Invite invalid: ${status.reason}`) : ""}
             </div>
             {status?.ok ? (
-              <div className="row" style={{ marginTop: 12, gap: 10 }}>
+              <div className="row" style={{ marginTop: "var(--space-md)", gap: "var(--space-10)" }}>
                 <button
                   onClick={() => {
                     try {

@@ -106,17 +106,17 @@ export default function AlsoOwnedBy({
   return (
     <>
     <hr style={{ border: 0, borderTop: "1px solid var(--border)", margin: "16px 0 0" }} />
-    <div style={{ marginTop: 14 }} className="card">
+    <div style={{ marginTop: "var(--space-14)" }} className="card">
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>Also owned by</div>
         <div className="muted">{owners.length}</div>
       </div>
       {owners.length === 0 ? (
-        <div className="muted" style={{ marginTop: 8 }}>
+        <div className="muted" style={{ marginTop: "var(--space-8)" }}>
           None found.
         </div>
       ) : (
-        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ marginTop: "var(--space-10)", display: "flex", flexDirection: "column", gap: "var(--space-10)" }}>
           {owners.map((r) => {
             const username = r.owner?.username ?? "";
             const avatarPath = r.owner?.avatar_path ?? null;

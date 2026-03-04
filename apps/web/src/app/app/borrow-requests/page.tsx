@@ -137,7 +137,7 @@ export default function BorrowRequestsPage() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: 8 }}>
+          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -156,7 +156,7 @@ export default function BorrowRequestsPage() {
             <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
           </div>
 
-          <div style={{ marginTop: 12 }} className="om-list">
+          <div style={{ marginTop: "var(--space-md)" }} className="om-list">
             {rows.length === 0 ? (
               <div className="muted">No requests yet.</div>
             ) : (
@@ -181,17 +181,17 @@ export default function BorrowRequestsPage() {
                       }
                     />
 
-                    <div style={{ marginTop: 8 }}>
+                    <div style={{ marginTop: "var(--space-8)" }}>
                       {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
                     </div>
 
                     {preview ? (
-                      <div className="muted" style={{ marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div className="muted" style={{ marginTop: "var(--space-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {preview}
                       </div>
                     ) : null}
 
-                    <div style={{ marginTop: 8 }}>
+                    <div style={{ marginTop: "var(--space-8)" }}>
                       <Link href={`/app/messages/${r.id}`}>View conversation</Link>
                     </div>
                   </div>

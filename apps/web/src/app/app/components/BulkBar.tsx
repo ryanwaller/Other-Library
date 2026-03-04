@@ -75,7 +75,7 @@ export default function BulkBar({
   const filteredMoveTargets = libraries.filter((l) => l.name.toLowerCase().includes(moveQuery.trim().toLowerCase()));
 
   return (
-    <div className="om-bulkbar" style={{ marginTop: 6 }}>
+    <div className="om-bulkbar" style={{ marginTop: "var(--space-sm)" }}>
       <div className="row" style={{ justifyContent: "flex-start", alignItems: "baseline", gap: 14 }}>
         <details
           ref={visibilityRef}
@@ -194,10 +194,10 @@ export default function BulkBar({
               if (e.key === "Escape") close(moreRef);
             }}
           >
-            <div className="muted" style={{ marginBottom: 6 }}>
+            <div className="muted" style={{ marginBottom: "var(--space-sm)" }}>
               Add category
             </div>
-            <div className="row" style={{ gap: 10, alignItems: "baseline", marginBottom: 12 }}>
+            <div className="row" style={{ gap: "var(--space-10)", alignItems: "baseline", marginBottom: "var(--space-md)" }}>
               <input
                 value={bulkCategoryName}
                 onChange={(e) => setBulkCategoryName(e.target.value)}

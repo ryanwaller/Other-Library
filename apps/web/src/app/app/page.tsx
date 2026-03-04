@@ -1828,7 +1828,7 @@ function AppShell({
         />
 
         <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
-          <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap", alignItems: "center" }}>
             <span className="muted">Catalogs</span>
             <span>{libraries.length}</span>
             <span className="muted">Books</span>
@@ -1848,7 +1848,7 @@ function AppShell({
               </>
             )}
           </div>
-          <div className="row muted" style={{ gap: 10, justifyContent: "flex-end" }}>
+          <div className="row muted" style={{ gap: "var(--space-10)", justifyContent: "flex-end" }}>
             <ActiveFilterDisplay
               pairs={(() => {
                 const pairs: FilterPair[] = [];
@@ -1874,9 +1874,9 @@ function AppShell({
 
         {isMobile ? (
           <>
-            <div className="row" style={{ width: "100%", margin: 0, gap: 10, alignItems: "baseline", flexWrap: "nowrap" }}>
+            <div className="row" style={{ width: "100%", margin: 0, gap: "var(--space-10)", alignItems: "baseline", flexWrap: "nowrap" }}>
               {showScan && (
-                <div className="row" style={{ gap: 6, flex: "0 0 auto", alignItems: "baseline" }}>
+                <div className="row" style={{ gap: "var(--space-sm)", flex: "0 0 auto", alignItems: "baseline" }}>
                   <button className="muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}>Scan</button>
                   <span className="muted" style={{ fontSize: "0.9em" }}>or</span>
                 </div>
@@ -1893,7 +1893,7 @@ function AppShell({
                 />
               </div>
               {((addInput.trim() || addInputFocused) || (addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message)) && (
-                <div className="row" style={{ gap: 10, flex: "0 0 auto" }}>
+                <div className="row" style={{ gap: "var(--space-10)", flex: "0 0 auto" }}>
                   {(addInput.trim() || addInputFocused) && (
                     <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
                       {addState.busy ? "…" : "Go"}
@@ -1905,7 +1905,7 @@ function AppShell({
                 </div>
               )}
             </div>
-            <div className="row" style={{ width: "100%", margin: 0, gap: 12, alignItems: "baseline", flexWrap: "nowrap" }}>
+            <div className="row" style={{ width: "100%", margin: 0, gap: "var(--space-md)", alignItems: "baseline", flexWrap: "nowrap" }}>
               <button onClick={() => { const next = !bulkMode; if (next) { setAddOpen(false); setSortOpen(false); setSearchOpen(false); setReorderMode(true); } else { exitEditMode(); } setBulkMode(next); }}>
                 {bulkMode ? "Done" : "Edit"}
               </button>
@@ -1928,9 +1928,9 @@ function AppShell({
           </>
         ) : (
           <div className="row" style={{ width: "100%", margin: 0, alignItems: "baseline", justifyContent: "space-between", flexWrap: "nowrap" }}>
-            <div className="row" style={{ flex: "1 1 auto", gap: 12, alignItems: "baseline", minWidth: 0, flexWrap: "nowrap", margin: 0 }}>
+            <div className="row" style={{ flex: "1 1 auto", gap: "var(--space-md)", alignItems: "baseline", minWidth: 0, flexWrap: "nowrap", margin: 0 }}>
               {showScan && (
-                <div className="row" style={{ gap: 6, flex: "0 0 auto", alignItems: "baseline" }}>
+                <div className="row" style={{ gap: "var(--space-sm)", flex: "0 0 auto", alignItems: "baseline" }}>
                   <button className="muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}>Scan</button>
                   <span className="muted" style={{ fontSize: "0.9em" }}>or</span>
                 </div>
@@ -1946,7 +1946,7 @@ function AppShell({
                   style={{ width: "100%" }}
                 />
               </div>
-              <div className="row" style={{ gap: 10, flex: "0 0 auto" }}>
+              <div className="row" style={{ gap: "var(--space-10)", flex: "0 0 auto" }}>
                 {(addInput.trim() || addInputFocused) && (
                   <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
                     {addState.busy ? "…" : "Go"}
@@ -1971,7 +1971,7 @@ function AppShell({
       </div>
 
       {!isMobile && searchOpen && (
-        <div className="row" style={{ width: "100%", marginTop: 6, alignItems: "baseline", gap: 12, flexWrap: "nowrap" }}>
+        <div className="row" style={{ width: "100%", marginTop: "var(--space-sm)", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
           <input
             className="om-inline-search-input"
             placeholder="Search your catalog"
@@ -1989,7 +1989,7 @@ function AppShell({
 
 
         {(addState.message || addSearchState.message) && (
-          <div className="muted" style={{ marginTop: 6 }}>
+          <div className="muted" style={{ marginTop: "var(--space-sm)" }}>
             {addState.message || addSearchState.message}
           </div>
         )}
@@ -2065,7 +2065,7 @@ function AppShell({
         )}
 
       {sortOpen && (
-        <div className="om-filter-row" style={{ marginTop: 16, marginBottom: 14, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, alignItems: "center" }}>
+        <div className="om-filter-row" style={{ marginTop: 16, marginBottom: "var(--space-14)", flexWrap: isMobile ? "wrap" : "nowrap", gap: "var(--space-10)", alignItems: "center" }}>
           <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
             <option value="grid">grid</option>
             {isMobile && <option value="list">list</option>}
@@ -2107,8 +2107,8 @@ function AppShell({
 
       {tagMenu.open && (
         <div ref={tagMenuRef} className="om-popover" style={{ position: "fixed", top: tagMenu.top, left: tagMenu.left, minWidth: tagMenu.minWidth, maxHeight: 320, overflow: "auto", zIndex: 1001 }}>
-          <input placeholder="Search…" value={tagSearch} onChange={(e) => setTagSearch(e.target.value)} style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <input placeholder="Search…" value={tagSearch} onChange={(e) => setTagSearch(e.target.value)} style={{ width: "100%", marginBottom: "var(--space-8)", position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
             <button onClick={() => { setUrlFilters({ tag: null }); closeTagMenu(); }} style={{ textAlign: "left" }}>all</button>
             {availableTags.filter(t => t.toLowerCase().includes(tagSearch.trim().toLowerCase())).slice(0, 400).map(t => (
               <button key={t} onClick={() => { setUrlFilters({ tag: t }); closeTagMenu(); }} style={{ textAlign: "left" }}>{t}</button>
@@ -2119,8 +2119,8 @@ function AppShell({
 
       {categoryMenu.open && (
         <div ref={categoryMenuRef} className="om-popover" style={{ position: "fixed", top: categoryMenu.top, left: categoryMenu.left, minWidth: categoryMenu.minWidth, maxHeight: 320, overflow: "auto", zIndex: 1001 }}>
-          <input placeholder="Search…" value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} style={{ width: "100%", marginBottom: 8, position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <input placeholder="Search…" value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} style={{ width: "100%", marginBottom: "var(--space-8)", position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
             <button onClick={() => { setUrlFilters({ category: null }); closeCategoryMenu(); }} style={{ textAlign: "left" }}>all</button>
             {availableCategories.filter(c => c.toLowerCase().includes(categorySearch.trim().toLowerCase())).slice(0, 400).map(c => (
               <button key={c} onClick={() => { setUrlFilters({ category: c }); closeCategoryMenu(); }} style={{ textAlign: "left" }}>{c}</button>
@@ -2177,7 +2177,7 @@ function AppShell({
               gridCols={effectiveCols}
               searchQuery={searchQuery}
               renderBooks={(limit) => (
-                <div style={{ display: viewMode === "grid" ? "grid" : "flex", flexDirection: viewMode === "list" ? "column" : undefined, gridTemplateColumns: viewMode === "grid" ? `repeat(${effectiveCols}, minmax(0, 1fr))` : undefined, gap: 12 }}>
+                <div style={{ display: viewMode === "grid" ? "grid" : "flex", flexDirection: viewMode === "list" ? "column" : undefined, gridTemplateColumns: viewMode === "grid" ? `repeat(${effectiveCols}, minmax(0, 1fr))` : undefined, gap: "var(--space-md)" }}>
                   {groups.slice(0, limit).map(g => (
                     <BookCard
                       key={g.key}
@@ -2207,7 +2207,7 @@ function AppShell({
       })}
 
       <div style={{ marginTop: 24 }} className="card">
-        <div className="row" style={{ marginTop: 6, flexWrap: isMobile ? "wrap" : "nowrap", gap: 10, width: "100%", alignItems: "baseline" }}>
+        <div className="row" style={{ marginTop: "var(--space-sm)", flexWrap: isMobile ? "wrap" : "nowrap", gap: "var(--space-10)", width: "100%", alignItems: "baseline" }}>
           <input
             placeholder="Add another catalog (e.g. Home, Office)"
             value={newLibraryName}
@@ -2277,7 +2277,7 @@ export default function AppPage() {
       {!supabase ? (
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: 8 }}>Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.</div>
+          <div className="muted" style={{ marginTop: "var(--space-8)" }}>Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.</div>
         </div>
       ) : !sessionLoaded ? (
         <div className="card">Loading…</div>

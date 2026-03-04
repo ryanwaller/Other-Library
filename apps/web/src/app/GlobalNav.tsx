@@ -247,14 +247,14 @@ export default function GlobalNav() {
   return (
     <div className="container">
       <div style={{ padding: "8px 0 6px" }}>
-        <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+        <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: "var(--space-10)" }}>
           <div>
             <Link href={sessionUserId ? "/app" : "/"} style={{ textDecoration: "none" }}>
               Other Library
             </Link>
           </div>
 
-          <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="row" style={{ gap: "var(--space-md)", alignItems: "center", flexWrap: "wrap" }}>
             {sessionUserId && editInAppHref ? (
               <Link href={editInAppHref} aria-label="Edit this page in the app">
                 Edit in app

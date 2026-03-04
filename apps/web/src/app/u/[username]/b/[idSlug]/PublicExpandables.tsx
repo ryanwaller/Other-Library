@@ -20,7 +20,7 @@ export function ExpandableSubjects({ subjects, username }: { subjects: string[];
         {!expanded && hasMore ? " …" : ""}
       </div>
       {hasMore && (
-        <div className="row" style={{ marginTop: 12, justifyContent: "center" }}>
+        <div className="row" style={{ marginTop: "var(--space-md)", justifyContent: "center" }}>
           <button onClick={() => setExpanded((v) => !v)} className="muted">
             {expanded ? "See less" : "Load more"}
           </button>
@@ -41,7 +41,7 @@ export function ExpandableDescription({ text }: { text: string }) {
         {expanded ? text : words.slice(0, limit).join(" ") + (hasMore ? "…" : "")}
       </div>
       {hasMore && (
-        <div className="row" style={{ marginTop: 12, justifyContent: "center" }}>
+        <div className="row" style={{ marginTop: "var(--space-md)", justifyContent: "center" }}>
           <button onClick={() => setExpanded((v) => !v)} className="muted">
             {expanded ? "See less" : "Load more"}
           </button>

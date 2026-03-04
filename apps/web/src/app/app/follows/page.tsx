@@ -243,7 +243,7 @@ export default function FollowsPage() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: 8 }}>
+          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -261,11 +261,11 @@ export default function FollowsPage() {
             <div>Follows</div>
             <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
           </div>
-          <div className="muted" style={{ marginTop: 8 }}>
+          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
             Followers-only content is visible only to <span>approved</span> followers.
           </div>
           {actionError ? (
-            <div className="muted" style={{ marginTop: 8 }}>
+            <div className="muted" style={{ marginTop: "var(--space-8)" }}>
               {actionError}
             </div>
           ) : null}
@@ -276,11 +276,11 @@ export default function FollowsPage() {
               <div className="muted">{incomingPending.length}</div>
             </div>
             {incomingPending.length === 0 ? (
-              <div className="muted" style={{ marginTop: 8 }}>
+              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
                 None.
               </div>
             ) : (
-              <div style={{ marginTop: 8 }}>
+              <div style={{ marginTop: "var(--space-8)" }}>
                 {incomingPending.map((r) => {
                   const pid = r.follower_id;
                   const username = profileUsername(pid);
@@ -288,7 +288,7 @@ export default function FollowsPage() {
                   const avatarUrl = avatarUrlFor(pid);
                   if (!username) return null;
                   return (
-                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: 8 }}>
+                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <IdentityRow
                         avatarUrl={avatarUrl}
                         displayName={profilesById[pid]?.display_name ?? null}
@@ -298,7 +298,7 @@ export default function FollowsPage() {
                             <button onClick={() => approve(pid)} disabled={actionBusyKey !== null}>
                               {actionBusyKey === `approve:${pid}` ? "Approving…" : "Approve"}
                             </button>
-                            <button onClick={() => reject(pid)} disabled={actionBusyKey !== null} style={{ marginLeft: 8 }}>
+                            <button onClick={() => reject(pid)} disabled={actionBusyKey !== null} style={{ marginLeft: "var(--space-8)" }}>
                               {actionBusyKey === `reject:${pid}` ? "Rejecting…" : "Reject"}
                             </button>
                           </div>
@@ -317,11 +317,11 @@ export default function FollowsPage() {
               <div className="muted">{incomingApproved.length}</div>
             </div>
             {incomingApproved.length === 0 ? (
-              <div className="muted" style={{ marginTop: 8 }}>
+              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
                 None yet.
               </div>
             ) : (
-              <div style={{ marginTop: 8 }}>
+              <div style={{ marginTop: "var(--space-8)" }}>
                 {incomingApproved.map((r) => {
                   const pid = r.follower_id;
                   const username = profileUsername(pid);
@@ -330,7 +330,7 @@ export default function FollowsPage() {
                   const outgoingStatus = myOutgoingStatusFor(pid);
                   if (!username) return null;
                   return (
-                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: 8 }}>
+                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <IdentityRow
                         avatarUrl={avatarUrl}
                         displayName={profilesById[pid]?.display_name ?? null}
@@ -373,11 +373,11 @@ export default function FollowsPage() {
               <div className="muted">{outgoingApproved.length}</div>
             </div>
             {outgoingApproved.length === 0 ? (
-              <div className="muted" style={{ marginTop: 8 }}>
+              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
                 None.
               </div>
             ) : (
-              <div style={{ marginTop: 8 }}>
+              <div style={{ marginTop: "var(--space-8)" }}>
                 {outgoingApproved.map((r) => {
                   const pid = r.followee_id;
                   const username = profileUsername(pid);
@@ -385,7 +385,7 @@ export default function FollowsPage() {
                   const avatarUrl = avatarUrlFor(pid);
                   if (!username) return null;
                   return (
-                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: 8 }}>
+                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <IdentityRow
                         avatarUrl={avatarUrl}
                         displayName={profilesById[pid]?.display_name ?? null}
@@ -411,11 +411,11 @@ export default function FollowsPage() {
               <div className="muted">{outgoingPending.length}</div>
             </div>
             {outgoingPending.length === 0 ? (
-              <div className="muted" style={{ marginTop: 8 }}>
+              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
                 None.
               </div>
             ) : (
-              <div style={{ marginTop: 8 }}>
+              <div style={{ marginTop: "var(--space-8)" }}>
                 {outgoingPending.map((r) => {
                   const pid = r.followee_id;
                   const username = profileUsername(pid);
@@ -423,7 +423,7 @@ export default function FollowsPage() {
                   const avatarUrl = avatarUrlFor(pid);
                   if (!username) return null;
                   return (
-                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: 8 }}>
+                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <IdentityRow
                         avatarUrl={avatarUrl}
                         displayName={profilesById[pid]?.display_name ?? null}
@@ -449,11 +449,11 @@ export default function FollowsPage() {
               <div className="muted">{outgoingRejected.length}</div>
             </div>
             {outgoingRejected.length === 0 ? (
-              <div className="muted" style={{ marginTop: 8 }}>
+              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
                 None.
               </div>
             ) : (
-              <div style={{ marginTop: 8 }}>
+              <div style={{ marginTop: "var(--space-8)" }}>
                 {outgoingRejected.map((r) => {
                   const pid = r.followee_id;
                   const username = profileUsername(pid);
@@ -461,7 +461,7 @@ export default function FollowsPage() {
                   const avatarUrl = avatarUrlFor(pid);
                   if (!username) return null;
                   return (
-                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: 8 }}>
+                    <div key={`${r.follower_id}:${r.followee_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <IdentityRow
                         avatarUrl={avatarUrl}
                         displayName={profilesById[pid]?.display_name ?? null}

@@ -145,9 +145,9 @@ export default function PublicBookList({
 
   const containerStyle = useMemo((): React.CSSProperties => {
     if (viewMode === "list") {
-      return { display: "flex", flexDirection: "column", gap: 8 };
+      return { display: "flex", flexDirection: "column", gap: "var(--space-8)" };
     }
-    return { display: "grid", gridTemplateColumns: `repeat(${effectiveCols}, 1fr)`, gap: 12 };
+    return { display: "grid", gridTemplateColumns: `repeat(${effectiveCols}, 1fr)`, gap: "var(--space-md)" };
   }, [viewMode, effectiveCols]);
 
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
@@ -179,7 +179,7 @@ export default function PublicBookList({
 
     if (viewMode === "list") {
       return (
-        <div key={g.key} className="card" style={{ display: "flex", gap: 12, alignItems: "start" }}>
+        <div key={g.key} className="card" style={{ display: "flex", gap: "var(--space-md)", alignItems: "start" }}>
           <Link href={href} style={{ display: "block" }} className="om-book-card-link">
             <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
               <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
@@ -230,7 +230,7 @@ export default function PublicBookList({
             compact
           />
         </div>
-        <div style={{ marginTop: 14 }}>
+        <div style={{ marginTop: "var(--space-14)" }}>
           <Link href={href} style={{ color: "inherit" }}><span className="om-book-title">{title}</span></Link>
         </div>
         <div className="om-book-secondary">
@@ -261,13 +261,13 @@ export default function PublicBookList({
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
       {/* Header Lockup */}
       <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
-        <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center", margin: 0 }}>
+        <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap", alignItems: "center", margin: 0 }}>
           <span className="muted">Catalogs</span>
           <span>{libraries.length}</span>
           <span className="muted">Books</span>
           <span>{filteredGroups.length}</span>
         </div>
-        <div className="row muted" style={{ gap: 10, justifyContent: "flex-end", margin: 0 }}>
+        <div className="row muted" style={{ gap: "var(--space-10)", justifyContent: "flex-end", margin: 0 }}>
           <ActiveFilterDisplay
             pairs={(() => {
               const pairs: FilterPair[] = [];
@@ -306,7 +306,7 @@ export default function PublicBookList({
         </div>
       </div>
 
-      <div className="row" style={{ margin: 0, alignItems: "baseline", gap: 12 }}>
+      <div className="row" style={{ margin: 0, alignItems: "baseline", gap: "var(--space-md)" }}>
         <button
           type="button"
           className={sortOpen ? "text-primary" : "muted"}
@@ -324,7 +324,7 @@ export default function PublicBookList({
       </div>
 
       {sortOpen && (
-        <div className="om-filter-row" style={{ marginTop: 10, marginBottom: 4, gap: 10, alignItems: "center" }}>
+        <div className="om-filter-row" style={{ marginTop: "var(--space-10)", marginBottom: 4, gap: "var(--space-10)", alignItems: "center" }}>
           <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as "grid" | "list")}>
             <option value="grid">grid</option>
             {isMobile && <option value="list">list</option>}
@@ -369,7 +369,7 @@ export default function PublicBookList({
               {idx > 0 && <hr className="om-hr" />}
               <div className="card" style={{ marginTop: idx === 0 ? 0 : 14 }}>
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap" }}>
-                  <div className="row" style={{ gap: 10, flex: 1, alignItems: "baseline", flexWrap: "nowrap", minWidth: 0 }}>
+                  <div className="row" style={{ gap: "var(--space-10)", flex: 1, alignItems: "baseline", flexWrap: "nowrap", minWidth: 0 }}>
                     <button
                       onClick={toggle}
                       aria-label={collapsed ? "Expand catalog" : "Collapse catalog"}
@@ -381,7 +381,7 @@ export default function PublicBookList({
                       <button onClick={toggle} style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left" }}>
                         {lib.name}
                       </button>
-                      <span className="muted" style={{ marginLeft: 12, whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
+                      <span className="muted" style={{ marginLeft: "var(--space-md)", whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
                         {libGroups.length}&nbsp;&nbsp;book{libGroups.length === 1 ? "" : "s"}
                       </span>
                     </div>

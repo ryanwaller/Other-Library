@@ -43,7 +43,7 @@ export default async function PublicFollowingPage({ params }: { params: Promise<
       <main className="container">
         <div className="card">
           <div>@{username}</div>
-          <div className="muted" style={{ marginTop: 8 }}>
+          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
             Not found (or private).
           </div>
         </div>
@@ -59,7 +59,7 @@ export default async function PublicFollowingPage({ params }: { params: Promise<
           <div>
             <Link href={`/u/${profile.username}`}>{profile.username}</Link> · following
           </div>
-          <div className="muted" style={{ marginTop: 8 }}>
+          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
             Following list is not visible.
           </div>
         </div>
@@ -88,14 +88,14 @@ export default async function PublicFollowingPage({ params }: { params: Promise<
         </div>
       </div>
 
-      <div style={{ marginTop: 12 }}>
+      <div style={{ marginTop: "var(--space-md)" }}>
         {rows.length === 0 ? (
           <div className="muted">None.</div>
         ) : (
           rows.map((p) => {
             const avatarUrl = p.avatar_path ? signedMap[p.avatar_path] ?? null : null;
             return (
-              <div key={p.id} className="card" style={{ marginTop: 10 }}>
+              <div key={p.id} className="card" style={{ marginTop: "var(--space-10)" }}>
                 <IdentityRow
                   avatarUrl={avatarUrl}
                   displayName={p.display_name}

@@ -197,8 +197,8 @@ export default function CoverEditor({ src, initialState, aspectRatio, onChange, 
       </div>
 
       {/* Controls */}
-      <div style={{ marginTop: 12 }}>
-        <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
+      <div style={{ marginTop: "var(--space-md)" }}>
+        <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
           <div className="muted" style={{ minWidth: 110 }}>Zoom</div>
           <CustomSlider
             min={1}
@@ -209,7 +209,7 @@ export default function CoverEditor({ src, initialState, aspectRatio, onChange, 
             style={{ flex: "1 1 auto" }}
           />
         </div>
-        <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
+        <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
           <div className="muted" style={{ minWidth: 110 }}>Rotate</div>
           <CustomSlider
             min={-180}
@@ -220,7 +220,7 @@ export default function CoverEditor({ src, initialState, aspectRatio, onChange, 
             style={{ flex: "1 1 auto" }}
           />
         </div>
-        <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
+        <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
           <div className="muted" style={{ minWidth: 110 }}>Bright</div>
           <CustomSlider
             min={0.5}
@@ -231,7 +231,7 @@ export default function CoverEditor({ src, initialState, aspectRatio, onChange, 
             style={{ flex: "1 1 auto" }}
           />
         </div>
-        <div className="row no-wrap" style={{ marginTop: 8, alignItems: "center" }}>
+        <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
           <div className="muted" style={{ minWidth: 110 }}>Contrast</div>
           <CustomSlider
             min={0.5}

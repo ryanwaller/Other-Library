@@ -43,7 +43,7 @@ export default function FacetBookList({
       viewMode="grid"
       gridCols={isMobile ? 2 : 4}
       containerStyle={{ 
-        marginTop: 10, 
+        marginTop: "var(--space-10)", 
         display: "grid", 
         gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(180px, 1fr))", 
         gap: 16 
@@ -65,7 +65,7 @@ export default function FacetBookList({
               <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
                 <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
               </div>
-              <div style={{ marginTop: 10 }} className="book-title">
+              <div style={{ marginTop: "var(--space-10)" }} className="book-title">
                 {title}
               </div>
             </Link>

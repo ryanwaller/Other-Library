@@ -38,7 +38,7 @@ export default function PublicImageGrid({ images, signedMap }: Props) {
 
   return (
     <>
-      <div className="om-images-grid" style={{ marginTop: 10 }}>
+      <div className="om-images-grid" style={{ marginTop: "var(--space-10)" }}>
         {images.map((m, idx) => {
           const url = signedMap[m.storage_path];
           return (

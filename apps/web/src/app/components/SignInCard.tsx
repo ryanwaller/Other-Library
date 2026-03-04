@@ -54,11 +54,11 @@ export default function SignInCard({
           <div>Email</div>
           <input value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
-        <div className="row" style={{ marginTop: 8 }}>
+        <div className="row" style={{ marginTop: "var(--space-8)" }}>
           <div>Password</div>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
-        <div className="row" style={{ marginTop: 12 }}>
+        <div className="row" style={{ marginTop: "var(--space-md)" }}>
           <button type="submit" disabled={busy || !email || !password}>
             Sign in
           </button>
@@ -70,7 +70,7 @@ export default function SignInCard({
           {error ? <span className="muted">{error}</span> : null}
         </div>
         {note ? (
-          <div className="muted" style={{ marginTop: 8 }}>
+          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
             {note}
           </div>
         ) : null}

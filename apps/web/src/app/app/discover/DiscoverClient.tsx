@@ -97,7 +97,7 @@ export default function DiscoverClient() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: 8 }}>
+          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -113,12 +113,12 @@ export default function DiscoverClient() {
         <SignInCard note="Sign in to search your network." />
       ) : (
         <div className="card">
-          <div className="row" style={{ justifyContent: "space-between", gap: 12 }}>
+          <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-md)" }}>
             <div>Discovery</div>
             <div className="muted">{busy ? "Searching…" : error ? error : ""}</div>
           </div>
 
-          <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+          <div className="row" style={{ marginTop: "var(--space-10)", flexWrap: "wrap", gap: "var(--space-10)", alignItems: "center" }}>
             <input
               placeholder="Search title, author, ISBN, tag, subject, publisher…"
               value={q}
@@ -135,23 +135,23 @@ export default function DiscoverClient() {
             </button>
           </div>
 
-          <div className="muted" style={{ marginTop: 10 }}>
+          <div className="muted" style={{ marginTop: "var(--space-10)" }}>
             Results show books that are visible to you (your own, people you follow, and public).
           </div>
 
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: "var(--space-md)" }}>
             {rows.length === 0 && q.trim() && !busy ? <div className="muted">No results.</div> : null}
 
             {grouped.mine.length > 0 ? (
-              <div className="card" style={{ marginTop: 10 }}>
-                <div className="muted" style={{ marginBottom: 8 }}>Your catalog</div>
+              <div className="card" style={{ marginTop: "var(--space-10)" }}>
+                <div className="muted" style={{ marginBottom: "var(--space-8)" }}>Your catalog</div>
                 <PagedBookList
                   items={grouped.mine}
                   viewMode="list"
                   gridCols={isMobile ? 2 : 4}
                   searchQuery={q}
                   renderItem={(r) => (
-                    <div key={`mine-${r.user_book_id}`} style={{ marginTop: 8 }}>
+                    <div key={`mine-${r.user_book_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <Link href={`/app/books/${r.user_book_id}`}>{r.title}</Link>
                       <div className="muted">
                         {r.authors?.length ? r.authors.join(", ") : ""} {r.isbn13 ? `· ${r.isbn13}` : ""}
@@ -163,15 +163,15 @@ export default function DiscoverClient() {
             ) : null}
 
             {grouped.following.length > 0 ? (
-              <div className="card" style={{ marginTop: 10 }}>
-                <div className="muted" style={{ marginBottom: 8 }}>People you follow</div>
+              <div className="card" style={{ marginTop: "var(--space-10)" }}>
+                <div className="muted" style={{ marginBottom: "var(--space-8)" }}>People you follow</div>
                 <PagedBookList
                   items={grouped.following}
                   viewMode="list"
                   gridCols={isMobile ? 2 : 4}
                   searchQuery={q}
                   renderItem={(r) => (
-                    <div key={`f-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
+                    <div key={`f-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
                       <div className="muted">
                         <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
@@ -184,15 +184,15 @@ export default function DiscoverClient() {
             ) : null}
 
             {grouped.second.length > 0 ? (
-              <div className="card" style={{ marginTop: 10 }}>
-                <div className="muted" style={{ marginBottom: 8 }}>2nd-degree (public)</div>
+              <div className="card" style={{ marginTop: "var(--space-10)" }}>
+                <div className="muted" style={{ marginBottom: "var(--space-8)" }}>2nd-degree (public)</div>
                 <PagedBookList
                   items={grouped.second}
                   viewMode="list"
                   gridCols={isMobile ? 2 : 4}
                   searchQuery={q}
                   renderItem={(r) => (
-                    <div key={`s-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
+                    <div key={`s-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
                       <div className="muted">
                         <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
@@ -205,15 +205,15 @@ export default function DiscoverClient() {
             ) : null}
 
             {grouped.pub.length > 0 ? (
-              <div className="card" style={{ marginTop: 10 }}>
-                <div className="muted" style={{ marginBottom: 8 }}>Public</div>
+              <div className="card" style={{ marginTop: "var(--space-10)" }}>
+                <div className="muted" style={{ marginBottom: "var(--space-8)" }}>Public</div>
                 <PagedBookList
                   items={grouped.pub}
                   viewMode="list"
                   gridCols={isMobile ? 2 : 4}
                   searchQuery={q}
                   renderItem={(r) => (
-                    <div key={`p-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: 8 }}>
+                    <div key={`p-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
                       <div className="muted">
                         <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>

@@ -57,9 +57,9 @@ export default function LibraryBlock({
   const { limit, loadMore } = usePagination(viewMode, gridCols, searchQuery);
 
   return (
-    <div className="card" style={{ marginTop: 14 }}>
+    <div className="card" style={{ marginTop: "var(--space-14)" }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap" }}>
-        <div className="row" style={{ gap: 10, flex: 1, alignItems: "baseline", flexWrap: "nowrap", minWidth: 0 }}>
+        <div className="row" style={{ gap: "var(--space-10)", flex: 1, alignItems: "baseline", flexWrap: "nowrap", minWidth: 0 }}>
           <button
             onClick={() => {
               onToggleCollapsed(libraryId);
@@ -174,7 +174,7 @@ export default function LibraryBlock({
                   {libraryName}
                 </button>
               )}
-              <span className="muted" style={{ marginLeft: 12, whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
+              <span className="muted" style={{ marginLeft: "var(--space-md)", whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
                 {bookCount}&nbsp;&nbsp;book{bookCount === 1 ? "" : "s"}
               </span>
             </div>
@@ -182,7 +182,7 @@ export default function LibraryBlock({
         </div>
 
         {reorderMode ? (
-          <div className="row" style={{ gap: 10, marginLeft: 12, alignItems: "baseline" }}>
+          <div className="row" style={{ gap: "var(--space-10)", marginLeft: "var(--space-md)", alignItems: "baseline" }}>
             {index > 0 ? (
               <button
                 onClick={() => onMoveUp(libraryId)}
@@ -208,7 +208,7 @@ export default function LibraryBlock({
         <>
           {renderBooks(limit)}
           {bookCount > limit && (
-            <div className="row" style={{ marginTop: 12, marginBottom: 24, justifyContent: "center" }}>
+            <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: 24, justifyContent: "center" }}>
               <button onClick={loadMore} className="muted">
                 Load more
               </button>

@@ -117,11 +117,11 @@ function AdminListItem({
 }) {
   return (
     <div className="om-list-row">
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
         <div style={{ minWidth: 0, wordBreak: "break-word" }}>
           {primaryHref ? <Link href={primaryHref}>{primary}</Link> : primary}
         </div>
-        {actions ? <div className="row" style={{ gap: 10, justifyContent: "flex-end" }}>{actions}</div> : null}
+        {actions ? <div className="row" style={{ gap: "var(--space-10)", justifyContent: "flex-end" }}>{actions}</div> : null}
       </div>
       <div className="admin-meta-line" style={{ marginTop: 4 }}>
         {meta.map((pair, idx) => (
@@ -374,7 +374,7 @@ export default function AdminPage() {
         <SignInCard note="Sign in as an admin to access /admin." />
       ) : (
         <div className="card">
-          <div className="row admin-summary-row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <div className="row admin-summary-row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)" }}>
             <div className="admin-meta-line">
               {tabStats.map((item) => (
                 <span className="admin-meta-pair" key={item.label}>
@@ -398,7 +398,7 @@ export default function AdminPage() {
 
           <hr className="om-hr" />
 
-          <div className="row admin-tabbar-row" style={{ justifyContent: "space-between", gap: 10 }}>
+          <div className="row admin-tabbar-row" style={{ justifyContent: "space-between", gap: "var(--space-10)" }}>
             <div className="admin-tabbar">
               <button type="button" onClick={() => setTab("users")} aria-current={tab === "users" ? "page" : undefined}>
                 Users
@@ -410,7 +410,7 @@ export default function AdminPage() {
                 Invites
               </button>
             </div>
-            <div className="row admin-invite-row" style={{ gap: 8, minWidth: 0 }}>
+            <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0 }}>
               <input
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
@@ -444,7 +444,7 @@ export default function AdminPage() {
               </button>
               {inviteLink ? (
                 copiedInvite ? (
-                  <span style={{ marginLeft: 8 }}>Copied</span>
+                  <span style={{ marginLeft: "var(--space-8)" }}>Copied</span>
                 ) : (
                   <button
                     onClick={async () => {
@@ -461,15 +461,15 @@ export default function AdminPage() {
           </div>
 
           {friendlyError ? (
-            <div className="muted" style={{ marginTop: 8 }}>
+            <div className="muted" style={{ marginTop: "var(--space-8)" }}>
               {friendlyError}
             </div>
           ) : null}
 
           <hr className="om-hr" />
 
-          <div className="row admin-filter-row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-            <div className="row admin-filter-left" style={{ gap: 8, alignItems: "center", flex: "1 1 auto", minWidth: 0 }}>
+          <div className="row admin-filter-row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)" }}>
+            <div className="row admin-filter-left" style={{ gap: "var(--space-8)", alignItems: "center", flex: "1 1 auto", minWidth: 0 }}>
               {tab === "users" ? (
                 <>
                   <select
@@ -554,7 +554,7 @@ export default function AdminPage() {
           </div>
 
           {searchOpen ? (
-            <div className="row admin-search-row" style={{ marginTop: 10, gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
+            <div className="row admin-search-row" style={{ marginTop: "var(--space-10)", gap: "var(--space-8)", alignItems: "center", justifyContent: "flex-end" }}>
               {tab === "users" ? (
                 <>
                   <input
@@ -824,7 +824,7 @@ export default function AdminPage() {
 
           <hr className="om-hr" />
 
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)" }}>
             <div className="muted">
               {tab === "users" ? resultLabel(usersData?.page ?? userPage, userTotalPages, usersData?.total ?? 0) : null}
               {tab === "waitlist" ? resultLabel(waitlistData?.page ?? waitPage, waitTotalPages, waitlistData?.total ?? 0) : null}
@@ -877,7 +877,7 @@ export default function AdminPage() {
           </div>
 
           {inviteLink ? (
-            <div className="muted" style={{ marginTop: 8, wordBreak: "break-all" }}>
+            <div className="muted" style={{ marginTop: "var(--space-8)", wordBreak: "break-all" }}>
               {inviteLink}
             </div>
           ) : null}

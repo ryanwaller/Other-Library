@@ -39,8 +39,8 @@ export default function HomeClient() {
   return (
     <main className="container">
       <div className="card">
-        <div style={{ marginBottom: 8 }}>Other Library</div>
-        <div className="muted" style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: "var(--space-8)" }}>Other Library</div>
+        <div className="muted" style={{ marginBottom: "var(--space-md)" }}>
           Private beta.
         </div>
         <div className="row" style={{ alignItems: "flex-start" }}>
@@ -49,8 +49,8 @@ export default function HomeClient() {
           </div>
 
           <div style={{ flex: "1 1 320px" }} className="card">
-            <div style={{ marginBottom: 8 }}>I have an invite</div>
-            <div className="row" style={{ marginTop: 8, alignItems: "baseline" }}>
+            <div style={{ marginBottom: "var(--space-8)" }}>I have an invite</div>
+            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "baseline" }}>
               <input value={inviteToken} onChange={(e) => setInviteToken(e.target.value)} placeholder="Invite token" style={{ flex: 1 }} />
               <button
                 onClick={() => {
@@ -71,11 +71,11 @@ export default function HomeClient() {
           </div>
 
           <div style={{ flex: "1 1 320px" }} className="card">
-            <div style={{ marginBottom: 8 }}>Request access</div>
-            <div className="row" style={{ marginTop: 8, alignItems: "baseline" }}>
+            <div style={{ marginBottom: "var(--space-8)" }}>Request access</div>
+            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "baseline" }}>
               <input value={waitEmail} onChange={(e) => setWaitEmail(e.target.value)} placeholder="Email" style={{ flex: 1 }} />
             </div>
-            <div className="row" style={{ marginTop: 8, alignItems: "baseline" }}>
+            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "baseline" }}>
               <input value={waitNote} onChange={(e) => setWaitNote(e.target.value)} placeholder="Note (optional)" style={{ flex: 1 }} />
               <button
                 onClick={async () => {
@@ -103,13 +103,13 @@ export default function HomeClient() {
                 {waitState.busy ? "Submitting…" : "Submit"}
               </button>
             </div>
-            <div className="muted" style={{ marginTop: 8 }}>
+            <div className="muted" style={{ marginTop: "var(--space-8)" }}>
               {waitState.message ? (waitState.error ? `${waitState.message} (${waitState.error})` : waitState.message) : ""}
             </div>
           </div>
         </div>
 
-        <div className="row" style={{ marginTop: 12 }}>
+        <div className="row" style={{ marginTop: "var(--space-md)" }}>
           <a href="/app">Open the app</a>
           <span className="muted">/</span>
           <a href="/admin">Admin</a>
