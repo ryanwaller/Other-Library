@@ -633,8 +633,8 @@ function AppShell({
         }
         return;
       }
-    } catch {
-      setDebugLastError("server_home_failed");
+    } catch (err: any) {
+      setDebugLastError(String(err?.message ?? "server_home_failed"));
     }
     setDebugBooksSource("books:failed");
     setItems([]);
