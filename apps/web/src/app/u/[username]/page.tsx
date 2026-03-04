@@ -105,6 +105,9 @@ export default async function PublicProfilePage({
     libraries = ((librariesRes.data ?? []) as any[])
       .map((l) => ({ id: Number(l.id), name: String(l.name ?? `Catalog ${l.id}`) }))
       .filter((l) => Number.isFinite(l.id) && l.id > 0);
+    if (libraries.length === 0) {
+      libraries = libraryIds.map((id) => ({ id, name: `Catalog ${id}` }));
+    }
   }
 
   const mediaPaths = Array.from(new Set([

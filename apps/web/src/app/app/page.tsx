@@ -644,6 +644,29 @@ function AppShell({
     if (!supabase) return [];
     setLibraryState({ busy: true, error: null, message: null });
     try {
+      try {
+        const listRes = await catalogApi<{ ok: true; catalogs: LibrarySummary[] }>("/api/catalog/list", { method: "GET" });
+        const apiList = Array.isArray(listRes.catalogs) ? listRes.catalogs : [];
+        if (apiList.length > 0) {
+          setLibraries(apiList);
+          try {
+            const raw = window.localStorage.getItem("om_addLibraryId");
+            const parsed = raw ? Number(raw) : NaN;
+            if (Number.isFinite(parsed) && parsed > 0 && apiList.some((l) => l.id === parsed)) {
+              setAddLibraryId(parsed);
+            } else {
+              setAddLibraryId(apiList[0]?.id ?? null);
+            }
+          } catch {
+            setAddLibraryId(apiList[0]?.id ?? null);
+          }
+          setLibraryState({ busy: false, error: null, message: null });
+          return apiList;
+        }
+      } catch {
+        // fall through to client-side queries
+      }
+
       let ownedList: LibrarySummary[] = [];
       const resWithOrder = await supabase
         .from("libraries")
