@@ -856,7 +856,7 @@ export default function SettingsPage() {
                   <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm" />
                 </div>
               </div>
-              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
+              <div className="row om-settings-row" style={{ alignItems: "baseline", marginBottom: "var(--space-lg)" }}>
                 <button onClick={savePassword} disabled={passwordState.busy}>
                   {passwordState.busy ? "Saving…" : "Save password"}
                 </button>
@@ -866,17 +866,27 @@ export default function SettingsPage() {
               </div>
 
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
-                <div style={{ width: 120 }} className="text-muted">This is permanent. Type DELETE to confirm.</div>
+                <div style={{ width: 120 }} className="text-muted">Delete Account</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <input
-                    value={deleteConfirm}
-                    onChange={(e) => setDeleteConfirm(e.target.value)}
-                    placeholder="This is permanent. Type DELETE to confirm."
-                  />
+                  <div className="row" style={{ alignItems: "baseline", flexWrap: "nowrap" }}>
+                    <input
+                      value={deleteConfirm}
+                      onChange={(e) => setDeleteConfirm(e.target.value)}
+                      placeholder="This is permanent. Type DELETE to confirm."
+                      style={{ flex: "1 1 auto", minWidth: 0 }}
+                    />
+                    {deleteConfirm.trim() ? (
+                      <button
+                        onClick={deleteAccount}
+                        disabled={deleteState.busy}
+                        className="text-muted"
+                        style={{ whiteSpace: "nowrap", flexShrink: 0, textDecoration: "underline" }}
+                      >
+                        {deleteState.busy ? "Deleting…" : "Delete Account"}
+                      </button>
+                    ) : null}
+                  </div>
                   <div className="row" style={{ marginTop: "var(--space-sm)", alignItems: "baseline" }}>
-                    <button onClick={deleteAccount} disabled={deleteState.busy}>
-                      {deleteState.busy ? "Deleting…" : "Delete account"}
-                    </button>
                     <div className="text-muted">{deleteState.message ? (deleteState.error ? `${deleteState.message} (${deleteState.error})` : deleteState.message) : ""}</div>
                   </div>
                 </div>
