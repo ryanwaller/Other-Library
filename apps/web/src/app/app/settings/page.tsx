@@ -155,6 +155,7 @@ function SettingsPageContent() {
   });
 
   const [emailDraft, setEmailDraft] = useState<string>("");
+  const [emailFocused, setEmailFocused] = useState(false);
   const [emailState, setEmailState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -164,6 +165,7 @@ function SettingsPageContent() {
   const [currentPassword, setCurrentPassword] = useState<string>("");
   const [newPassword, setNewPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [passwordFocused, setPasswordFocused] = useState(false);
   const [passwordState, setPasswordState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
     error: null,
@@ -176,6 +178,8 @@ function SettingsPageContent() {
     error: null,
     message: null
   });
+  const [usernameEdited, setUsernameEdited] = useState(false);
+  const [displayNameEdited, setDisplayNameEdited] = useState(false);
   const [tab, setTab] = useState<"profile" | "follows" | "borrows" | "catalog" | "account">("profile");
 
   useEffect(() => {
@@ -320,6 +324,14 @@ function SettingsPageContent() {
     if (usernameAvailability.state === "taken") return true;
     return false;
   }, [profile?.username, normalized, localUsernameIssue, usernameAvailability.state]);
+  const usernameDirty = useMemo(() => {
+    if (!profile) return false;
+    return normalizeUsername(profileForm.username) !== profile.username;
+  }, [profile, profileForm.username]);
+  const displayNameDirty = useMemo(() => {
+    if (!profile) return false;
+    return (profileForm.display_name ?? "") !== (profile.display_name ?? "");
+  }, [profile, profileForm.display_name]);
 
   useEffect(() => {
     const client = supabase;
@@ -581,11 +593,24 @@ function SettingsPageContent() {
                         <img
                           alt=""
                           src={avatarUrl}
-                          style={{ width: 28, height: 28, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border-avatar)" }}
+                          style={{
+                            width: "var(--avatar-size)",
+                            height: "var(--avatar-size)",
+                            borderRadius: 999,
+                            objectFit: "cover",
+                            border: "1px solid var(--border-avatar)"
+                          }}
                         />
                       </a>
                     ) : (
-                      <div style={{ width: 28, height: 28, borderRadius: 999, border: "1px solid var(--border-avatar)" }} />
+                      <div
+                        style={{
+                          width: "var(--avatar-size)",
+                          height: "var(--avatar-size)",
+                          borderRadius: 999,
+                          border: "1px solid var(--border-avatar)"
+                        }}
+                      />
                     )}
                     <input
                       ref={avatarInputRef}
@@ -652,16 +677,33 @@ function SettingsPageContent() {
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Username</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <input
-                    value={profileForm.username}
-                    onChange={(e) => setProfileForm((p) => ({ ...p, username: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter") return;
-                      e.preventDefault();
-                      saveProfile();
-                    }}
-                    placeholder="username"
-                  />
+                  <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)" }}>
+                    <input
+                      value={profileForm.username}
+                      onChange={(e) => {
+                        setProfileForm((p) => ({ ...p, username: e.target.value }));
+                        setUsernameEdited(true);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        saveProfile();
+                      }}
+                      placeholder="username"
+                      style={{ flex: "1 1 auto", minWidth: 0 }}
+                    />
+                    {usernameEdited && usernameDirty ? (
+                      <button
+                        className="text-muted"
+                        style={{ whiteSpace: "nowrap", textDecoration: "underline" }}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={saveProfile}
+                        disabled={profileSaveState.busy || usernameSaveBlocked}
+                      >
+                        {profileSaveState.busy ? "Saving…" : "Save"}
+                      </button>
+                    ) : null}
+                  </div>
                   <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
                     {profile && normalized && normalized !== profile.username ? usernameAvailability.message ?? "" : ""}
                   </div>
@@ -671,16 +713,33 @@ function SettingsPageContent() {
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Display name</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <input
-                    value={profileForm.display_name}
-                    onChange={(e) => setProfileForm((p) => ({ ...p, display_name: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter") return;
-                      e.preventDefault();
-                      saveProfile();
-                    }}
-                    placeholder="(optional)"
-                  />
+                  <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)" }}>
+                    <input
+                      value={profileForm.display_name}
+                      onChange={(e) => {
+                        setProfileForm((p) => ({ ...p, display_name: e.target.value }));
+                        setDisplayNameEdited(true);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        saveProfile();
+                      }}
+                      placeholder="(optional)"
+                      style={{ flex: "1 1 auto", minWidth: 0 }}
+                    />
+                    {displayNameEdited && displayNameDirty ? (
+                      <button
+                        className="text-muted"
+                        style={{ whiteSpace: "nowrap", textDecoration: "underline" }}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={saveProfile}
+                        disabled={profileSaveState.busy}
+                      >
+                        {profileSaveState.busy ? "Saving…" : "Save"}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
@@ -712,7 +771,7 @@ function SettingsPageContent() {
                 </div>
               </div>
 
-              <div className="row om-settings-row" style={{ gap: "var(--space-md)" }}>
+              <div className="row om-settings-row" style={{ gap: "var(--space-md)", justifyContent: "space-between", alignItems: "baseline" }}>
                 <button onClick={saveProfile} disabled={profileSaveState.busy || usernameSaveBlocked}>
                   {profileSaveState.busy ? "Saving…" : "Save profile"}
                 </button>
@@ -815,20 +874,33 @@ function SettingsPageContent() {
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Email</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <input
-                    value={emailDraft}
-                    onChange={(e) => setEmailDraft(e.target.value)}
-                    placeholder="you@example.com"
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter") return;
-                      e.preventDefault();
-                      saveEmail();
-                    }}
-                  />
+                  <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)" }}>
+                    <input
+                      value={emailDraft}
+                      onChange={(e) => setEmailDraft(e.target.value)}
+                      onFocus={() => setEmailFocused(true)}
+                      onBlur={() => setEmailFocused(false)}
+                      placeholder="you@example.com"
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        saveEmail();
+                      }}
+                      style={{ flex: "1 1 auto", minWidth: 0 }}
+                    />
+                    {emailFocused ? (
+                      <button
+                        className="text-muted"
+                        style={{ whiteSpace: "nowrap", textDecoration: "underline" }}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={saveEmail}
+                        disabled={emailState.busy || !emailDraft.trim()}
+                      >
+                        {emailState.busy ? "Saving…" : "Save email"}
+                      </button>
+                    ) : null}
+                  </div>
                   <div className="row" style={{ marginTop: "var(--space-sm)", alignItems: "baseline" }}>
-                    <button onClick={saveEmail} disabled={emailState.busy || !emailDraft.trim()}>
-                      {emailState.busy ? "Saving…" : "Save email"}
-                    </button>
                     <div className="text-muted">{emailState.message ? (emailState.error ? `${emailState.message} (${emailState.error})` : emailState.message) : ""}</div>
                   </div>
                 </div>
@@ -837,25 +909,57 @@ function SettingsPageContent() {
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Password</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Current password" />
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onFocus={() => setPasswordFocused(true)}
+                    onBlur={() => setPasswordFocused(false)}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Current password"
+                  />
                 </div>
               </div>
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">New password</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" />
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onFocus={() => setPasswordFocused(true)}
+                    onBlur={() => setPasswordFocused(false)}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="New password"
+                  />
                 </div>
               </div>
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Confirm</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm" />
+                  <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)" }}>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onFocus={() => setPasswordFocused(true)}
+                      onBlur={() => setPasswordFocused(false)}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm"
+                      style={{ flex: "1 1 auto", minWidth: 0 }}
+                    />
+                    {passwordFocused ? (
+                      <button
+                        className="text-muted"
+                        style={{ whiteSpace: "nowrap", textDecoration: "underline" }}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={savePassword}
+                        disabled={passwordState.busy}
+                      >
+                        {passwordState.busy ? "Saving…" : "Save password"}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
               <div className="row om-settings-row" style={{ alignItems: "baseline", marginBottom: "var(--space-lg)" }}>
-                <button onClick={savePassword} disabled={passwordState.busy}>
-                  {passwordState.busy ? "Saving…" : "Save password"}
-                </button>
                 <div className="text-muted">
                   {passwordState.message ? (passwordState.error ? `${passwordState.message} (${passwordState.error})` : passwordState.message) : ""}
                 </div>
