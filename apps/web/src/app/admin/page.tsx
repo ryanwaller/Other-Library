@@ -12,6 +12,7 @@ type ProfileRow = {
   email: string | null;
   username: string;
   display_name: string | null;
+  avatar_path: string | null;
   role: "user" | "admin";
   status: "active" | "disabled" | "pending";
   created_at: string;
@@ -107,19 +108,33 @@ function AdminListItem({
   primaryHref,
   actions,
   meta,
-  secondary
+  secondary,
+  showAvatar = false,
+  avatarUrl = null
 }: {
   primary: string;
   primaryHref?: string | null;
   actions?: ReactNode;
   meta: MetaPair[];
   secondary?: ReactNode;
+  showAvatar?: boolean;
+  avatarUrl?: string | null;
 }) {
   return (
     <div className="om-list-row">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
-        <div style={{ minWidth: 0, wordBreak: "break-word" }}>
-          {primaryHref ? <Link href={primaryHref}>{primary}</Link> : primary}
+        <div className={showAvatar ? "om-avatar-lockup" : undefined} style={{ minWidth: 0, wordBreak: "break-word", flex: 1 }}>
+          {showAvatar ? (
+            avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt="" src={avatarUrl} className="om-avatar-img" />
+            ) : (
+              <span className="om-avatar-img" style={{ display: "inline-block", background: "var(--placeholder-bg)" }} />
+            )
+          ) : null}
+          <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+            {primaryHref ? <Link href={primaryHref}>{primary}</Link> : primary}
+          </div>
         </div>
         {actions ? <div className="row" style={{ gap: "var(--space-10)", justifyContent: "flex-end" }}>{actions}</div> : null}
       </div>
@@ -153,10 +168,12 @@ export default function AdminPage() {
   }, [error]);
 
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteEmailFocused, setInviteEmailFocused] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [copiedLinkForId, setCopiedLinkForId] = useState<number | string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [avatarUrlsByPath, setAvatarUrlsByPath] = useState<Record<string, string>>({});
 
   const [userTab, setUserTab] = useState<"all" | "active" | "disabled" | "admins">("all");
   const [userSearchDraft, setUserSearchDraft] = useState("");
@@ -330,6 +347,34 @@ export default function AdminPage() {
   useEffect(() => setWaitPage((prev) => clampPage(prev, waitTotalPages)), [waitTotalPages]);
   useEffect(() => setInvitesPage((prev) => clampPage(prev, invitesTotalPages)), [invitesTotalPages]);
   useEffect(() => setSearchOpen(false), [tab]);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!supabase) {
+        setAvatarUrlsByPath({});
+        return;
+      }
+      if (tab !== "users") {
+        setAvatarUrlsByPath({});
+        return;
+      }
+      const paths = Array.from(new Set((usersData?.users ?? []).map((u) => u.avatar_path).filter(Boolean))) as string[];
+      if (paths.length === 0) {
+        setAvatarUrlsByPath({});
+        return;
+      }
+      const signed = await supabase.storage.from("avatars").createSignedUrls(paths, 60 * 30);
+      if (!alive) return;
+      const map: Record<string, string> = {};
+      for (const row of signed.data ?? []) {
+        if (row.path && row.signedUrl) map[row.path] = row.signedUrl;
+      }
+      setAvatarUrlsByPath(map);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [tab, usersData?.users]);
 
   const tabStats = useMemo(() => {
     if (tab === "users") {
@@ -398,8 +443,8 @@ export default function AdminPage() {
 
           <hr className="om-hr" />
 
-          <div className="row admin-tabbar-row" style={{ justifyContent: "space-between", gap: "var(--space-10)" }}>
-            <div className="admin-tabbar">
+          <div className="row admin-tabbar-row" style={{ justifyContent: "flex-start", gap: "var(--space-10)" }}>
+            <div className="admin-tabbar" style={{ flexWrap: "wrap" }}>
               <button type="button" onClick={() => setTab("users")} aria-current={tab === "users" ? "page" : undefined}>
                 Users
               </button>
@@ -409,54 +454,59 @@ export default function AdminPage() {
               <button type="button" onClick={() => setTab("invites")} aria-current={tab === "invites" ? "page" : undefined}>
                 Invites
               </button>
-            </div>
-            <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0 }}>
-              <input
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="Add via email"
-                style={{ width: "100%" }}
-              />
-              <button
-                className="om-inline-link-muted"
-                onClick={async () => {
-                  setBusy(true);
-                  setError(null);
-                  setInviteLink(null);
-                  try {
-                    const res = await api<{ link: string }>("/api/admin/invites", {
-                      method: "POST",
-                      token,
-                      body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
-                    });
-                    setInviteLink(res.link);
-                    await refreshInvites();
-                    await refreshSummary();
-                  } catch (e: any) {
-                    setError(e?.message ?? "Failed to create invite");
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-                disabled={busy}
-              >
-                Invite
-              </button>
-              {inviteLink ? (
-                copiedInvite ? (
-                  <span style={{ marginLeft: "var(--space-8)" }}>Copied</span>
-                ) : (
+              <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0 }}>
+                <input
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  onFocus={() => setInviteEmailFocused(true)}
+                  onBlur={() => setInviteEmailFocused(false)}
+                  placeholder="Add via email"
+                  style={{ width: "100%" }}
+                />
+                {(inviteEmailFocused || busy) ? (
                   <button
+                    className="om-inline-link-muted"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={async () => {
-                      await navigator.clipboard.writeText(inviteLink);
-                      setCopiedInvite(true);
-                      window.setTimeout(() => setCopiedInvite(false), 1500);
+                      setBusy(true);
+                      setError(null);
+                      setInviteLink(null);
+                      try {
+                        const res = await api<{ link: string }>("/api/admin/invites", {
+                          method: "POST",
+                          token,
+                          body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
+                        });
+                        setInviteLink(res.link);
+                        await refreshInvites();
+                        await refreshSummary();
+                      } catch (e: any) {
+                        setError(e?.message ?? "Failed to create invite");
+                      } finally {
+                        setBusy(false);
+                      }
                     }}
+                    disabled={busy}
                   >
-                    Copy link
+                    Invite
                   </button>
-                )
-              ) : null}
+                ) : null}
+                {inviteLink ? (
+                  copiedInvite ? (
+                    <span style={{ marginLeft: "var(--space-8)" }}>Copied</span>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(inviteLink);
+                        setCopiedInvite(true);
+                        window.setTimeout(() => setCopiedInvite(false), 1500);
+                      }}
+                    >
+                      Copy link
+                    </button>
+                  )
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -643,6 +693,8 @@ export default function AdminPage() {
                       key={u.id}
                       primary={primary}
                       primaryHref={u.username?.trim() ? `/u/${encodeURIComponent(u.username)}` : null}
+                      showAvatar
+                      avatarUrl={u.avatar_path ? (avatarUrlsByPath[u.avatar_path] ?? null) : null}
                       actions={
                         <>
                           <button
@@ -816,13 +868,7 @@ export default function AdminPage() {
                   );
                 })
               : null}
-
-            {tab === "users" && (usersData?.users ?? []).length === 0 ? <div className="text-muted">No users.</div> : null}
-            {tab === "waitlist" && (waitlistData?.waitlist ?? []).length === 0 ? <div className="text-muted">No requests.</div> : null}
-            {tab === "invites" && (invitesData?.invites ?? []).length === 0 ? <div className="text-muted">No invites.</div> : null}
           </div>
-
-          <hr className="om-hr" />
 
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)" }}>
             <div className="text-muted">

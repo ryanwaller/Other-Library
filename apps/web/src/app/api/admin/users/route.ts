@@ -36,7 +36,7 @@ export async function GET(req: Request) {
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    let query = admin.from("profiles").select("id,email,username,display_name,role,status,created_at", { count: "exact" });
+    let query = admin.from("profiles").select("id,email,username,display_name,avatar_path,role,status,created_at", { count: "exact" });
     if (q) query = query.ilike("email", `%${q}%`);
     if (status && status !== "all") query = query.eq("status", status);
     if (role && role !== "all") query = query.eq("role", role);

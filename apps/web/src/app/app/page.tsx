@@ -1828,15 +1828,21 @@ function AppShell({
         />
 
         <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
-          <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap", alignItems: "center" }}>
-            <span className="text-muted">Catalogs</span>
-            <span>{libraries.length}</span>
-            <span className="text-muted">Books</span>
-            <span>{displayGroups.length}</span>
+          <div className="om-stat-line">
+            <span className="om-stat-pair">
+              <span className="text-muted">Catalogs</span>
+              <span>{libraries.length}</span>
+            </span>
+            <span className="om-stat-pair">
+              <span className="text-muted">Books</span>
+              <span>{displayGroups.length}</span>
+            </span>
             {bulkMode && (
               <>
-                <span className="text-muted">Selected</span>
-                <span>{bulkSelectedGroups.length}</span>
+                <span className="om-stat-pair">
+                  <span className="text-muted">Selected</span>
+                  <span>{bulkSelectedGroups.length}</span>
+                </span>
                 {displayGroups.length > 0 && bulkSelectedGroups.length < displayGroups.length && (
                   <button type="button" onClick={selectAll} style={{ background: "transparent", border: 0, padding: 0, font: "inherit", color: "inherit", textDecoration: "underline", cursor: "pointer" }}>
                     Select all

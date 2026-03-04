@@ -62,14 +62,14 @@ export default function PublicProfileHeader({
         </div>
       </div>
 
-      <div className="row text-muted" style={{ marginTop: "var(--space-md)", gap: 16 }}>
-        <span style={{ display: "inline-flex", gap: "var(--space-10)" }}>
+      <div className="om-stat-line text-muted" style={{ marginTop: "var(--space-md)" }}>
+        <span className="om-stat-pair">
           <Link href={`/u/${username}/followers`} className="text-muted">
             Followers
           </Link>
           <span>{followerCount ?? "—"}</span>
         </span>
-        <span style={{ display: "inline-flex", gap: "var(--space-10)" }}>
+        <span className="om-stat-pair">
           <Link href={`/u/${username}/following`} className="text-muted">
             Following
           </Link>

@@ -186,11 +186,15 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
   return (
     <main className="container">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-        <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap", alignItems: "center" }}>
-          <span className="text-muted">Catalogs</span>
-          <span>{catalogsCount}</span>
-          <span className="text-muted">Books</span>
-          <span>{booksCount}</span>
+        <div className="om-stat-line">
+          <span className="om-stat-pair">
+            <span className="text-muted">Catalogs</span>
+            <span>{catalogsCount}</span>
+          </span>
+          <span className="om-stat-pair">
+            <span className="text-muted">Books</span>
+            <span>{booksCount}</span>
+          </span>
         </div>
         <ActiveFilterDisplay
           pairs={[{ label: facetLabel, value: entity.name, key: role, clearHref: "/app" }]}

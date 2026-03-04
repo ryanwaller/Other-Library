@@ -51,6 +51,8 @@
   --space-32: 32px;
   --space-xl: 48px;
   --catalog-top-gap: var(--space-xl);
+  --stat-pair-gap: var(--space-10);
+  --stat-group-gap: var(--space-lg);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -754,17 +756,19 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   width: 100%;
 }
 
+.om-stat-line,
 .admin-meta-line {
   display: flex;
   flex-wrap: wrap;
-  gap: 30px;
+  gap: var(--stat-group-gap);
   align-items: baseline;
 }
 
+.om-stat-pair,
 .admin-meta-pair {
   display: inline-flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--stat-pair-gap);
   white-space: nowrap;
 }
 

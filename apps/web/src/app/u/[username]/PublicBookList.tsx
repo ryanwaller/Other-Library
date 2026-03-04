@@ -261,11 +261,15 @@ export default function PublicBookList({
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
       <div className="toolbar" style={{ flexDirection: "column", gap: "var(--space-sm)", marginBottom: 0 }}>
         <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
-          <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap", alignItems: "center", margin: 0 }}>
-            <span className="text-muted">Catalogs</span>
-            <span>{libraries.length}</span>
-            <span className="text-muted">Books</span>
-            <span>{filteredGroups.length}</span>
+          <div className="om-stat-line" style={{ margin: 0 }}>
+            <span className="om-stat-pair">
+              <span className="text-muted">Catalogs</span>
+              <span>{libraries.length}</span>
+            </span>
+            <span className="om-stat-pair">
+              <span className="text-muted">Books</span>
+              <span>{filteredGroups.length}</span>
+            </span>
           </div>
           <div className="row text-muted" style={{ gap: "var(--space-10)", justifyContent: "flex-end", margin: 0 }}>
             <ActiveFilterDisplay
