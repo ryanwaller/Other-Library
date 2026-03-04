@@ -1876,6 +1876,33 @@ function AppShell({
               Search
             </button>
           </div>
+          {showScan && (
+            <div className="row" style={{ gap: 6, flex: "0 0 auto", alignItems: "baseline" }}>
+              <button className="muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}>Scan</button>
+              <span className="muted" style={{ fontSize: "0.9em" }}>or</span>
+            </div>
+          )}
+          <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+            <input
+              placeholder={showScan ? "enter ISBN…" : "Add by ISBN, URL, or title/author"}
+              value={addInput}
+              onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); }}
+              onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
+              onChange={(e) => setAddInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); smartAddOrSearch(); } }}
+              style={{ width: "100%" }}
+            />
+          </div>
+          <div className="row" style={{ gap: 10, flex: "0 0 auto", justifyContent: "flex-end" }}>
+            {(addInput.trim() || addInputFocused) && (
+              <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
+                {addState.busy ? "…" : "Go"}
+              </button>
+            )}
+            {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message) && (
+              <button onClick={cancelAddPreview} disabled={addState.busy}>Cancel</button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1896,35 +1923,6 @@ function AppShell({
         </div>
       )}
 
-      <div className="row" style={{ width: "100%", marginTop: 6, flexWrap: "nowrap", gap: 10, alignItems: "baseline" }}>
-        {showScan && (
-          <div className="row" style={{ gap: 6, flex: "0 0 auto", alignItems: "baseline" }}>
-            <button className="muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}>Scan</button>
-            <span className="muted" style={{ fontSize: "0.9em" }}>or</span>
-          </div>
-        )}
-        <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-          <input
-            placeholder={showScan ? "enter ISBN…" : "Add by ISBN, URL, or title"}
-            value={addInput}
-            onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); }}
-            onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
-            onChange={(e) => setAddInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); smartAddOrSearch(); } }}
-            style={{ width: "100%" }}
-          />
-        </div>
-        <div className="row" style={{ gap: 10, flex: "0 0 auto", justifyContent: "flex-end" }}>
-          {(addInput.trim() || addInputFocused) && (
-            <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
-              {addState.busy ? "…" : "Go"}
-            </button>
-          )}
-          {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message) && (
-            <button onClick={cancelAddPreview} disabled={addState.busy}>Cancel</button>
-          )}
-        </div>
-      </div>
 
         {(addState.message || addSearchState.message) && (
           <div className="muted" style={{ marginTop: 6 }}>
