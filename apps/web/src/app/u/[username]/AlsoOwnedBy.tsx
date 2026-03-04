@@ -106,7 +106,7 @@ export default function AlsoOwnedBy({
   return (
     <>
     <hr style={{ border: 0, borderTop: "1px solid var(--border)", margin: "var(--space-16) 0" }} />
-    <div className="card">
+    <div>
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>Also owned by</div>
         <div className="text-muted">{owners.length}</div>
