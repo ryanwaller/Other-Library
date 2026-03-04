@@ -169,6 +169,7 @@ export default function AdminPage() {
   }, [error]);
 
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteEmailFocused, setInviteEmailFocused] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [copiedLinkForId, setCopiedLinkForId] = useState<number | string | null>(null);
@@ -456,14 +457,16 @@ export default function AdminPage() {
                 Invites
               </button>
             </div>
-            <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0, flex: "1 1 auto" }}>
+            <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0, flex: "1 1 auto", marginLeft: "var(--space-lg)" }}>
               <input
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
+                onFocus={() => setInviteEmailFocused(true)}
+                onBlur={() => setInviteEmailFocused(false)}
                 placeholder="Add via email"
                 style={{ width: "100%", flex: "1 1 auto", minWidth: 0 }}
               />
-              {inviteEmail.trim() ? (
+              {(inviteEmailFocused || inviteEmail.trim()) ? (
                 <button
                   className="om-inline-link-muted"
                   onClick={async () => {
@@ -513,8 +516,6 @@ export default function AdminPage() {
               {friendlyError}
             </div>
           ) : null}
-
-          <hr className="om-hr" />
 
           <div className="row admin-filter-row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)" }}>
             <div className="row admin-filter-left" style={{ gap: "var(--space-8)", alignItems: "center", flex: "1 1 auto", minWidth: 0 }}>
