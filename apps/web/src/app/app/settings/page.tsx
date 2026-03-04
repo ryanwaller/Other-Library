@@ -173,7 +173,7 @@ export default function SettingsPage() {
     error: null,
     message: null
   });
-  const [tab, setTab] = useState<"profile" | "requests" | "defaults" | "catalog" | "account">("profile");
+  const [tab, setTab] = useState<"profile" | "follows" | "borrows" | "catalog" | "account">("profile");
 
   useEffect(() => {
     if (!supabase) return;
@@ -542,8 +542,8 @@ export default function SettingsPage() {
           <div className="row admin-tabbar-row" style={{ justifyContent: "flex-start", width: "100%", flexWrap: "nowrap" }}>
             <div className="admin-tabbar" style={{ flexWrap: "nowrap", overflowX: "auto", whiteSpace: "nowrap" }}>
               <button type="button" onClick={() => setTab("profile")} aria-current={tab === "profile" ? "page" : undefined}>Profile</button>
-              <button type="button" onClick={() => setTab("requests")} aria-current={tab === "requests" ? "page" : undefined}>Requests &amp; Approvals</button>
-              <button type="button" onClick={() => setTab("defaults")} aria-current={tab === "defaults" ? "page" : undefined}>Defaults</button>
+              <button type="button" onClick={() => setTab("follows")} aria-current={tab === "follows" ? "page" : undefined}>Follows</button>
+              <button type="button" onClick={() => setTab("borrows")} aria-current={tab === "borrows" ? "page" : undefined}>Borrows</button>
               <button type="button" onClick={() => setTab("catalog")} aria-current={tab === "catalog" ? "page" : undefined}>Catalog Import</button>
               <button type="button" onClick={() => setTab("account")} aria-current={tab === "account" ? "page" : undefined}>Account</button>
             </div>
@@ -715,24 +715,18 @@ export default function SettingsPage() {
             </div>
           ) : null}
 
-          {tab === "requests" ? (
+          {tab === "follows" ? (
             <div className="card">
-              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
-                <div style={{ width: 120 }} className="text-muted">Visibility</div>
-                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <div className="text-muted">Manage who can see followers-only content.</div>
-                  <div style={{ marginTop: "var(--space-sm)" }}>
-                    <Link href="/app/follows">Open follow settings</Link>
-                  </div>
-                </div>
+              <div style={{ marginTop: "var(--space-sm)" }}>
+                <Link href="/app/follows">Open follow settings</Link>
               </div>
             </div>
           ) : null}
 
-          {tab === "defaults" ? (
+          {tab === "borrows" ? (
             <div className="card">
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
-                <div style={{ width: 120 }} className="text-muted">Borrowable by default</div>
+                <div style={{ width: 120 }} className="text-muted">Borrowable</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <select
                     value={profileForm.borrowable_default ? "yes" : "no"}
@@ -744,7 +738,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
-                <div style={{ width: 120 }} className="text-muted">Who can request</div>
+                <div style={{ width: 120 }} className="text-muted">Who</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <select
                     value={profileForm.borrow_request_scope}
@@ -770,12 +764,9 @@ export default function SettingsPage() {
                         ? "Only people you follow."
                         : "Only approved followers."}
                   </div>
-                </div>
-              </div>
-              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
-                <div style={{ width: 120 }} className="text-muted">Requests</div>
-                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <Link href="/app/borrow-requests">View borrow requests</Link>
+                  <div style={{ marginTop: "var(--space-sm)" }}>
+                    <Link href="/app/borrow-requests">View borrow requests</Link>
+                  </div>
                 </div>
               </div>
             </div>
