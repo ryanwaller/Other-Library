@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useRef } from "react";
 import type { Session } from "@supabase/supabase-js";
 import Cropper, { type Area } from "react-easy-crop";
@@ -95,6 +95,7 @@ async function cropToBlob(imageSrc: string, crop: Area, outputSize = 512): Promi
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const csvInputRef = useRef<HTMLInputElement | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -176,6 +177,13 @@ export default function SettingsPage() {
     message: null
   });
   const [tab, setTab] = useState<"profile" | "follows" | "borrows" | "catalog" | "account">("profile");
+
+  useEffect(() => {
+    const raw = String(searchParams.get("tab") ?? "").trim().toLowerCase();
+    if (raw === "profile" || raw === "follows" || raw === "borrows" || raw === "catalog" || raw === "account") {
+      setTab(raw as any);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -764,7 +772,7 @@ export default function SettingsPage() {
                         ? "Only people you follow."
                         : "Only approved followers."}
                   </div>
-                  <div style={{ marginTop: "var(--space-sm)" }}>
+                  <div style={{ marginTop: "var(--space-lg)" }}>
                     <BorrowRequestsPanel embedded />
                   </div>
                 </div>

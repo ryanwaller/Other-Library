@@ -200,7 +200,9 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                     ) : null}
 
                     <div style={{ marginTop: "var(--space-8)" }}>
-                      <Link href={`/app/messages/${r.id}`}>View conversation</Link>
+                      <Link href={embedded ? `/app/messages/${r.id}?back=${encodeURIComponent("/app/settings?tab=borrows")}` : `/app/messages/${r.id}`}>
+                        View conversation
+                      </Link>
                     </div>
                   </div>
                 );

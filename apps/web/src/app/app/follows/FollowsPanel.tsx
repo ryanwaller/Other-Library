@@ -272,7 +272,7 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
             </div>
           ) : null}
 
-          <div style={{ marginTop: 16 }} className="card">
+          <div className="om-list-row">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Incoming requests</div>
               <div className="text-muted">{incomingPending.length}</div>
@@ -296,11 +296,11 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
                         displayName={profilesById[pid]?.display_name ?? null}
                         username={username}
                         rightSlot={
-                          <div className="row">
+                          <div className="row" style={{ minWidth: 220, width: 220, justifyContent: "space-between", gap: "var(--space-lg)" }}>
                             <button onClick={() => approve(pid)} disabled={actionBusyKey !== null}>
                               {actionBusyKey === `approve:${pid}` ? "Approving…" : "Approve"}
                             </button>
-                            <button onClick={() => reject(pid)} disabled={actionBusyKey !== null} style={{ marginLeft: "var(--space-8)" }}>
+                            <button onClick={() => reject(pid)} disabled={actionBusyKey !== null}>
                               {actionBusyKey === `reject:${pid}` ? "Rejecting…" : "Reject"}
                             </button>
                           </div>
@@ -312,9 +312,8 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
               </div>
             )}
           </div>
-          <hr className="om-hr" style={{ marginTop: "var(--space-16)", marginBottom: "var(--space-16)" }} />
 
-          <div className="card">
+          <div className="om-list-row">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Your followers</div>
               <div className="text-muted">{incomingApproved.length}</div>
@@ -369,9 +368,8 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
               </div>
             )}
           </div>
-          <hr className="om-hr" style={{ marginTop: "var(--space-16)", marginBottom: "var(--space-16)" }} />
 
-          <div className="card">
+          <div className="om-list-row">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>You follow</div>
               <div className="text-muted">{outgoingApproved.length}</div>
@@ -408,9 +406,8 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
               </div>
             )}
           </div>
-          <hr className="om-hr" style={{ marginTop: "var(--space-16)", marginBottom: "var(--space-16)" }} />
 
-          <div className="card">
+          <div className="om-list-row">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Outgoing requests</div>
               <div className="text-muted">{outgoingPending.length}</div>
@@ -447,9 +444,8 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
               </div>
             )}
           </div>
-          <hr className="om-hr" style={{ marginTop: "var(--space-16)", marginBottom: "var(--space-16)" }} />
 
-          <div className="card">
+          <div className="om-list-row">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Rejected requests</div>
               <div className="text-muted">{outgoingRejected.length}</div>
