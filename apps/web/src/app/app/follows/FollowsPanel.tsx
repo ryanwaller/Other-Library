@@ -265,13 +265,7 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
     <SignInCard note="Sign in to manage follow requests." />
   ) : (
     <div className="card">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <div>Follows</div>
-            <div className="text-muted">{busy ? "Loading…" : error ? error : ""}</div>
-          </div>
-          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
-            Followers-only content is visible only to <span>approved</span> followers.
-          </div>
+          <div className="text-muted">{busy ? "Loading…" : error ? error : ""}</div>
           {actionError ? (
             <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
               {actionError}

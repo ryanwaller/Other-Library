@@ -8,6 +8,7 @@ import Cropper, { type Area } from "react-easy-crop";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
 import FollowsPanel from "../follows/FollowsPanel";
+import BorrowRequestsPanel from "../borrow-requests/BorrowRequestsPanel";
 
 const RESERVED_USERNAMES = [
   "app",
@@ -764,7 +765,7 @@ export default function SettingsPage() {
                         : "Only approved followers."}
                   </div>
                   <div style={{ marginTop: "var(--space-sm)" }}>
-                    <Link href="/app/borrow-requests">View borrow requests</Link>
+                    <BorrowRequestsPanel embedded />
                   </div>
                 </div>
               </div>
