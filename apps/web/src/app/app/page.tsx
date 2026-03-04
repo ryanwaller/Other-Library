@@ -268,7 +268,6 @@ function AppShell({
   const [debugLibrariesSource, setDebugLibrariesSource] = useState<string>("libs:init");
   const [debugBooksSource, setDebugBooksSource] = useState<string>("books:init");
   const [debugLastError, setDebugLastError] = useState<string>("");
-  const [userBooksCount, setUserBooksCount] = useState<number | null>(null);
   const { scannerOpen, openScanner, closeScanner } = useBookScanner();
   const [showScan, setShowScan] = useState(false);
   useEffect(() => {
@@ -828,10 +827,29 @@ function AppShell({
         }
 
         const avatarByPath: Record<string, string> = {};
-        for (const p of Object.values(profileById)) {
-          if (!p.avatar_path || avatarByPath[p.avatar_path]) continue;
-          const signed = await supabase.storage.from("avatars").createSignedUrl(p.avatar_path, 60 * 30);
-          if (signed.data?.signedUrl) avatarByPath[p.avatar_path] = signed.data.signedUrl;
+        const avatarPaths = Array.from(
+          new Set(
+            Object.values(profileById)
+              .map((p) => (p.avatar_path ?? "").trim())
+              .filter(Boolean)
+          )
+        );
+        const directUrls = avatarPaths.filter((p) => /^https?:\/\//i.test(p));
+        for (const p of directUrls) avatarByPath[p] = p;
+        const storagePaths = avatarPaths.filter((p) => !/^https?:\/\//i.test(p));
+        if (storagePaths.length > 0) {
+          const signed = await supabase.storage.from("avatars").createSignedUrls(storagePaths, 60 * 30);
+          if (!signed.error && Array.isArray(signed.data)) {
+            for (const row of signed.data) {
+              if (row.path && row.signedUrl) avatarByPath[row.path] = row.signedUrl;
+            }
+          }
+          for (const path of storagePaths) {
+            if (avatarByPath[path]) continue;
+            const pub = supabase.storage.from("avatars").getPublicUrl(path);
+            const fallback = String(pub.data?.publicUrl ?? "").trim();
+            if (fallback) avatarByPath[path] = fallback;
+          }
         }
 
         const membersByCatalog: Record<number, Array<{ userId: string; username: string; avatarUrl: string | null; acceptedAt: string }>> = {};
@@ -1050,27 +1068,16 @@ function AppShell({
     let alive = true;
     (async () => {
       if (!supabase) return;
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("username,visibility,avatar_path")
-        .eq("id", userId)
-        .maybeSingle();
+      const [profileRes, libs] = await Promise.all([
+        supabase.from("profiles").select("username,visibility,avatar_path").eq("id", userId).maybeSingle(),
+        refreshLibraries()
+      ]);
+      const profileData = profileRes.data;
       if (!alive) return;
       if (profileData) setProfile(profileData);
-
-      if (profileData?.avatar_path) {
-        const signed = await supabase.storage.from("avatars").createSignedUrl(profileData.avatar_path, 60 * 60);
-        if (!alive) return;
-        setAvatarUrl(signed.data?.signedUrl ?? null);
-      } else {
-        setAvatarUrl(null);
-      }
-
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
+      const resolvedAvatar = await resolveAvatarUrl(profileData?.avatar_path ?? null);
       if (!alive) return;
-      setUserBooksCount(count ?? 0);
-
-      const libs = await refreshLibraries();
+      setAvatarUrl(resolvedAvatar);
       await refreshAllBooks(libs.map((l) => l.id));
       if (alive) setInitialLoadDone(true);
     })();
@@ -1125,8 +1132,6 @@ function AppShell({
       if (created.error) throw new Error(created.error.message);
 
       await refreshAllBooks();
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
-      setUserBooksCount(count ?? 0);
       return created.data.id as number;
     } catch (e: any) {
       throw new Error(e?.message ?? "Failed to add book");
@@ -1167,8 +1172,6 @@ function AppShell({
       if (created.error) throw new Error(created.error.message);
 
       await refreshAllBooks();
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
-      setUserBooksCount(count ?? 0);
       return created.data.id as number;
     } catch (e: any) {
       throw new Error(e?.message ?? "Failed to add book");
@@ -1424,8 +1427,6 @@ function AppShell({
       }
 
       await refreshAllBooks();
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
-      setUserBooksCount(count ?? 0);
       
       const finalMsg = skipCount > 0 
         ? `Imported ${successCount} / ${csvRows.length}. ${skipCount} skipped.`
@@ -1627,8 +1628,6 @@ function AppShell({
     const created = await supabase.from("user_books").insert(insertPayload).select("id").single();
     if (created.error) throw new Error(created.error.message);
     await refreshAllBooks();
-    const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
-    setUserBooksCount(count ?? 0);
     return created.data.id as number;
   }
 
@@ -1743,6 +1742,17 @@ function AppShell({
     return json as T;
   }
 
+  async function resolveAvatarUrl(path: string | null | undefined): Promise<string | null> {
+    const value = String(path ?? "").trim();
+    if (!value) return null;
+    if (/^https?:\/\//i.test(value)) return value;
+    if (!supabase) return null;
+    const signed = await supabase.storage.from("avatars").createSignedUrl(value, 60 * 60);
+    if (signed.data?.signedUrl) return signed.data.signedUrl;
+    const pub = supabase.storage.from("avatars").getPublicUrl(value);
+    return pub.data?.publicUrl ?? null;
+  }
+
   async function loadCatalogMembers(catalogId: number) {
     if (!supabase) return;
     setMembersByCatalogId((prev) => ({
@@ -1758,15 +1768,10 @@ function AppShell({
     try {
       const res = await catalogApi<{ ok: true; members: any[] }>(`/api/catalog/${catalogId}/members`, { method: "GET" });
       const rows = (res.members ?? []) as any[];
-      const nextMembers: CatalogMemberView[] = [];
-      for (const row of rows) {
+      const nextMembers: CatalogMemberView[] = await Promise.all(rows.map(async (row) => {
         const avatarPath = row?.profile?.avatar_path ? String(row.profile.avatar_path) : null;
-        let avatarUrl: string | null = null;
-        if (avatarPath) {
-          const signed = await supabase.storage.from("avatars").createSignedUrl(avatarPath, 60 * 30);
-          avatarUrl = signed.data?.signedUrl ?? null;
-        }
-        nextMembers.push({
+        const avatarUrl = await resolveAvatarUrl(avatarPath);
+        return {
           id: String(row.id),
           catalog_id: Number(row.catalog_id),
           user_id: String(row.user_id),
@@ -1784,8 +1789,8 @@ function AppShell({
               }
             : null,
           avatar_url: avatarUrl
-        });
-      }
+        };
+      }));
       setMembersByCatalogId((prev) => ({
         ...prev,
         [catalogId]: {
@@ -1850,8 +1855,6 @@ function AppShell({
       if (del.error) throw new Error(del.error.message);
       setBulkSelectedKeys({});
       await refreshAllBooks();
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
-      setUserBooksCount(count ?? 0);
       setBulkState({ busy: false, error: null, message: "Deleted" });
       window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
     } catch (e: any) {
@@ -1969,8 +1972,6 @@ function AppShell({
       const del = await supabase.from("user_books").delete().eq("id", userBookId);
       if (del.error) throw new Error(del.error.message);
       await refreshAllBooks();
-      const { count } = await supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", userId);
-      setUserBooksCount(count ?? 0);
       setDeleteStateByBookId((prev) => ({ ...prev, [userBookId]: { busy: false, error: null, message: "Deleted" } }));
     } catch (e: any) {
       setDeleteStateByBookId((prev) => ({ ...prev, [userBookId]: { busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" } }));
@@ -2292,19 +2293,6 @@ function AppShell({
 
   return (
     <>
-      <div
-        style={{
-          border: "1px solid #b00020",
-          color: "#fff",
-          padding: "6px 8px",
-          fontSize: 12,
-          marginBottom: "var(--space-sm)",
-          background: "rgba(176, 0, 32, 0.12)"
-        }}
-      >
-        debug | libs={libraries.length} | items={items.length} | groups={displayGroups.length} | {debugLibrariesSource} | {debugBooksSource}
-        {debugLastError ? ` | err=${debugLastError}` : ""}
-      </div>
       <div style={{ marginTop: "var(--space-16)", display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
         <input
           ref={csvInputRef}
