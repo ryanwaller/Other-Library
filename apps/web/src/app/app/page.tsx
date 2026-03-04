@@ -602,6 +602,18 @@ function AppShell({
     if (!supabase) return;
     const ids = Array.from(new Set((targetLibraryIds ?? libraries.map((l) => l.id)).filter((n) => Number.isFinite(n) && n > 0)));
     if (ids.length === 0) {
+      const ownerOnly = await supabase
+        .from("user_books")
+        .select(
+          "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
+        )
+        .eq("owner_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(800);
+      if (!ownerOnly.error) {
+        setItems(((ownerOnly.data ?? []) as any[]) as any);
+        return;
+      }
       setItems([]);
       return;
     }
@@ -791,6 +803,21 @@ function AppShell({
           .order("created_at", { ascending: true });
         if (res2.error) throw new Error(res2.error.message);
         list = ((res2.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
+      }
+
+      if (list.length === 0) {
+        const ownerBooks = await supabase.from("user_books").select("library_id").eq("owner_id", userId).limit(800);
+        if (!ownerBooks.error) {
+          const idsFromBooks = Array.from(
+            new Set(((ownerBooks.data ?? []) as any[]).map((r) => Number(r.library_id)).filter((n) => Number.isFinite(n) && n > 0))
+          );
+          list = idsFromBooks.map((id) => ({
+            id,
+            name: `Catalog ${id}`,
+            created_at: new Date(0).toISOString(),
+            myRole: "owner" as const
+          }));
+        }
       }
 
       const libraryIds = list.map((l) => l.id).filter((n) => Number.isFinite(n) && n > 0);
