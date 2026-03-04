@@ -265,6 +265,9 @@ function AppShell({
   const userId = session.user.id;
   const [profile, setProfile] = useState<{ username: string; visibility: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [debugLibrariesSource, setDebugLibrariesSource] = useState<string>("libs:init");
+  const [debugBooksSource, setDebugBooksSource] = useState<string>("books:init");
+  const [debugLastError, setDebugLastError] = useState<string>("");
   const [userBooksCount, setUserBooksCount] = useState<number | null>(null);
   const { scannerOpen, openScanner, closeScanner } = useBookScanner();
   const [showScan, setShowScan] = useState(false);
@@ -611,9 +614,12 @@ function AppShell({
         .order("created_at", { ascending: false })
         .limit(800);
       if (!ownerOnly.error) {
+        setDebugBooksSource("books:owner-noids");
         setItems(((ownerOnly.data ?? []) as any[]) as any);
         return;
       }
+      setDebugBooksSource("books:empty-noids");
+      setDebugLastError(ownerOnly.error?.message ?? "owner_noids_failed");
       setItems([]);
       return;
     }
@@ -625,6 +631,7 @@ function AppShell({
       if (Array.isArray(serverHome.books)) {
         const serverRows = serverHome.books as any[];
         if (serverRows.length > 0) {
+          setDebugBooksSource("books:server-home");
           setItems(serverRows as any);
           const serverPaths = Array.from(
             new Set([
@@ -650,6 +657,7 @@ function AppShell({
         }
       }
     } catch {
+      setDebugLastError("server_home_failed");
       // fall through to client-side queries
     }
 
@@ -662,6 +670,7 @@ function AppShell({
 
     const first = await supabase.from("user_books").select(fullSelect).in("library_id", ids).order("created_at", { ascending: false }).limit(800);
     if (!first.error) {
+      setDebugBooksSource("books:client-full");
       rows = (first.data ?? []) as any[];
     } else {
       primaryError = first.error;
@@ -673,10 +682,14 @@ function AppShell({
         .order("created_at", { ascending: false })
         .limit(800);
       if (!fallbackOwnerOnly.error) {
+        setDebugBooksSource("books:client-owner-filtered");
         rows = (fallbackOwnerOnly.data ?? []) as any[];
       } else {
         const fallbackShared = await supabase.from("user_books").select(basicSelect).in("library_id", ids).order("created_at", { ascending: false }).limit(800);
-        if (!fallbackShared.error) rows = (fallbackShared.data ?? []) as any[];
+        if (!fallbackShared.error) {
+          setDebugBooksSource("books:client-basic-shared");
+          rows = (fallbackShared.data ?? []) as any[];
+        }
         if (rows.length === 0) {
           const fallbackAnyOwner = await supabase
             .from("user_books")
@@ -684,7 +697,13 @@ function AppShell({
             .eq("owner_id", userId)
             .order("created_at", { ascending: false })
             .limit(800);
-          if (!fallbackAnyOwner.error) rows = (fallbackAnyOwner.data ?? []) as any[];
+          if (!fallbackAnyOwner.error) {
+            setDebugBooksSource("books:client-owner-any");
+            rows = (fallbackAnyOwner.data ?? []) as any[];
+          } else {
+            setDebugBooksSource("books:failed");
+            setDebugLastError(fallbackAnyOwner.error?.message ?? "books_failed");
+          }
         }
       }
     }
@@ -726,9 +745,11 @@ function AppShell({
         const listRes = await catalogApi<{ ok: true; catalogs: LibrarySummary[] }>("/api/catalog/list", { method: "GET" });
         const apiList = Array.isArray(listRes.catalogs) ? listRes.catalogs : [];
         if (apiList.length > 0) {
+          setDebugLibrariesSource("libs:api-list");
           list = apiList;
         }
       } catch {
+        setDebugLastError("catalog_list_failed");
         // fall through to client-side queries
       }
 
@@ -740,6 +761,7 @@ function AppShell({
           .eq("owner_id", userId)
           .order("sort_order", { ascending: true });
         if (!resWithOrder.error) {
+          setDebugLibrariesSource("libs:client-owned-sort");
           ownedList = ((resWithOrder.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
         } else {
           const msg = (resWithOrder.error.message ?? "").toLowerCase();
@@ -750,6 +772,7 @@ function AppShell({
               .eq("owner_id", userId)
               .order("created_at", { ascending: true });
             if (res.error) throw new Error(res.error.message);
+            setDebugLibrariesSource("libs:client-owned-created");
             ownedList = ((res.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
           } else {
             throw new Error(resWithOrder.error.message);
@@ -763,6 +786,7 @@ function AppShell({
             { method: "GET" }
           );
           const acceptedShared = Array.isArray(sharedRes.shared) ? sharedRes.shared : [];
+          if (acceptedShared.length > 0) setDebugLibrariesSource("libs:client-shared");
           sharedList = acceptedShared
             .map((r) => {
               const cid = Number(r.catalog?.id ?? r.catalog_id);
@@ -808,6 +832,7 @@ function AppShell({
       if (list.length === 0) {
         const ownerBooks = await supabase.from("user_books").select("library_id").eq("owner_id", userId).limit(800);
         if (!ownerBooks.error) {
+          setDebugLibrariesSource("libs:derived-from-owner-books");
           const idsFromBooks = Array.from(
             new Set(((ownerBooks.data ?? []) as any[]).map((r) => Number(r.library_id)).filter((n) => Number.isFinite(n) && n > 0))
           );
@@ -911,6 +936,7 @@ function AppShell({
           .eq("owner_id", userId)
           .order("created_at", { ascending: true });
         if (!ownerFallback.error) {
+          setDebugLibrariesSource("libs:owner-fallback");
           const ownerList = ((ownerFallback.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const })) as LibrarySummary[];
           setLibraries(ownerList);
           setAddLibraryId(ownerList[0]?.id ?? null);
@@ -920,6 +946,8 @@ function AppShell({
       } catch {
         // ignore
       }
+      setDebugLibrariesSource("libs:failed");
+      setDebugLastError(e?.message ?? "libs_failed");
       setLibraries([]);
       setAddLibraryId(null);
       setLibraryState({ busy: false, error: e?.message ?? "Failed to load catalogs", message: null });
@@ -2301,6 +2329,19 @@ function AppShell({
 
   return (
     <>
+      <div
+        style={{
+          border: "1px solid #b00020",
+          color: "#fff",
+          padding: "6px 8px",
+          fontSize: 12,
+          marginBottom: "var(--space-sm)",
+          background: "rgba(176, 0, 32, 0.12)"
+        }}
+      >
+        debug | libs={libraries.length} | items={items.length} | groups={displayGroups.length} | {debugLibrariesSource} | {debugBooksSource}
+        {debugLastError ? ` | err=${debugLastError}` : ""}
+      </div>
       <div style={{ marginTop: "var(--space-16)", display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
         <input
           ref={csvInputRef}
