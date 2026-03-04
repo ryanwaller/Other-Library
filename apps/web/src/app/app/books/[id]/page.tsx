@@ -3747,12 +3747,7 @@ export default function BookDetailPage() {
 
               {isOwner ? (
                 <>
-                  <hr className="divider" />
-
-                  <div className="om-edit-label">
-                    Book info
-                  </div>
-                  <div style={{ marginTop: "var(--space-8)" }}>
+                  <div className="meta-list">
                     <div className="row om-row-baseline">
                       <div style={{ minWidth: 110 }} className="text-muted">
                         Catalog
@@ -3883,10 +3878,7 @@ export default function BookDetailPage() {
                     ) : null}
                   </div>
 
-                  <div style={{ marginTop: 16 }} className="om-edit-label">
-                    Privacy &amp; lending
-                  </div>
-                  <div style={{ marginTop: "var(--space-8)" }}>
+                  <div className="meta-list">
                     <div className="row om-row-baseline">
                       <div style={{ minWidth: 110 }} className="text-muted">
                         Visibility
@@ -3980,14 +3972,12 @@ export default function BookDetailPage() {
                   </div>
 
                   {editMode || Boolean((formLocation ?? "").trim()) || Boolean((formShelf ?? "").trim()) ? (
-                    <>
-                      <div style={{ marginTop: 16 }} className="om-edit-label">Place</div>
-                      <div style={{ marginTop: "var(--space-8)" }}>
-                        {editMode || Boolean((formLocation ?? "").trim()) ? (
-                          <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                            <div style={{ minWidth: 110 }} className="text-muted">
-                              Location
-                            </div>
+                    <div className="meta-list">
+                      {editMode || Boolean((formLocation ?? "").trim()) ? (
+                        <div className="row om-row-baseline">
+                          <div style={{ minWidth: 110 }} className="text-muted">
+                            Location
+                          </div>
                             <div style={{ flex: "1 1 auto" }}>
                               {editMode ? (
                                 <input
@@ -4023,7 +4013,6 @@ export default function BookDetailPage() {
                           </div>
                         ) : null}
                       </div>
-                    </>
                   ) : null}
 
                   {publicBookUrl ? (
@@ -4140,14 +4129,11 @@ export default function BookDetailPage() {
               ) : null}
             </div>
           ) : null}
-        <div style={{ marginTop: 0 }}>
-          {editionId ? (
-            <>
-              <hr className="divider" />
-              <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} />
-            </>
-          ) : null}
-        </div>
+        {editionId ? (
+          <>
+            <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} />
+          </>
+        ) : null}
         </div>
       )}
 
