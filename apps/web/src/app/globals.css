@@ -179,6 +179,27 @@ button.muted:focus-visible {
   margin-top: var(--settings-row-gap) !important;
 }
 
+.om-settings-inline-action {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  flex-wrap: nowrap !important;
+  width: 100%;
+}
+
+.om-settings-inline-action input:not([type="file"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]) {
+  width: auto !important;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.om-settings-inline-action > button,
+.om-settings-inline-action > a {
+  margin-left: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .om-book-card-link {
   text-decoration: none;
 }

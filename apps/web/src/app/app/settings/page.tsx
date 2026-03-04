@@ -677,7 +677,7 @@ function SettingsPageContent() {
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Username</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
+                  <div className="om-settings-inline-action">
                     <input
                       value={profileForm.username}
                       onChange={(e) => {
@@ -690,12 +690,11 @@ function SettingsPageContent() {
                         saveProfile();
                       }}
                       placeholder="username"
-                      style={{ flex: "1 1 auto", minWidth: 0 }}
                     />
                     {usernameEdited && usernameDirty ? (
                       <button
                         className="text-muted"
-                        style={{ whiteSpace: "nowrap", textDecoration: "underline" }}
+                        style={{ textDecoration: "underline" }}
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={saveProfile}
                         disabled={profileSaveState.busy || usernameSaveBlocked}
@@ -713,7 +712,7 @@ function SettingsPageContent() {
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Display name</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)" }}>
+                  <div className="om-settings-inline-action">
                     <input
                       value={profileForm.display_name}
                       onChange={(e) => {
@@ -726,12 +725,11 @@ function SettingsPageContent() {
                         saveProfile();
                       }}
                       placeholder="(optional)"
-                      style={{ flex: "1 1 auto", minWidth: 0 }}
                     />
                     {displayNameEdited && displayNameDirty ? (
                       <button
                         className="text-muted"
-                        style={{ whiteSpace: "nowrap", textDecoration: "underline" }}
+                        style={{ textDecoration: "underline" }}
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={saveProfile}
                         disabled={profileSaveState.busy}
@@ -874,7 +872,7 @@ function SettingsPageContent() {
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Email</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)" }}>
+                  <div className="om-settings-inline-action">
                     <input
                       value={emailDraft}
                       onChange={(e) => setEmailDraft(e.target.value)}
@@ -886,12 +884,11 @@ function SettingsPageContent() {
                         e.preventDefault();
                         saveEmail();
                       }}
-                      style={{ flex: "1 1 auto", minWidth: 0 }}
                     />
                     {emailFocused ? (
                       <button
                         className="text-muted"
-                        style={{ whiteSpace: "nowrap", textDecoration: "underline" }}
+                        style={{ textDecoration: "underline" }}
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={saveEmail}
                         disabled={emailState.busy || !emailDraft.trim()}
@@ -935,7 +932,7 @@ function SettingsPageContent() {
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Confirm</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                  <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)" }}>
+                  <div className="om-settings-inline-action">
                     <input
                       type="password"
                       value={confirmPassword}
@@ -943,12 +940,11 @@ function SettingsPageContent() {
                       onBlur={() => setPasswordFocused(false)}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Confirm"
-                      style={{ flex: "1 1 auto", minWidth: 0 }}
                     />
                     {(passwordFocused || currentPassword.trim() || newPassword.trim() || confirmPassword.trim()) ? (
                       <button
                         className="text-muted"
-                        style={{ whiteSpace: "nowrap", textDecoration: "underline" }}
+                        style={{ textDecoration: "underline" }}
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={savePassword}
                         disabled={passwordState.busy}
