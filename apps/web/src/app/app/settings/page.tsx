@@ -94,6 +94,8 @@ async function cropToBlob(imageSrc: string, crop: Area, outputSize = 512): Promi
 export default function SettingsPage() {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [profileReady, setProfileReady] = useState(false);
   const userId = session?.user?.id ?? null;
   const sessionEmail = session?.user?.email ?? null;
 
@@ -174,8 +176,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSession(newSession));
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      setAuthReady(true);
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -186,7 +194,11 @@ export default function SettingsPage() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      if (!supabase || !userId) return;
+      if (!supabase || !userId) {
+        setProfileReady(false);
+        return;
+      }
+      setProfileReady(false);
       setBusy(true);
       setError(null);
       const res = await supabase
@@ -212,6 +224,7 @@ export default function SettingsPage() {
         });
       }
       setBusy(false);
+      setProfileReady(true);
     })();
     return () => {
       alive = false;
@@ -513,10 +526,20 @@ export default function SettingsPage() {
     );
   }
 
+  if (!authReady) {
+    return (
+      <main className="container om-settings-page">
+        <div className="card" style={{ minHeight: 240 }} />
+      </main>
+    );
+  }
+
   return (
-    <main className="container">
+    <main className="container om-settings-page">
       {!session ? (
         <SignInCard note="Sign in to edit your settings." />
+      ) : !profileReady ? (
+        <div className="card" style={{ minHeight: 240 }} />
       ) : (
         <div className="card">
           <div className="row" style={{ justifyContent: "space-between" }}>
@@ -611,7 +634,7 @@ export default function SettingsPage() {
               </div>
             ) : null}
 
-            <div className="row" style={{ marginTop: "var(--space-10)" }}>
+            <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
               <div style={{ width: 120 }} className="text-muted">
                 Username
               </div>
@@ -631,7 +654,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="row" style={{ marginTop: "var(--space-10)" }}>
+            <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
               <div style={{ width: 120 }} className="text-muted">
                 Display name
               </div>
@@ -660,7 +683,7 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="row" style={{ marginTop: "var(--space-10)" }}>
+            <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
               <div style={{ width: 120 }} className="text-muted">
                 Library visibility
               </div>
@@ -710,7 +733,7 @@ export default function SettingsPage() {
               <div>Borrowing</div>
               <div className="text-muted">defaults</div>
             </div>
-            <div className="row" style={{ marginTop: "var(--space-10)" }}>
+            <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
               <div style={{ width: 170 }} className="text-muted">
                 Borrowable by default
               </div>
@@ -722,7 +745,7 @@ export default function SettingsPage() {
                 <option value="yes">yes</option>
               </select>
             </div>
-            <div className="row" style={{ marginTop: "var(--space-10)" }}>
+            <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "baseline" }}>
               <div style={{ width: 170 }} className="text-muted">
                 Who can request
               </div>
@@ -806,7 +829,7 @@ export default function SettingsPage() {
             <div style={{ marginTop: "var(--space-10)" }} className="text-muted">
               Email
             </div>
-            <div className="row" style={{ marginTop: "var(--space-8)" }}>
+            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "baseline" }}>
               <input
                 value={emailDraft}
                 onChange={(e) => setEmailDraft(e.target.value)}
@@ -827,7 +850,7 @@ export default function SettingsPage() {
             <div style={{ marginTop: "var(--space-md)" }} className="text-muted">
               Change password
             </div>
-            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "center", flexWrap: "wrap", gap: "var(--space-10)" }}>
+            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "baseline", flexWrap: "wrap", gap: "var(--space-10)" }}>
               <input
                 type="password"
                 value={currentPassword}
@@ -857,7 +880,7 @@ export default function SettingsPage() {
             <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
               This is permanent. Type <span style={{ fontWeight: 600 }}>DELETE</span> to confirm.
             </div>
-            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "center", gap: "var(--space-10)", flexWrap: "wrap" }}>
+            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "baseline", gap: "var(--space-10)", flexWrap: "wrap" }}>
               <input value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} placeholder="DELETE" style={{ width: 160 }} />
               <button onClick={deleteAccount} disabled={deleteState.busy}>
                 {deleteState.busy ? "Deleting…" : "Delete account"}

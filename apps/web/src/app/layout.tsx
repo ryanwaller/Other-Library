@@ -1,6 +1,5 @@
 import "./globals.css";
 import GlobalNav from "./GlobalNav";
-import PageTransition from "./PageTransition";
 
 export const metadata = {
   title: "Other Library",
@@ -18,7 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <GlobalNav />
-        <PageTransition>{children}</PageTransition>
+        {children}
       </body>
     </html>
   );

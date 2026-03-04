@@ -168,20 +168,25 @@ button.muted:focus-visible {
   to { opacity: 0; }
 }
 
-.page-transition-root {
-  position: relative;
-}
-
-.page-exit {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  animation: pageExit 800ms ease-in forwards;
+@keyframes pageDebugFlash {
+  from { background: rgba(255, 0, 0, 0.65); }
+  to { background: transparent; }
 }
 
 .page-enter {
   position: relative;
   animation: pageEnter 800ms ease-out forwards;
+}
+
+.page-debug-flash {
+  animation:
+    pageDebugFlash 220ms ease-out forwards,
+    pageEnter 800ms ease-out forwards;
+}
+
+.om-settings-page input:not([type="file"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]) {
+  line-height: inherit;
+  padding: 0 0 9px;
 }
 
 .om-book-card-link {
