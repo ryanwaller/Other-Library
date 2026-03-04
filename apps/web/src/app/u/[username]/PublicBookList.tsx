@@ -168,6 +168,11 @@ export default function PublicBookList({
   }, [viewMode, effectiveCols]);
 
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
+  const effectiveLibraries = useMemo(() => {
+    if (libraries.length > 0) return libraries;
+    const ids = Array.from(new Set(filteredGroups.map((g) => g.libraryId))).filter((id) => Number.isFinite(id) && id > 0);
+    return ids.map((id) => ({ id, name: `Catalog ${id}` }));
+  }, [libraries, filteredGroups]);
 
   const renderBook = (g: CatalogGroup) => {
     const b = g.primary;
@@ -281,7 +286,7 @@ export default function PublicBookList({
           <div className="om-stat-line" style={{ margin: 0 }}>
             <span className="om-stat-pair">
               <span className="text-muted">Catalogs</span>
-              <span>{libraries.length}</span>
+              <span>{effectiveLibraries.length}</span>
             </span>
             <span className="om-stat-pair">
               <span className="text-muted">Books</span>
@@ -375,7 +380,7 @@ export default function PublicBookList({
 
       {showLibraryBlocks ? (
         <div style={{ display: "flex", flexDirection: "column" }}>
-          {libraries
+          {effectiveLibraries
             .filter(lib => filteredGroups.some(g => g.libraryId === lib.id))
             .map((lib, idx) => {
             const libGroups = filteredGroups.filter(g => g.libraryId === lib.id);

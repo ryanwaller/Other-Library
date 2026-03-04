@@ -629,6 +629,15 @@ function AppShell({
       } else {
         const fallbackShared = await supabase.from("user_books").select(basicSelect).in("library_id", ids).order("created_at", { ascending: false }).limit(800);
         if (!fallbackShared.error) rows = (fallbackShared.data ?? []) as any[];
+        if (rows.length === 0) {
+          const fallbackAnyOwner = await supabase
+            .from("user_books")
+            .select(basicSelect)
+            .eq("owner_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(800);
+          if (!fallbackAnyOwner.error) rows = (fallbackAnyOwner.data ?? []) as any[];
+        }
       }
     }
 
@@ -2196,6 +2205,17 @@ function AppShell({
     return by;
   }, [displayGroups]);
 
+  const renderLibraries = useMemo<LibrarySummary[]>(() => {
+    if (libraries.length > 0) return libraries;
+    const ids = Array.from(new Set(displayGroups.map((g) => g.libraryId))).filter((id) => Number.isFinite(id) && id > 0);
+    return ids.map((id) => ({
+      id,
+      name: `Catalog ${id}`,
+      created_at: new Date(0).toISOString(),
+      myRole: "owner"
+    }));
+  }, [libraries, displayGroups]);
+
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
     for (const it of items) {
@@ -2249,7 +2269,7 @@ function AppShell({
           <div className="om-stat-line">
             <span className="om-stat-pair">
               <span className="text-muted">Catalogs</span>
-              <span>{libraries.length}</span>
+              <span>{renderLibraries.length}</span>
             </span>
             <span className="om-stat-pair">
               <span className="text-muted">Books</span>
@@ -2571,7 +2591,7 @@ function AppShell({
         bulkMode={bulkMode}
         bulkState={bulkState}
         selectedGroupsCount={bulkSelectedGroups.length}
-        libraries={libraries.map((l) => ({ id: l.id, name: l.name }))}
+        libraries={renderLibraries.map((l) => ({ id: l.id, name: l.name }))}
         bulkCategoryName={bulkCategoryName}
         setBulkCategoryName={setBulkCategoryName}
         onClearSelected={() => setBulkSelectedKeys({})}
@@ -2586,7 +2606,7 @@ function AppShell({
 
       <div style={{ height: "var(--catalog-top-gap)" }} />
 
-      {libraries.map((lib, idx) => {
+      {renderLibraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];
         const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
         const memberState = membersByCatalogId[lib.id] ?? { busy: false, error: null, members: [], inviteInput: "", inviteBusy: false };
@@ -2602,7 +2622,7 @@ function AppShell({
               memberPreviews={lib.memberPreviews ?? []}
               bookCount={groups.length}
               index={idx}
-              total={libraries.length}
+              total={renderLibraries.length}
               busy={libraryState.busy}
               isEditing={editingLibraryId === lib.id}
               nameDraft={libraryNameDraft}
@@ -2730,7 +2750,7 @@ function AppShell({
                 {memberState.error ? <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{memberState.error}</div> : null}
               </div>
             ) : null}
-            {idx < libraries.length - 1 && <hr className="om-hr" />}
+            {idx < renderLibraries.length - 1 && <hr className="om-hr" />}
           </div>
         );
       })}
