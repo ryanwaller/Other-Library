@@ -668,31 +668,28 @@ function AppShell({
       }
 
       let sharedList: LibrarySummary[] = [];
-      const mem = await supabase
-        .from("catalog_members")
-        .select("catalog_id,role,accepted_at")
-        .eq("user_id", userId)
-        .not("accepted_at", "is", null);
-      if (!mem.error) {
-        const memberRows = ((mem.data ?? []) as any[]).filter((r) => Number.isFinite(Number(r.catalog_id)));
-        const catalogIds = Array.from(new Set(memberRows.map((r) => Number(r.catalog_id)).filter((n) => Number.isFinite(n) && n > 0)));
-        const roleByCatalog = new Map<number, "owner" | "editor">();
-        for (const r of memberRows) {
-          const role = String(r.role ?? "").toLowerCase();
-          const id = Number(r.catalog_id);
-          if (id > 0 && (role === "owner" || role === "editor")) {
-            roleByCatalog.set(id, role as any);
-          }
-        }
-        if (catalogIds.length > 0) {
-          const libs = await supabase.from("libraries").select("id,name,created_at,sort_order,owner_id").in("id", catalogIds);
-          if (!libs.error) {
-            sharedList = ((libs.data ?? []) as any[]).map((l) => ({
-              ...l,
-              myRole: roleByCatalog.get(Number(l.id))
-            }));
-          }
-        }
+      try {
+        const sharedRes = await catalogApi<{ ok: true; shared: Array<{ catalog_id: number; role: "owner" | "editor"; catalog: { id: number; name: string } | null }> }>(
+          "/api/catalog/shared",
+          { method: "GET" }
+        );
+        const acceptedShared = Array.isArray(sharedRes.shared) ? sharedRes.shared : [];
+        sharedList = acceptedShared
+          .map((r) => {
+            const cid = Number(r.catalog?.id ?? r.catalog_id);
+            if (!Number.isFinite(cid) || cid <= 0) return null;
+            return {
+              id: cid,
+              name: String(r.catalog?.name ?? `Catalog ${cid}`),
+              created_at: new Date(0).toISOString(),
+              sort_order: null,
+              owner_id: null,
+              myRole: r.role === "owner" ? "owner" : "editor"
+            } satisfies LibrarySummary;
+          })
+          .filter(Boolean) as LibrarySummary[];
+      } catch {
+        sharedList = [];
       }
 
       const byId = new Map<number, LibrarySummary>();
@@ -2596,6 +2593,8 @@ function AppShell({
                 <div style={{ marginTop: "var(--space-md)" }}>
                   {acceptedMembers.map((m) => {
                     const display = (m.profile?.display_name ?? "").trim() || m.profile?.username || m.user_id;
+                    const username = (m.profile?.username ?? "").trim();
+                    const isSelfRow = m.user_id === userId;
                     const isRowOwner = m.role === "owner";
                     const canModify = iAmOwner && !isRowOwner;
                     return (
@@ -2607,7 +2606,7 @@ function AppShell({
                           ) : (
                             <div className="om-avatar-img" style={{ background: "var(--placeholder-bg)" }} />
                           )}
-                          <span>{display}</span>
+                          {username && !isSelfRow ? <Link href={`/u/${username}`}>{display}</Link> : <span>{display}</span>}
                         </div>
                         <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
                           {isRowOwner ? <span className="text-muted">owner</span> : <span className="text-muted">editor</span>}
@@ -2627,9 +2626,11 @@ function AppShell({
                     <div className="text-muted">Pending invitations</div>
                     {pendingMembers.map((m) => {
                       const display = (m.profile?.display_name ?? "").trim() || m.profile?.username || m.profile?.email || m.user_id;
+                      const username = (m.profile?.username ?? "").trim();
+                      const isSelfRow = m.user_id === userId;
                       return (
                         <div key={m.id} className="row" style={{ justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-sm)" }}>
-                          <span>{display}</span>
+                          {username && !isSelfRow ? <Link href={`/u/${username}`}>{display}</Link> : <span>{display}</span>}
                           <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
                             <span className="text-muted">pending</span>
                             {iAmOwner ? (

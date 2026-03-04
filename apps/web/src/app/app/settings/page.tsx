@@ -256,6 +256,23 @@ function SettingsPageContent() {
     }
   }
 
+  async function leaveSharedCatalog(catalogId: number) {
+    if (!accessToken) return;
+    setSharedCatalogsError(null);
+    try {
+      const res = await fetch(`/api/catalog/${catalogId}/leave`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${accessToken}` }
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(json?.error ?? "leave_failed"));
+      window.dispatchEvent(new Event("om:catalog-members-changed"));
+      await refreshSharedCatalogs();
+    } catch (e: any) {
+      setSharedCatalogsError(e?.message ?? "Failed to leave catalog");
+    }
+  }
+
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
@@ -975,7 +992,7 @@ function SettingsPageContent() {
                       <div style={{ minWidth: 0 }}>
                         <div>{row.catalog?.name ?? `Catalog ${row.catalog_id}`}</div>
                         <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
-                          {row.inviter?.username ? `Invited by ${row.inviter.username}` : "Invited"} · {row.role}
+                          {row.inviter?.username ? `Invited by ${row.inviter.username}` : "Invited"}
                         </div>
                       </div>
                       <div className="row" style={{ gap: "var(--space-md)", alignItems: "baseline" }}>
@@ -1011,8 +1028,14 @@ function SettingsPageContent() {
                 <div className="om-list">
                   {acceptedSharedCatalogs.map((row, idx) => (
                     <div key={row.id} className="om-list-row" style={idx === acceptedSharedCatalogs.length - 1 ? { borderBottom: "none" } : undefined}>
-                      <div>{row.catalog?.name ?? `Catalog ${row.catalog_id}`}</div>
-                      <div className="text-muted">{row.role}</div>
+                      <div style={{ minWidth: 0 }}>{row.catalog?.name ?? `Catalog ${row.catalog_id}`}</div>
+                      <button
+                        className="text-muted"
+                        style={{ textDecoration: "underline", marginLeft: "auto" }}
+                        onClick={() => void leaveSharedCatalog(row.catalog_id)}
+                      >
+                        Leave
+                      </button>
                     </div>
                   ))}
                 </div>

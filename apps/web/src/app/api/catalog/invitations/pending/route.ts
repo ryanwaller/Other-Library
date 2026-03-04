@@ -17,7 +17,7 @@ export async function GET(req: Request) {
       id: String(r.id),
       catalog_id: Number(r.catalog_id),
       user_id: String(r.user_id),
-      role: String(r.role),
+      role: String(r.role) === "viewer" ? "editor" : String(r.role),
       invited_by: r.invited_by ? String(r.invited_by) : null,
       invited_at: String(r.invited_at),
       accepted_at: r.accepted_at ? String(r.accepted_at) : null

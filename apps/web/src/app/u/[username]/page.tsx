@@ -78,9 +78,6 @@ export default async function PublicProfilePage({
   const followersCount = followersCountRes.count;
   const followingCount = followingCountRes.count;
 
-  const librariesRes = await supabase.from("libraries").select("id,name").eq("owner_id", profile.id).order("created_at", { ascending: true });
-  const libraries = (librariesRes.data ?? []) as Array<{ id: number; name: string }>;
-
   const booksRes = await supabase
     .from("user_books")
     .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path)")
@@ -94,6 +91,21 @@ export default async function PublicProfilePage({
     if (b.visibility === "followers_only") return false;
     return profile.visibility === "public";
   });
+
+  const libraryIds = Array.from(
+    new Set(
+      visibleBooks
+        .map((b) => Number((b as any).library_id))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    )
+  );
+  let libraries: Array<{ id: number; name: string }> = [];
+  if (libraryIds.length > 0) {
+    const librariesRes = await supabase.from("libraries").select("id,name").in("id", libraryIds);
+    libraries = ((librariesRes.data ?? []) as any[])
+      .map((l) => ({ id: Number(l.id), name: String(l.name ?? `Catalog ${l.id}`) }))
+      .filter((l) => Number.isFinite(l.id) && l.id > 0);
+  }
 
   const mediaPaths = Array.from(new Set([
     ...visibleBooks.flatMap(b => b.media.map(m => m.storage_path)),
