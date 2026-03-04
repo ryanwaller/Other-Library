@@ -103,13 +103,30 @@ export default function GlobalNav() {
         setPendingCatalogInvites(0);
         return;
       }
-      const res = await supabase
-        .from("catalog_members")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", sessionUserId)
-        .is("accepted_at", null);
-      if (!alive) return;
-      setPendingCatalogInvites(res.error ? 0 : (res.count ?? 0));
+      try {
+        const sess = await supabase.auth.getSession();
+        const token = sess.data.session?.access_token ?? null;
+        if (!token) {
+          if (!alive) return;
+          setPendingCatalogInvites(0);
+          return;
+        }
+        const res = await fetch("/api/catalog/invitations/pending", {
+          method: "GET",
+          headers: { authorization: `Bearer ${token}` }
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!alive) return;
+        if (!res.ok) {
+          setPendingCatalogInvites(0);
+          return;
+        }
+        const invitations = Array.isArray((json as any)?.invitations) ? ((json as any).invitations as any[]) : [];
+        setPendingCatalogInvites(invitations.length);
+      } catch {
+        if (!alive) return;
+        setPendingCatalogInvites(0);
+      }
     }
 
     refreshPendingCatalogInvites();
@@ -310,7 +327,7 @@ export default function GlobalNav() {
 
             {sessionUserId && pendingCatalogInvites > 0 ? (
               <Link href="/app/catalog-invitations" aria-label={`${pendingCatalogInvites} pending catalog invitations`} style={{ textDecoration: "none" }}>
-                <span className="om-nav-badge om-nav-badge--circle" style={{ background: "#b00020" }}>
+                <span className="om-nav-badge om-nav-badge--circle" style={{ background: "#2563eb" }}>
                   {pendingCatalogInvites}
                 </span>
               </Link>

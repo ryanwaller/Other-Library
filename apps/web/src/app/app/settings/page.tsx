@@ -104,6 +104,7 @@ function SettingsPageContent() {
   const [profileReady, setProfileReady] = useState(false);
   const userId = session?.user?.id ?? null;
   const sessionEmail = session?.user?.email ?? null;
+  const accessToken = session?.access_token ?? null;
 
   const [profile, setProfile] = useState<{
     username: string;
@@ -181,14 +182,79 @@ function SettingsPageContent() {
   });
   const [usernameEdited, setUsernameEdited] = useState(false);
   const [displayNameEdited, setDisplayNameEdited] = useState(false);
-  const [tab, setTab] = useState<"profile" | "follows" | "borrows" | "catalog" | "account">("profile");
+  const [tab, setTab] = useState<"profile" | "follows" | "borrows" | "catalog" | "shared" | "account">("profile");
+  const [sharedCatalogsBusy, setSharedCatalogsBusy] = useState(false);
+  const [sharedCatalogsError, setSharedCatalogsError] = useState<string | null>(null);
+  const [pendingSharedCatalogs, setPendingSharedCatalogs] = useState<
+    Array<{
+      id: string;
+      catalog_id: number;
+      role: "owner" | "editor" | "viewer";
+      invited_at: string;
+      catalog: { id: number; name: string } | null;
+      inviter: { id: string; username: string | null } | null;
+    }>
+  >([]);
+  const [acceptedSharedCatalogs, setAcceptedSharedCatalogs] = useState<
+    Array<{
+      id: string;
+      catalog_id: number;
+      role: "owner" | "editor" | "viewer";
+      accepted_at: string | null;
+      catalog: { id: number; name: string } | null;
+      inviter: { id: string; username: string | null } | null;
+    }>
+  >([]);
 
   useEffect(() => {
     const raw = String(searchParams.get("tab") ?? "").trim().toLowerCase();
-    if (raw === "profile" || raw === "follows" || raw === "borrows" || raw === "catalog" || raw === "account") {
+    if (raw === "profile" || raw === "follows" || raw === "borrows" || raw === "catalog" || raw === "shared" || raw === "account") {
       setTab(raw as any);
     }
   }, [searchParams]);
+
+  async function refreshSharedCatalogs() {
+    if (!accessToken) {
+      setPendingSharedCatalogs([]);
+      setAcceptedSharedCatalogs([]);
+      return;
+    }
+    setSharedCatalogsBusy(true);
+    setSharedCatalogsError(null);
+    try {
+      const res = await fetch("/api/catalog/shared", {
+        method: "GET",
+        headers: { authorization: `Bearer ${accessToken}` }
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(json?.error ?? "request_failed"));
+      setPendingSharedCatalogs(Array.isArray(json?.pending) ? (json.pending as any[]) : []);
+      setAcceptedSharedCatalogs(Array.isArray(json?.shared) ? (json.shared as any[]) : []);
+    } catch (e: any) {
+      setPendingSharedCatalogs([]);
+      setAcceptedSharedCatalogs([]);
+      setSharedCatalogsError(e?.message ?? "Failed to load shared catalogs");
+    } finally {
+      setSharedCatalogsBusy(false);
+    }
+  }
+
+  async function actOnSharedInvitation(catalogId: number, action: "accept" | "decline") {
+    if (!accessToken) return;
+    setSharedCatalogsError(null);
+    try {
+      const res = await fetch(`/api/catalog/${catalogId}/${action}`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${accessToken}` }
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(json?.error ?? `${action}_failed`));
+      window.dispatchEvent(new Event("om:catalog-members-changed"));
+      await refreshSharedCatalogs();
+    } catch (e: any) {
+      setSharedCatalogsError(e?.message ?? `Failed to ${action} invitation`);
+    }
+  }
 
   useEffect(() => {
     if (!supabase) return;
@@ -202,6 +268,19 @@ function SettingsPageContent() {
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (tab !== "shared") return;
+    void refreshSharedCatalogs();
+    const onChanged = () => {
+      void refreshSharedCatalogs();
+    };
+    window.addEventListener("om:catalog-members-changed", onChanged);
+    return () => {
+      window.removeEventListener("om:catalog-members-changed", onChanged);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, accessToken]);
 
   useEffect(() => {
     setEmailDraft(sessionEmail ?? "");
@@ -568,6 +647,7 @@ function SettingsPageContent() {
               <button type="button" onClick={() => setTab("follows")} aria-current={tab === "follows" ? "page" : undefined}>Follows</button>
               <button type="button" onClick={() => setTab("borrows")} aria-current={tab === "borrows" ? "page" : undefined}>Borrows</button>
               <button type="button" onClick={() => setTab("catalog")} aria-current={tab === "catalog" ? "page" : undefined}>Catalog Import</button>
+              <button type="button" onClick={() => setTab("shared")} aria-current={tab === "shared" ? "page" : undefined}>Shared catalogs</button>
               <button type="button" onClick={() => setTab("account")} aria-current={tab === "account" ? "page" : undefined}>Account</button>
             </div>
           </div>
@@ -877,6 +957,72 @@ function SettingsPageContent() {
                   </button>
                 </div>
               </div>
+            </div>
+          ) : null}
+
+          {tab === "shared" ? (
+            <div className="card">
+              <div className="row om-settings-row" style={{ alignItems: "baseline", justifyContent: "space-between" }}>
+                <div className="text-muted">Pending invitations</div>
+                <div className="text-muted">{pendingSharedCatalogs.length}</div>
+              </div>
+              {pendingSharedCatalogs.length === 0 ? (
+                <div className="text-muted">None.</div>
+              ) : (
+                <div className="om-list">
+                  {pendingSharedCatalogs.map((row, idx) => (
+                    <div key={row.id} className="om-list-row" style={idx === pendingSharedCatalogs.length - 1 ? { borderBottom: "none" } : undefined}>
+                      <div style={{ minWidth: 0 }}>
+                        <div>{row.catalog?.name ?? `Catalog ${row.catalog_id}`}</div>
+                        <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
+                          {row.inviter?.username ? `Invited by ${row.inviter.username}` : "Invited"} · {row.role}
+                        </div>
+                      </div>
+                      <div className="row" style={{ gap: "var(--space-md)", alignItems: "baseline" }}>
+                        <button
+                          className="text-muted"
+                          style={{ textDecoration: "underline" }}
+                          onClick={() => void actOnSharedInvitation(row.catalog_id, "accept")}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          className="text-muted"
+                          style={{ textDecoration: "underline" }}
+                          onClick={() => void actOnSharedInvitation(row.catalog_id, "decline")}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <hr className="om-hr" />
+
+              <div className="row om-settings-row" style={{ alignItems: "baseline", justifyContent: "space-between" }}>
+                <div className="text-muted">Shared with you</div>
+                <div className="text-muted">{acceptedSharedCatalogs.length}</div>
+              </div>
+              {acceptedSharedCatalogs.length === 0 ? (
+                <div className="text-muted">None.</div>
+              ) : (
+                <div className="om-list">
+                  {acceptedSharedCatalogs.map((row, idx) => (
+                    <div key={row.id} className="om-list-row" style={idx === acceptedSharedCatalogs.length - 1 ? { borderBottom: "none" } : undefined}>
+                      <div>{row.catalog?.name ?? `Catalog ${row.catalog_id}`}</div>
+                      <div className="text-muted">{row.role}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {(sharedCatalogsBusy || sharedCatalogsError) ? (
+                <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
+                  {sharedCatalogsBusy ? "Loading…" : sharedCatalogsError}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
