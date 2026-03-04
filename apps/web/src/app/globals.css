@@ -36,11 +36,15 @@
   --input-bg: #fff;
   --button-bg: #fff;
   --placeholder-bg: #e8e8e8;
+  --bg-muted: var(--placeholder-bg);
 
   --border-avatar: #e0e0e0;
 
+  --space-xs: 4px;
   --space-sm: 6px;
   --space-md: 12px;
+  --space-lg: 24px;
+  --space-xl: 48px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -53,6 +57,7 @@
     --input-bg: #101014;
     --button-bg: #101014;
     --placeholder-bg: #1a1a1a;
+    --bg-muted: var(--placeholder-bg);
 
     --border-avatar: #2a2a2e;
   }
@@ -76,6 +81,18 @@ body {
   overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+}
+
+.text-primary {
+  color: var(--fg);
+}
+
+.text-muted {
+  color: var(--muted);
+}
+
+.text-dim {
+  opacity: 0.55;
 }
 
 a, 
@@ -144,7 +161,7 @@ button.muted:focus-visible {
 
 .om-book-secondary {
   color: var(--muted);
-  margin-top: 6px;
+  margin-top: var(--space-sm);
 }
 
 .om-cover-slot {
@@ -201,13 +218,13 @@ button.muted:focus-visible {
 .om-avatar-lockup {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   flex-wrap: nowrap;
   min-width: 0;
 }
 
 .om-avatar-lockup-tight {
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .om-avatar-link {
@@ -322,21 +339,6 @@ input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-webkit-search-results-button,
 input[type="search"]::-webkit-search-results-decoration {
   -webkit-appearance: none;
-}
-
-.text-primary {
-  font-size: var(--text-size-1);
-  opacity: var(--tone-strong);
-}
-
-.text-secondary {
-  font-size: var(--text-size-1);
-  opacity: var(--tone-medium);
-}
-
-.text-tertiary {
-  font-size: var(--text-size-1);
-  opacity: var(--tone-light);
 }
 
 .book-title {
@@ -481,7 +483,7 @@ select.om-filter-control::-ms-expand {
 .om-menu-summary {
   display: inline-flex;
   align-items: baseline;
-  gap: 6px;
+  gap: var(--space-sm);
   cursor: pointer;
   user-select: none;
 }
@@ -499,7 +501,7 @@ select.om-filter-control::-ms-expand {
 .om-menu-panel {
   position: absolute;
   right: 0;
-  top: calc(100% + 6px);
+  top: calc(100% + var(--space-sm));
   z-index: 50;
   min-width: 220px;
   max-width: min(320px, 90vw);
@@ -516,7 +518,7 @@ select.om-filter-control::-ms-expand {
 .om-menu-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-sm);
   max-height: 220px;
   overflow: auto;
 }
@@ -574,7 +576,7 @@ select.om-filter-control::-ms-expand {
 
 .row {
   display: flex;
-  gap: 12px;
+  gap: var(--space-md);
   align-items: center;
   flex-wrap: wrap;
 }
@@ -668,7 +670,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 .card {
   border: none;
   background: transparent;
-  padding: 12px 0;
+  padding: var(--space-md) 0;
   width: 100%;
 }
 
@@ -728,10 +730,10 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   color: #b00020;
 }
 
-.om-hr {
+.om-hr, .divider {
   border: 0;
   border-top: 1px solid var(--border);
-  margin: 12px 0;
+  margin: var(--space-md) 0;
   width: 100%;
 }
 
@@ -803,7 +805,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   border: 0;
   padding: 0;
   font: inherit;
-  margin-left: 4px;
+  margin-left: var(--space-xs);
 }
 
 .om-clear-filter-btn:hover {
@@ -826,7 +828,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 /* Lookup results (book detail) */
 .om-lookup-row {
   display: flex;
-  gap: 12px;
+  gap: var(--space-md);
   align-items: flex-start;
 }
 
@@ -966,7 +968,7 @@ summary::-webkit-details-marker {
 .om-disclosure-summary {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-sm);
   cursor: pointer;
   list-style: none;
   color: var(--muted);
@@ -1007,27 +1009,27 @@ summary::-webkit-details-marker {
   word-break: normal;
 }
 
-.om-token-field {
+.pill-token-field {
   display: inline-block;
   position: relative;
   max-width: 100%;
 }
 
-.om-token-row {
+.pill-token-row {
   display: inline;
 }
 
-.om-token {
+.pill-token, .pill-token {
   display: inline;
   border: 0;
   padding: 0;
 }
 
-.om-token-text {
+.pill-token-text {
   opacity: var(--tone-strong);
 }
 
-.om-token-x {
+.pill-token-x {
   border: 0;
   padding: 0;
   margin: 0 0 0 0.3em;
@@ -1036,12 +1038,12 @@ summary::-webkit-details-marker {
   opacity: var(--tone-light);
 }
 
-.om-token-x:hover {
+.pill-token-x:hover {
   opacity: var(--tone-strong);
   text-decoration: underline;
 }
 
-.om-token-input {
+.pill-token-input {
   display: inline-block;
   width: 12ch;
   min-width: 8ch;
@@ -1060,18 +1062,18 @@ summary::-webkit-details-marker {
   vertical-align: baseline !important;
 }
 
-.om-token-input:focus,
-.om-token-input:focus-visible {
+.pill-token-input:focus,
+.pill-token-input:focus-visible {
   outline: 0 !important;
   box-shadow: none !important;
   border: 0 !important;
   border-bottom: 0 !important;
 }
 
-.om-token-suggestions {
+.pill-token-suggestions {
   position: absolute;
   left: 0;
-  top: calc(100% + 4px);
+  top: calc(100% + var(--space-xs));
   z-index: 20;
   border: 1px solid var(--border);
   background: var(--card-bg);
@@ -1080,23 +1082,37 @@ summary::-webkit-details-marker {
   min-width: 160px;
 }
 
-.om-token-suggestion {
+.pill-token-suggestion {
   display: block;
   width: 100%;
   text-align: left;
   border: 0;
   background: transparent;
-  padding: 4px 6px;
+  padding: var(--space-xs) var(--space-sm);
   color: inherit;
 }
 
-.om-token-suggestion:hover {
+.pill-token-suggestion:hover {
   text-decoration: underline;
+}
+
+.meta-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
 }
 
 @media (max-width: 720px) {
   :root {
-    --page-pad: 12px;
+    --page-pad: var(--space-md);
   }
 
   .container {
@@ -1113,7 +1129,7 @@ summary::-webkit-details-marker {
 
   .om-lookup-row {
     flex-wrap: wrap;
-    gap: 10px;
+    gap: var(--space-md);
   }
 
   .om-lookup-actions {
@@ -1140,7 +1156,7 @@ summary::-webkit-details-marker {
   }
 
   .admin-invite-row {
-    gap: 6px;
+    gap: var(--space-sm);
     flex-wrap: nowrap;
     width: 100%;
   }

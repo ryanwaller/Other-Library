@@ -132,19 +132,19 @@ export default function EntityTokenField(props: {
   }
 
   return (
-    <div className="om-token-field" onFocus={cancelClose} onBlur={scheduleClose}>
-      <div className="om-token-row">
+    <div className="pill-token-field" onFocus={cancelClose} onBlur={scheduleClose}>
+      <div className="pill-token-row">
         {normalizedValue.map((t, idx) => (
-          <span key={t} className="om-token">
-            <span className="om-token-text">{t}</span>
-            <button type="button" className="om-token-x" onClick={() => removeToken(t)} aria-label={`Remove ${t}`} disabled={disabled}>
+          <span key={t} className="pill-token">
+            <span className="pill-token-text">{t}</span>
+            <button type="button" className="pill-token-x" onClick={() => removeToken(t)} aria-label={`Remove ${t}`} disabled={disabled}>
               ×
             </button>
             {idx < normalizedValue.length - 1 ? ", " : " "}
           </span>
         ))}
         <input
-          className="om-token-input"
+          className="pill-token-input"
           value={draft}
           onChange={(e) => {
             setDraft(e.target.value);
@@ -160,12 +160,12 @@ export default function EntityTokenField(props: {
       </div>
 
       {open && suggestions.length > 0 ? (
-        <div className="om-token-suggestions" role="listbox" aria-label="Suggestions">
+        <div className="pill-token-suggestions" role="listbox" aria-label="Suggestions">
           {suggestions.map((s) => (
             <button
               key={s.id}
               type="button"
-              className="om-token-suggestion"
+              className="pill-token-suggestion"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 addToken(s.name);
