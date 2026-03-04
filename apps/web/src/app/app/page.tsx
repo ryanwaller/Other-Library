@@ -604,146 +604,41 @@ function AppShell({
   async function refreshAllBooks(targetLibraryIds?: number[]) {
     if (!supabase) return;
     const ids = Array.from(new Set((targetLibraryIds ?? libraries.map((l) => l.id)).filter((n) => Number.isFinite(n) && n > 0)));
-    if (ids.length === 0) {
-      try {
-        const serverHomeNoIds = await catalogApi<{ ok: true; books: any[] }>("/api/catalog/home", { method: "GET" });
-        if (Array.isArray(serverHomeNoIds.books) && serverHomeNoIds.books.length > 0) {
-          setDebugBooksSource("books:server-home-noids");
-          setItems((serverHomeNoIds.books as any[]) as any);
-          return;
-        }
-      } catch {
-        // continue
-      }
-      const ownerOnly = await supabase
-        .from("user_books")
-        .select(
-          "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
-        )
-        .eq("owner_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(800);
-      if (!ownerOnly.error) {
-        setDebugBooksSource("books:owner-noids");
-        setItems(((ownerOnly.data ?? []) as any[]) as any);
-        return;
-      }
-      setDebugBooksSource("books:empty-noids");
-      setDebugLastError(ownerOnly.error?.message ?? "owner_noids_failed");
-      setItems([]);
-      return;
-    }
+    const endpoint = ids.length > 0 ? `/api/catalog/home?catalog_ids=${encodeURIComponent(ids.join(","))}` : "/api/catalog/home";
     try {
-      const serverHome = await catalogApi<{ ok: true; books: any[] }>(
-        `/api/catalog/home?catalog_ids=${encodeURIComponent(ids.join(","))}`,
-        { method: "GET" }
-      );
+      const serverHome = await catalogApi<{ ok: true; books: any[] }>(endpoint, { method: "GET" });
       if (Array.isArray(serverHome.books)) {
         const serverRows = serverHome.books as any[];
-        if (serverRows.length > 0) {
-          setDebugBooksSource("books:server-home");
-          setItems(serverRows as any);
-          const serverPaths = Array.from(
-            new Set([
-              ...serverRows
-                .flatMap((r) => (Array.isArray(r.media) ? r.media : []))
-                .map((m: any) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
-                .filter(Boolean),
-              ...serverRows
-                .filter((r: any) => r.cover_crop && typeof r.cover_original_url === "string" && r.cover_original_url)
-                .map((r: any) => r.cover_original_url as string)
-            ])
-          );
-          const serverMissing = serverPaths.filter((p) => !mediaUrlsByPath[p]);
-          if (serverMissing.length > 0) {
-            const signedServer = await supabase.storage.from("user-book-media").createSignedUrls(serverMissing, 60 * 60);
-            if (!signedServer.error && signedServer.data) {
-              const nextMap: Record<string, string> = {};
-              for (const s of signedServer.data) if (s.path && s.signedUrl) nextMap[s.path] = s.signedUrl;
-              setMediaUrlsByPath((prev) => ({ ...prev, ...nextMap }));
-            }
+        setDebugBooksSource(ids.length > 0 ? "books:server-home" : "books:server-home-noids");
+        setItems(serverRows as any);
+        const serverPaths = Array.from(
+          new Set([
+            ...serverRows
+              .flatMap((r) => (Array.isArray(r.media) ? r.media : []))
+              .map((m: any) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
+              .filter(Boolean),
+            ...serverRows
+              .filter((r: any) => r.cover_crop && typeof r.cover_original_url === "string" && r.cover_original_url)
+              .map((r: any) => r.cover_original_url as string)
+          ])
+        );
+        const serverMissing = serverPaths.filter((p) => !mediaUrlsByPath[p]);
+        if (serverMissing.length > 0) {
+          const signedServer = await supabase.storage.from("user-book-media").createSignedUrls(serverMissing, 60 * 60);
+          if (!signedServer.error && signedServer.data) {
+            const nextMap: Record<string, string> = {};
+            for (const s of signedServer.data) if (s.path && s.signedUrl) nextMap[s.path] = s.signedUrl;
+            setMediaUrlsByPath((prev) => ({ ...prev, ...nextMap }));
           }
-          return;
         }
+        return;
       }
     } catch {
       setDebugLastError("server_home_failed");
-      // fall through to client-side queries
     }
-
-    let rows: any[] = [];
-    let primaryError: any = null;
-    const fullSelect =
-      "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
-    const basicSelect =
-      "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
-
-    const first = await supabase.from("user_books").select(fullSelect).in("library_id", ids).order("created_at", { ascending: false }).limit(800);
-    if (!first.error) {
-      setDebugBooksSource("books:client-full");
-      rows = (first.data ?? []) as any[];
-    } else {
-      primaryError = first.error;
-      const fallbackOwnerOnly = await supabase
-        .from("user_books")
-        .select(basicSelect)
-        .eq("owner_id", userId)
-        .in("library_id", ids)
-        .order("created_at", { ascending: false })
-        .limit(800);
-      if (!fallbackOwnerOnly.error) {
-        setDebugBooksSource("books:client-owner-filtered");
-        rows = (fallbackOwnerOnly.data ?? []) as any[];
-      } else {
-        const fallbackShared = await supabase.from("user_books").select(basicSelect).in("library_id", ids).order("created_at", { ascending: false }).limit(800);
-        if (!fallbackShared.error) {
-          setDebugBooksSource("books:client-basic-shared");
-          rows = (fallbackShared.data ?? []) as any[];
-        }
-        if (rows.length === 0) {
-          const fallbackAnyOwner = await supabase
-            .from("user_books")
-            .select(basicSelect)
-            .eq("owner_id", userId)
-            .order("created_at", { ascending: false })
-            .limit(800);
-          if (!fallbackAnyOwner.error) {
-            setDebugBooksSource("books:client-owner-any");
-            rows = (fallbackAnyOwner.data ?? []) as any[];
-          } else {
-            setDebugBooksSource("books:failed");
-            setDebugLastError(fallbackAnyOwner.error?.message ?? "books_failed");
-          }
-        }
-      }
-    }
-
-    if (rows.length === 0 && primaryError) {
-      console.warn("refreshAllBooks fallback used due primary query error", primaryError.message ?? primaryError);
-    }
-    setItems(rows as any);
-
-    const paths = Array.from(
-      new Set([
-        ...rows
-          .flatMap((r) => (Array.isArray(r.media) ? r.media : []))
-          .map((m: any) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
-          .filter(Boolean),
-        ...rows
-          .filter((r: any) => r.cover_crop && typeof r.cover_original_url === "string" && r.cover_original_url)
-          .map((r: any) => r.cover_original_url as string)
-      ])
-    );
-    const missing = paths.filter((p) => !mediaUrlsByPath[p]);
-    if (missing.length === 0) return;
-
-    const { data: signed, error: signErr } = await supabase.storage.from("user-book-media").createSignedUrls(missing, 60 * 60);
-    if (signErr || !signed) return;
-    const nextMap: Record<string, string> = {};
-    for (const s of signed) {
-      if (s.path && s.signedUrl) nextMap[s.path] = s.signedUrl;
-    }
-    setMediaUrlsByPath((prev) => ({ ...prev, ...nextMap }));
+    setDebugBooksSource("books:failed");
+    setItems([]);
+    return;
   }
 
   async function refreshLibraries(): Promise<LibrarySummary[]> {
