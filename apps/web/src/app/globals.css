@@ -837,6 +837,8 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 
 .om-lookup-actions {
   min-width: 88px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .om-lookup-controls {
@@ -850,7 +852,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 .om-lookup-item {
   margin-top: 8px;
   padding-top: 8px;
-  padding-bottom: 8px;
+  padding-bottom: 14px;
   border-bottom: 1px solid var(--border);
 }
 
