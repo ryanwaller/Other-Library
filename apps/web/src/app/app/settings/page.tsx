@@ -208,7 +208,14 @@ function SettingsPageContent() {
   const [ownedSharedCatalogs, setOwnedSharedCatalogs] = useState<
     Array<{
       catalog: { id: number; name: string };
-      members: Array<{ user_id: string; username: string | null; accepted_at: string | null }>;
+      members: Array<{
+        user_id: string;
+        username: string | null;
+        avatar_path: string | null;
+        avatar_url: string | null;
+        role: "owner" | "editor";
+        accepted_at: string | null;
+      }>;
     }>
   >([]);
 
@@ -279,6 +286,23 @@ function SettingsPageContent() {
       await refreshSharedCatalogs();
     } catch (e: any) {
       setSharedCatalogsError(e?.message ?? "Failed to leave catalog");
+    }
+  }
+
+  async function removeOwnedSharedMember(catalogId: number, memberUserId: string) {
+    if (!accessToken) return;
+    setSharedCatalogsError(null);
+    try {
+      const res = await fetch(`/api/catalog/${catalogId}/member/${encodeURIComponent(memberUserId)}`, {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${accessToken}` }
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(String(json?.error ?? "remove_member_failed"));
+      window.dispatchEvent(new Event("om:catalog-members-changed"));
+      await refreshSharedCatalogs();
+    } catch (e: any) {
+      setSharedCatalogsError(e?.message ?? "Failed to remove member");
     }
   }
 
@@ -359,9 +383,23 @@ function SettingsPageContent() {
         setAvatarUrl(null);
         return;
       }
-      const signed = await supabase.storage.from("avatars").createSignedUrl(profile.avatar_path, 60 * 60);
+      const path = String(profile.avatar_path ?? "").trim();
+      if (!path) {
+        setAvatarUrl(null);
+        return;
+      }
+      if (/^https?:\/\//i.test(path)) {
+        setAvatarUrl(path);
+        return;
+      }
+      const signed = await supabase.storage.from("avatars").createSignedUrl(path, 60 * 60);
       if (!alive) return;
-      setAvatarUrl(signed.data?.signedUrl ?? null);
+      if (signed.data?.signedUrl) {
+        setAvatarUrl(signed.data.signedUrl);
+      } else {
+        const pub = supabase.storage.from("avatars").getPublicUrl(path);
+        setAvatarUrl(pub.data?.publicUrl ?? null);
+      }
     })();
     return () => {
       alive = false;
@@ -1068,13 +1106,49 @@ function SettingsPageContent() {
                     >
                       <div style={{ minWidth: 0 }}>
                         <div>{row.catalog.name}</div>
-                        <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
-                          {row.members
-                            .map((m) => {
-                              const name = (m.username ?? "").trim() || m.user_id;
-                              return m.accepted_at ? name : `${name} (pending)`;
+                        <div className="om-list" style={{ marginTop: "var(--space-sm)" }}>
+                          {row.members.length === 0 ? (
+                            <div className="text-muted">None.</div>
+                          ) : (
+                            row.members.map((m, memberIdx) => {
+                              const username = (m.username ?? "").trim();
+                              const label = username || m.user_id;
+                              return (
+                                <div
+                                  key={`${row.catalog.id}:${m.user_id}`}
+                                  className="om-list-row"
+                                  style={memberIdx === row.members.length - 1 ? { borderBottom: "none", paddingInline: 0 } : { paddingInline: 0 }}
+                                >
+                                  <div className="om-avatar-lockup" style={{ minWidth: 0 }}>
+                                    {m.avatar_url ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img alt="" src={m.avatar_url} className="om-avatar-img" />
+                                    ) : (
+                                      <div className="om-avatar-img" style={{ background: "var(--placeholder-bg)" }} />
+                                    )}
+                                    {username ? (
+                                      <Link href={`/u/${username}`} className="om-book-title-link" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
+                                        {label}
+                                      </Link>
+                                    ) : (
+                                      <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{label}</span>
+                                    )}
+                                  </div>
+                                  <div className="row" style={{ marginLeft: "auto", gap: "var(--space-lg)", alignItems: "baseline" }}>
+                                    <span className="text-muted">{m.accepted_at ? m.role : "pending"}</span>
+                                    <button
+                                      type="button"
+                                      className="text-muted"
+                                      style={{ textDecoration: "underline" }}
+                                      onClick={() => void removeOwnedSharedMember(row.catalog.id, m.user_id)}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              );
                             })
-                            .join(", ")}
+                          )}
                         </div>
                       </div>
                     </div>

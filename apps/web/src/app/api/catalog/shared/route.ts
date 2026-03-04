@@ -67,32 +67,74 @@ export async function GET(req: Request) {
     const ownedLibs = ((ownedLibsRes.data ?? []) as any[]).map((l) => ({ id: Number(l.id), name: String(l.name ?? "Catalog") }));
     const ownedCatalogIds = ownedLibs.map((l) => l.id).filter((id) => Number.isFinite(id) && id > 0);
 
-    const ownedMembersByCatalog: Record<number, Array<{ user_id: string; username: string | null; accepted_at: string | null }>> = {};
+    const ownedMembersByCatalog: Record<
+      number,
+      Array<{ user_id: string; username: string | null; avatar_path: string | null; avatar_url: string | null; role: "owner" | "editor"; accepted_at: string | null }>
+    > = {};
     if (ownedCatalogIds.length > 0) {
       const ownedMembersRes = await admin
         .from("catalog_members")
-        .select("catalog_id,user_id,accepted_at")
+        .select("catalog_id,user_id,role,accepted_at")
         .in("catalog_id", ownedCatalogIds)
         .neq("user_id", current.id)
         .order("invited_at", { ascending: true });
       const ownedRows = (ownedMembersRes.error ? [] : ((ownedMembersRes.data ?? []) as any[])).map((r) => ({
         catalog_id: Number(r.catalog_id),
         user_id: String(r.user_id),
+        role: (String(r.role ?? "").toLowerCase() === "owner" ? "owner" : "editor") as "owner" | "editor",
         accepted_at: r.accepted_at ? String(r.accepted_at) : null
       }));
       const ownedMemberIds = Array.from(new Set(ownedRows.map((r) => r.user_id)));
-      let usernameById: Record<string, string | null> = {};
+      let profileById: Record<string, { username: string | null; avatar_path: string | null }> = {};
       if (ownedMemberIds.length > 0) {
-        const pr = await admin.from("profiles").select("id,username").in("id", ownedMemberIds);
+        const pr = await admin.from("profiles").select("id,username,avatar_path").in("id", ownedMemberIds);
         if (!pr.error) {
-          usernameById = Object.fromEntries(((pr.data ?? []) as any[]).map((p) => [String(p.id), p.username ? String(p.username) : null]));
+          profileById = Object.fromEntries(
+            ((pr.data ?? []) as any[]).map((p) => [
+              String(p.id),
+              {
+                username: p.username ? String(p.username) : null,
+                avatar_path: p.avatar_path ? String(p.avatar_path) : null
+              }
+            ])
+          );
+        }
+      }
+
+      const avatarByPath: Record<string, string> = {};
+      const avatarPaths = Array.from(
+        new Set(
+          Object.values(profileById)
+            .map((p) => (p.avatar_path ?? "").trim())
+            .filter(Boolean)
+        )
+      );
+      const directUrls = avatarPaths.filter((p) => /^https?:\/\//i.test(p));
+      for (const p of directUrls) avatarByPath[p] = p;
+      const storagePaths = avatarPaths.filter((p) => !/^https?:\/\//i.test(p));
+      if (storagePaths.length > 0) {
+        const signed = await admin.storage.from("avatars").createSignedUrls(storagePaths, 60 * 30);
+        if (!signed.error && Array.isArray(signed.data)) {
+          for (const row of signed.data) {
+            if (row.path && row.signedUrl) avatarByPath[row.path] = row.signedUrl;
+          }
+        }
+        for (const path of storagePaths) {
+          if (avatarByPath[path]) continue;
+          const pub = admin.storage.from("avatars").getPublicUrl(path);
+          const fallback = String(pub.data?.publicUrl ?? "").trim();
+          if (fallback) avatarByPath[path] = fallback;
         }
       }
       for (const r of ownedRows) {
         if (!ownedMembersByCatalog[r.catalog_id]) ownedMembersByCatalog[r.catalog_id] = [];
+        const profile = profileById[r.user_id] ?? { username: null, avatar_path: null };
         ownedMembersByCatalog[r.catalog_id].push({
           user_id: r.user_id,
-          username: usernameById[r.user_id] ?? null,
+          username: profile.username,
+          avatar_path: profile.avatar_path,
+          avatar_url: profile.avatar_path ? avatarByPath[profile.avatar_path] ?? null : null,
+          role: r.role,
           accepted_at: r.accepted_at
         });
       }
