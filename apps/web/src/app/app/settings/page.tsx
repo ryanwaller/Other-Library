@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo, useState, useRef } from "react";
 import type { Session } from "@supabase/supabase-js";
 import Cropper, { type Area } from "react-easy-crop";
 import { supabase } from "../../../lib/supabaseClient";
+import CustomSlider from "../../../components/CustomSlider";
 import SignInCard from "../../components/SignInCard";
 import FollowsPanel from "../follows/FollowsPanel";
 import BorrowRequestsPanel from "../borrow-requests/BorrowRequestsPanel";
@@ -647,28 +648,40 @@ function SettingsPageContent() {
 
               {pendingAvatarPreviewUrl ? (
                 <div style={{ marginTop: "var(--space-10)" }}>
-                  <div style={{ position: "relative", width: 280, height: 180, border: "1px solid var(--border-avatar)", background: "black" }}>
+                  <div
+                    style={{
+                      position: "relative",
+                      width: 280,
+                      height: 280,
+                      border: "1px solid var(--border-avatar)",
+                      background: "black",
+                      touchAction: "none"
+                    }}
+                  >
                     <Cropper
                       image={pendingAvatarPreviewUrl}
                       crop={avatarCrop}
                       zoom={avatarZoom}
                       aspect={1}
-                      cropShape="round"
+                      cropShape="rect"
                       showGrid={false}
+                      style={{
+                        containerStyle: { touchAction: "none", cursor: "grab" }
+                      }}
                       onCropChange={setAvatarCrop}
                       onZoomChange={(z: number) => setAvatarZoom(clamp(Number(z), 1, 3))}
                       onCropComplete={(_area: Area, areaPixels: Area) => setAvatarCroppedAreaPixels(areaPixels)}
                     />
                   </div>
-                  <div className="row" style={{ marginTop: "var(--space-10)", gap: "var(--space-10)", alignItems: "center", flexWrap: "wrap" }}>
-                    <span className="text-muted">Zoom</span>
-                    <input
-                      type="range"
+                  <div className="row no-wrap" style={{ marginTop: "var(--space-10)", alignItems: "center" }}>
+                    <div className="text-muted" style={{ minWidth: 110 }}>Zoom</div>
+                    <CustomSlider
                       min={1}
                       max={3}
                       step={0.01}
                       value={avatarZoom}
-                      onChange={(e) => setAvatarZoom(clamp(Number(e.target.value), 1, 3))}
+                      onChange={(z) => setAvatarZoom(clamp(Number(z), 1, 3))}
+                      style={{ flex: "1 1 auto" }}
                     />
                   </div>
                 </div>
