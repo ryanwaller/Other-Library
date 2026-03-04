@@ -5,6 +5,7 @@ import Link from "next/link";
 import { bookIdSlug } from "../../../lib/slug";
 import AddToLibraryButton from "./AddToLibraryButton";
 import CoverImage from "../../../components/CoverImage";
+import ActiveFilterDisplay, { type FilterPair } from "../../../components/ActiveFilterDisplay";
 import PagedBookList from "../../app/components/PagedBookList";
 import type { PublicBook, CatalogGroup } from "../../../lib/types";
 import { 
@@ -267,34 +268,41 @@ export default function PublicBookList({
           <span>{filteredGroups.length}</span>
         </div>
         <div className="row muted" style={{ gap: 10, justifyContent: "flex-end", margin: 0 }}>
-          {hasActiveFilters ? (
-            <>
-              {(() => {
-                const pairs: Array<{ label: string; value: string }> = [];
-                if (activeFilters.category) pairs.push({ label: "Category", value: activeFilters.category });
-                if (activeFilters.tag) pairs.push({ label: "Tag", value: activeFilters.tag });
-                if (activeFilters.author) pairs.push({ label: "Author", value: activeFilters.author });
-                if (activeFilters.subject) pairs.push({ label: "Subject", value: activeFilters.subject });
-                if (activeFilters.publisher) pairs.push({ label: "Publisher", value: activeFilters.publisher });
-                return pairs.length ? (
-                  <span style={{ display: "inline-flex", gap: 12, flexWrap: "wrap", alignItems: "baseline" }}>
-                    {pairs.map((p) => (
-                      <span key={`${p.label}:${p.value}`} className="row" style={{ gap: 12, alignItems: "baseline" }}>
-                        <span className="muted">{p.label}</span>
-                        <span style={{ color: "var(--fg)" }}>{p.value}</span>
-                      </span>
-                    ))}
-                  </span>
-                ) : null;
-              })()}<button 
-                onClick={() => {
-                  setActiveFilters({});
-                  window.history.replaceState({}, "", `/u/${username}`);
-                }}
-                className="om-clear-filter-btn"
-              >clear</button>
-            </>
-          ) : null}
+          <ActiveFilterDisplay
+            pairs={(() => {
+              const pairs: FilterPair[] = [];
+              if (activeFilters.category) pairs.push({ label: "Category", value: activeFilters.category, key: "category", onClear: () => {
+                const next = { ...activeFilters }; delete next.category; setActiveFilters(next);
+                const params = new URLSearchParams(window.location.search); params.delete("category");
+                window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+              }});
+              if (activeFilters.tag) pairs.push({ label: "Tag", value: activeFilters.tag, key: "tag", onClear: () => {
+                const next = { ...activeFilters }; delete next.tag; setActiveFilters(next);
+                const params = new URLSearchParams(window.location.search); params.delete("tag");
+                window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+              }});
+              if (activeFilters.author) pairs.push({ label: "Author", value: activeFilters.author, key: "author", onClear: () => {
+                const next = { ...activeFilters }; delete next.author; setActiveFilters(next);
+                const params = new URLSearchParams(window.location.search); params.delete("author");
+                window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+              }});
+              if (activeFilters.subject) pairs.push({ label: "Subject", value: activeFilters.subject, key: "subject", onClear: () => {
+                const next = { ...activeFilters }; delete next.subject; setActiveFilters(next);
+                const params = new URLSearchParams(window.location.search); params.delete("subject");
+                window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+              }});
+              if (activeFilters.publisher) pairs.push({ label: "Publisher", value: activeFilters.publisher, key: "publisher", onClear: () => {
+                const next = { ...activeFilters }; delete next.publisher; setActiveFilters(next);
+                const params = new URLSearchParams(window.location.search); params.delete("publisher");
+                window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+              }});
+              return pairs;
+            })()}
+            onClearAll={() => {
+              setActiveFilters({});
+              window.history.replaceState({}, "", `/u/${username}`);
+            }}
+          />
         </div>
       </div>
 

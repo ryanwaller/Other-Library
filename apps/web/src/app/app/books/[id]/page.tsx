@@ -1247,59 +1247,49 @@ export default function BookDetailPage() {
     };
 
     const rows = ((book?.book_entities ?? []) as Array<{ role: FacetRole; position: number | null; entity: EntityRef | null }> | null) ?? [];
-    if (rows.length > 0) {
-      const sorted = rows
-        .filter((r) => r?.role && r?.entity?.name && r?.entity?.slug)
-        .slice()
-        .sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999));
-      for (const r of sorted) {
-        const role = r.role;
-        const ent = r.entity!;
-        if (!out[role]) continue;
+    const sorted = rows
+      .filter((r) => r?.role && r?.entity?.name && r?.entity?.slug)
+      .slice()
+      .sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999));
+    for (const r of sorted) {
+      const role = r.role;
+      const ent = r.entity!;
+      if (out[role]) {
         out[role].push({ id: ent.id, name: ent.name, slug: ent.slug });
       }
-      return out;
     }
 
-    // Fallback (when DB migration isn't applied yet): generate slugs client-side so links still work.
-    for (const a of effectiveAuthors) {
-      const slug = slugifyFallback(a) || slugifyFallback(`author-${a}`);
-      out.author.push({ id: `author:${slug}`, name: a, slug });
-    }
-    for (const a of effectiveEditors) {
-      const slug = slugifyFallback(a) || slugifyFallback(`editor-${a}`);
-      out.editor.push({ id: `editor:${slug}`, name: a, slug });
-    }
-    for (const a of effectiveDesigners) {
-      const slug = slugifyFallback(a) || slugifyFallback(`designer-${a}`);
-      out.designer.push({ id: `designer:${slug}`, name: a, slug });
-    }
-    for (const s of effectiveSubjects) {
-      const slug = slugifyFallback(s) || slugifyFallback(`subject-${s}`);
-      out.subject.push({ id: `subject:${slug}`, name: s, slug });
-    }
-    for (const t of tags) {
-      const slug = slugifyFallback(t.name) || slugifyFallback(`tag-${t.name}`);
-      out.tag.push({ id: `tag:${slug}`, name: t.name, slug });
-    }
-    for (const t of categories) {
-      const slug = slugifyFallback(t.name) || slugifyFallback(`category-${t.name}`);
-      out.category.push({ id: `category:${slug}`, name: t.name, slug });
-    }
+    // Supplement with fallback slugs generated from effective variables for any roles that are missing local overrides.
+    // This ensures that even designers/editors added via CSV (stored in overrides) are clickable.
+    const supplement = (role: FacetRole, names: string[]) => {
+      for (const name of names) {
+        const normalized = name.trim();
+        if (!normalized) continue;
+        // If we already have this name in out[role] from DB rows, skip it
+        if (out[role].some((existing) => existing.name.toLowerCase() === normalized.toLowerCase())) continue;
+
+        const slug = slugifyFallback(normalized) || slugifyFallback(`${role}-${normalized}`);
+        out[role].push({ id: `${role}:${slug}`, name: normalized, slug });
+      }
+    };
+
+    supplement("author", effectiveAuthors);
+    supplement("editor", effectiveEditors);
+    supplement("designer", effectiveDesigners);
+    supplement("subject", effectiveSubjects);
+    supplement("tag", tags.map((t) => t.name));
+    supplement("category", categories.map((t) => t.name));
+
     if (effectivePublisher.trim()) {
-      const slug = slugifyFallback(effectivePublisher) || slugifyFallback(`publisher-${effectivePublisher}`);
-      out.publisher.push({ id: `publisher:${slug}`, name: effectivePublisher, slug });
+      supplement("publisher", [effectivePublisher.trim()]);
     }
+
     const printerName = (facetDraft.printer?.[0] ?? formPrinter).trim();
-    if (printerName) {
-      const slug = slugifyFallback(printerName) || slugifyFallback(`printer-${printerName}`);
-      out.printer.push({ id: `printer:${slug}`, name: printerName, slug });
-    }
+    if (printerName) supplement("printer", [printerName]);
+
     const materialName = (facetDraft.material?.[0] ?? formMaterials).trim();
-    if (materialName) {
-      const slug = slugifyFallback(materialName) || slugifyFallback(`material-${materialName}`);
-      out.material.push({ id: `material:${slug}`, name: materialName, slug });
-    }
+    if (materialName) supplement("material", [materialName]);
+
     return out;
   }, [
     book?.book_entities,

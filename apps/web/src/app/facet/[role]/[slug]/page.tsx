@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getServerSupabase } from "../../../../lib/supabaseServer";
 import FacetBookList from "./FacetBookList";
+import ActiveFilterDisplay from "../../../../components/ActiveFilterDisplay";
 import type { CoverCrop } from "../../../../components/CoverImage";
 
 export const dynamic = "force-dynamic";
@@ -191,11 +192,9 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
           <span className="muted">Books</span>
           <span>{booksCount}</span>
         </div>
-        <div className="row muted" style={{ gap: 12, flexWrap: "wrap" }}>
-          <span>{facetLabel}</span>
-          <span style={{ color: "var(--fg)" }}>{entity.name}</span>
-          <Link href="/app" className="om-clear-filter-btn">clear</Link>
-        </div>
+        <ActiveFilterDisplay
+          pairs={[{ label: facetLabel, value: entity.name, key: role, clearHref: "/app" }]}
+        />
       </div>
 
       <hr className="om-hr" style={{ marginTop: 10 }} />
