@@ -312,8 +312,9 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
               </div>
             )}
           </div>
+          <hr className="om-hr" style={{ marginTop: "var(--space-16)", marginBottom: "var(--space-16)" }} />
 
-          <div style={{ marginTop: 16 }} className="card">
+          <div className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Your followers</div>
               <div className="text-muted">{incomingApproved.length}</div>
@@ -368,8 +369,9 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
               </div>
             )}
           </div>
+          <hr className="om-hr" style={{ marginTop: "var(--space-16)", marginBottom: "var(--space-16)" }} />
 
-          <div style={{ marginTop: 16 }} className="card">
+          <div className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>You follow</div>
               <div className="text-muted">{outgoingApproved.length}</div>
@@ -406,8 +408,9 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
               </div>
             )}
           </div>
+          <hr className="om-hr" style={{ marginTop: "var(--space-16)", marginBottom: "var(--space-16)" }} />
 
-          <div style={{ marginTop: 16 }} className="card">
+          <div className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Outgoing requests</div>
               <div className="text-muted">{outgoingPending.length}</div>
@@ -444,8 +447,9 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
               </div>
             )}
           </div>
+          <hr className="om-hr" style={{ marginTop: "var(--space-16)", marginBottom: "var(--space-16)" }} />
 
-          <div style={{ marginTop: 16 }} className="card">
+          <div className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Rejected requests</div>
               <div className="text-muted">{outgoingRejected.length}</div>
