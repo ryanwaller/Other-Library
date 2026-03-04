@@ -50,7 +50,7 @@
   --space-lg: 24px;
   --space-32: 32px;
   --space-xl: 48px;
-  --catalog-top-gap: var(--space-lg);
+  --catalog-top-gap: var(--space-xl);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1116,7 +1116,7 @@ summary::-webkit-details-marker {
 .meta-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-8);
 }
 
 .toolbar {

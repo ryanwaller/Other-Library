@@ -258,99 +258,99 @@ export default function PublicBookList({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
-      {/* Header Lockup */}
-      <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
-        <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap", alignItems: "center", margin: 0 }}>
-          <span className="text-muted">Catalogs</span>
-          <span>{libraries.length}</span>
-          <span className="text-muted">Books</span>
-          <span>{filteredGroups.length}</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      <div className="toolbar" style={{ flexDirection: "column", gap: "var(--space-sm)", marginBottom: 0 }}>
+        <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
+          <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap", alignItems: "center", margin: 0 }}>
+            <span className="text-muted">Catalogs</span>
+            <span>{libraries.length}</span>
+            <span className="text-muted">Books</span>
+            <span>{filteredGroups.length}</span>
+          </div>
+          <div className="row text-muted" style={{ gap: "var(--space-10)", justifyContent: "flex-end", margin: 0 }}>
+            <ActiveFilterDisplay
+              pairs={(() => {
+                const pairs: FilterPair[] = [];
+                if (activeFilters.category) pairs.push({ label: "Category", value: activeFilters.category, key: "category", onClear: () => {
+                  const next = { ...activeFilters }; delete next.category; setActiveFilters(next);
+                  const params = new URLSearchParams(window.location.search); params.delete("category");
+                  window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+                }});
+                if (activeFilters.tag) pairs.push({ label: "Tag", value: activeFilters.tag, key: "tag", onClear: () => {
+                  const next = { ...activeFilters }; delete next.tag; setActiveFilters(next);
+                  const params = new URLSearchParams(window.location.search); params.delete("tag");
+                  window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+                }});
+                if (activeFilters.author) pairs.push({ label: "Author", value: activeFilters.author, key: "author", onClear: () => {
+                  const next = { ...activeFilters }; delete next.author; setActiveFilters(next);
+                  const params = new URLSearchParams(window.location.search); params.delete("author");
+                  window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+                }});
+                if (activeFilters.subject) pairs.push({ label: "Subject", value: activeFilters.subject, key: "subject", onClear: () => {
+                  const next = { ...activeFilters }; delete next.subject; setActiveFilters(next);
+                  const params = new URLSearchParams(window.location.search); params.delete("subject");
+                  window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+                }});
+                if (activeFilters.publisher) pairs.push({ label: "Publisher", value: activeFilters.publisher, key: "publisher", onClear: () => {
+                  const next = { ...activeFilters }; delete next.publisher; setActiveFilters(next);
+                  const params = new URLSearchParams(window.location.search); params.delete("publisher");
+                  window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+                }});
+                return pairs;
+              })()}
+              onClearAll={() => {
+                setActiveFilters({});
+                window.history.replaceState({}, "", `/u/${username}`);
+              }}
+            />
+          </div>
         </div>
-        <div className="row text-muted" style={{ gap: "var(--space-10)", justifyContent: "flex-end", margin: 0 }}>
-          <ActiveFilterDisplay
-            pairs={(() => {
-              const pairs: FilterPair[] = [];
-              if (activeFilters.category) pairs.push({ label: "Category", value: activeFilters.category, key: "category", onClear: () => {
-                const next = { ...activeFilters }; delete next.category; setActiveFilters(next);
-                const params = new URLSearchParams(window.location.search); params.delete("category");
-                window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
-              }});
-              if (activeFilters.tag) pairs.push({ label: "Tag", value: activeFilters.tag, key: "tag", onClear: () => {
-                const next = { ...activeFilters }; delete next.tag; setActiveFilters(next);
-                const params = new URLSearchParams(window.location.search); params.delete("tag");
-                window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
-              }});
-              if (activeFilters.author) pairs.push({ label: "Author", value: activeFilters.author, key: "author", onClear: () => {
-                const next = { ...activeFilters }; delete next.author; setActiveFilters(next);
-                const params = new URLSearchParams(window.location.search); params.delete("author");
-                window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
-              }});
-              if (activeFilters.subject) pairs.push({ label: "Subject", value: activeFilters.subject, key: "subject", onClear: () => {
-                const next = { ...activeFilters }; delete next.subject; setActiveFilters(next);
-                const params = new URLSearchParams(window.location.search); params.delete("subject");
-                window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
-              }});
-              if (activeFilters.publisher) pairs.push({ label: "Publisher", value: activeFilters.publisher, key: "publisher", onClear: () => {
-                const next = { ...activeFilters }; delete next.publisher; setActiveFilters(next);
-                const params = new URLSearchParams(window.location.search); params.delete("publisher");
-                window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
-              }});
-              return pairs;
-            })()}
-            onClearAll={() => {
-              setActiveFilters({});
-              window.history.replaceState({}, "", `/u/${username}`);
-            }}
+
+        <div className="row" style={{ margin: 0, alignItems: "baseline", gap: "var(--space-md)" }}>
+          <button
+            type="button"
+            className={sortOpen ? "text-primary" : "text-muted"}
+            onClick={() => setSortOpen((v) => !v)}
+          >
+            View by
+          </button>
+          <input
+            className="om-inline-search-input"
+            placeholder="Search books"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ minWidth: 0, flex: 1 }}
           />
         </div>
-      </div>
 
-      <div className="row" style={{ margin: 0, alignItems: "baseline", gap: "var(--space-md)" }}>
-        <button
-          type="button"
-          className={sortOpen ? "text-primary" : "text-muted"}
-          onClick={() => setSortOpen((v) => !v)}
-        >
-          View by
-        </button>
-        <input
-          className="om-inline-search-input"
-          placeholder="Search books"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{ minWidth: 0, flex: 1 }}
-        />
-      </div>
-
-      {sortOpen && (
-        <div className="om-filter-row" style={{ marginTop: "var(--space-10)", marginBottom: 4, gap: "var(--space-10)", alignItems: "center" }}>
-          <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as "grid" | "list")}>
-            <option value="grid">grid</option>
-            {isMobile && <option value="list">list</option>}
-          </select>
-          {viewMode === "grid" && (
-            <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as 1 | 2 | 4 | 8)}>
-              {isMobile && <option value={1}>1</option>}
-              <option value={2}>2</option>
-              {!isMobile && (
-                <>
-                  <option value={4}>4</option>
-                  <option value={8}>8</option>
-                </>
-              )}
+        {sortOpen && (
+          <div className="om-filter-row" style={{ marginTop: "var(--space-10)", marginBottom: 4, gap: "var(--space-10)", alignItems: "center" }}>
+            <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as "grid" | "list")}>
+              <option value="grid">grid</option>
+              {isMobile && <option value="list">list</option>}
             </select>
-          )}
-          <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)}>
-            <option value="latest">latest</option>
-            <option value="earliest">earliest</option>
-            <option value="title_asc">title A-Z</option>
-            <option value="title_desc">title Z-A</option>
-          </select>
-        </div>
-      )}
-
-      <div style={{ marginTop: "var(--catalog-top-gap)" }} />
+            {viewMode === "grid" && (
+              <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as 1 | 2 | 4 | 8)}>
+                {isMobile && <option value={1}>1</option>}
+                <option value={2}>2</option>
+                {!isMobile && (
+                  <>
+                    <option value={4}>4</option>
+                    <option value={8}>8</option>
+                  </>
+                )}
+              </select>
+            )}
+            <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)}>
+              <option value="latest">latest</option>
+              <option value="earliest">earliest</option>
+              <option value="title_asc">title A-Z</option>
+              <option value="title_desc">title Z-A</option>
+            </select>
+          </div>
+        )}
+      </div>
+      <div style={{ height: "var(--catalog-top-gap)" }} />
 
       {showLibraryBlocks ? (
         <div style={{ display: "flex", flexDirection: "column" }}>

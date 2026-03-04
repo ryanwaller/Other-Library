@@ -2146,7 +2146,7 @@ function AppShell({
         onAnyMenuOpen={() => { closeTagMenu(); closeCategoryMenu(); }}
       />
 
-      <div style={{ marginTop: "var(--catalog-top-gap)" }} />
+      <div style={{ height: "var(--catalog-top-gap)" }} />
 
       {libraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];
