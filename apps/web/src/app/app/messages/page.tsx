@@ -174,7 +174,7 @@ export default function MessagesPage() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -194,16 +194,16 @@ export default function MessagesPage() {
               <button onClick={refresh} disabled={busy}>
                 Refresh
               </button>
-              <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
+              <div className="text-muted">{busy ? "Loading…" : error ? error : ""}</div>
             </div>
           </div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Borrow request conversations. Pending incoming: {pendingIncomingCount}.
           </div>
 
           <div style={{ marginTop: "var(--space-md)" }}>
             {rows.length === 0 ? (
-              <div className="muted">No conversations yet.</div>
+              <div className="text-muted">No conversations yet.</div>
             ) : (
               rows.map((r) => {
                 const isOwner = r.owner_id === userId;
@@ -225,7 +225,7 @@ export default function MessagesPage() {
                       username={other?.username || otherId}
                       label={isOwner ? "request from" : "to"}
                       rightSlot={
-                        <div className="muted" style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                        <div className="text-muted" style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-sm)" }}>
                           {r.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
                           {r.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
                           {r.status === "pending" ? <span>…</span> : null}
@@ -235,22 +235,22 @@ export default function MessagesPage() {
                     />
 
                     <div style={{ marginTop: "var(--space-8)" }}>
-                      <span className="muted">{book?.object_type || "book"}: </span>
+                      <span className="text-muted">{book?.object_type || "book"}: </span>
                       <Link href={`/app/books/${r.user_book_id}`}>{title}</Link>
                     </div>
 
                     {preview ? (
-                      <div className="muted" style={{ marginTop: "var(--space-8)", whiteSpace: "pre-wrap" }}>
+                      <div className="text-muted" style={{ marginTop: "var(--space-8)", whiteSpace: "pre-wrap" }}>
                         {preview}
                       </div>
                     ) : (
-                      <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+                      <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
                         (no messages yet)
                       </div>
                     )}
 
                     <div className="row" style={{ marginTop: "var(--space-10)", justifyContent: "space-between" }}>
-                      <Link href={`/app/messages/${r.id}`} className="muted">
+                      <Link href={`/app/messages/${r.id}`} className="text-muted">
                         Open chat
                       </Link>
                       {isOwner && r.status === "pending" ? <Link href="/app/borrow-requests">Manage</Link> : null}

@@ -167,7 +167,7 @@ export default function BulkBar({
                   {l.name}
                 </button>
               ))}
-              {filteredMoveTargets.length === 0 ? <div className="muted">No matches.</div> : null}
+              {filteredMoveTargets.length === 0 ? <div className="text-muted">No matches.</div> : null}
             </div>
           </div>
         </details>
@@ -194,7 +194,7 @@ export default function BulkBar({
               if (e.key === "Escape") close(moreRef);
             }}
           >
-            <div className="muted" style={{ marginBottom: "var(--space-sm)" }}>
+            <div className="text-muted" style={{ marginBottom: "var(--space-sm)" }}>
               Add category
             </div>
             <div className="row" style={{ gap: "var(--space-10)", alignItems: "baseline", marginBottom: "var(--space-md)" }}>

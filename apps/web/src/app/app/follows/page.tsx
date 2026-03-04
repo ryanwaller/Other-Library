@@ -243,7 +243,7 @@ export default function FollowsPage() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -259,13 +259,13 @@ export default function FollowsPage() {
         <div className="card">
           <div className="row" style={{ justifyContent: "space-between" }}>
             <div>Follows</div>
-            <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
+            <div className="text-muted">{busy ? "Loading…" : error ? error : ""}</div>
           </div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Followers-only content is visible only to <span>approved</span> followers.
           </div>
           {actionError ? (
-            <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+            <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
               {actionError}
             </div>
           ) : null}
@@ -273,10 +273,10 @@ export default function FollowsPage() {
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Incoming requests</div>
-              <div className="muted">{incomingPending.length}</div>
+              <div className="text-muted">{incomingPending.length}</div>
             </div>
             {incomingPending.length === 0 ? (
-              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+              <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
                 None.
               </div>
             ) : (
@@ -314,10 +314,10 @@ export default function FollowsPage() {
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Your followers</div>
-              <div className="muted">{incomingApproved.length}</div>
+              <div className="text-muted">{incomingApproved.length}</div>
             </div>
             {incomingApproved.length === 0 ? (
-              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+              <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
                 None yet.
               </div>
             ) : (
@@ -342,11 +342,11 @@ export default function FollowsPage() {
                                 {actionBusyKey === `follow:${pid}` ? "Requesting…" : "Follow back"}
                               </button>
                             ) : outgoingStatus === "approved" ? (
-                              <span className="muted" style={{ marginRight: 8 }}>
+                              <span className="text-muted" style={{ marginRight: 8 }}>
                                 Following
                               </span>
                             ) : outgoingStatus === "pending" ? (
-                              <span className="muted" style={{ marginRight: 8 }}>
+                              <span className="text-muted" style={{ marginRight: 8 }}>
                                 Requested
                               </span>
                             ) : (
@@ -370,10 +370,10 @@ export default function FollowsPage() {
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>You follow</div>
-              <div className="muted">{outgoingApproved.length}</div>
+              <div className="text-muted">{outgoingApproved.length}</div>
             </div>
             {outgoingApproved.length === 0 ? (
-              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+              <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
                 None.
               </div>
             ) : (
@@ -408,10 +408,10 @@ export default function FollowsPage() {
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Outgoing requests</div>
-              <div className="muted">{outgoingPending.length}</div>
+              <div className="text-muted">{outgoingPending.length}</div>
             </div>
             {outgoingPending.length === 0 ? (
-              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+              <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
                 None.
               </div>
             ) : (
@@ -446,10 +446,10 @@ export default function FollowsPage() {
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Rejected requests</div>
-              <div className="muted">{outgoingRejected.length}</div>
+              <div className="text-muted">{outgoingRejected.length}</div>
             </div>
             {outgoingRejected.length === 0 ? (
-              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+              <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
                 None.
               </div>
             ) : (

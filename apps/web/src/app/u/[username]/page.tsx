@@ -59,7 +59,7 @@ export default async function PublicProfilePage({
       <main className="container">
         <div className="card">
           <div>@{username}</div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Not found (or private).
           </div>
         </div>

@@ -174,7 +174,7 @@ export default function LibraryBlock({
                   {libraryName}
                 </button>
               )}
-              <span className="muted" style={{ marginLeft: "var(--space-md)", whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
+              <span className="text-muted" style={{ marginLeft: "var(--space-md)", whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
                 {bookCount}&nbsp;&nbsp;book{bookCount === 1 ? "" : "s"}
               </span>
             </div>
@@ -209,7 +209,7 @@ export default function LibraryBlock({
           {renderBooks(limit)}
           {bookCount > limit && (
             <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: 24, justifyContent: "center" }}>
-              <button onClick={loadMore} className="muted">
+              <button onClick={loadMore} className="text-muted">
                 Load more
               </button>
             </div>

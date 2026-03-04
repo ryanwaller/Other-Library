@@ -43,7 +43,7 @@ export default async function PublicFollowersPage({ params }: { params: Promise<
       <main className="container">
         <div className="card">
           <div>@{username}</div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Not found (or private).
           </div>
         </div>
@@ -59,7 +59,7 @@ export default async function PublicFollowersPage({ params }: { params: Promise<
           <div>
             <Link href={`/u/${profile.username}`}>{profile.username}</Link> · followers
           </div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Followers list is not visible.
           </div>
         </div>
@@ -84,13 +84,13 @@ export default async function PublicFollowersPage({ params }: { params: Promise<
           <div>
             <Link href={`/u/${profile.username}`}>{profile.username}</Link> · followers
           </div>
-          <div className="muted">{rows.length}</div>
+          <div className="text-muted">{rows.length}</div>
         </div>
       </div>
 
       <div style={{ marginTop: "var(--space-md)" }}>
         {rows.length === 0 ? (
-          <div className="muted">None.</div>
+          <div className="text-muted">None.</div>
         ) : (
           rows.map((p) => {
             const avatarUrl = p.avatar_path ? signedMap[p.avatar_path] ?? null : null;

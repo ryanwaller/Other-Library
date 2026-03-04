@@ -38,7 +38,7 @@ export default function IdentityRow({
           {avatar}
         </Link>
         <div style={{ minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {label && <span className="muted" style={{ marginRight: 6 }}>{label}</span>}
+          {label && <span className="text-muted" style={{ marginRight: 6 }}>{label}</span>}
           <Link href={`/u/${username}`}>
             {name}
           </Link>

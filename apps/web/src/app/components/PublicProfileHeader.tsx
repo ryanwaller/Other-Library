@@ -36,7 +36,7 @@ export default function PublicProfileHeader({
   const nameLockup = (
     <div style={{ textDecoration: "none", color: "inherit" }}>
       <div style={{ fontSize: "1em" }} className="om-header-display-name">{displayName || `@${username}`}</div>
-      {displayName ? <div className="muted">@{username}</div> : null}
+      {displayName ? <div className="text-muted">@{username}</div> : null}
     </div>
   );
 
@@ -64,13 +64,13 @@ export default function PublicProfileHeader({
 
       <div className="row muted" style={{ marginTop: "var(--space-md)", gap: 16 }}>
         <span style={{ display: "inline-flex", gap: "var(--space-10)" }}>
-          <Link href={`/u/${username}/followers`} className="muted">
+          <Link href={`/u/${username}/followers`} className="text-muted">
             Followers
           </Link>
           <span>{followerCount ?? "—"}</span>
         </span>
         <span style={{ display: "inline-flex", gap: "var(--space-10)" }}>
-          <Link href={`/u/${username}/following`} className="muted">
+          <Link href={`/u/${username}/following`} className="text-muted">
             Following
           </Link>
           <span>{followingCount ?? "—"}</span>
@@ -78,7 +78,7 @@ export default function PublicProfileHeader({
         {followButton}
       </div>
       {bio && (
-        <div className="muted" style={{ marginTop: "var(--space-8)", whiteSpace: "pre-wrap" }}>
+        <div className="text-muted" style={{ marginTop: "var(--space-8)", whiteSpace: "pre-wrap" }}>
           {bio}
         </div>
       )}

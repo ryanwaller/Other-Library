@@ -250,7 +250,7 @@ export default function MessageThreadPage() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -290,7 +290,7 @@ export default function MessageThreadPage() {
 
   return (
     <main className="container">
-      <div className="muted" style={{ marginBottom: "var(--space-md)" }}>
+      <div className="text-muted" style={{ marginBottom: "var(--space-md)" }}>
         <Link href="/app/messages">Back</Link>
       </div>
 
@@ -302,7 +302,7 @@ export default function MessageThreadPage() {
             username={other?.username || otherUserId || ""}
             label={isOwner ? "request from" : "request to"}
             rightSlot={
-              <div className="muted" style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-sm)" }}>
+              <div className="text-muted" style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-sm)" }}>
                 {req.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
                 {req.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
                 {req.status === "pending" ? <span>…</span> : null}
@@ -311,7 +311,7 @@ export default function MessageThreadPage() {
           />
 
           <div style={{ marginTop: "var(--space-8)" }}>
-            <span className="muted">{book?.object_type || "book"}: </span>
+            <span className="text-muted">{book?.object_type || "book"}: </span>
             <Link href={`/app/books/${req.user_book_id}`}>{title}</Link>
           </div>
         </div>
@@ -320,7 +320,7 @@ export default function MessageThreadPage() {
       <div className="om-thread" style={{ marginTop: "var(--space-14)" }}>
         {req?.message ? (
           <div className="om-thread-msg">
-            <div className="muted">{requesterName}</div>
+            <div className="text-muted">{requesterName}</div>
             <div style={{ whiteSpace: "pre-wrap" }}>{req.message}</div>
           </div>
         ) : null}
@@ -345,7 +345,7 @@ export default function MessageThreadPage() {
               const senderName = profilesById[m.sender_id]?.username ?? "someone";
               return (
                 <div key={m.id} className="om-thread-msg">
-                  <div className="muted">{senderName}</div>
+                  <div className="text-muted">{senderName}</div>
                   <div style={{ whiteSpace: "pre-wrap" }}>{m.message}</div>
                 </div>
               );
@@ -377,7 +377,7 @@ export default function MessageThreadPage() {
             >
               {sendState.busy ? "Sending…" : "Send"}
             </button>
-            <span className="muted">{sendState.message ? (sendState.error ? `${sendState.message} (${sendState.error})` : sendState.message) : ""}</span>
+            <span className="text-muted">{sendState.message ? (sendState.error ? `${sendState.message} (${sendState.error})` : sendState.message) : ""}</span>
           </div>
 
           <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap" }}>
@@ -396,7 +396,7 @@ export default function MessageThreadPage() {
                 Cancel request
               </button>
             ) : null}
-            <span className="muted">{statusState.message ? (statusState.error ? `${statusState.message} (${statusState.error})` : statusState.message) : ""}</span>
+            <span className="text-muted">{statusState.message ? (statusState.error ? `${statusState.message} (${statusState.error})` : statusState.message) : ""}</span>
           </div>
         </div>
       </div>

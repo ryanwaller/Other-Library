@@ -24,7 +24,7 @@ export default function PagedBookList<T>({
 
   if (items.length === 0) {
     return (
-      <div className="muted" style={{ marginTop: "var(--space-10)" }}>
+      <div className="text-muted" style={{ marginTop: "var(--space-10)" }}>
         {noItemsMessage}
       </div>
     );
@@ -37,7 +37,7 @@ export default function PagedBookList<T>({
       </div>
       {items.length > limit && (
         <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: 24, justifyContent: "center" }}>
-          <button onClick={loadMore} className="muted">
+          <button onClick={loadMore} className="text-muted">
             Load more
           </button>
         </div>

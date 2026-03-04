@@ -1829,13 +1829,13 @@ function AppShell({
 
         <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
           <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap", alignItems: "center" }}>
-            <span className="muted">Catalogs</span>
+            <span className="text-muted">Catalogs</span>
             <span>{libraries.length}</span>
-            <span className="muted">Books</span>
+            <span className="text-muted">Books</span>
             <span>{displayGroups.length}</span>
             {bulkMode && (
               <>
-                <span className="muted">Selected</span>
+                <span className="text-muted">Selected</span>
                 <span>{bulkSelectedGroups.length}</span>
                 {displayGroups.length > 0 && bulkSelectedGroups.length < displayGroups.length && (
                   <button type="button" onClick={selectAll} style={{ background: "transparent", border: 0, padding: 0, font: "inherit", color: "inherit", textDecoration: "underline", cursor: "pointer" }}>
@@ -1877,8 +1877,8 @@ function AppShell({
             <div className="row" style={{ width: "100%", margin: 0, gap: "var(--space-10)", alignItems: "baseline", flexWrap: "nowrap" }}>
               {showScan && (
                 <div className="row" style={{ gap: "var(--space-sm)", flex: "0 0 auto", alignItems: "baseline" }}>
-                  <button className="muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}>Scan</button>
-                  <span className="muted" style={{ fontSize: "0.9em" }}>or</span>
+                  <button className="text-muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}>Scan</button>
+                  <span className="text-muted" style={{ fontSize: "0.9em" }}>or</span>
                 </div>
               )}
               <div style={{ flex: "1 1 auto", minWidth: 0 }}>
@@ -1909,7 +1909,7 @@ function AppShell({
               <button onClick={() => { const next = !bulkMode; if (next) { setAddOpen(false); setSortOpen(false); setSearchOpen(false); setReorderMode(true); } else { exitEditMode(); } setBulkMode(next); }}>
                 {bulkMode ? "Done" : "Edit"}
               </button>
-              <button type="button" className={sortOpen ? "text-primary" : "muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !sortOpen; setSortOpen(next); if (next) { setSearchOpen(false); } }}>
+              <button type="button" className={sortOpen ? "text-primary" : "text-muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !sortOpen; setSortOpen(next); if (next) { setSearchOpen(false); } }}>
                 View by
               </button>
               <input
@@ -1922,7 +1922,7 @@ function AppShell({
                 style={{ minWidth: 0, flex: 1 }}
               />
               {(searchFocused || searchQuery.trim()) && (
-                <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`} className="muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>Search others</Link>
+                <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`} className="text-muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>Search others</Link>
               )}
             </div>
           </>
@@ -1931,8 +1931,8 @@ function AppShell({
             <div className="row" style={{ flex: "1 1 auto", gap: "var(--space-md)", alignItems: "baseline", minWidth: 0, flexWrap: "nowrap", margin: 0 }}>
               {showScan && (
                 <div className="row" style={{ gap: "var(--space-sm)", flex: "0 0 auto", alignItems: "baseline" }}>
-                  <button className="muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}>Scan</button>
-                  <span className="muted" style={{ fontSize: "0.9em" }}>or</span>
+                  <button className="text-muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}>Scan</button>
+                  <span className="text-muted" style={{ fontSize: "0.9em" }}>or</span>
                 </div>
               )}
               <div style={{ flex: "1 1 auto", minWidth: 0 }}>
@@ -1959,11 +1959,11 @@ function AppShell({
               <button onClick={() => { const next = !bulkMode; if (next) { setAddOpen(false); setSortOpen(false); setSearchOpen(false); setReorderMode(true); } else { exitEditMode(); } setBulkMode(next); }}>
                 {bulkMode ? "Done" : "Edit"}
               </button>
-              <button type="button" className={sortOpen ? "text-primary" : "muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !sortOpen; setSortOpen(next); if (next) { setSearchOpen(false); } }}>
+              <button type="button" className={sortOpen ? "text-primary" : "text-muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !sortOpen; setSortOpen(next); if (next) { setSearchOpen(false); } }}>
                 View by
               </button>
             </div>
-            <button type="button" className={searchOpen ? "text-primary" : "muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !searchOpen; setSearchOpen(next); if (next) { setSortOpen(false); } }}>
+            <button type="button" className={searchOpen ? "text-primary" : "text-muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !searchOpen; setSearchOpen(next); if (next) { setSortOpen(false); } }}>
               Search
             </button>
           </div>
@@ -1982,14 +1982,14 @@ function AppShell({
             style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
           />
           {(searchFocused || searchQuery.trim()) && (
-            <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`} className="muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>Search others</Link>
+            <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`} className="text-muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>Search others</Link>
           )}
         </div>
       )}
 
 
         {(addState.message || addSearchState.message) && (
-          <div className="muted" style={{ marginTop: "var(--space-sm)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
             {addState.message || addSearchState.message}
           </div>
         )}
@@ -2014,10 +2014,10 @@ function AppShell({
               </div>
               <div className="om-lookup-main">
                 <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(addUrlPreview.title ?? "").trim() || "—"}</div>
-                <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {(addUrlPreview.authors ?? []).filter(Boolean).join(", ") || "—"}
                 </div>
-                <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {[addUrlPreview.publisher ?? "", addUrlPreview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
                 </div>
               </div>
@@ -2046,10 +2046,10 @@ function AppShell({
                   </div>
                   <div className="om-lookup-main">
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(result.title ?? "").trim() || "—"}</div>
-                    <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {(result.authors ?? []).filter(Boolean).join(", ") || "—"}
                     </div>
-                    <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {[result.publisher ?? "", result.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
                     </div>
                   </div>
@@ -2277,7 +2277,7 @@ export default function AppPage() {
       {!supabase ? (
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.</div>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.</div>
         </div>
       ) : !sessionLoaded ? (
         <div className="card">Loading…</div>

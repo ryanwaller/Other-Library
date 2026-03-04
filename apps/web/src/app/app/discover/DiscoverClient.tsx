@@ -97,7 +97,7 @@ export default function DiscoverClient() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -115,7 +115,7 @@ export default function DiscoverClient() {
         <div className="card">
           <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-md)" }}>
             <div>Discovery</div>
-            <div className="muted">{busy ? "Searching…" : error ? error : ""}</div>
+            <div className="text-muted">{busy ? "Searching…" : error ? error : ""}</div>
           </div>
 
           <div className="row" style={{ marginTop: "var(--space-10)", flexWrap: "wrap", gap: "var(--space-10)", alignItems: "center" }}>
@@ -135,16 +135,16 @@ export default function DiscoverClient() {
             </button>
           </div>
 
-          <div className="muted" style={{ marginTop: "var(--space-10)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-10)" }}>
             Results show books that are visible to you (your own, people you follow, and public).
           </div>
 
           <div style={{ marginTop: "var(--space-md)" }}>
-            {rows.length === 0 && q.trim() && !busy ? <div className="muted">No results.</div> : null}
+            {rows.length === 0 && q.trim() && !busy ? <div className="text-muted">No results.</div> : null}
 
             {grouped.mine.length > 0 ? (
               <div className="card" style={{ marginTop: "var(--space-10)" }}>
-                <div className="muted" style={{ marginBottom: "var(--space-8)" }}>Your catalog</div>
+                <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>Your catalog</div>
                 <PagedBookList
                   items={grouped.mine}
                   viewMode="list"
@@ -153,7 +153,7 @@ export default function DiscoverClient() {
                   renderItem={(r) => (
                     <div key={`mine-${r.user_book_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <Link href={`/app/books/${r.user_book_id}`}>{r.title}</Link>
-                      <div className="muted">
+                      <div className="text-muted">
                         {r.authors?.length ? r.authors.join(", ") : ""} {r.isbn13 ? `· ${r.isbn13}` : ""}
                       </div>
                     </div>
@@ -164,7 +164,7 @@ export default function DiscoverClient() {
 
             {grouped.following.length > 0 ? (
               <div className="card" style={{ marginTop: "var(--space-10)" }}>
-                <div className="muted" style={{ marginBottom: "var(--space-8)" }}>People you follow</div>
+                <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>People you follow</div>
                 <PagedBookList
                   items={grouped.following}
                   viewMode="list"
@@ -173,7 +173,7 @@ export default function DiscoverClient() {
                   renderItem={(r) => (
                     <div key={`f-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
-                      <div className="muted">
+                      <div className="text-muted">
                         <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
                         {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
                       </div>
@@ -185,7 +185,7 @@ export default function DiscoverClient() {
 
             {grouped.second.length > 0 ? (
               <div className="card" style={{ marginTop: "var(--space-10)" }}>
-                <div className="muted" style={{ marginBottom: "var(--space-8)" }}>2nd-degree (public)</div>
+                <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>2nd-degree (public)</div>
                 <PagedBookList
                   items={grouped.second}
                   viewMode="list"
@@ -194,7 +194,7 @@ export default function DiscoverClient() {
                   renderItem={(r) => (
                     <div key={`s-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
-                      <div className="muted">
+                      <div className="text-muted">
                         <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
                         {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
                       </div>
@@ -206,7 +206,7 @@ export default function DiscoverClient() {
 
             {grouped.pub.length > 0 ? (
               <div className="card" style={{ marginTop: "var(--space-10)" }}>
-                <div className="muted" style={{ marginBottom: "var(--space-8)" }}>Public</div>
+                <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>Public</div>
                 <PagedBookList
                   items={grouped.pub}
                   viewMode="list"
@@ -215,7 +215,7 @@ export default function DiscoverClient() {
                   renderItem={(r) => (
                     <div key={`p-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: "var(--space-8)" }}>
                       <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
-                      <div className="muted">
+                      <div className="text-muted">
                         <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
                         {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
                       </div>

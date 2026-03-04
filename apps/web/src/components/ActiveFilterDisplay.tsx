@@ -29,19 +29,19 @@ export default function ActiveFilterDisplay({ pairs, onClearAll, clearAllHref }:
       <span style={{ display: "inline-flex", gap: 32, flexWrap: "wrap", alignItems: "baseline" }}>
         {pairs.map((p, idx) => (
           <span key={`${p.label}:${p.value}:${idx}`} className="row" style={{ gap: "var(--space-md)", alignItems: "baseline" }}>
-            <span className="muted" style={{ marginRight: 2 }}>{p.label}</span>
+            <span className="text-muted" style={{ marginRight: 2 }}>{p.label}</span>
             <span style={{ color: "var(--fg)", marginRight: 4 }}>{p.value}</span>
             {p.onClear ? (
               <button
                 type="button"
                 onClick={p.onClear}
-                className="muted"
+                className="text-muted"
                 style={{ font: "inherit", cursor: "pointer", border: "none", background: "none", padding: 0 }}
               >
                 clear
               </button>
             ) : p.clearHref ? (
-              <Link href={p.clearHref} className="muted">
+              <Link href={p.clearHref} className="text-muted">
                 clear
               </Link>
             ) : null}

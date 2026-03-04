@@ -2650,7 +2650,7 @@ export default function BookDetailPage() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -2679,17 +2679,17 @@ export default function BookDetailPage() {
                     {editMode ? (
                       deleteConfirm ? (
                         <div className="row" style={{ gap: "var(--space-md)", alignItems: "baseline", flexWrap: "nowrap" }}>
-                          <span className="muted">Are you sure?</span>
+                          <span className="text-muted">Are you sure?</span>
                           <button onClick={() => deleteBook()} disabled={deleteState.busy}>Yes</button>
-                          <button onClick={() => setDeleteConfirm(false)} disabled={deleteState.busy} className="muted">No</button>
+                          <button onClick={() => setDeleteConfirm(false)} disabled={deleteState.busy} className="text-muted">No</button>
                         </div>
                       ) : (
                         <>
                           <button onClick={doneEditMode} disabled={busy || saveState.busy}>
                             {saveState.busy ? "Saving..." : "Save"}
                           </button>
-                          <button onClick={cancelEditMode} disabled={busy || saveState.busy} className="muted">Cancel</button>
-                          <button onClick={() => setDeleteConfirm(true)} disabled={busy || saveState.busy} className="muted">Delete</button>
+                          <button onClick={cancelEditMode} disabled={busy || saveState.busy} className="text-muted">Cancel</button>
+                          <button onClick={() => setDeleteConfirm(true)} disabled={busy || saveState.busy} className="text-muted">Delete</button>
                         </>
                       )
                     ) : (
@@ -2698,7 +2698,7 @@ export default function BookDetailPage() {
                     {updatesCount > 0 ? (
                       <button
                         onClick={() => { cancelEditMode(); setFindMoreOpen(false); setMergePanelOpen((v) => !v); }}
-                        className={mergePanelOpen ? "" : "muted"}
+                        className={mergePanelOpen ? "" : "text-muted"}
                         style={{ whiteSpace: "nowrap" }}
                       >
                         <span>Updates available</span><span style={{ marginLeft: "0.5em" }}>{updatesCount}</span>
@@ -2739,14 +2739,14 @@ export default function BookDetailPage() {
                         >
                           {mergeState.busy ? "Merging…" : "Apply merge"}
                         </button>
-                        <button onClick={() => setMergePanelOpen(false)} className="muted" style={{ whiteSpace: "nowrap" }}>
+                        <button onClick={() => setMergePanelOpen(false)} className="text-muted" style={{ whiteSpace: "nowrap" }}>
                           Close
                         </button>
                       </>
                     ) : null}
                     <button
                       onClick={() => { if (!findMoreOpen) { cancelEditMode(); setMergePanelOpen(false); } setFindMoreOpen((v) => !v); }}
-                      className="muted"
+                      className="text-muted"
                       style={{ whiteSpace: "nowrap" }}
                     >
                       {findMoreOpen ? "Cancel" : "Find more info"}
@@ -2754,13 +2754,13 @@ export default function BookDetailPage() {
                   </div>
                 ) : null}
               </div>
-              <div className="muted" style={{ marginTop: "var(--space-sm)", textAlign: "right" }}>
+              <div className="text-muted" style={{ marginTop: "var(--space-sm)", textAlign: "right" }}>
                 {mergeState.message
                   ? mergeState.error
                     ? `${mergeState.message} (${mergeState.error})`
                     : mergeState.message
                   : mergeUndoSnapshot
-                    ? <button onClick={() => void undoMerge()} disabled={mergeState.busy} className="muted">Undo merge</button>
+                    ? <button onClick={() => void undoMerge()} disabled={mergeState.busy} className="text-muted">Undo merge</button>
                     : saveState.message
                       ? saveState.error
                         ? `${saveState.message} (${saveState.error})`
@@ -2778,7 +2778,7 @@ export default function BookDetailPage() {
                   <div style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: "var(--space-8)", marginBottom: 0, alignItems: "baseline" }}>
                     <span />
                     <span />
-                    <span className="muted" style={{ textAlign: "right" }}>Sources</span>
+                    <span className="text-muted" style={{ textAlign: "right" }}>Sources</span>
                   </div>
                   {/* Field rows — spacing matches metadata list (marginTop: "var(--space-8)") */}
                   {mergeFieldGroups.flatMap((group): ReactNode[] => {
@@ -2788,7 +2788,7 @@ export default function BookDetailPage() {
                         const userHasCover = (book?.media ?? []).some((m) => m.kind === "cover");
                         return [(
                           <div key="cover-row" style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: "var(--space-8)", marginTop: "var(--space-8)", alignItems: "start" }}>
-                            <span className="muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>Cover</span>
+                            <span className="text-muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>Cover</span>
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-8)" }}>
                               {group.candidates.map((cand) => {
                                 const selKey = `cover::${cand.value}`;
@@ -2821,7 +2821,7 @@ export default function BookDetailPage() {
                                 );
                               })}
                             </div>
-                            <span className="muted" style={{ textAlign: "right", paddingTop: 2 }}>{group.candidates.length}</span>
+                            <span className="text-muted" style={{ textAlign: "right", paddingTop: 2 }}>{group.candidates.length}</span>
                           </div>
                         )];
                       }
@@ -2836,12 +2836,12 @@ export default function BookDetailPage() {
                             onClick={() => setMergeSelections((s) => ({ ...s, [selKey]: isChecked ? null : cand.value }))}
                             style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: "var(--space-8)", marginTop: "var(--space-8)", alignItems: "baseline", cursor: "pointer" }}
                           >
-                            <span className="muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{i === 0 ? group.label : ""}</span>
+                            <span className="text-muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{i === 0 ? group.label : ""}</span>
                             <span style={{ display: "flex", alignItems: "baseline", gap: "var(--space-sm)", minWidth: 0 }}>
                               <span style={{ flexShrink: 0, width: "1em", display: "inline-block" }}>{isChecked ? "+" : "–"}</span>
                               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, opacity: isChecked ? 1 : 0.45 }}>{cand.value}</span>
                             </span>
-                            <span className="muted" style={{ textAlign: "right" }}>{cand.count}</span>
+                            <span className="text-muted" style={{ textAlign: "right" }}>{cand.count}</span>
                           </div>
                         );
                       });
@@ -2856,12 +2856,12 @@ export default function BookDetailPage() {
                           onClick={() => setMergeSelections((s) => ({ ...s, [group.key]: isChecked ? null : cand.value }))}
                           style={{ display: "grid", gridTemplateColumns: "90px 1fr auto", gap: "var(--space-8)", marginTop: "var(--space-8)", alignItems: "baseline", cursor: "pointer" }}
                         >
-                          <span className="muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{group.label}</span>
+                          <span className="text-muted" style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{group.label}</span>
                           <span style={{ display: "flex", alignItems: "baseline", gap: "var(--space-sm)", minWidth: 0 }}>
                             <span style={{ flexShrink: 0, width: "1em", display: "inline-block" }}>{isChecked ? "+" : "–"}</span>
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, opacity: isChecked ? 1 : 0.45 }}>{cand.value}</span>
                           </span>
-                          <span className="muted" style={{ textAlign: "right" }}>{cand.count}</span>
+                          <span className="text-muted" style={{ textAlign: "right" }}>{cand.count}</span>
                         </div>
                       )];
                     }
@@ -2876,13 +2876,13 @@ export default function BookDetailPage() {
                       {showScan && (
                         <div className="row" style={{ gap: "var(--space-md)", flex: "0 0 auto", alignItems: "baseline" }}>
                           <button 
-                            className="muted" 
+                            className="text-muted" 
                             onClick={openScanner} 
                             style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}
                           >
                             Scan
                           </button>
-                          <span className="muted">or</span>
+                          <span className="text-muted">or</span>
                         </div>
                       )}
                       <div style={{ flex: "1 1 auto", minWidth: 0 }}>
@@ -2908,7 +2908,7 @@ export default function BookDetailPage() {
                       ) : null}
                     </div>
                   </div>
-                  <div className="muted" style={{ marginTop: "var(--space-sm)" }}>
+                  <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
                     {importState.busy || searchState.busy
                       ? "Working…"
                       : importState.error
@@ -2920,7 +2920,7 @@ export default function BookDetailPage() {
 
                   {searchResults.length > 0 ? (
                     <div style={{ marginTop: "var(--space-10)" }}>
-                      <div className="muted">Title/author results</div>
+                      <div className="text-muted">Title/author results</div>
                       <div style={{ marginTop: "var(--space-sm)" }}>
                         {searchResults.slice(0, lookupLimit).map((r, idx) => {
                           const bestIsbn = r.isbn13 ?? r.isbn10 ?? "";
@@ -2958,11 +2958,11 @@ export default function BookDetailPage() {
                                 </div>
                                 <div className="om-lookup-main">
                                   <div>{title}</div>
-                                  <div className="muted" style={{ marginTop: 4 }}>
+                                  <div className="text-muted" style={{ marginTop: 4 }}>
                                     {authors || "—"}
                                     {pub ? ` · ${pub}` : ""}
                                   </div>
-                                  <div className="muted" style={{ marginTop: 4 }}>
+                                  <div className="text-muted" style={{ marginTop: 4 }}>
                                     {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"} · {r.source}
                                   </div>
                                 </div>
@@ -3005,7 +3005,7 @@ export default function BookDetailPage() {
                       </div>
                       {searchResults.length > lookupLimit ? (
                         <div className="row" style={{ marginTop: "var(--space-md)", justifyContent: "center" }}>
-                          <button onClick={() => setLookupLimit((prev) => prev + 10)} className="muted">
+                          <button onClick={() => setLookupLimit((prev) => prev + 10)} className="text-muted">
                             Load more
                           </button>
                         </div>
@@ -3039,30 +3039,30 @@ export default function BookDetailPage() {
                                 </div>
                                 <div className="om-lookup-main" style={{ minWidth: 0 }}>
                                   <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(preview.title ?? "").trim() || "—"}</div>
-                                  <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     {(preview.authors ?? []).filter(Boolean).join(", ") || "—"}
                                   </div>
                                   {(preview.editors ?? []).length > 0 ? (
-                                    <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                       ed. {preview.editors!.join(", ")}
                                     </div>
                                   ) : null}
                                   {(preview.designers ?? []).length > 0 ? (
-                                    <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                       design: {preview.designers!.join(", ")}
                                     </div>
                                   ) : null}
                                   {(preview.printers ?? []).length > 0 ? (
-                                    <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                       print: {preview.printers!.join(", ")}
                                     </div>
                                   ) : null}
-                                  <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     {[preview.publisher ?? "", preview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
                                     {preview.trim_width && preview.trim_height ? ` · ${preview.trim_width} × ${preview.trim_height} ${preview.trim_unit ?? ""}`.trim() : ""}
                                   </div>
                                   {(importMeta.domain || previewFinalUrl) && (
-                                    <div className="muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                       {importMeta.domain ? `${importMeta.domain_kind ?? "generic"} · ${importMeta.domain}` : importMeta.domain_kind ?? ""}
                                       {previewFinalUrl ? (
                                         <>{" "}· <a href={previewFinalUrl} target="_blank" rel="noreferrer">open page</a></>
@@ -3198,14 +3198,14 @@ export default function BookDetailPage() {
                           {coverState.busy ? "Saving…" : "Save"}
                         </button>
                       ) : (
-                        <span className="muted" style={{ cursor: "pointer" }}>
+                        <span className="text-muted" style={{ cursor: "pointer" }}>
                           {coverUrl ? "Edit cover" : "Add cover"}
                         </span>
                       )}
                       
                       {coverToolsOpen && (
                         <button 
-                          className="muted" 
+                          className="text-muted" 
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); cancelCoverEdit(); }}
                           disabled={coverState.busy}
                         >
@@ -3220,7 +3220,7 @@ export default function BookDetailPage() {
                           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                             {/* Trim size — crop-local state; syncs to metadata when a real unit is selected */}
                             <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
-                              <div className="muted" style={{ minWidth: 110 }}>Trim size</div>
+                              <div className="text-muted" style={{ minWidth: 110 }}>Trim size</div>
                               <div className="row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
                                 <input
                                   type="number"
@@ -3231,7 +3231,7 @@ export default function BookDetailPage() {
                                   placeholder="W"
                                   style={{ width: 68 }}
                                 />
-                                <span className="muted">×</span>
+                                <span className="text-muted">×</span>
                                 <input
                                   type="number"
                                   value={cropTrimHeight}
@@ -3254,7 +3254,7 @@ export default function BookDetailPage() {
                             </div>
 
                             <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
-                              <div className="muted" style={{ minWidth: 110 }}>Zoom</div>
+                              <div className="text-muted" style={{ minWidth: 110 }}>Zoom</div>
                               <CustomSlider
                                 min={1}
                                 max={4}
@@ -3265,7 +3265,7 @@ export default function BookDetailPage() {
                               />
                             </div>
                             <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
-                              <div className="muted" style={{ minWidth: 110 }}>Rotate</div>
+                              <div className="text-muted" style={{ minWidth: 110 }}>Rotate</div>
                               <CustomSlider
                                 min={-180}
                                 max={180}
@@ -3276,7 +3276,7 @@ export default function BookDetailPage() {
                               />
                             </div>
                             <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
-                              <div className="muted" style={{ minWidth: 110 }}>Bright</div>
+                              <div className="text-muted" style={{ minWidth: 110 }}>Bright</div>
                               <CustomSlider
                                 min={0.5}
                                 max={1.5}
@@ -3287,7 +3287,7 @@ export default function BookDetailPage() {
                               />
                             </div>
                             <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
-                              <div className="muted" style={{ minWidth: 110 }}>Contrast</div>
+                              <div className="text-muted" style={{ minWidth: 110 }}>Contrast</div>
                               <CustomSlider
                                 min={0.5}
                                 max={1.5}
@@ -3300,14 +3300,14 @@ export default function BookDetailPage() {
                           </div>
                         </div>
                       ) : coverUrl ? (
-                        <div className="muted" style={{ marginTop: "var(--space-8)" }}>Click Replace or wait for cover to load.</div>
+                        <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>Click Replace or wait for cover to load.</div>
                       ) : (
-                        <div className="muted" style={{ marginTop: "var(--space-8)" }}>No cover image. Click “Add cover” to upload.</div>
+                        <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>No cover image. Click “Add cover” to upload.</div>
                       )}
                       {coverToolsOpen && (
                         <div className="row" style={{ marginTop: "var(--space-md)", gap: 16 }}>
                           <label 
-                            className="muted" 
+                            className="text-muted" 
                             style={{ cursor: "pointer", textDecoration: "underline" }}
                           >
                             Replace
@@ -3324,7 +3324,7 @@ export default function BookDetailPage() {
 
                           {coverUrl && (
                             <button 
-                              className="muted" 
+                              className="text-muted" 
                               style={{ textDecoration: "underline" }}
                               onClick={resetCoverEdit}
                             >
@@ -3334,7 +3334,7 @@ export default function BookDetailPage() {
 
                           {coverUrl && (
                             <button 
-                              className="muted" 
+                              className="text-muted" 
                               style={{ textDecoration: "underline" }}
                               onClick={() => void deleteCover()}
                               disabled={coverState.busy}
@@ -3345,7 +3345,7 @@ export default function BookDetailPage() {
                         </div>
                       )}
                       {coverState.message ? (
-                        <div className="muted" style={{ marginTop: "var(--space-sm)" }}>
+                        <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
                           {coverState.error ? `${coverState.message} (${coverState.error})` : coverState.message}
                         </div>
                       ) : null}
@@ -3373,7 +3373,7 @@ export default function BookDetailPage() {
               <div style={{ marginTop: "var(--space-14)" }}>
                 {editMode || facetView.author.length > 0 ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Authors
                     </div>
                     <div className="om-hanging-value">
@@ -3397,7 +3397,7 @@ export default function BookDetailPage() {
 
                 {editMode || facetView.editor.length > 0 ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Editors
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -3421,7 +3421,7 @@ export default function BookDetailPage() {
 
                 {editMode || facetView.designer.length > 0 ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Designers
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -3445,7 +3445,7 @@ export default function BookDetailPage() {
 
                 {editMode || facetView.printer.length > 0 ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Printer
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -3470,7 +3470,7 @@ export default function BookDetailPage() {
 
                 {editMode || facetView.material.length > 0 ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Materials
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -3495,7 +3495,7 @@ export default function BookDetailPage() {
 
                 {editMode || Boolean((formEditionOverride ?? "").trim()) ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Edition
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -3516,7 +3516,7 @@ export default function BookDetailPage() {
 
                 {editMode || facetView.publisher.length > 0 ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Publisher
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -3541,7 +3541,7 @@ export default function BookDetailPage() {
 
                 {editMode || Boolean(effectivePublishDate) ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Publish date
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -3561,7 +3561,7 @@ export default function BookDetailPage() {
 
                 {editMode || Boolean(book?.pages) ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Pages
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -3582,7 +3582,7 @@ export default function BookDetailPage() {
 
                 {editMode || Boolean((book as any)?.trim_width) ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Trim size
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -3598,7 +3598,7 @@ export default function BookDetailPage() {
                             placeholder="W"
                             style={{ width: 72 }}
                           />
-                          <span className="muted">×</span>
+                          <span className="text-muted">×</span>
                           <input
                             className="om-inline-control"
                             type="number"
@@ -3629,7 +3629,7 @@ export default function BookDetailPage() {
 
                 {editMode || Boolean((book?.object_type ?? "").trim()) ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Object type
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -3650,7 +3650,7 @@ export default function BookDetailPage() {
 
                 {editMode || Boolean((book?.decade ?? "").trim()) ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Decade
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -3678,7 +3678,7 @@ export default function BookDetailPage() {
 
                 {editMode || facetView.subject.length > 0 ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       Subjects
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -3708,7 +3708,7 @@ export default function BookDetailPage() {
 
                 {editMode || Boolean(book?.edition?.isbn13 ?? book?.edition?.isbn10) ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="muted">
+                    <div style={{ minWidth: 110 }} className="text-muted">
                       ISBN
                     </div>
                     <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10}</div>
@@ -3717,7 +3717,7 @@ export default function BookDetailPage() {
 
                 {editMode || Boolean(effectiveDescription.trim()) ? (
                   <div style={{ marginTop: "var(--space-8)" }}>
-                    <div className="muted">Description</div>
+                    <div className="text-muted">Description</div>
                     {editMode ? (
                       <textarea
                         ref={descriptionTextareaRef}
@@ -3756,7 +3756,7 @@ export default function BookDetailPage() {
                   </div>
                   <div style={{ marginTop: "var(--space-8)" }}>
                     <div className="row om-row-baseline">
-                      <div style={{ minWidth: 110 }} className="muted">
+                      <div style={{ minWidth: 110 }} className="text-muted">
                         Catalog
                       </div>
                       {editMode ? (
@@ -3777,7 +3777,7 @@ export default function BookDetailPage() {
                               </option>
                             ))}
                           </select>
-                          <div className="muted" style={{ marginLeft: "var(--space-10)" }}>
+                          <div className="text-muted" style={{ marginLeft: "var(--space-10)" }}>
                             {libraryMoveState.message ? (libraryMoveState.error ? `${libraryMoveState.message} (${libraryMoveState.error})` : libraryMoveState.message) : ""}
                           </div>
                         </>
@@ -3787,7 +3787,7 @@ export default function BookDetailPage() {
                     </div>
 
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                      <div style={{ minWidth: 110 }} className="muted">
+                      <div style={{ minWidth: 110 }} className="text-muted">
                         {copiesLabel}
                       </div>
                       {editMode ? (
@@ -3800,7 +3800,7 @@ export default function BookDetailPage() {
                             onChange={(e) => setCopiesDraft(e.target.value)}
                             style={{ width: 90 }}
                           />
-                          <div className="muted" style={{ marginLeft: "var(--space-10)" }}>
+                          <div className="text-muted" style={{ marginLeft: "var(--space-10)" }}>
                             {copiesUpdateState.message
                               ? copiesUpdateState.error
                                 ? `${copiesUpdateState.message} (${copiesUpdateState.error})`
@@ -3820,7 +3820,7 @@ export default function BookDetailPage() {
                     </div>
                     {editMode || facetView.category.length > 0 ? (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="muted">
+                        <div style={{ minWidth: 110 }} className="text-muted">
                           Categories
                         </div>
                         <div style={{ flex: "1 1 auto" }}>
@@ -3841,7 +3841,7 @@ export default function BookDetailPage() {
 
                     {editMode || facetView.tag.length > 0 ? (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="muted">
+                        <div style={{ minWidth: 110 }} className="text-muted">
                           Tags
                         </div>
                         <div style={{ flex: "1 1 auto" }}>
@@ -3862,7 +3862,7 @@ export default function BookDetailPage() {
 
                     {editMode || Boolean((formNotes ?? "").trim()) ? (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="muted">
+                        <div style={{ minWidth: 110 }} className="text-muted">
                           Notes
                         </div>
                         <div style={{ flex: "1 1 auto" }}>
@@ -3890,13 +3890,13 @@ export default function BookDetailPage() {
                   </div>
                   <div style={{ marginTop: "var(--space-8)" }}>
                     <div className="row om-row-baseline">
-                      <div style={{ minWidth: 110 }} className="muted">
+                      <div style={{ minWidth: 110 }} className="text-muted">
                         Visibility
                       </div>
                       {editMode ? (
                         formVisibility === "inherit" ? (
                           <>
-                            <div className="muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
+                            <div className="text-muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
                               {ownerProfile ? `From settings: ${ownerProfile.visibility === "public" ? "public" : "private"}` : "From settings: …"}
                             </div>
                             <button
@@ -3926,7 +3926,7 @@ export default function BookDetailPage() {
                     </div>
 
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                      <div style={{ minWidth: 110 }} className="muted">
+                      <div style={{ minWidth: 110 }} className="text-muted">
                         Status
                       </div>
                       {editMode ? (
@@ -3947,13 +3947,13 @@ export default function BookDetailPage() {
                     </div>
 
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                      <div style={{ minWidth: 110 }} className="muted">
+                      <div style={{ minWidth: 110 }} className="text-muted">
                         Borrowable
                       </div>
                       {editMode ? (
                         formBorrowable === "inherit" ? (
                           <>
-                            <div className="muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
+                            <div className="text-muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
                               {ownerBorrowDefaults ? `From settings: ${ownerBorrowDefaults.borrowable_default ? "yes" : "no"}` : "From settings: …"}
                             </div>
                             <button onClick={() => setFormBorrowable(ownerBorrowDefaults?.borrowable_default ? "yes" : "no")} disabled={!ownerBorrowDefaults}>
@@ -3987,7 +3987,7 @@ export default function BookDetailPage() {
                       <div style={{ marginTop: "var(--space-8)" }}>
                         {editMode || Boolean((formLocation ?? "").trim()) ? (
                           <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                            <div style={{ minWidth: 110 }} className="muted">
+                            <div style={{ minWidth: 110 }} className="text-muted">
                               Location
                             </div>
                             <div style={{ flex: "1 1 auto" }}>
@@ -4007,7 +4007,7 @@ export default function BookDetailPage() {
 
                         {editMode || Boolean((formShelf ?? "").trim()) ? (
                           <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                            <div style={{ minWidth: 110 }} className="muted">
+                            <div style={{ minWidth: 110 }} className="text-muted">
                               Shelf
                             </div>
                             <div style={{ flex: "1 1 auto" }}>
@@ -4049,7 +4049,7 @@ export default function BookDetailPage() {
                         )}
                       </div>
                       {shareState.error ? (
-                        <div className="muted" style={{ marginTop: "var(--space-sm)", textAlign: "right" }}>
+                        <div className="text-muted" style={{ marginTop: "var(--space-sm)", textAlign: "right" }}>
                           {shareState.message} ({shareState.error})
                         </div>
                       ) : null}
@@ -4066,12 +4066,12 @@ export default function BookDetailPage() {
               <hr className="om-hr" style={{ marginBottom: 16 }} />
               {isOwner && editMode ? (
                 <details style={{ marginTop: "var(--space-8)", border: "none", outline: "none", boxShadow: "none" }}>
-                  <summary className="muted" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none", cursor: "pointer" }}>Add images…</summary>
+                  <summary className="text-muted" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none", cursor: "pointer" }}>Add images…</summary>
                   <div style={{ marginTop: "var(--space-8)" }}>
                     <input key={imagesInputKey} type="file" accept="image/*" multiple onChange={(ev) => selectPendingImages(ev.target.files)} />
 
                     {pendingImages.length > 0 ? (
-                      <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+                      <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
                         <div>Selected (not uploaded yet):</div>
                         <div style={{ marginTop: "var(--space-sm)" }}>
                           {pendingImages.map((f) => (
@@ -4082,20 +4082,20 @@ export default function BookDetailPage() {
                           <button onClick={uploadImages} disabled={imagesState.busy}>
                             {imagesState.busy ? "Uploading…" : "Submit"}
                           </button>
-                          <button onClick={clearPendingImages} disabled={imagesState.busy} className="muted">
+                          <button onClick={clearPendingImages} disabled={imagesState.busy} className="text-muted">
                             Clear
                           </button>
-                          <div className="muted" style={{ marginLeft: "var(--space-10)" }}>
+                          <div className="text-muted" style={{ marginLeft: "var(--space-10)" }}>
                             {imagesState.message ? (imagesState.error ? `${imagesState.message} (${imagesState.error})` : imagesState.message) : ""}
                           </div>
                         </div>
                       </div>
                     ) : imagesState.message ? (
-                      <div className="muted" style={{ marginTop: "var(--space-sm)" }}>
+                      <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
                         {imagesState.error ? `${imagesState.message} (${imagesState.error})` : imagesState.message}
                       </div>
                     ) : (
-                      <div className="muted" style={{ marginTop: "var(--space-sm)" }}>
+                      <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
                         Select one or more images, then click Submit.
                       </div>
                     )}
@@ -4136,7 +4136,7 @@ export default function BookDetailPage() {
                   })}
                 </div>
               ) : editMode ? (
-                <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+                <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
                   No images yet.
                 </div>
               ) : null}

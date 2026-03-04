@@ -40,7 +40,7 @@ export default function HomeClient() {
     <main className="container">
       <div className="card">
         <div style={{ marginBottom: "var(--space-8)" }}>Other Library</div>
-        <div className="muted" style={{ marginBottom: "var(--space-md)" }}>
+        <div className="text-muted" style={{ marginBottom: "var(--space-md)" }}>
           Private beta.
         </div>
         <div className="row" style={{ alignItems: "flex-start" }}>
@@ -103,7 +103,7 @@ export default function HomeClient() {
                 {waitState.busy ? "Submitting…" : "Submit"}
               </button>
             </div>
-            <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+            <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
               {waitState.message ? (waitState.error ? `${waitState.message} (${waitState.error})` : waitState.message) : ""}
             </div>
           </div>
@@ -111,9 +111,9 @@ export default function HomeClient() {
 
         <div className="row" style={{ marginTop: "var(--space-md)" }}>
           <a href="/app">Open the app</a>
-          <span className="muted">/</span>
+          <span className="text-muted">/</span>
           <a href="/admin">Admin</a>
-          <span className="muted">/</span>
+          <span className="text-muted">/</span>
           <a href="mailto:hello@other-library.com">Contact</a>
         </div>
       </div>

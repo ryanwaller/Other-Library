@@ -154,7 +154,7 @@ export default function BorrowRequestWidget({
   if (!supabase) return null;
 
   if (isOwner) {
-    return <div className="muted">This is your book.</div>;
+    return <div className="text-muted">This is your book.</div>;
   }
 
   if (!sessionUserId) {
@@ -163,7 +163,7 @@ export default function BorrowRequestWidget({
 
   if (scope !== "anyone" && !relationshipAllowed) {
     return (
-      <div className="muted">
+      <div className="text-muted">
         {scope === "following" ? "Only people this user follows can request to borrow." : "Only approved followers can request to borrow."}{" "}
         <Link href={`/u/${ownerUsername}`}>View profile</Link>.
       </div>
@@ -173,24 +173,24 @@ export default function BorrowRequestWidget({
   if (existing) {
     return (
       <div>
-        <div className="muted">Borrow request: {existing.status}.</div>
+        <div className="text-muted">Borrow request: {existing.status}.</div>
         <div className="row" style={{ marginTop: "var(--space-8)" }}>
           {existing.status === "pending" ? (
             <button onClick={cancelRequest} disabled={state.busy}>
               {state.busy ? "…" : "Cancel request"}
             </button>
           ) : null}
-          <Link href={`/app/messages/${existing.id}`} className="muted">
+          <Link href={`/app/messages/${existing.id}`} className="text-muted">
             Open chat
           </Link>
-          <div className="muted">{state.message ? (state.error ? `${state.message} (${state.error})` : state.message) : ""}</div>
+          <div className="text-muted">{state.message ? (state.error ? `${state.message} (${state.error})` : state.message) : ""}</div>
         </div>
       </div>
     );
   }
 
   if (!borrowable) {
-    return <div className="muted">Not borrowable.</div>;
+    return <div className="text-muted">Not borrowable.</div>;
   }
 
   return (
@@ -204,7 +204,7 @@ export default function BorrowRequestWidget({
           >
             Ask to borrow
           </button>
-          <div className="muted">{!canRequest ? "Not allowed." : ""}</div>
+          <div className="text-muted">{!canRequest ? "Not allowed." : ""}</div>
         </div>
       ) : (
         <>
@@ -224,7 +224,7 @@ export default function BorrowRequestWidget({
             <button onClick={() => { setComposerOpen(false); setMessage(""); }} disabled={state.busy}>
               Cancel
             </button>
-            <div className="muted">{state.message ? (state.error ? `${state.message} (${state.error})` : state.message) : ""}</div>
+            <div className="text-muted">{state.message ? (state.error ? `${state.message} (${state.error})` : state.message) : ""}</div>
           </div>
         </>
       )}

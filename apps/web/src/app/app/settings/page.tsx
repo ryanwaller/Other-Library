@@ -505,7 +505,7 @@ export default function SettingsPage() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -521,13 +521,13 @@ export default function SettingsPage() {
         <div className="card">
           <div className="row" style={{ justifyContent: "space-between" }}>
             <div>Settings</div>
-            <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
+            <div className="text-muted">{busy ? "Loading…" : error ? error : ""}</div>
           </div>
 
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Profile</div>
-              <div className="muted">
+              <div className="text-muted">
                 {profileSaveState.message
                   ? profileSaveState.error
                     ? `${profileSaveState.message} (${profileSaveState.error})`
@@ -537,7 +537,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="row" style={{ marginTop: "var(--space-10)" }}>
-              <div style={{ width: 120 }} className="muted">
+              <div style={{ width: 120 }} className="text-muted">
                 Photo
               </div>
               <div className="row" style={{ gap: "var(--space-10)", alignItems: "center", flexWrap: "wrap" }}>
@@ -575,7 +575,7 @@ export default function SettingsPage() {
                     Clear
                   </button>
                 ) : null}
-                <div className="muted">
+                <div className="text-muted">
                   {avatarState.message ? (avatarState.error ? `${avatarState.message} (${avatarState.error})` : avatarState.message) : ""}
                 </div>
               </div>
@@ -597,7 +597,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="row" style={{ marginTop: "var(--space-10)", gap: "var(--space-10)", alignItems: "center", flexWrap: "wrap" }}>
-                  <span className="muted">Zoom</span>
+                  <span className="text-muted">Zoom</span>
                   <input
                     type="range"
                     min={1}
@@ -612,7 +612,7 @@ export default function SettingsPage() {
             ) : null}
 
             <div className="row" style={{ marginTop: "var(--space-10)" }}>
-              <div style={{ width: 120 }} className="muted">
+              <div style={{ width: 120 }} className="text-muted">
                 Username
               </div>
               <input
@@ -626,13 +626,13 @@ export default function SettingsPage() {
                 placeholder="username"
                 style={{ width: 220 }}
               />
-              <div className="muted">
+              <div className="text-muted">
                 {profile && normalized && normalized !== profile.username ? usernameAvailability.message ?? "" : ""}
               </div>
             </div>
 
             <div className="row" style={{ marginTop: "var(--space-10)" }}>
-              <div style={{ width: 120 }} className="muted">
+              <div style={{ width: 120 }} className="text-muted">
                 Display name
               </div>
               <input
@@ -649,7 +649,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="row" style={{ marginTop: "var(--space-10)", alignItems: "flex-start" }}>
-              <div style={{ width: 120 }} className="muted">
+              <div style={{ width: 120 }} className="text-muted">
                 Bio
               </div>
               <textarea
@@ -661,7 +661,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="row" style={{ marginTop: "var(--space-10)" }}>
-              <div style={{ width: 120 }} className="muted">
+              <div style={{ width: 120 }} className="text-muted">
                 Library visibility
               </div>
               <select
@@ -671,7 +671,7 @@ export default function SettingsPage() {
                 <option value="followers_only">followers_only</option>
                 <option value="public">public</option>
               </select>
-              <div className="muted">
+              <div className="text-muted">
                 {profileForm.visibility === "public" ? "Anyone can view /u/username" : "Only approved followers (and public book overrides)."}
               </div>
             </div>
@@ -681,7 +681,7 @@ export default function SettingsPage() {
                 {profileSaveState.busy ? "Saving…" : "Save profile"}
               </button>
               {profile ? (
-                <a href={`/u/${profile.username}`} target="_blank" rel="noreferrer" className="muted">
+                <a href={`/u/${profile.username}`} target="_blank" rel="noreferrer" className="text-muted">
                   View public profile
                 </a>
               ) : null}
@@ -693,9 +693,9 @@ export default function SettingsPage() {
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Follows</div>
-              <div className="muted">requests + approvals</div>
+              <div className="text-muted">requests + approvals</div>
             </div>
-            <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+            <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
               Manage who can see followers-only content.
             </div>
             <div style={{ marginTop: "var(--space-10)" }}>
@@ -708,10 +708,10 @@ export default function SettingsPage() {
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Borrowing</div>
-              <div className="muted">defaults</div>
+              <div className="text-muted">defaults</div>
             </div>
             <div className="row" style={{ marginTop: "var(--space-10)" }}>
-              <div style={{ width: 170 }} className="muted">
+              <div style={{ width: 170 }} className="text-muted">
                 Borrowable by default
               </div>
               <select
@@ -723,7 +723,7 @@ export default function SettingsPage() {
               </select>
             </div>
             <div className="row" style={{ marginTop: "var(--space-10)" }}>
-              <div style={{ width: 170 }} className="muted">
+              <div style={{ width: 170 }} className="text-muted">
                 Who can request
               </div>
               <select
@@ -743,7 +743,7 @@ export default function SettingsPage() {
                 <option value="following">following</option>
                 <option value="anyone">anyone</option>
               </select>
-              <div className="muted">
+              <div className="text-muted">
                 {profileForm.borrow_request_scope === "anyone"
                   ? "Any signed-in user."
                   : profileForm.borrow_request_scope === "following"
@@ -761,9 +761,9 @@ export default function SettingsPage() {
           <div style={{ marginTop: 16 }} className="card" id="bulk-update">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Bulk update</div>
-              <div className="muted">catalog import</div>
+              <div className="text-muted">catalog import</div>
             </div>
-            <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+            <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
               Upload CSV files from your catalog workspace.
             </div>
             <div style={{ marginTop: "var(--space-10)" }}>
@@ -800,10 +800,10 @@ export default function SettingsPage() {
           <div style={{ marginTop: 16 }} className="card">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <div>Account</div>
-              <div className="muted"></div>
+              <div className="text-muted"></div>
             </div>
 
-            <div style={{ marginTop: "var(--space-10)" }} className="muted">
+            <div style={{ marginTop: "var(--space-10)" }} className="text-muted">
               Email
             </div>
             <div className="row" style={{ marginTop: "var(--space-8)" }}>
@@ -821,10 +821,10 @@ export default function SettingsPage() {
               <button onClick={saveEmail} disabled={emailState.busy || !emailDraft.trim()}>
                 {emailState.busy ? "Saving…" : "Save email"}
               </button>
-              <div className="muted">{emailState.message ? (emailState.error ? `${emailState.message} (${emailState.error})` : emailState.message) : ""}</div>
+              <div className="text-muted">{emailState.message ? (emailState.error ? `${emailState.message} (${emailState.error})` : emailState.message) : ""}</div>
             </div>
 
-            <div style={{ marginTop: "var(--space-md)" }} className="muted">
+            <div style={{ marginTop: "var(--space-md)" }} className="text-muted">
               Change password
             </div>
             <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "center", flexWrap: "wrap", gap: "var(--space-10)" }}>
@@ -846,15 +846,15 @@ export default function SettingsPage() {
               <button onClick={savePassword} disabled={passwordState.busy}>
                 {passwordState.busy ? "Saving…" : "Save password"}
               </button>
-              <div className="muted">
+              <div className="text-muted">
                 {passwordState.message ? (passwordState.error ? `${passwordState.message} (${passwordState.error})` : passwordState.message) : ""}
               </div>
             </div>
 
-            <div style={{ marginTop: "var(--space-md)" }} className="muted">
+            <div style={{ marginTop: "var(--space-md)" }} className="text-muted">
               Delete account
             </div>
-            <div className="muted" style={{ marginTop: "var(--space-sm)" }}>
+            <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
               This is permanent. Type <span style={{ fontWeight: 600 }}>DELETE</span> to confirm.
             </div>
             <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "center", gap: "var(--space-10)", flexWrap: "wrap" }}>
@@ -862,7 +862,7 @@ export default function SettingsPage() {
               <button onClick={deleteAccount} disabled={deleteState.busy}>
                 {deleteState.busy ? "Deleting…" : "Delete account"}
               </button>
-              <div className="muted">{deleteState.message ? (deleteState.error ? `${deleteState.message} (${deleteState.error})` : deleteState.message) : ""}</div>
+              <div className="text-muted">{deleteState.message ? (deleteState.error ? `${deleteState.message} (${deleteState.error})` : deleteState.message) : ""}</div>
             </div>
           </div>
         </div>

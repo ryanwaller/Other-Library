@@ -109,7 +109,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       <main className="container">
         <div className="card">
           <div>@{username}</div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Not found (or private).
           </div>
         </div>
@@ -138,7 +138,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       <main className="container">
         <div className="card">
           <div>Error loading book.</div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             {bookRes.error.message}
           </div>
         </div>
@@ -154,7 +154,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           <div>
             <Link href={`/u/${profile.username}`}>@{profile.username}</Link>
           </div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Book not found (or private).
           </div>
         </div>
@@ -261,7 +261,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
               </div>
               {effectiveAuthors.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Authors
                   </div>
                   <div className="om-hanging-value">
@@ -277,7 +277,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {effectiveEditors.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Editors
                   </div>
                   <div>{effectiveEditors.join(", ")}</div>
@@ -286,7 +286,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {effectiveDesigners.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Designers
                   </div>
                   <div>{effectiveDesigners.join(", ")}</div>
@@ -295,7 +295,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {effectivePrinter ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Printer
                   </div>
                   <div>{effectivePrinter}</div>
@@ -304,7 +304,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {effectiveMaterials ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Materials
                   </div>
                   <div>{effectiveMaterials}</div>
@@ -313,7 +313,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {effectiveEdition ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Edition
                   </div>
                   <div>{effectiveEdition}</div>
@@ -322,7 +322,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {effectivePublisher ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Publisher
                   </div>
                   <div>
@@ -333,7 +333,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {effectivePublishDate ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Publish date
                   </div>
                   <div>{displayPublishDate}</div>
@@ -342,7 +342,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {book.pages ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Pages
                   </div>
                   <div>{book.pages}</div>
@@ -351,7 +351,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {(book.group_label ?? "").trim() ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Group
                   </div>
                   <div>{(book.group_label ?? "").trim()}</div>
@@ -360,7 +360,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {(book.object_type ?? "").trim() ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Object type
                   </div>
                   <div>{(book.object_type ?? "").trim()}</div>
@@ -369,7 +369,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {(book.decade ?? "").trim() ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Decade
                   </div>
                   <div>{(book.decade ?? "").trim()}</div>
@@ -378,7 +378,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {subjects.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-md)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     Subjects
                   </div>
                   <div style={{ flex: "1 1 auto" }}>
@@ -389,7 +389,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {book.edition?.isbn13 || book.edition?.isbn10 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                  <div style={{ minWidth: 110 }} className="muted">
+                  <div style={{ minWidth: 110 }} className="text-muted">
                     ISBN
                   </div>
                   <div>{book.edition?.isbn13 ?? book.edition?.isbn10}</div>
@@ -398,7 +398,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
               {effectiveDescription ? (
                 <div style={{ marginTop: "var(--space-md)" }}>
-                  <div className="muted">
+                  <div className="text-muted">
                     Description
                   </div>
                   <div style={{ marginTop: "var(--space-sm)" }}>
@@ -423,7 +423,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           {images.length > 0 ? (
             <div style={{ marginTop: 16 }}>
               <hr className="om-hr" style={{ marginBottom: 16 }} />
-              <div className="muted">
+              <div className="text-muted">
                 Images
               </div>
               <PublicImageGrid images={images} signedMap={signedMap} />

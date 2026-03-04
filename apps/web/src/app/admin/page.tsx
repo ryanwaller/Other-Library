@@ -126,12 +126,12 @@ function AdminListItem({
       <div className="admin-meta-line" style={{ marginTop: 4 }}>
         {meta.map((pair, idx) => (
           <span className="admin-meta-pair" key={`${pair.label}-${idx}`}>
-            <span className="muted">{pair.label}</span> {pair.value}
+            <span className="text-muted">{pair.label}</span> {pair.value}
           </span>
         ))}
       </div>
       {secondary ? (
-        <div className="muted" style={{ marginTop: 4, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+        <div className="text-muted" style={{ marginTop: 4, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
           {secondary}
         </div>
       ) : null}
@@ -378,7 +378,7 @@ export default function AdminPage() {
             <div className="admin-meta-line">
               {tabStats.map((item) => (
                 <span className="admin-meta-pair" key={item.label}>
-                  <span className="muted">{item.label}</span> {item.value}
+                  <span className="text-muted">{item.label}</span> {item.value}
                 </span>
               ))}
             </div>
@@ -461,7 +461,7 @@ export default function AdminPage() {
           </div>
 
           {friendlyError ? (
-            <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+            <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
               {friendlyError}
             </div>
           ) : null}
@@ -817,15 +817,15 @@ export default function AdminPage() {
                 })
               : null}
 
-            {tab === "users" && (usersData?.users ?? []).length === 0 ? <div className="muted">No users.</div> : null}
-            {tab === "waitlist" && (waitlistData?.waitlist ?? []).length === 0 ? <div className="muted">No requests.</div> : null}
-            {tab === "invites" && (invitesData?.invites ?? []).length === 0 ? <div className="muted">No invites.</div> : null}
+            {tab === "users" && (usersData?.users ?? []).length === 0 ? <div className="text-muted">No users.</div> : null}
+            {tab === "waitlist" && (waitlistData?.waitlist ?? []).length === 0 ? <div className="text-muted">No requests.</div> : null}
+            {tab === "invites" && (invitesData?.invites ?? []).length === 0 ? <div className="text-muted">No invites.</div> : null}
           </div>
 
           <hr className="om-hr" />
 
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)" }}>
-            <div className="muted">
+            <div className="text-muted">
               {tab === "users" ? resultLabel(usersData?.page ?? userPage, userTotalPages, usersData?.total ?? 0) : null}
               {tab === "waitlist" ? resultLabel(waitlistData?.page ?? waitPage, waitTotalPages, waitlistData?.total ?? 0) : null}
               {tab === "invites" ? resultLabel(invitesData?.page ?? invitesPage, invitesTotalPages, invitesData?.total ?? 0) : null}
@@ -877,7 +877,7 @@ export default function AdminPage() {
           </div>
 
           {inviteLink ? (
-            <div className="muted" style={{ marginTop: "var(--space-8)", wordBreak: "break-all" }}>
+            <div className="text-muted" style={{ marginTop: "var(--space-8)", wordBreak: "break-all" }}>
               {inviteLink}
             </div>
           ) : null}

@@ -109,10 +109,10 @@ export default function AlsoOwnedBy({
     <div style={{ marginTop: "var(--space-14)" }} className="card">
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div>Also owned by</div>
-        <div className="muted">{owners.length}</div>
+        <div className="text-muted">{owners.length}</div>
       </div>
       {owners.length === 0 ? (
-        <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+        <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
           None found.
         </div>
       ) : (
@@ -127,7 +127,7 @@ export default function AlsoOwnedBy({
                 avatarUrl={avatarUrl}
                 displayName={null}
                 username={username}
-                rightSlot={<span className="muted">{r.copies > 1 ? `(${r.copies})` : ""}</span>}
+                rightSlot={<span className="text-muted">{r.copies > 1 ? `(${r.copies})` : ""}</span>}
               />
             );
           })}

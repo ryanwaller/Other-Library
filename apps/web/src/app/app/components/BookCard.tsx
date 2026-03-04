@@ -99,13 +99,13 @@ export default function BookCard({
               <span className="om-book-title">{title}</span>
             </Link>
           </div>
-          <div className="muted" style={{ marginTop: 4 }}>
+          <div className="text-muted" style={{ marginTop: 4 }}>
             {truncatedAuthors.length > 0 ? (
               <>
                 {truncatedAuthors.map((a, idx) => (
                   <span key={a}>
                     {isMobile && a === "+ more" ? (
-                      <span className="muted">{a}</span>
+                      <span className="text-muted">{a}</span>
                     ) : (
                       <Link
                         href={`/app?author=${encodeURIComponent(a)}`}
@@ -153,7 +153,7 @@ export default function BookCard({
                     {gridCols === 8 && authors.length > 1 ? (
                       <span>{author}</span>
                     ) : isMobile && author === "+ more" ? (
-                      <span className="muted">{author}</span>
+                      <span className="text-muted">{author}</span>
                     ) : (
                       <Link
                         href={`/app?author=${encodeURIComponent(author)}`}
@@ -188,7 +188,7 @@ export default function BookCard({
                     {gridCols === 8 && authors.length > 1 ? (
                       <span>{author}</span>
                     ) : isMobile && author === "+ more" ? (
-                      <span className="muted">{author}</span>
+                      <span className="text-muted">{author}</span>
                     ) : (
                       <Link
                         href={`/app?author=${encodeURIComponent(author)}`}

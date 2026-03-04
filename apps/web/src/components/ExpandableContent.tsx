@@ -18,7 +18,7 @@ export default function ExpandableContent<T>({ items, limit, renderVisible }: Pr
       {renderVisible(visible, isExpanded)}
       {hasMore && (
         <div className="row" style={{ marginTop: "var(--space-md)", justifyContent: "center" }}>
-          <button onClick={() => setIsExpanded(!isExpanded)} className="muted">
+          <button onClick={() => setIsExpanded(!isExpanded)} className="text-muted">
             {isExpanded ? "See less" : "Load more"}
           </button>
         </div>

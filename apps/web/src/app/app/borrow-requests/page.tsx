@@ -137,7 +137,7 @@ export default function BorrowRequestsPage() {
       <main className="container">
         <div className="card">
           <div>Supabase is not configured.</div>
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.
           </div>
         </div>
@@ -153,12 +153,12 @@ export default function BorrowRequestsPage() {
         <>
           <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
             <div>Requests from other readers</div>
-            <div className="muted">{busy ? "Loading…" : error ? error : ""}</div>
+            <div className="text-muted">{busy ? "Loading…" : error ? error : ""}</div>
           </div>
 
           <div style={{ marginTop: "var(--space-md)" }} className="om-list">
             {rows.length === 0 ? (
-              <div className="muted">No requests yet.</div>
+              <div className="text-muted">No requests yet.</div>
             ) : (
               rows.map((r) => {
                 const requester = profilesById[r.requester_id];
@@ -173,7 +173,7 @@ export default function BorrowRequestsPage() {
                       displayName={null}
                       username={requester?.username || r.requester_id}
                       rightSlot={
-                        <div className="muted" style={{ whiteSpace: "nowrap" }}>
+                        <div className="text-muted" style={{ whiteSpace: "nowrap" }}>
                           {r.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
                           {r.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
                           {r.status === "pending" ? <span>…</span> : null}
@@ -186,7 +186,7 @@ export default function BorrowRequestsPage() {
                     </div>
 
                     {preview ? (
-                      <div className="muted" style={{ marginTop: "var(--space-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div className="text-muted" style={{ marginTop: "var(--space-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {preview}
                       </div>
                     ) : null}

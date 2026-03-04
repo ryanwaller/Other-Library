@@ -192,7 +192,7 @@ export default function PublicBookList({
                 ? truncatedAuthors.map((a, idx) => (
                     <span key={a}>
                       {isMobile && a === "+ more" ? (
-                        <span className="muted">{a}</span>
+                        <span className="text-muted">{a}</span>
                       ) : (
                         <button 
                           onClick={() => setActiveFilters({ author: a })}
@@ -238,7 +238,7 @@ export default function PublicBookList({
             ? truncatedAuthors.map((a, idx) => (
                 <span key={a}>
                   {isMobile && a === "+ more" ? (
-                    <span className="muted">{a}</span>
+                    <span className="text-muted">{a}</span>
                   ) : (
                     <button 
                       onClick={() => setActiveFilters({ author: a })}
@@ -262,9 +262,9 @@ export default function PublicBookList({
       {/* Header Lockup */}
       <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
         <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap", alignItems: "center", margin: 0 }}>
-          <span className="muted">Catalogs</span>
+          <span className="text-muted">Catalogs</span>
           <span>{libraries.length}</span>
-          <span className="muted">Books</span>
+          <span className="text-muted">Books</span>
           <span>{filteredGroups.length}</span>
         </div>
         <div className="row muted" style={{ gap: "var(--space-10)", justifyContent: "flex-end", margin: 0 }}>
@@ -309,7 +309,7 @@ export default function PublicBookList({
       <div className="row" style={{ margin: 0, alignItems: "baseline", gap: "var(--space-md)" }}>
         <button
           type="button"
-          className={sortOpen ? "text-primary" : "muted"}
+          className={sortOpen ? "text-primary" : "text-muted"}
           onClick={() => setSortOpen((v) => !v)}
         >
           View by
@@ -381,7 +381,7 @@ export default function PublicBookList({
                       <button onClick={toggle} style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left" }}>
                         {lib.name}
                       </button>
-                      <span className="muted" style={{ marginLeft: "var(--space-md)", whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
+                      <span className="text-muted" style={{ marginLeft: "var(--space-md)", whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
                         {libGroups.length}&nbsp;&nbsp;book{libGroups.length === 1 ? "" : "s"}
                       </span>
                     </div>

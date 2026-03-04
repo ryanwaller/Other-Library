@@ -187,9 +187,9 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
     <main className="container">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
         <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap", alignItems: "center" }}>
-          <span className="muted">Catalogs</span>
+          <span className="text-muted">Catalogs</span>
           <span>{catalogsCount}</span>
-          <span className="muted">Books</span>
+          <span className="text-muted">Books</span>
           <span>{booksCount}</span>
         </div>
         <ActiveFilterDisplay
@@ -207,7 +207,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
             {index > 0 ? <hr className="om-hr" /> : null}
             <div className="row" style={{ gap: "var(--space-10)", marginTop: "var(--space-8)", marginBottom: "var(--space-10)" }}>
               <span>{group.name}</span>
-              <span className="muted">
+              <span className="text-muted">
                 {group.rows.length} book{group.rows.length === 1 ? "" : "s"}
               </span>
             </div>

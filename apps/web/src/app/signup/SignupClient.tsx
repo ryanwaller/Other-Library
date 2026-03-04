@@ -54,7 +54,7 @@ export default function SignupClient() {
       <div className="card">
         <div style={{ marginBottom: "var(--space-8)" }}>Sign up (invite-only)</div>
         {!supabase ? (
-          <div className="muted">
+          <div className="text-muted">
             Supabase is not configured. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
           </div>
         ) : (
@@ -75,20 +75,20 @@ export default function SignupClient() {
               <button type="submit" disabled={busy || !token.trim() || !email.trim() || !password.trim()}>
                 {busy ? "Creating…" : "Create account"}
               </button>
-              <Link href="/" className="muted">
+              <Link href="/" className="text-muted">
                 Back
               </Link>
-              <Link href="/app" className="muted">
+              <Link href="/app" className="text-muted">
                 Sign in
               </Link>
             </div>
             {message ? (
-              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+              <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
                 {message}
               </div>
             ) : null}
             {error ? (
-              <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+              <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
                 {error}
               </div>
             ) : null}

@@ -67,10 +67,10 @@ export default function SignInCard({
               Sign up
             </button>
           ) : null}
-          {error ? <span className="muted">{error}</span> : null}
+          {error ? <span className="text-muted">{error}</span> : null}
         </div>
         {note ? (
-          <div className="muted" style={{ marginTop: "var(--space-8)" }}>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
             {note}
           </div>
         ) : null}

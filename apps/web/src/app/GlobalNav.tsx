@@ -287,7 +287,7 @@ export default function GlobalNav() {
                 ) : null}
 
                 {me?.username ? (
-                  <Link href="/app" className="muted" style={{ textDecoration: "none" }}>
+                  <Link href="/app" className="text-muted" style={{ textDecoration: "none" }}>
                     {me.username}
                   </Link>
                 ) : null}

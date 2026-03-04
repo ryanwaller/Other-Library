@@ -95,7 +95,7 @@ export default function FollowControls({
   if (!sessionUserId) {
     if (compact) return null;
     return (
-      <div style={{ marginTop: compact || inline ? 0 : 10 }} className="muted">
+      <div style={{ marginTop: compact || inline ? 0 : 10 }} className="text-muted">
         <Link href="/app">Sign in</Link> to follow.
       </div>
     );
@@ -115,21 +115,21 @@ export default function FollowControls({
     <div style={containerStyle}>
       {status === "approved" ? (
         <>
-          {!compact ? <span className="muted">You follow</span> : null}
+          {!compact ? <span className="text-muted">You follow</span> : null}
           <button onClick={cancelOrUnfollow} disabled={busy} style={actionStyle}>
             {busy ? "Working…" : "Unfollow"}
           </button>
         </>
       ) : status === "pending" ? (
         <>
-          {!compact ? <span className="muted">Requested</span> : null}
+          {!compact ? <span className="text-muted">Requested</span> : null}
           <button onClick={cancelOrUnfollow} disabled={busy} style={actionStyle}>
             {busy ? "Working…" : "Cancel request"}
           </button>
         </>
       ) : status === "rejected" ? (
         <>
-          {!compact ? <span className="muted">Request was rejected</span> : null}
+          {!compact ? <span className="text-muted">Request was rejected</span> : null}
           <button onClick={requestFollow} disabled={busy} style={actionStyle}>
             {busy ? "Working…" : "Request again"}
           </button>
@@ -140,7 +140,7 @@ export default function FollowControls({
         </button>
       )}
       {error ? (
-        <span className="muted" style={{ marginLeft: "var(--space-10)" }}>
+        <span className="text-muted" style={{ marginLeft: "var(--space-10)" }}>
           {error}
         </span>
       ) : null}

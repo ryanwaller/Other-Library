@@ -9,7 +9,7 @@ export default function DiscoverPage() {
       fallback={
         <main className="container">
           <div className="card">
-            <div className="muted">Loading…</div>
+            <div className="text-muted">Loading…</div>
           </div>
         </main>
       }

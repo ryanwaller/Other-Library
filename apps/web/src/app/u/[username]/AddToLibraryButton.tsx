@@ -256,7 +256,7 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
           {busy ? (compact ? "…" : "Adding…") : label}
         </button>
       )}
-      {error ? <span className="muted">{error}</span> : null}
+      {error ? <span className="text-muted">{error}</span> : null}
     </span>
   );
 }
