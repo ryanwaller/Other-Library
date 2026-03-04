@@ -9,6 +9,7 @@ import BorrowRequestWidget from "../../BorrowRequestWidget";
 import ScrollToTopOnMount from "../../../../components/ScrollToTopOnMount";
 import { ExpandableSubjects, ExpandableDescription } from "./PublicExpandables";
 import FollowControls from "../../FollowControls";
+import PublicProfileHeader from "../../../../components/PublicProfileHeader";
 import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
 import PublicImageGrid from "./PublicImageGrid";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
@@ -228,47 +229,16 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     <main className="container">
       <ScrollToTopOnMount />
       <AddToLibraryProvider editionIds={editionId ? [editionId] : []}>
-        <div className="card">
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-            <div className="row" style={{ gap: 12, alignItems: "center" }}>
-              <Link href={`/u/${profile.username}`} className="om-avatar-link" aria-label="Open profile">
-                {avatarUrl ? (
-                  <div style={{ width: 48, height: 48, borderRadius: 999, overflow: "hidden", border: "1px solid var(--border-avatar)" }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img alt="" src={avatarUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  </div>
-                ) : (
-                  <div style={{ width: 48, height: 48, borderRadius: 999, border: "1px solid var(--border-avatar)", background: "var(--bg-muted)" }} />
-                )}
-              </Link>
-              <Link href={`/u/${profile.username}`} style={{ textDecoration: "none", color: "inherit" }} className="om-header-name-link">
-                <div style={{ fontSize: "1em" }} className="om-header-display-name">{profile.display_name || `@${profile.username}`}</div>
-                {profile.display_name ? <div className="muted">@{profile.username}</div> : null}
-              </Link>
-            </div>
-          </div>
-
-          <div className="row muted" style={{ marginTop: 12, gap: 16 }}>
-            <span style={{ display: "inline-flex", gap: 10 }}>
-              <Link href={`/u/${profile.username}/followers`} className="muted">
-                Followers
-              </Link>
-              <span>{followersCount ?? "—"}</span>
-            </span>
-            <span style={{ display: "inline-flex", gap: 10 }}>
-              <Link href={`/u/${profile.username}/following`} className="muted">
-                Following
-              </Link>
-              <span>{followingCount ?? "—"}</span>
-            </span>
-            <FollowControls profileId={profile.id} profileUsername={profile.username} inline />
-          </div>
-          {profile.bio ? (
-            <div className="muted" style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>
-              {profile.bio}
-            </div>
-          ) : null}
-        </div>
+        <PublicProfileHeader
+          avatarUrl={avatarUrl}
+          displayName={profile.display_name}
+          username={profile.username}
+          followerCount={followersCount}
+          followingCount={followingCount}
+          isLinked={true}
+          followButton={<FollowControls profileId={profile.id} profileUsername={profile.username} inline />}
+          bio={profile.bio}
+        />
 
         <div style={{ marginTop: 14 }} className="card">
           <div className="om-book-detail-grid">
