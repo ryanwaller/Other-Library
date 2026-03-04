@@ -2670,7 +2670,10 @@ export default function BookDetailPage() {
         </div>
       ) : (
         <div className="card">
-          <div className="om-book-detail-grid" style={{ marginTop: "var(--space-10)", rowGap: 24, columnGap: 14, alignItems: "start" }}>
+          <div
+            className="om-book-detail-grid"
+            style={{ marginTop: "var(--space-10)", rowGap: 24, columnGap: 14, alignItems: "start", gridTemplateColumns: isNarrow ? "1fr" : "220px minmax(0, 1fr)" }}
+          >
             <div style={{ gridColumn: "1 / -1", marginBottom: 16 }}>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: "var(--space-10)" }}>
                 {/* Left group: primary action + updates indicator */}

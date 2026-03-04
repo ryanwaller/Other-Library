@@ -264,7 +264,7 @@ button.muted:focus-visible {
 }
 
 .om-avatar-img-nav {
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .om-avatar-img-public {

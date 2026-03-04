@@ -1994,7 +1994,7 @@ function AppShell({
       </div>
 
       {!isMobile && searchOpen && (
-        <div className="row" style={{ width: "100%", marginTop: "var(--space-sm)", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
+        <div className="row" style={{ width: "100%", marginTop: "var(--space-sm)", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap", position: "relative", zIndex: 2 }}>
           <input
             className="om-inline-search-input"
             placeholder="Search your catalog"
@@ -2002,7 +2002,7 @@ function AppShell({
             onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); cancelAddPreview(); setSearchFocused(true); }}
             onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ minWidth: 0, flex: 1, maxWidth: "100%" }}
+            style={{ minWidth: 0, flex: 1, maxWidth: "100%", position: "relative", zIndex: 2, pointerEvents: "auto" }}
           />
           {(searchFocused || searchQuery.trim()) && (
             <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`} className="text-muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>Search others</Link>
