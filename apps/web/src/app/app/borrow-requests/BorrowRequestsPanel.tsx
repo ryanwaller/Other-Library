@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
-import IdentityRow from "../../components/IdentityRow";
 
 type BorrowRequest = {
   id: number;
@@ -48,7 +47,8 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<BorrowRequest[]>([]);
+  const [incomingRows, setIncomingRows] = useState<BorrowRequest[]>([]);
+  const [outgoingRows, setOutgoingRows] = useState<BorrowRequest[]>([]);
 
   const [profilesById, setProfilesById] = useState<Record<string, ProfileLite>>({});
   const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<string, string>>({});
@@ -66,22 +66,41 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
     setBusy(true);
     setError(null);
     try {
-      const res = await supabase
-        .from("borrow_requests")
-        .select("id,user_book_id,requester_id,owner_id,kind,status,message,created_at")
-        .eq("owner_id", userId)
-        .eq("kind", "borrow")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      if (res.error) throw new Error(res.error.message);
-      const nextRows = ((res.data as any) ?? []) as BorrowRequest[];
-      setRows(nextRows);
+      const [incomingRes, outgoingRes] = await Promise.all([
+        supabase
+          .from("borrow_requests")
+          .select("id,user_book_id,requester_id,owner_id,kind,status,message,created_at")
+          .eq("owner_id", userId)
+          .eq("kind", "borrow")
+          .order("created_at", { ascending: false })
+          .limit(200),
+        supabase
+          .from("borrow_requests")
+          .select("id,user_book_id,requester_id,owner_id,kind,status,message,created_at")
+          .eq("requester_id", userId)
+          .eq("kind", "borrow")
+          .order("created_at", { ascending: false })
+          .limit(200)
+      ]);
+      if (incomingRes.error) throw new Error(incomingRes.error.message);
+      if (outgoingRes.error) throw new Error(outgoingRes.error.message);
+      const nextIncomingRows = ((incomingRes.data as any) ?? []) as BorrowRequest[];
+      const nextOutgoingRows = ((outgoingRes.data as any) ?? []) as BorrowRequest[];
+      setIncomingRows(nextIncomingRows);
+      setOutgoingRows(nextOutgoingRows);
 
-      const requesterIds = Array.from(new Set(nextRows.map((r) => r.requester_id).filter(Boolean)));
-      const bookIds = Array.from(new Set(nextRows.map((r) => r.user_book_id).filter((n) => Number.isFinite(n))));
+      const counterpartyIds = Array.from(
+        new Set([
+          ...nextIncomingRows.map((r) => r.requester_id),
+          ...nextOutgoingRows.map((r) => r.owner_id)
+        ].filter(Boolean))
+      );
+      const bookIds = Array.from(
+        new Set([...nextIncomingRows, ...nextOutgoingRows].map((r) => r.user_book_id).filter((n) => Number.isFinite(n)))
+      );
 
-      if (requesterIds.length > 0) {
-        const pr = await supabase.from("profiles").select("id,username,avatar_path").in("id", requesterIds);
+      if (counterpartyIds.length > 0) {
+        const pr = await supabase.from("profiles").select("id,username,avatar_path").in("id", counterpartyIds);
         if (!pr.error) {
           const map: Record<string, ProfileLite> = {};
           for (const p of (pr.data as any[]) ?? []) {
@@ -159,16 +178,19 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
     <SignInCard note="Sign in to manage borrow requests." />
   ) : (
     <>
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: embedded ? "var(--space-xl)" : undefined }}
+          >
             <div>Requests from other readers</div>
             <div className="text-muted">{busy ? "Loading…" : error ? error : ""}</div>
           </div>
 
           <div style={{ marginTop: "var(--space-md)" }} className="om-list">
-            {rows.length === 0 ? (
+            {incomingRows.length === 0 ? (
               <div className="text-muted">No requests yet.</div>
             ) : (
-              rows.map((r) => {
+              incomingRows.map((r) => {
                 const requester = profilesById[r.requester_id];
                 const avatarUrl = avatarUrlByUserId[r.requester_id] ?? null;
                 const book = booksById[r.user_book_id];
@@ -176,21 +198,74 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                 const preview = oneLinePreview(r.message);
                 return (
                   <div key={r.id} className="om-list-row">
-                    <IdentityRow
-                      avatarUrl={avatarUrl}
-                      displayName={null}
-                      username={requester?.username || r.requester_id}
-                      rightSlot={
-                        <div className="text-muted" style={{ whiteSpace: "nowrap" }}>
-                          {r.status === "approved" ? <span style={{ color: "#0b6b2e" }}>✓</span> : null}
-                          {r.status === "rejected" ? <span style={{ color: "#b00020" }}>×</span> : null}
-                          {r.status === "pending" ? <span>…</span> : null}
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
+                      <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
+                        <Link href={`/u/${requester?.username || r.requester_id}`} className="om-avatar-link">
+                          {avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img alt="" src={avatarUrl} className="om-avatar-img" />
+                          ) : (
+                            <div className="om-avatar-img" style={{ background: "var(--bg-muted)" }} />
+                          )}
+                        </Link>
+                        <div style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <Link href={`/u/${requester?.username || r.requester_id}`}>{requester?.username || r.requester_id}</Link>
+                          {" wants "}
+                          {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
                         </div>
-                      }
-                    />
+                      </div>
+                      <div className="text-muted" style={{ whiteSpace: "nowrap" }}>{statusLabel(r.status)}</div>
+                    </div>
+
+                    {preview ? (
+                      <div className="text-muted" style={{ marginTop: "var(--space-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {preview}
+                      </div>
+                    ) : null}
 
                     <div style={{ marginTop: "var(--space-8)" }}>
-                      {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
+                      <Link href={embedded ? `/app/messages/${r.id}?back=${encodeURIComponent("/app/settings?tab=borrows")}` : `/app/messages/${r.id}`}>
+                        View conversation
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--space-xl)" }}>
+            <div>Requests you made</div>
+            <div className="text-muted">{outgoingRows.length}</div>
+          </div>
+          <div style={{ marginTop: "var(--space-md)" }} className="om-list">
+            {outgoingRows.length === 0 ? (
+              <div className="text-muted">None.</div>
+            ) : (
+              outgoingRows.map((r) => {
+                const owner = profilesById[r.owner_id];
+                const avatarUrl = avatarUrlByUserId[r.owner_id] ?? null;
+                const book = booksById[r.user_book_id];
+                const title = (book?.title_override ?? "").trim() || book?.edition?.title || "(untitled)";
+                const preview = oneLinePreview(r.message);
+                return (
+                  <div key={r.id} className="om-list-row">
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
+                      <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
+                        <Link href={`/u/${owner?.username || r.owner_id}`} className="om-avatar-link">
+                          {avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img alt="" src={avatarUrl} className="om-avatar-img" />
+                          ) : (
+                            <div className="om-avatar-img" style={{ background: "var(--bg-muted)" }} />
+                          )}
+                        </Link>
+                        <div style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          You asked <Link href={`/u/${owner?.username || r.owner_id}`}>{owner?.username || r.owner_id}</Link> for{" "}
+                          {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
+                        </div>
+                      </div>
+                      <div className="text-muted" style={{ whiteSpace: "nowrap" }}>{statusLabel(r.status)}</div>
                     </div>
 
                     {preview ? (

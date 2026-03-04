@@ -767,7 +767,7 @@ function SettingsPageContent() {
                   </select>
                 </div>
               </div>
-              <div style={{ marginTop: "var(--space-lg)" }}>
+              <div style={{ marginTop: "var(--space-2xl)" }}>
                 <BorrowRequestsPanel embedded />
               </div>
             </div>
