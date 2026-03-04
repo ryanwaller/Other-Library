@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import sizeOf from "image-size";
+import { fetchWithSafeRedirects, isSafeHttpUrl } from "../../../lib/networkSafety";
 
 export const runtime = "nodejs";
 
@@ -686,21 +687,6 @@ function detectDomainKind(hostname: string): string {
   return "generic";
 }
 
-function isBlockedHostname(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  if (h === "localhost" || h.endsWith(".localhost")) return true;
-  if (h === "127.0.0.1" || h === "0.0.0.0" || h === "::1") return true;
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) {
-    const [a, b] = h.split(".").map((x) => Number(x));
-    if (a === 10) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 127) return true;
-    if (a === 0) return true;
-  }
-  return false;
-}
-
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
   // Option A: Full browser-like headers
   const browserHeaders = {
@@ -721,17 +707,20 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
   
   try {
     console.log(`[fetch] Trying Option A (browser headers) for ${url}`);
-    const res = await fetch(url, {
-      headers: browserHeaders,
-      redirect: "follow",
-      signal: controller.signal
-    });
+    const { response: res, finalUrl } = await fetchWithSafeRedirects(
+      url,
+      {
+        headers: browserHeaders,
+        signal: controller.signal
+      },
+      5
+    );
 
     if (res.ok) {
       console.log(`[fetch] Option A succeeded for ${url}`);
       const txt = await res.text();
       const html = txt.length > 2_000_000 ? txt.slice(0, 2_000_000) : txt;
-      return { html, finalUrl: res.url || url };
+      return { html, finalUrl };
     }
 
     if (res.status === 403) {
@@ -820,11 +809,17 @@ async function validateCoverUrl(url: string | null | undefined): Promise<string 
   if (!normalized) return null;
 
   try {
-    const res = await fetch(normalized, {
-      method: "GET",
-      headers: { "User-Agent": USER_AGENT },
-      signal: AbortSignal.timeout(5000)
-    });
+    const parsed = new URL(normalized);
+    if (!isSafeHttpUrl(parsed)) return null;
+    const { response: res } = await fetchWithSafeRedirects(
+      parsed,
+      {
+        method: "GET",
+        headers: { "User-Agent": USER_AGENT },
+        signal: AbortSignal.timeout(5000)
+      },
+      3
+    );
     if (!res.ok) return null;
 
     const buffer = await res.arrayBuffer();
@@ -859,15 +854,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid URL." }, { status: 400 });
   }
 
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-    return NextResponse.json({ ok: false, error: "Only http/https URLs are supported." }, { status: 400 });
-  }
-
-  if (parsed.username || parsed.password) {
-    return NextResponse.json({ ok: false, error: "URLs with credentials are not supported." }, { status: 400 });
-  }
-
-  if (isBlockedHostname(parsed.hostname)) {
+  if (!isSafeHttpUrl(parsed)) {
     return NextResponse.json({ ok: false, error: "That host is not allowed." }, { status: 400 });
   }
 

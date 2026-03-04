@@ -19,7 +19,10 @@ Required:
 
 Optional (web-only features):
 - `SUPABASE_SERVICE_ROLE_KEY` (admin API routes)
+- `APP_ORIGIN` (required in production for invite links, e.g. `https://your-domain.com`)
 - `GOOGLE_VISION_API_KEY` (`/api/vision-scan`)
+- `ENABLE_VISION_SCAN` (`true` to allow `/api/vision-scan`, default should stay `false` unless intentionally enabled)
+- `VISION_SCAN_RATE_LIMIT_WINDOW_MS`, `VISION_SCAN_RATE_LIMIT_MAX`, `VISION_SCAN_MAX_IMAGE_BYTES` (safety limits for vision-scan)
 
 ## Run
 

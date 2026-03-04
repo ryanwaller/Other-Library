@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { getSupabaseAdmin, requireAdmin } from "../../../../lib/supabaseAdmin";
+import { getTrustedAppOrigin } from "../../../../lib/appOrigin";
 
 export const runtime = "nodejs";
 
@@ -17,13 +18,6 @@ function normalizeSort(input: string | null): "created_at" {
 
 function normalizeDir(input: string | null): "asc" | "desc" {
   return input === "asc" ? "asc" : "desc";
-}
-
-function getOrigin(req: Request): string {
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
-  const proto = req.headers.get("x-forwarded-proto") ?? "https";
-  if (!host) return new URL(req.url).origin;
-  return `${proto}://${host}`;
 }
 
 function newToken(): string {
@@ -138,12 +132,12 @@ export async function POST(req: Request) {
       .maybeSingle();
     if (ins.error) return NextResponse.json({ error: ins.error.message }, { status: 500 });
 
-    const origin = getOrigin(req);
+    const origin = getTrustedAppOrigin(req);
     const link = `${origin}/accept-invite?token=${encodeURIComponent(token)}`;
     return NextResponse.json({ invite: ins.data, link });
   } catch (e: any) {
     const msg = e?.message ?? "forbidden";
-    const status = msg === "not_authenticated" ? 401 : msg === "forbidden" ? 403 : 400;
+    const status = msg === "not_authenticated" ? 401 : msg === "forbidden" ? 403 : msg.startsWith("app_origin_") ? 500 : 400;
     return NextResponse.json({ error: msg }, { status });
   }
 }

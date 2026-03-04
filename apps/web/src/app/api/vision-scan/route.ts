@@ -1,8 +1,31 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getCurrentUser } from "../../../lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
 const VISION_ENDPOINT = "https://vision.googleapis.com/v1/images:annotate";
+const ENABLE_VISION_SCAN = String(process.env.ENABLE_VISION_SCAN ?? "").toLowerCase() === "true";
+const RATE_LIMIT_WINDOW_MS = Number(process.env.VISION_SCAN_RATE_LIMIT_WINDOW_MS ?? "60000");
+const RATE_LIMIT_MAX = Number(process.env.VISION_SCAN_RATE_LIMIT_MAX ?? "20");
+const MAX_IMAGE_BYTES = Number(process.env.VISION_SCAN_MAX_IMAGE_BYTES ?? "4000000");
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function clientId(req: NextRequest, userId: string): string {
+  const fwd = req.headers.get("x-forwarded-for") ?? "";
+  const ip = fwd.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+  return `${userId}:${ip}`;
+}
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  const current = rateBuckets.get(key);
+  if (!current || now >= current.resetAt) {
+    rateBuckets.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  current.count += 1;
+  return current.count > RATE_LIMIT_MAX;
+}
 
 interface WebEntity {
   entityId?: string;
@@ -117,6 +140,20 @@ function extractIsbn13FromUrl(url: string): string | null {
 
 
 export async function POST(req: NextRequest) {
+  if (!ENABLE_VISION_SCAN) {
+    return NextResponse.json({ ok: false, error: "Vision scan is disabled" }, { status: 403 });
+  }
+
+  const current = await getCurrentUser(req);
+  if (!current) {
+    return NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 });
+  }
+
+  const key = clientId(req, current.id);
+  if (isRateLimited(key)) {
+    return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
+  }
+
   const apiKey = process.env.GOOGLE_VISION_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ ok: false, error: "Vision API not configured" }, { status: 503 });
@@ -132,6 +169,10 @@ export async function POST(req: NextRequest) {
   const { image } = body;
   if (!image || typeof image !== "string") {
     return NextResponse.json({ ok: false, error: "Missing image" }, { status: 400 });
+  }
+  const approxBytes = Math.floor((image.length * 3) / 4);
+  if (approxBytes > MAX_IMAGE_BYTES) {
+    return NextResponse.json({ ok: false, error: "Image too large" }, { status: 400 });
   }
 
   const controller = new AbortController();
