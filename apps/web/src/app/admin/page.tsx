@@ -141,7 +141,8 @@ function AdminListItem({
       <div className="admin-meta-line" style={{ marginTop: 4 }}>
         {meta.map((pair, idx) => (
           <span className="admin-meta-pair" key={`${pair.label}-${idx}`}>
-            <span className="text-muted">{pair.label}</span> {pair.value}
+            <span className="text-muted">{pair.label}</span>
+            <span>{pair.value}</span>
           </span>
         ))}
       </div>
@@ -168,7 +169,6 @@ export default function AdminPage() {
   }, [error]);
 
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteEmailFocused, setInviteEmailFocused] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [copiedLinkForId, setCopiedLinkForId] = useState<number | string | null>(null);
@@ -423,7 +423,8 @@ export default function AdminPage() {
             <div className="admin-meta-line">
               {tabStats.map((item) => (
                 <span className="admin-meta-pair" key={item.label}>
-                  <span className="text-muted">{item.label}</span> {item.value}
+                  <span className="text-muted">{item.label}</span>
+                  <span>{item.value}</span>
                 </span>
               ))}
             </div>
@@ -443,8 +444,8 @@ export default function AdminPage() {
 
           <hr className="om-hr" />
 
-          <div className="row admin-tabbar-row" style={{ justifyContent: "flex-start", gap: "var(--space-10)" }}>
-            <div className="admin-tabbar" style={{ flexWrap: "wrap" }}>
+          <div className="row admin-tabbar-row" style={{ justifyContent: "flex-start", gap: "var(--space-10)", width: "100%", flexWrap: "nowrap" }}>
+            <div className="admin-tabbar" style={{ flexWrap: "nowrap", flex: "0 0 auto" }}>
               <button type="button" onClick={() => setTab("users")} aria-current={tab === "users" ? "page" : undefined}>
                 Users
               </button>
@@ -454,59 +455,56 @@ export default function AdminPage() {
               <button type="button" onClick={() => setTab("invites")} aria-current={tab === "invites" ? "page" : undefined}>
                 Invites
               </button>
-              <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0 }}>
-                <input
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  onFocus={() => setInviteEmailFocused(true)}
-                  onBlur={() => setInviteEmailFocused(false)}
-                  placeholder="Add via email"
-                  style={{ width: "100%" }}
-                />
-                {(inviteEmailFocused || busy) ? (
+            </div>
+            <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0, flex: "1 1 auto" }}>
+              <input
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="Add via email"
+                style={{ width: "100%", flex: "1 1 auto", minWidth: 0 }}
+              />
+              {inviteEmail.trim() ? (
+                <button
+                  className="om-inline-link-muted"
+                  onClick={async () => {
+                    setBusy(true);
+                    setError(null);
+                    setInviteLink(null);
+                    try {
+                      const res = await api<{ link: string }>("/api/admin/invites", {
+                        method: "POST",
+                        token,
+                        body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
+                      });
+                      setInviteLink(res.link);
+                      await refreshInvites();
+                      await refreshSummary();
+                    } catch (e: any) {
+                      setError(e?.message ?? "Failed to create invite");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  disabled={busy}
+                >
+                  Invite
+                </button>
+              ) : null}
+              {inviteLink ? (
+                copiedInvite ? (
+                  <span style={{ marginLeft: "var(--space-8)" }}>Copied</span>
+                ) : (
                   <button
-                    className="om-inline-link-muted"
-                    onMouseDown={(e) => e.preventDefault()}
                     onClick={async () => {
-                      setBusy(true);
-                      setError(null);
-                      setInviteLink(null);
-                      try {
-                        const res = await api<{ link: string }>("/api/admin/invites", {
-                          method: "POST",
-                          token,
-                          body: JSON.stringify({ email: inviteEmail.trim() || null, expiresInDays: 14 })
-                        });
-                        setInviteLink(res.link);
-                        await refreshInvites();
-                        await refreshSummary();
-                      } catch (e: any) {
-                        setError(e?.message ?? "Failed to create invite");
-                      } finally {
-                        setBusy(false);
-                      }
+                      await navigator.clipboard.writeText(inviteLink);
+                      setCopiedInvite(true);
+                      window.setTimeout(() => setCopiedInvite(false), 1500);
                     }}
-                    disabled={busy}
                   >
-                    Invite
+                    Copy link
                   </button>
-                ) : null}
-                {inviteLink ? (
-                  copiedInvite ? (
-                    <span style={{ marginLeft: "var(--space-8)" }}>Copied</span>
-                  ) : (
-                    <button
-                      onClick={async () => {
-                        await navigator.clipboard.writeText(inviteLink);
-                        setCopiedInvite(true);
-                        window.setTimeout(() => setCopiedInvite(false), 1500);
-                      }}
-                    >
-                      Copy link
-                    </button>
-                  )
-                ) : null}
-              </div>
+                )
+              ) : null}
             </div>
           </div>
 
@@ -870,7 +868,7 @@ export default function AdminPage() {
               : null}
           </div>
 
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)" }}>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)", marginTop: "var(--space-lg)" }}>
             <div className="text-muted">
               {tab === "users" ? resultLabel(usersData?.page ?? userPage, userTotalPages, usersData?.total ?? 0) : null}
               {tab === "waitlist" ? resultLabel(waitlistData?.page ?? waitPage, waitTotalPages, waitlistData?.total ?? 0) : null}
