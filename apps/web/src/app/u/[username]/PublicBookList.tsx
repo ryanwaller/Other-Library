@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import Link from "next/link";
 import { bookIdSlug } from "../../../lib/slug";
 import AddToLibraryButton from "./AddToLibraryButton";
@@ -345,10 +345,11 @@ export default function PublicBookList({
       <div style={{ marginTop: 32 }} />
 
       {showLibraryBlocks ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {libraries.map((lib) => {
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {libraries
+            .filter(lib => filteredGroups.some(g => g.libraryId === lib.id))
+            .map((lib, idx) => {
             const libGroups = filteredGroups.filter(g => g.libraryId === lib.id);
-            if (libGroups.length === 0) return null;
             const collapsed = !!collapsedByLibraryId[lib.id];
             const toggle = () => setCollapsedByLibraryId(prev => {
               const next = { ...prev };
@@ -356,7 +357,9 @@ export default function PublicBookList({
               return next;
             });
             return (
-              <div key={lib.id} className="card" style={{ marginTop: 0 }}>
+              <Fragment key={lib.id}>
+              {idx > 0 && <hr className="om-hr" />}
+              <div className="card" style={{ marginTop: idx === 0 ? 0 : 14 }}>
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap" }}>
                   <div className="row" style={{ gap: 10, flex: 1, alignItems: "baseline", flexWrap: "nowrap", minWidth: 0 }}>
                     <button
@@ -387,6 +390,7 @@ export default function PublicBookList({
                   />
                 )}
               </div>
+              </Fragment>
             );
           })}
         </div>

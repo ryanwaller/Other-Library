@@ -171,23 +171,15 @@ export default function BookCard({
           </div>
         </>
       ) : (
-        <div
-          className="om-book-card-link"
-          style={{ display: "block", color: "inherit", cursor: "pointer" }}
-          role="link"
-          tabIndex={0}
-          onClick={() => router.push(href)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              router.push(href);
-            }
-          }}
-        >
-          {coverEl}
+        <>
+          <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link">
+            {coverEl}
+          </Link>
           <div style={{ marginTop: 14 }}>
             <div className="row" style={{ justifyContent: "space-between", gap: 10, alignItems: "baseline" }}>
-              <span className="om-book-title">{title}</span>
+              <Link href={href} style={{ textDecoration: "none" }} className="om-book-card-link">
+                <span className="om-book-title">{title}</span>
+              </Link>
             </div>
             {truncatedAuthors.length > 0 ? (
               <div className="om-book-secondary">
@@ -212,7 +204,7 @@ export default function BookCard({
               </div>
             ) : null}
           </div>
-        </div>
+        </>
       )}
     </div>
   );
