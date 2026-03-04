@@ -199,11 +199,8 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                 const preview = oneLinePreview(r.message);
                 return (
                   <div key={r.id} className="om-list-row" style={idx === incomingRows.length - 1 ? { borderBottom: "none" } : undefined}>
-                    <div
-                      className="row"
-                      style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}
-                    >
-                      <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
+                    <div className="om-request-line">
+                      <div className="om-request-sentence-wrap">
                         <Link href={`/u/${requester?.username || r.requester_id}`} className="om-avatar-link">
                           {avatarUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -212,13 +209,13 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                             <div className="om-avatar-img" style={{ background: "var(--bg-muted)" }} />
                           )}
                         </Link>
-                        <div style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <div className="om-request-sentence">
                           <Link href={`/u/${requester?.username || r.requester_id}`}>{requester?.username || r.requester_id}</Link>
                           {" wants "}
                           {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
                         </div>
                       </div>
-                      <div className="text-muted" style={{ whiteSpace: "nowrap", alignSelf: "baseline", lineHeight: "inherit" }}>{statusLabel(r.status)}</div>
+                      <div className="text-muted om-request-status">{statusLabel(r.status)}</div>
                     </div>
 
                     {preview ? (
@@ -255,11 +252,8 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                 const preview = oneLinePreview(r.message);
                 return (
                   <div key={r.id} className="om-list-row" style={idx === outgoingRows.length - 1 ? { borderBottom: "none" } : undefined}>
-                    <div
-                      className="row"
-                      style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}
-                    >
-                      <div className="om-avatar-lockup" style={{ minWidth: 0, flex: 1 }}>
+                    <div className="om-request-line">
+                      <div className="om-request-sentence-wrap">
                         <Link href={me?.username ? `/u/${me.username}` : "/app/settings?tab=profile"} className="om-avatar-link">
                           {avatarUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -268,12 +262,12 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                             <div className="om-avatar-img" style={{ background: "var(--bg-muted)" }} />
                           )}
                         </Link>
-                        <div style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <div className="om-request-sentence">
                           You asked <Link href={`/u/${owner?.username || r.owner_id}`}>{owner?.username || r.owner_id}</Link> for{" "}
                           {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
                         </div>
                       </div>
-                      <div className="text-muted" style={{ whiteSpace: "nowrap", alignSelf: "baseline", lineHeight: "inherit" }}>{statusLabel(r.status)}</div>
+                      <div className="text-muted om-request-status">{statusLabel(r.status)}</div>
                     </div>
 
                     {preview ? (

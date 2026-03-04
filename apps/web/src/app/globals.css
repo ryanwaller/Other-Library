@@ -764,13 +764,36 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   align-items: center;
 }
 
-.om-borrow-requests-panel .om-avatar-lockup {
-  align-items: baseline;
-}
-
 .om-follows-panel .om-avatar-img,
 .om-borrow-requests-panel .om-avatar-img {
   transform: translateY(-2px);
+}
+
+.om-borrow-requests-panel .om-request-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-md);
+  align-items: baseline;
+}
+
+.om-borrow-requests-panel .om-request-sentence-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.om-borrow-requests-panel .om-request-sentence {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.om-borrow-requests-panel .om-request-status {
+  white-space: nowrap;
+  align-self: baseline;
+  line-height: inherit;
 }
 
 .om-thread {
