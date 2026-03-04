@@ -7,6 +7,7 @@ import type { Session } from "@supabase/supabase-js";
 import Cropper, { type Area } from "react-easy-crop";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
+import FollowsPanel from "../follows/FollowsPanel";
 
 const RESERVED_USERNAMES = [
   "app",
@@ -717,9 +718,7 @@ export default function SettingsPage() {
 
           {tab === "follows" ? (
             <div className="card">
-              <div style={{ marginTop: "var(--space-sm)" }}>
-                <Link href="/app/follows">Open follow settings</Link>
-              </div>
+              <FollowsPanel embedded />
             </div>
           ) : null}
 
