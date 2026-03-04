@@ -605,6 +605,16 @@ function AppShell({
     if (!supabase) return;
     const ids = Array.from(new Set((targetLibraryIds ?? libraries.map((l) => l.id)).filter((n) => Number.isFinite(n) && n > 0)));
     if (ids.length === 0) {
+      try {
+        const serverHomeNoIds = await catalogApi<{ ok: true; books: any[] }>("/api/catalog/home", { method: "GET" });
+        if (Array.isArray(serverHomeNoIds.books) && serverHomeNoIds.books.length > 0) {
+          setDebugBooksSource("books:server-home-noids");
+          setItems((serverHomeNoIds.books as any[]) as any);
+          return;
+        }
+      } catch {
+        // continue
+      }
       const ownerOnly = await supabase
         .from("user_books")
         .select(
@@ -751,6 +761,64 @@ function AppShell({
       } catch {
         setDebugLastError("catalog_list_failed");
         // fall through to client-side queries
+      }
+
+      if (list.length > 0) {
+        setLibraries(list);
+        try {
+          const raw = window.localStorage.getItem("om_addLibraryId");
+          const parsed = raw ? Number(raw) : NaN;
+          if (Number.isFinite(parsed) && parsed > 0 && list.some((l) => l.id === parsed)) {
+            setAddLibraryId(parsed);
+          } else {
+            setAddLibraryId(list[0]?.id ?? null);
+          }
+        } catch {
+          setAddLibraryId(list[0]?.id ?? null);
+        }
+        setLibraryState({ busy: false, error: null, message: null });
+        return list;
+      }
+
+      if (list.length === 0) {
+        try {
+          const serverHome = await catalogApi<{ ok: true; catalogs: LibrarySummary[]; books: any[] }>("/api/catalog/home", { method: "GET" });
+          const serverCatalogs = Array.isArray(serverHome.catalogs) ? serverHome.catalogs : [];
+          if (serverCatalogs.length > 0) {
+            setDebugLibrariesSource("libs:server-home");
+            list = serverCatalogs;
+          } else {
+            const rows = Array.isArray(serverHome.books) ? serverHome.books : [];
+            const idsFromBooks = Array.from(new Set(rows.map((r: any) => Number(r.library_id)).filter((n: any) => Number.isFinite(n) && n > 0)));
+            if (idsFromBooks.length > 0) {
+              setDebugLibrariesSource("libs:server-home-derived");
+              list = idsFromBooks.map((id) => ({
+                id,
+                name: `Catalog ${id}`,
+                created_at: new Date(0).toISOString(),
+                myRole: "owner" as const
+              }));
+            }
+          }
+          if (list.length > 0) {
+            setLibraries(list);
+            try {
+              const raw = window.localStorage.getItem("om_addLibraryId");
+              const parsed = raw ? Number(raw) : NaN;
+              if (Number.isFinite(parsed) && parsed > 0 && list.some((l) => l.id === parsed)) {
+                setAddLibraryId(parsed);
+              } else {
+                setAddLibraryId(list[0]?.id ?? null);
+              }
+            } catch {
+              setAddLibraryId(list[0]?.id ?? null);
+            }
+            setLibraryState({ busy: false, error: null, message: null });
+            return list;
+          }
+        } catch {
+          // continue to client fallback
+        }
       }
 
       if (list.length === 0) {

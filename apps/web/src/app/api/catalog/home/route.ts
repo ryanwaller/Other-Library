@@ -70,15 +70,18 @@ export async function GET(req: Request) {
 
     let books: any[] = [];
     if (catalogIds.length > 0) {
-      const booksRes = await admin
-        .from("user_books")
-        .select(
-          "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
-        )
-        .in("library_id", catalogIds)
-        .order("created_at", { ascending: false })
-        .limit(800);
-      if (!booksRes.error) books = (booksRes.data ?? []) as any[];
+      const fullSelect =
+        "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+      const basicSelect =
+        "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+
+      const booksRes = await admin.from("user_books").select(fullSelect).in("library_id", catalogIds).order("created_at", { ascending: false }).limit(800);
+      if (!booksRes.error) {
+        books = (booksRes.data ?? []) as any[];
+      } else {
+        const fallback = await admin.from("user_books").select(basicSelect).in("library_id", catalogIds).order("created_at", { ascending: false }).limit(800);
+        if (!fallback.error) books = (fallback.data ?? []) as any[];
+      }
     }
 
     return NextResponse.json({ ok: true, catalogs, books });

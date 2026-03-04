@@ -8,9 +8,9 @@ export async function GET(req: Request) {
 
     const ownedRes = await admin
       .from("libraries")
-      .select("id,name,created_at,sort_order,owner_id")
+      .select("id,name,created_at,owner_id")
       .eq("owner_id", current.id)
-      .order("sort_order", { ascending: true });
+      .order("created_at", { ascending: true });
     if (ownedRes.error) throw new Error(ownedRes.error.message);
 
     const membershipsRes = await admin
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
 
     let sharedLibs: any[] = [];
     if (sharedIds.length > 0) {
-      const libsRes = await admin.from("libraries").select("id,name,created_at,sort_order,owner_id").in("id", sharedIds);
+      const libsRes = await admin.from("libraries").select("id,name,created_at,owner_id").in("id", sharedIds);
       if (!libsRes.error) sharedLibs = (libsRes.data ?? []) as any[];
     }
 
@@ -50,11 +50,61 @@ export async function GET(req: Request) {
         id,
         name: String(l.name ?? `Catalog ${id}`),
         created_at: String(l.created_at ?? new Date(0).toISOString()),
-        sort_order: Number.isFinite(Number(l.sort_order)) ? Number(l.sort_order) : null,
+        sort_order: null,
         owner_id: l.owner_id ? String(l.owner_id) : null,
-        myRole: role
+        myRole: role,
+        memberPreviews: [] as Array<{ userId: string; username: string; avatarUrl: string | null }>
       };
     });
+
+    const catalogIds = catalogs.map((c) => c.id).filter((id) => Number.isFinite(id) && id > 0);
+    if (catalogIds.length > 0) {
+      const membersRes = await admin
+        .from("catalog_members")
+        .select("catalog_id,user_id,accepted_at")
+        .in("catalog_id", catalogIds)
+        .not("accepted_at", "is", null);
+      const memberRows = (membersRes.error ? [] : ((membersRes.data ?? []) as any[])).filter((r) => String(r.user_id) !== current.id);
+      const memberIds = Array.from(new Set(memberRows.map((r) => String(r.user_id)).filter(Boolean)));
+      let profileById: Record<string, { username: string; avatar_path: string | null }> = {};
+      if (memberIds.length > 0) {
+        const pr = await admin.from("profiles").select("id,username,avatar_path").in("id", memberIds);
+        if (!pr.error) {
+          profileById = Object.fromEntries(
+            ((pr.data ?? []) as any[]).map((p) => [String(p.id), { username: String(p.username ?? ""), avatar_path: p.avatar_path ? String(p.avatar_path) : null }])
+          );
+        }
+      }
+
+      const avatarByPath: Record<string, string> = {};
+      for (const p of Object.values(profileById)) {
+        if (!p.avatar_path || avatarByPath[p.avatar_path]) continue;
+        const signed = await admin.storage.from("avatars").createSignedUrl(p.avatar_path, 60 * 30);
+        if (signed.data?.signedUrl) avatarByPath[p.avatar_path] = signed.data.signedUrl;
+      }
+
+      const byCatalog: Record<number, Array<{ userId: string; username: string; avatarUrl: string | null; acceptedAt: string }>> = {};
+      for (const r of memberRows) {
+        const cid = Number(r.catalog_id);
+        const uid = String(r.user_id);
+        const p = profileById[uid];
+        if (!p?.username) continue;
+        if (!byCatalog[cid]) byCatalog[cid] = [];
+        byCatalog[cid].push({
+          userId: uid,
+          username: p.username,
+          avatarUrl: p.avatar_path ? avatarByPath[p.avatar_path] ?? null : null,
+          acceptedAt: String(r.accepted_at ?? "")
+        });
+      }
+
+      for (const c of catalogs) {
+        c.memberPreviews = (byCatalog[c.id] ?? [])
+          .sort((a, b) => Date.parse(a.acceptedAt) - Date.parse(b.acceptedAt))
+          .slice(0, 3)
+          .map((m) => ({ userId: m.userId, username: m.username, avatarUrl: m.avatarUrl }));
+      }
+    }
 
     return NextResponse.json({ ok: true, catalogs });
   } catch (err) {
