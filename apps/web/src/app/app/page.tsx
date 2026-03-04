@@ -395,6 +395,7 @@ function AppShell({
   const [reorderMode, setReorderMode] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
+  const autoReducedGridColsRef = useRef<4 | 8 | null>(null);
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, true | undefined>>({});
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
@@ -436,8 +437,24 @@ function AppShell({
   }, []);
 
   useEffect(() => {
-    if (!isMobile) return;
-    setGridCols((prev) => (prev === 4 || prev === 8 ? 2 : prev));
+    if (isMobile) {
+      setGridCols((prev) => {
+        if (prev === 4 || prev === 8) {
+          autoReducedGridColsRef.current = prev;
+          return 2;
+        }
+        return prev;
+      });
+      return;
+    }
+    setGridCols((prev) => {
+      const restore = autoReducedGridColsRef.current;
+      if (restore && (prev === 1 || prev === 2)) {
+        autoReducedGridColsRef.current = null;
+        return restore;
+      }
+      return prev;
+    });
   }, [isMobile]);
 
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import Link from "next/link";
 import { bookIdSlug } from "../../../lib/slug";
 import AddToLibraryButton from "./AddToLibraryButton";
@@ -37,6 +37,7 @@ export default function PublicBookList({
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [gridCols, setGridCols] = useState<1 | 2 | 4 | 8>(4);
+  const autoReducedGridColsRef = useRef<4 | 8 | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [sortOpen, setSortOpen] = useState(false);
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, boolean>>({});
@@ -50,8 +51,24 @@ export default function PublicBookList({
   }, []);
 
   useEffect(() => {
-    if (!isMobile) return;
-    setGridCols((prev) => (prev > 2 ? 2 : prev));
+    if (isMobile) {
+      setGridCols((prev) => {
+        if (prev === 4 || prev === 8) {
+          autoReducedGridColsRef.current = prev;
+          return 2;
+        }
+        return prev;
+      });
+      return;
+    }
+    setGridCols((prev) => {
+      const restore = autoReducedGridColsRef.current;
+      if (restore && (prev === 1 || prev === 2)) {
+        autoReducedGridColsRef.current = null;
+        return restore;
+      }
+      return prev;
+    });
   }, [isMobile]);
 
   // Use state for filters so we can clear them instantly
