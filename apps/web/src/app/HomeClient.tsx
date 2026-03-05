@@ -34,7 +34,18 @@ export default function HomeClient() {
     });
   }, [router]);
 
-  if (!sessionLoaded) return null;
+  if (!sessionLoaded) {
+    return (
+      <main className="container" aria-hidden="true">
+        <div className="card">
+          <div style={{ marginBottom: "var(--space-8)" }}>Other Library</div>
+          <div className="text-muted" style={{ marginBottom: "var(--space-md)" }}>
+            Loading…
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="container">

@@ -34,6 +34,7 @@ export default function GlobalNav() {
   const viewingUsername = useMemo(() => parseViewingUsername(pathname), [pathname]);
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [authResolved, setAuthResolved] = useState(false);
   const [me, setMe] = useState<{ username: string; avatar_path: string | null; role?: string | null; status?: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<number>(0);
@@ -58,8 +59,14 @@ export default function GlobalNav() {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSessionUserId(data.session?.user?.id ?? null));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSessionUserId(newSession?.user?.id ?? null));
+    supabase.auth.getSession().then(({ data }) => {
+      setSessionUserId(data.session?.user?.id ?? null);
+      setAuthResolved(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSessionUserId(newSession?.user?.id ?? null);
+      setAuthResolved(true);
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -446,7 +453,7 @@ export default function GlobalNav() {
               </Link>
             ) : null}
             {sessionUserId && <button onClick={signOut}>Sign out</button>}
-            {!sessionUserId && <Link href="/">Sign in</Link>}
+            {!sessionUserId && authResolved ? <Link href="/">Sign in</Link> : null}
           </div>
         </div>
       </div>
