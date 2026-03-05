@@ -635,6 +635,18 @@ function AppShell({
     setTagMode(normalized);
   }, [filterTag]);
 
+  useEffect(() => {
+    const onReset = () => {
+      setTagMode("all");
+      setCategoryMode("all");
+      setVisibilityMode("all");
+      setSearchQuery("");
+      router.push("/app");
+    };
+    window.addEventListener("om:home-reset-filters", onReset);
+    return () => window.removeEventListener("om:home-reset-filters", onReset);
+  }, [router]);
+
   async function applyBooksFromServer(serverRows: any[], source: string) {
     const client = supabase;
     if (!client) return;

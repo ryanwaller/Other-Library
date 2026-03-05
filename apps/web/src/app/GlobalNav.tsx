@@ -381,7 +381,14 @@ export default function GlobalNav() {
       <div style={{ padding: "8px 0 6px" }}>
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: "var(--space-10)" }}>
           <div>
-            <Link href={sessionUserId ? "/app" : "/"} style={{ textDecoration: "none" }}>
+            <Link
+              href={sessionUserId ? "/app" : "/"}
+              onClick={() => {
+                if (!sessionUserId) return;
+                window.dispatchEvent(new Event("om:home-reset-filters"));
+              }}
+              style={{ textDecoration: "none" }}
+            >
               Other Library
             </Link>
           </div>
