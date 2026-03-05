@@ -78,6 +78,7 @@ export default function MessageThreadPage() {
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
   const [deletedLocally, setDeletedLocally] = useState(false);
+  const [reopenRequested, setReopenRequested] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -98,6 +99,26 @@ export default function MessageThreadPage() {
         return /deleted this conversation\.\s*also delete\?/i.test(raw) && m.sender_id !== userId;
       }),
     [thread, userId]
+  );
+  const hasReplyAfterDeleteNotice = useMemo(() => {
+    let lastDeleteIdx = -1;
+    for (let i = thread.length - 1; i >= 0; i -= 1) {
+      const raw = String(thread[i]?.message ?? "").trim();
+      if (/deleted this conversation\.\s*also delete\?/i.test(raw) && thread[i]?.sender_id !== userId) {
+        lastDeleteIdx = i;
+        break;
+      }
+    }
+    if (lastDeleteIdx < 0) return false;
+    for (let i = lastDeleteIdx + 1; i < thread.length; i += 1) {
+      const raw = String(thread[i]?.message ?? "").trim();
+      if (!/deleted this conversation\.\s*also delete\?/i.test(raw)) return true;
+    }
+    return false;
+  }, [thread, userId]);
+  const blocksComposerFromDeleteNotice = useMemo(
+    () => hasDeleteNoticeFromOther && !hasReplyAfterDeleteNotice && !(req?.status === "approved" && reopenRequested),
+    [hasDeleteNoticeFromOther, hasReplyAfterDeleteNotice, req?.status, reopenRequested]
   );
   const otherUserId = useMemo(() => {
     if (!req || !userId) return null;
@@ -302,6 +323,7 @@ export default function MessageThreadPage() {
       return;
     }
     setDeletedAtForMe(null);
+    setReopenRequested(true);
     setDeleteState({ busy: false, error: null });
     notifyBorrowRequestsChanged();
   }
@@ -457,7 +479,7 @@ export default function MessageThreadPage() {
         )}
       </div>
 
-      {(!deletedAtForMe || canComposeInDeletedThread) && !deletedLocally && !hasDeleteNoticeFromOther ? (
+      {(!deletedAtForMe || canComposeInDeletedThread) && !deletedLocally && !blocksComposerFromDeleteNotice ? (
       <div style={{ marginTop: "var(--space-14)" }}>
         <textarea
           value={draft}
