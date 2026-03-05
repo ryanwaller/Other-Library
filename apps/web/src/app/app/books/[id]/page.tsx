@@ -390,6 +390,7 @@ export default function BookDetailPage() {
   const [copiesCount, setCopiesCount] = useState<number | null>(null);
   const [copiesCountState, setCopiesCountState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
   const [libraries, setLibraries] = useState<Array<{ id: number; name: string; created_at: string }>>([]);
+  const [libMemberPreviewsById, setLibMemberPreviewsById] = useState<Record<number, Array<{ userId: string; username: string; avatarUrl: string | null }>>>({});
   const [formLibraryId, setFormLibraryId] = useState<number | null>(null);
   const [libraryMoveState, setLibraryMoveState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
@@ -697,6 +698,60 @@ export default function BookDetailPage() {
       alive = false;
     };
   }, [userId, book?.owner_id, book?.library_id, memberCanEdit]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!supabase || !userId || !formLibraryId) {
+        setLibMemberPreviewsById({});
+        return;
+      }
+      const membersRes = await supabase
+        .from("catalog_members")
+        .select("catalog_id,user_id,accepted_at")
+        .eq("catalog_id", formLibraryId)
+        .not("accepted_at", "is", null);
+      if (!alive) return;
+      const memberRows = (membersRes.error ? [] : ((membersRes.data ?? []) as any[])).filter((r) => String(r.user_id) !== userId);
+      const memberIds = Array.from(new Set(memberRows.map((r: any) => String(r.user_id)).filter(Boolean)));
+      let profileById: Record<string, { username: string; avatar_path: string | null }> = {};
+      if (memberIds.length > 0) {
+        const pr = await supabase.from("profiles").select("id,username,avatar_path").in("id", memberIds);
+        if (!alive) return;
+        if (!pr.error) {
+          profileById = Object.fromEntries(
+            ((pr.data ?? []) as any[]).map((p) => [String(p.id), { username: String(p.username ?? ""), avatar_path: p.avatar_path ? String(p.avatar_path) : null }])
+          );
+        }
+      }
+      const avatarByPath: Record<string, string> = {};
+      const avatarPaths = Array.from(new Set(Object.values(profileById).map((p) => (p.avatar_path ?? "").trim()).filter(Boolean)));
+      const directUrls = avatarPaths.filter((p) => /^https?:\/\//i.test(p));
+      for (const p of directUrls) avatarByPath[p] = p;
+      const storagePaths = avatarPaths.filter((p) => !/^https?:\/\//i.test(p));
+      if (storagePaths.length > 0) {
+        const signed = await supabase.storage.from("avatars").createSignedUrls(storagePaths, 60 * 30);
+        if (!alive) return;
+        if (!signed.error && Array.isArray(signed.data)) {
+          for (const row of signed.data) {
+            if (row.path && row.signedUrl) avatarByPath[row.path] = row.signedUrl;
+          }
+        }
+      }
+      const previews = memberRows
+        .sort((a: any, b: any) => Date.parse(String(a.accepted_at ?? "")) - Date.parse(String(b.accepted_at ?? "")))
+        .map((r: any) => {
+          const uid = String(r.user_id);
+          const prof = profileById[uid];
+          if (!prof?.username) return null;
+          return { userId: uid, username: prof.username, avatarUrl: prof.avatar_path ? avatarByPath[prof.avatar_path] ?? null : null };
+        })
+        .filter(Boolean) as Array<{ userId: string; username: string; avatarUrl: string | null }>;
+      if (!alive) return;
+      setLibMemberPreviewsById({ [formLibraryId]: previews });
+    })();
+    return () => { alive = false; };
+  }, [formLibraryId, userId]);
 
   async function refresh() {
     if (!supabase) return;
@@ -3820,7 +3875,26 @@ export default function BookDetailPage() {
                           </div>
                         </>
                       ) : (
-                        <div>{libraries.find((l) => l.id === formLibraryId)?.name ?? "—"}</div>
+                        <div className="row" style={{ alignItems: "center", gap: 6, flexWrap: "nowrap" }}>
+                          <span>{libraries.find((l) => l.id === formLibraryId)?.name ?? "—"}</span>
+                          {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length > 0 ? (
+                            <span className="om-member-stack" aria-label="Shared catalog members">
+                              {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).slice(0, 6).map((m) =>
+                                m.avatarUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img key={m.userId} alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar" />
+                                ) : (
+                                  <span key={m.userId} className="om-member-stack-avatar" title={m.username} />
+                                )
+                              )}
+                              {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length > 6 ? (
+                                <span className="om-member-stack-overflow" title={`${(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length - 6} more members`}>
+                                  +{(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length - 6}
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : null}
+                        </div>
                       )}
                     </div>
 

@@ -871,7 +871,7 @@ function AppShell({
           ...l,
           memberPreviews: (membersByCatalog[l.id] ?? [])
             .sort((a, b) => Date.parse(a.acceptedAt) - Date.parse(b.acceptedAt))
-            .slice(0, 3)
+            .slice(0, 10)
             .map((m) => ({ userId: m.userId, username: m.username, avatarUrl: m.avatarUrl }))
         }));
       }
@@ -1996,19 +1996,24 @@ function AppShell({
   }
 
   function moveLibrary(libraryId: number, delta: -1 | 1) {
-    setLibraries((prev) => {
-      const idx = prev.findIndex((l) => l.id === libraryId);
-      if (idx < 0) return prev;
-      const nextIdx = idx + delta;
-      if (nextIdx < 0 || nextIdx >= prev.length) return prev;
-      const next = prev.slice();
-      const [moved] = next.splice(idx, 1);
-      next.splice(nextIdx, 0, moved);
-      try {
-        window.localStorage.setItem("om_libraryOrder", next.map((l) => l.id).join(","));
-      } catch { }
-      return next;
-    });
+    const idx = libraries.findIndex((l) => l.id === libraryId);
+    if (idx < 0) return;
+    const nextIdx = idx + delta;
+    if (nextIdx < 0 || nextIdx >= libraries.length) return;
+    const next = libraries.slice();
+    const [moved] = next.splice(idx, 1);
+    next.splice(nextIdx, 0, moved);
+    setLibraries(next);
+    try {
+      window.localStorage.setItem("om_libraryOrder", next.map((l) => l.id).join(","));
+    } catch { }
+    if (supabase) {
+      void Promise.all(
+        next.map((l, i) =>
+          supabase!.from("libraries").update({ sort_order: i }).eq("id", l.id).eq("owner_id", userId)
+        )
+      ).catch(() => {});
+    }
   }
 
   function beginEditLibrary(libraryId: number, currentName: string) {

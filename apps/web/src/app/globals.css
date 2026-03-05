@@ -325,7 +325,14 @@ button.muted:focus-visible {
 }
 
 .om-member-stack-avatar + .om-member-stack-avatar {
-  margin-left: -4px;
+  margin-left: 3px;
+}
+
+.om-member-stack-overflow {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 4px;
+  white-space: nowrap;
 }
 
 .om-nav-badge {

@@ -178,7 +178,7 @@ export default function LibraryBlock({
               )}
               {(memberPreviews ?? []).length > 0 ? (
                 <span className="om-member-stack" aria-label="Shared catalog members">
-                  {(memberPreviews ?? []).slice(0, 3).map((m) =>
+                  {(memberPreviews ?? []).slice(0, 6).map((m) =>
                     m.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img key={m.userId} alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar" />
@@ -186,6 +186,11 @@ export default function LibraryBlock({
                       <span key={m.userId} className="om-member-stack-avatar" title={m.username} />
                     )
                   )}
+                  {(memberPreviews ?? []).length > 6 ? (
+                    <span className="om-member-stack-overflow" title={`${(memberPreviews ?? []).length - 6} more members`}>
+                      +{(memberPreviews ?? []).length - 6}
+                    </span>
+                  ) : null}
                 </span>
               ) : null}
               <span className="text-muted" style={{ marginLeft: "var(--space-md)", whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
