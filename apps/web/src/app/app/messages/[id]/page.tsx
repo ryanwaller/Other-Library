@@ -79,6 +79,10 @@ export default function MessageThreadPage() {
   const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
   const [deletedLocally, setDeletedLocally] = useState(false);
   const [reopenRequested, setReopenRequested] = useState(false);
+  const reopenStorageKey = useMemo(
+    () => (Number.isFinite(requestId) ? `om:reopened-thread:${requestId}` : null),
+    [requestId]
+  );
 
   useEffect(() => {
     if (!supabase) return;
@@ -86,6 +90,18 @@ export default function MessageThreadPage() {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSession(newSession));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!reopenStorageKey) {
+      setReopenRequested(false);
+      return;
+    }
+    try {
+      setReopenRequested(window.localStorage.getItem(reopenStorageKey) === "1");
+    } catch {
+      setReopenRequested(false);
+    }
+  }, [reopenStorageKey]);
 
   const isOwner = useMemo(() => Boolean(userId && req?.owner_id && userId === req.owner_id), [userId, req?.owner_id]);
   const canComposeInDeletedThread = useMemo(
@@ -303,6 +319,14 @@ export default function MessageThreadPage() {
     if (!supabase || !req) return;
     setDeleteState({ busy: true, error: null });
     setDeletedLocally(true);
+    setReopenRequested(false);
+    if (reopenStorageKey) {
+      try {
+        window.localStorage.removeItem(reopenStorageKey);
+      } catch {
+        // ignore
+      }
+    }
     const res = await supabase.rpc("delete_borrow_conversation", { input_borrow_request_id: req.id });
     if (res.error) {
       setDeletedLocally(false);
@@ -316,6 +340,14 @@ export default function MessageThreadPage() {
 
   async function reopenConversationForMe() {
     if (!supabase || !req || !userId) return;
+    setReopenRequested(true);
+    if (reopenStorageKey) {
+      try {
+        window.localStorage.setItem(reopenStorageKey, "1");
+      } catch {
+        // ignore
+      }
+    }
     setDeleteState({ busy: true, error: null });
     const res = await supabase
       .from("borrow_request_deleted_for")
@@ -323,11 +355,18 @@ export default function MessageThreadPage() {
       .eq("borrow_request_id", req.id)
       .eq("user_id", userId);
     if (res.error) {
+      setReopenRequested(false);
+      if (reopenStorageKey) {
+        try {
+          window.localStorage.removeItem(reopenStorageKey);
+        } catch {
+          // ignore
+        }
+      }
       setDeleteState({ busy: false, error: res.error.message });
       return;
     }
     setDeletedAtForMe(null);
-    setReopenRequested(true);
     setDeleteState({ busy: false, error: null });
     notifyBorrowRequestsChanged();
   }
