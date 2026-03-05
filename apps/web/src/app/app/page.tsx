@@ -319,6 +319,8 @@ function AppShell({
   });
   const addSearchPageSize = 8;
   const [addSearchLimit, setAddSearchLimit] = useState(addSearchPageSize);
+  const [addPreviewLibraryId, setAddPreviewLibraryId] = useState<number | null>(null);
+  const [addSearchLibraryIds, setAddSearchLibraryIds] = useState<Record<number, number>>({});
 
   useEffect(() => {
     setAddSearchLimit(addSearchPageSize);
@@ -401,6 +403,27 @@ function AppShell({
     error: null,
     message: null
   });
+
+  useEffect(() => {
+    const fallbackId = addLibraryId ?? libraries[0]?.id ?? null;
+    setAddPreviewLibraryId((prev) => (prev && libraries.some((l) => l.id === prev) ? prev : fallbackId));
+  }, [addLibraryId, libraries]);
+
+  useEffect(() => {
+    const fallbackId = addLibraryId ?? libraries[0]?.id ?? null;
+    if (!fallbackId) {
+      setAddSearchLibraryIds({});
+      return;
+    }
+    setAddSearchLibraryIds((prev) => {
+      const next: Record<number, number> = {};
+      for (let i = 0; i < addSearchResults.length; i += 1) {
+        const current = prev[i];
+        next[i] = current && libraries.some((l) => l.id === current) ? current : fallbackId;
+      }
+      return next;
+    });
+  }, [addSearchResults, addLibraryId, libraries]);
   const [membersByCatalogId, setMembersByCatalogId] = useState<
     Record<
       number,
@@ -1593,9 +1616,10 @@ function AppShell({
     description?: string | null;
     subjects?: string[];
     cover_url?: string | null;
-  }): Promise<number> {
+  }, targetLibraryId?: number | null): Promise<number> {
     if (!supabase) throw new Error("Supabase is not configured");
-    if (!addLibraryId) throw new Error("Choose a catalog first");
+    const selectedLibraryId = Number(targetLibraryId ?? addLibraryId ?? 0);
+    if (!selectedLibraryId) throw new Error("Choose a catalog first");
     const isbn13 = (data.isbn13 ?? "").trim();
     let editionId: number | undefined;
     if (isbn13) {
@@ -1618,7 +1642,7 @@ function AppShell({
         editionId = inserted.data.id;
       }
     }
-    const insertPayload: Record<string, unknown> = { owner_id: userId, library_id: addLibraryId, edition_id: editionId ?? null };
+    const insertPayload: Record<string, unknown> = { owner_id: userId, library_id: selectedLibraryId, edition_id: editionId ?? null };
     if (!editionId) {
       insertPayload.title_override = data.title ?? null;
       insertPayload.authors_override = (data.authors ?? []).length > 0 ? data.authors : null;
@@ -1635,7 +1659,7 @@ function AppShell({
     if (!addUrlPreview) return;
     setAddState({ busy: true, error: null, message: "Adding…" });
     try {
-      const id = await addEditionData(addUrlPreview);
+      const id = await addEditionData(addUrlPreview, addPreviewLibraryId);
       setAddInput("");
       cancelAddPreview();
       router.push(`/app/books/${id}`);
@@ -1644,10 +1668,10 @@ function AppShell({
     }
   }
 
-  async function addFromSearchResultItem(result: typeof addSearchResults[number]) {
+  async function addFromSearchResultItem(result: typeof addSearchResults[number], targetLibraryId?: number | null) {
     setAddState({ busy: true, error: null, message: "Adding…" });
     try {
-      const id = await addEditionData(result);
+      const id = await addEditionData(result, targetLibraryId);
       setAddInput("");
       cancelAddPreview();
       router.push(`/app/books/${id}`);
@@ -2524,9 +2548,29 @@ function AppShell({
                 </div>
               </div>
               <div className="om-lookup-actions">
-                <button onClick={confirmAddFromPreview} disabled={addState.busy}>
-                  {addState.busy ? "…" : "Add to catalog"}
-                </button>
+                {renderLibraries.length > 1 ? (
+                  <div className="row no-wrap" style={{ gap: "var(--space-sm)", alignItems: "baseline" }}>
+                    <span className="text-muted">Add to</span>
+                    <select
+                      value={String(addPreviewLibraryId ?? addLibraryId ?? renderLibraries[0]?.id ?? "")}
+                      onChange={(e) => setAddPreviewLibraryId(Number(e.target.value))}
+                      disabled={addState.busy}
+                    >
+                      {renderLibraries.map((l) => (
+                        <option key={l.id} value={String(l.id)}>
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button onClick={confirmAddFromPreview} disabled={addState.busy}>
+                      {addState.busy ? "…" : "OK"}
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={confirmAddFromPreview} disabled={addState.busy}>
+                    {addState.busy ? "…" : "Add to catalog"}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -2556,9 +2600,31 @@ function AppShell({
                     </div>
                   </div>
                   <div className="om-lookup-actions">
-                    <button onClick={() => addFromSearchResultItem(result)} disabled={addState.busy}>
-                      {addState.busy ? "…" : "Add"}
-                    </button>
+                    {renderLibraries.length > 1 ? (
+                      <div className="row no-wrap" style={{ gap: "var(--space-sm)", alignItems: "baseline" }}>
+                        <span className="text-muted">Add to</span>
+                        <select
+                          value={String(addSearchLibraryIds[i] ?? addLibraryId ?? renderLibraries[0]?.id ?? "")}
+                          onChange={(e) =>
+                            setAddSearchLibraryIds((prev) => ({ ...prev, [i]: Number(e.target.value) }))
+                          }
+                          disabled={addState.busy}
+                        >
+                          {renderLibraries.map((l) => (
+                            <option key={l.id} value={String(l.id)}>
+                              {l.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button onClick={() => addFromSearchResultItem(result, addSearchLibraryIds[i])} disabled={addState.busy}>
+                          {addState.busy ? "…" : "OK"}
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => addFromSearchResultItem(result, addLibraryId)} disabled={addState.busy}>
+                        {addState.busy ? "…" : "Add"}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
