@@ -627,15 +627,21 @@ function AppShell({
   async function applyBooksFromServer(serverRows: any[], source: string) {
     const client = supabase;
     if (!client) return;
+    const normalizedRows = (serverRows ?? []).map((r: any) => ({
+      ...r,
+      media: Array.isArray(r?.media) ? r.media : [],
+      book_tags: Array.isArray(r?.book_tags) ? r.book_tags : [],
+      edition: r?.edition ?? null
+    }));
     setDebugBooksSource(source);
-    setItems(serverRows as any);
+    setItems(normalizedRows as any);
     const serverPaths = Array.from(
       new Set([
-        ...serverRows
+        ...normalizedRows
           .flatMap((r) => (Array.isArray(r.media) ? r.media : []))
           .map((m: any) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
           .filter(Boolean),
-        ...serverRows
+        ...normalizedRows
           .filter((r: any) => r.cover_crop && typeof r.cover_original_url === "string" && r.cover_original_url)
           .map((r: any) => r.cover_original_url as string)
       ])
