@@ -345,7 +345,14 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Designers
                   </div>
-                  <div>{effectiveDesigners.join(", ")}</div>
+                  <div className="om-hanging-value">
+                    {effectiveDesigners.map((name, idx) => (
+                      <span key={`designer-${name}`}>
+                        <Link href={`/u/${profile.username}?designer=${encodeURIComponent(name)}`}>{name}</Link>
+                        {idx < effectiveDesigners.length - 1 ? <span>, </span> : null}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               ) : null}
 
@@ -428,7 +435,9 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Decade
                   </div>
-                  <div>{(book.decade ?? "").trim()}</div>
+                  <div>
+                    <Link href={`/u/${profile.username}?decade=${encodeURIComponent((book.decade ?? "").trim())}`}>{(book.decade ?? "").trim()}</Link>
+                  </div>
                 </div>
               ) : null}
 

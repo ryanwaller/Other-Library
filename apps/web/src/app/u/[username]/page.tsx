@@ -14,7 +14,7 @@ export default async function PublicProfilePage({
   searchParams
 }: { 
   params: Promise<{ username: string }>,
-  searchParams: Promise<{ author?: string; tag?: string; subject?: string; category?: string; publisher?: string; decade?: string }>
+  searchParams: Promise<{ author?: string; tag?: string; subject?: string; category?: string; publisher?: string; decade?: string; designer?: string }>
 }) {
   const { username } = await params;
   const rawParams = await searchParams;
@@ -24,6 +24,7 @@ export default async function PublicProfilePage({
   const filterCategory = rawParams.category ? decodeURIComponent(rawParams.category) : undefined;
   const filterPublisher = rawParams.publisher ? decodeURIComponent(rawParams.publisher) : undefined;
   const filterDecade = rawParams.decade ? decodeURIComponent(rawParams.decade) : undefined;
+  const filterDesigner = rawParams.designer ? decodeURIComponent(rawParams.designer) : undefined;
 
   const usernameNorm = (username ?? "").trim().toLowerCase();
   const supabase = getServerSupabase();
@@ -92,7 +93,7 @@ export default async function PublicProfilePage({
 
   const booksRes = await supabase
     .from("user_books")
-    .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind))")
+    .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))")
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
     .limit(1000);
@@ -164,7 +165,7 @@ export default async function PublicProfilePage({
             profileId={profile.id}
             signedMap={signedMap}
             showLibraryBlocks={showLibraryBlocks}
-            initialFilters={{ author: filterAuthor, subject: filterSubject, tag: filterTag, category: filterCategory, publisher: filterPublisher, decade: filterDecade }}
+            initialFilters={{ author: filterAuthor, subject: filterSubject, tag: filterTag, category: filterCategory, publisher: filterPublisher, decade: filterDecade, designer: filterDesigner }}
           />
         </AddToLibraryProvider>
       </div>

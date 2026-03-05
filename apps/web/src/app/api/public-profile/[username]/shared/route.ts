@@ -120,7 +120,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ username: strin
 
     const booksRes = await admin
       .from("user_books")
-      .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind))")
+      .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))")
       .in("library_id", sharedCatalogIds)
       .order("created_at", { ascending: false })
       .limit(1200);
@@ -129,6 +129,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ username: strin
       ...b,
       media: Array.isArray(b?.media) ? b.media : [],
       book_tags: Array.isArray(b?.book_tags) ? b.book_tags : [],
+      book_entities: Array.isArray(b?.book_entities) ? b.book_entities : [],
       edition: b?.edition ?? null
     }));
 

@@ -25,7 +25,7 @@ type Props = {
   profileId: string;
   signedMap: Record<string, string>;
   showLibraryBlocks: boolean;
-  initialFilters: { author?: string; tag?: string; category?: string; publisher?: string; decade?: string; subject?: string };
+  initialFilters: { author?: string; tag?: string; category?: string; publisher?: string; decade?: string; subject?: string; designer?: string };
 };
 
 type MemberPreview = { userId: string; username: string; avatarUrl: string | null };
@@ -83,6 +83,39 @@ export default function PublicBookList({
 
   // Use state for filters so we can clear them instantly
   const [activeFilters, setActiveFilters] = useState(initialFilters);
+  useEffect(() => {
+    setActiveFilters(initialFilters);
+  }, [initialFilters]);
+
+  function namesForRole(b: PublicBook, role: "tag" | "category" | "subject" | "designer"): string[] {
+    if (role === "tag" || role === "category") {
+      const fromTags = (b.book_tags ?? [])
+        .map((bt) => bt?.tag)
+        .filter((t): t is NonNullable<typeof t> => Boolean(t))
+        .filter((t) => t.kind === role)
+        .map((t) => String(t.name ?? "").trim())
+        .filter(Boolean);
+      const fromEntities = (b.book_entities ?? [])
+        .filter((row) => String(row?.role ?? "").trim() === role)
+        .map((row) => String(row?.entity?.name ?? "").trim())
+        .filter(Boolean);
+      return Array.from(new Set([...fromTags, ...fromEntities]));
+    }
+    if (role === "subject") {
+      const fromOverrides = (b.subjects_override ?? b.edition?.subjects ?? []).map((s) => String(s ?? "").trim()).filter(Boolean);
+      const fromEntities = (b.book_entities ?? [])
+        .filter((row) => String(row?.role ?? "").trim() === "subject")
+        .map((row) => String(row?.entity?.name ?? "").trim())
+        .filter(Boolean);
+      return Array.from(new Set([...fromOverrides, ...fromEntities]));
+    }
+    const fromOverrides = (b.designers_override ?? []).map((s) => String(s ?? "").trim()).filter(Boolean);
+    const fromEntities = (b.book_entities ?? [])
+      .filter((row) => String(row?.role ?? "").trim() === "designer")
+      .map((row) => String(row?.entity?.name ?? "").trim())
+      .filter(Boolean);
+    return Array.from(new Set([...fromOverrides, ...fromEntities]));
+  }
 
   useEffect(() => {
     if (!supabase) {
@@ -167,7 +200,7 @@ export default function PublicBookList({
 
   const combinedSignedMap = useMemo(() => ({ ...sharedSignedMap, ...signedMap }), [sharedSignedMap, signedMap]);
 
-  function setFilterAndUrl(key: "author" | "tag" | "category" | "publisher" | "decade" | "subject", value?: string) {
+  function setFilterAndUrl(key: "author" | "tag" | "category" | "publisher" | "decade" | "subject" | "designer", value?: string) {
     const next = { ...activeFilters };
     if (value && value.trim()) {
       (next as any)[key] = value;
@@ -193,23 +226,23 @@ export default function PublicBookList({
         if (String(pub ?? "").toLowerCase() !== activeFilters.publisher.toLowerCase()) return false;
       }
       if (activeFilters.category) {
-        const categories = (b.book_tags ?? [])
-          .map((bt) => bt?.tag)
-          .filter((t): t is NonNullable<typeof t> => Boolean(t))
-          .filter((t) => t.kind === "category")
-          .map((t) => String(t.name ?? "").toLowerCase());
+        const categories = namesForRole(b, "category").map((n) => n.toLowerCase());
         if (!categories.includes(activeFilters.category.toLowerCase())) return false;
+      }
+      if (activeFilters.subject) {
+        const subjects = namesForRole(b, "subject").map((n) => n.toLowerCase());
+        if (!subjects.includes(activeFilters.subject.toLowerCase())) return false;
+      }
+      if (activeFilters.designer) {
+        const designers = namesForRole(b, "designer").map((n) => n.toLowerCase());
+        if (!designers.includes(activeFilters.designer.toLowerCase())) return false;
       }
       if (activeFilters.decade) {
         const decade = String(b.decade ?? "").toLowerCase();
         if (decade !== activeFilters.decade.toLowerCase()) return false;
       }
       if (activeFilters.tag) {
-        const tags = (b.book_tags ?? [])
-          .map((bt) => bt?.tag)
-          .filter((t): t is NonNullable<typeof t> => Boolean(t))
-          .filter((t) => t.kind === "tag")
-          .map((t) => String(t.name ?? "").toLowerCase());
+        const tags = namesForRole(b, "tag").map((n) => n.toLowerCase());
         if (!tags.includes(activeFilters.tag.toLowerCase())) return false;
       }
       
@@ -217,15 +250,13 @@ export default function PublicBookList({
         const q = searchQuery.toLowerCase().trim();
         const title = effectiveTitleFor(b).toLowerCase();
         const authors = effectiveAuthorsFor(b).join(" ").toLowerCase();
-        const subjects = (b.subjects_override ?? b.edition?.subjects ?? []).join(" ").toLowerCase();
+        const subjects = namesForRole(b, "subject").join(" ").toLowerCase();
         const pub = (b.publisher_override || b.edition?.publisher || "").toLowerCase();
-        const tags = (b.book_tags ?? [])
-          .map((bt) => bt?.tag)
-          .filter((t): t is NonNullable<typeof t> => Boolean(t))
-          .map((t) => String(t.name ?? "").toLowerCase())
-          .join(" ");
+        const tags = namesForRole(b, "tag").join(" ").toLowerCase();
+        const categories = namesForRole(b, "category").join(" ").toLowerCase();
+        const designers = namesForRole(b, "designer").join(" ").toLowerCase();
         const decades = String(b.decade ?? "").toLowerCase();
-        if (!title.includes(q) && !authors.includes(q) && !subjects.includes(q) && !pub.includes(q) && !tags.includes(q) && !decades.includes(q)) return false;
+        if (!title.includes(q) && !authors.includes(q) && !subjects.includes(q) && !pub.includes(q) && !tags.includes(q) && !categories.includes(q) && !designers.includes(q) && !decades.includes(q)) return false;
       }
       return true;
     });
@@ -251,24 +282,8 @@ export default function PublicBookList({
         return score(b) - score(a);
       })[0]!;
 
-      const tagNames = Array.from(
-        new Set(
-          sorted
-            .flatMap((copy) => (copy.book_tags ?? []).map((bt) => bt?.tag).filter((t): t is NonNullable<typeof t> => Boolean(t)))
-            .filter((t) => t.kind === "tag")
-            .map((t) => String(t.name ?? "").trim())
-            .filter(Boolean)
-        )
-      );
-      const categoryNames = Array.from(
-        new Set(
-          sorted
-            .flatMap((copy) => (copy.book_tags ?? []).map((bt) => bt?.tag).filter((t): t is NonNullable<typeof t> => Boolean(t)))
-            .filter((t) => t.kind === "category")
-            .map((t) => String(t.name ?? "").trim())
-            .filter(Boolean)
-        )
-      );
+      const tagNames = Array.from(new Set(sorted.flatMap((copy) => namesForRole(copy, "tag"))));
+      const categoryNames = Array.from(new Set(sorted.flatMap((copy) => namesForRole(copy, "category"))));
 
       return { 
         key, 
@@ -279,9 +294,9 @@ export default function PublicBookList({
         tagNames,
         categoryNames,
         filterAuthors: effectiveAuthorsFor(primary),
-        filterSubjects: (primary.subjects_override ?? primary.edition?.subjects ?? []) as string[],
+        filterSubjects: namesForRole(primary, "subject"),
         filterPublishers: [primary.publisher_override || primary.edition?.publisher || ""],
-        filterDesigners: (primary.designers_override ?? []) as string[],
+        filterDesigners: namesForRole(primary, "designer"),
         filterGroups: [primary.group_label || ""],
         filterDecades: [primary.decade || ""],
         title: effectiveTitleFor(primary),
@@ -321,9 +336,7 @@ export default function PublicBookList({
       Array.from(
         new Set(
           mergedAllBooks
-            .flatMap((b) => (b.book_tags ?? []).map((bt) => bt?.tag).filter((t): t is NonNullable<typeof t> => Boolean(t)))
-            .filter((t) => t.kind === "category")
-            .map((t) => String(t.name ?? "").trim())
+            .flatMap((b) => namesForRole(b, "category"))
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b)),
@@ -334,9 +347,7 @@ export default function PublicBookList({
       Array.from(
         new Set(
           mergedAllBooks
-            .flatMap((b) => (b.book_tags ?? []).map((bt) => bt?.tag).filter((t): t is NonNullable<typeof t> => Boolean(t)))
-            .filter((t) => t.kind === "tag")
-            .map((t) => String(t.name ?? "").trim())
+            .flatMap((b) => namesForRole(b, "tag"))
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b)),
@@ -499,6 +510,8 @@ export default function PublicBookList({
                 if (activeFilters.category) pairs.push({ label: "Category", value: activeFilters.category, key: "category", onClear: () => setFilterAndUrl("category") });
                 if (activeFilters.tag) pairs.push({ label: "Tag", value: activeFilters.tag, key: "tag", onClear: () => setFilterAndUrl("tag") });
                 if (activeFilters.author) pairs.push({ label: "Author", value: activeFilters.author, key: "author", onClear: () => setFilterAndUrl("author") });
+                if (activeFilters.subject) pairs.push({ label: "Subject", value: activeFilters.subject, key: "subject", onClear: () => setFilterAndUrl("subject") });
+                if (activeFilters.designer) pairs.push({ label: "Designer", value: activeFilters.designer, key: "designer", onClear: () => setFilterAndUrl("designer") });
                 if (activeFilters.publisher) pairs.push({ label: "Publisher", value: activeFilters.publisher, key: "publisher", onClear: () => setFilterAndUrl("publisher") });
                 if (activeFilters.decade) pairs.push({ label: "Decade", value: activeFilters.decade, key: "decade", onClear: () => setFilterAndUrl("decade") });
                 return pairs;

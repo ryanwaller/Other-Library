@@ -35,6 +35,7 @@ export type PublicBook = {
   } | null;
   media: Array<{ id?: number; kind: "cover" | "image"; storage_path: string; caption?: string | null; created_at?: string }>;
   book_tags?: Array<{ tag: { id: number; name: string; kind: "tag" | "category" } | null }>;
+  book_entities?: Array<{ role: string; position: number | null; entity: { id: string; name: string; slug: string } | null }> | null;
 };
 
 export type CatalogItem = PublicBook & {
