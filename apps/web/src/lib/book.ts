@@ -10,11 +10,15 @@ export function effectiveTitleFor(b: PublicBook): string {
 }
 
 export function effectiveAuthorsFor(b: PublicBook): string[] {
-  const override = (b.authors_override ?? []).filter(Boolean);
-  if (override.length > 0) return override;
+  const editors = (b.editors_override ?? []).filter(Boolean);
+  if (b.authors_override !== null && b.authors_override !== undefined) {
+    const override = (b.authors_override ?? []).filter(Boolean);
+    if (override.length > 0) return override;
+    return editors;
+  }
   const editionAuthors = (b.edition?.authors ?? []).filter(Boolean);
   if (editionAuthors.length > 0) return editionAuthors;
-  return (b.editors_override ?? []).filter(Boolean);
+  return editors;
 }
 
 export function effectiveSubjectsFor(b: PublicBook): string[] {

@@ -865,7 +865,9 @@ export default function BookDetailPage() {
       } else {
         // Fallback to legacy fields/tables when entities aren't present yet.
         const authorsFallback =
-          row.authors_override && row.authors_override.length > 0 ? row.authors_override : ((row.edition?.authors ?? []) as string[]);
+          row.authors_override !== null && row.authors_override !== undefined
+            ? (row.authors_override as string[])
+            : ((row.edition?.authors ?? []) as string[]);
         const subjectsFallback = row.subjects_override !== null && row.subjects_override !== undefined ? row.subjects_override : (row.edition?.subjects ?? []);
         nextFacets.author = (authorsFallback ?? []).filter(Boolean);
         nextFacets.editor = (row.editors_override ?? []).filter(Boolean);
@@ -1124,6 +1126,9 @@ export default function BookDetailPage() {
   }, [formDescription, book]);
 
   const effectiveAuthors = useMemo(() => {
+    if (book?.authors_override !== null && book?.authors_override !== undefined) {
+      return uniqStrings(facetDraft.author ?? []);
+    }
     if ((facetDraft.author ?? []).length > 0) return uniqStrings(facetDraft.author);
     const override = parseAuthorsInput(formAuthors);
     if (override.length > 0) return override;
@@ -1654,7 +1659,7 @@ export default function BookDetailPage() {
       trim_height,
       trim_unit,
       title_override,
-      authors_override: authors_override.length > 0 ? authors_override : null,
+      authors_override,
       editors_override: editors_override.length > 0 ? editors_override : null,
       designers_override: designers_override.length > 0 ? designers_override : null,
       publisher_override: publisher_override || null,
