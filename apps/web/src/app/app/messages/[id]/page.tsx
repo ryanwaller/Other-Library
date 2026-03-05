@@ -120,6 +120,10 @@ export default function MessageThreadPage() {
     () => hasDeleteNoticeFromOther && !hasReplyAfterDeleteNotice && !(req?.status === "approved" && reopenRequested),
     [hasDeleteNoticeFromOther, hasReplyAfterDeleteNotice, req?.status, reopenRequested]
   );
+  const threadReopened = useMemo(
+    () => reopenRequested || hasReplyAfterDeleteNotice,
+    [reopenRequested, hasReplyAfterDeleteNotice]
+  );
   const otherUserId = useMemo(() => {
     if (!req || !userId) return null;
     return userId === req.owner_id ? req.requester_id : req.owner_id;
@@ -416,6 +420,7 @@ export default function MessageThreadPage() {
               const raw = String(m.message ?? "").trim();
               const isDeleteNotice = /deleted this conversation\.\s*also delete\?/i.test(raw);
               if (isDeleteNotice) {
+                if (threadReopened) return null;
                 const deleteNoticeText = m.sender_id === userId ? "You deleted this conversation." : raw;
                 return (
                   <div key={m.id} className="om-thread-msg">
