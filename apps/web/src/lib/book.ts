@@ -46,9 +46,29 @@ export function groupKeyFor(b: PublicBook): string {
 }
 
 export function tagsFor(it: PublicBook & { book_tags?: any[] }): Array<{ name: string; kind: "tag" | "category" }> {
-  return (it.book_tags ?? [])
+  const fromTags = (it.book_tags ?? [])
     .map((bt) => bt.tag)
     .filter(Boolean)
     .map((t) => ({ name: (t as any).name as string, kind: (t as any).kind as "tag" | "category" }))
     .filter((t) => t.name && (t.kind === "tag" || t.kind === "category"));
+  const fromEntities = (it.book_entities ?? [])
+    .filter((be: any) => {
+      const role = String(be?.role ?? "").toLowerCase();
+      return role === "tag" || role === "category";
+    })
+    .map((be: any) => {
+      const role = String(be?.role ?? "").toLowerCase() as "tag" | "category";
+      const name = String(be?.entity?.name ?? "").trim();
+      return { name, kind: role };
+    })
+    .filter((t: { name: string; kind: "tag" | "category" }) => t.name.length > 0);
+  const seen = new Set<string>();
+  const out: Array<{ name: string; kind: "tag" | "category" }> = [];
+  for (const t of [...fromTags, ...fromEntities]) {
+    const key = `${t.kind}:${t.name.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+  }
+  return out;
 }

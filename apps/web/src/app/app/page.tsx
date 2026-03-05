@@ -2350,6 +2350,21 @@ function AppShell({
     }
     return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
   }, [items]);
+  const availableDecades = useMemo(() => {
+    const set = new Set<string>();
+    for (const g of displayGroups) {
+      for (const d of g.filterDecades ?? []) {
+        const v = String(d ?? "").trim();
+        if (v) set.add(v);
+      }
+    }
+    return Array.from(set.values()).sort((a, b) => {
+      const ai = DECADE_OPTIONS.indexOf(a);
+      const bi = DECADE_OPTIONS.indexOf(b);
+      if (ai !== -1 || bi !== -1) return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      return a.localeCompare(b);
+    });
+  }, [displayGroups]);
 
   useEffect(() => {
     if ((filterCategory ?? "").trim()) return;
@@ -2724,7 +2739,7 @@ function AppShell({
           </select>
           <select className="om-filter-control" value={filterDecade ?? ""} onChange={(e) => setUrlFilters({ decade: e.target.value || null })}>
             <option value="">decade</option>
-            {DECADE_OPTIONS.map((decade) => (
+            {availableDecades.map((decade) => (
               <option key={decade} value={decade}>
                 {decade}
               </option>
