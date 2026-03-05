@@ -67,8 +67,6 @@ type CatalogMemberView = {
   avatar_url: string | null;
 };
 
-let hasRenderedHomepageData = false;
-
 function parseCsvToObjects(text: string): Array<Record<string, string>> {
   const src = (text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const rows: string[][] = [];
@@ -468,7 +466,14 @@ function AppShell({
   const autoReducedGridColsRef = useRef<4 | 8 | null>(null);
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, true | undefined>>({});
   const [initialLoadDone, setInitialLoadDone] = useState(false);
-  const [showInitialSkeleton, setShowInitialSkeleton] = useState(!hasRenderedHomepageData);
+  const [showInitialSkeleton, setShowInitialSkeleton] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      return window.sessionStorage.getItem("om_homepage_loaded_once") !== "1";
+    } catch {
+      return true;
+    }
+  });
 
   const [stagedCsvData, setStagedCsvData] = useState<string | null>(null);
   const [stagedCsvFilename, setStagedCsvFilename] = useState<string | null>(null);
@@ -1072,7 +1077,6 @@ function AppShell({
     (async () => {
       if (!supabase) return;
       if (alive) setInitialLoadDone(true);
-      if (!hasRenderedHomepageData && alive) setShowInitialSkeleton(true);
       try {
         const [profileRes] = await Promise.all([
           supabase.from("profiles").select("username,visibility,avatar_path").eq("id", userId).maybeSingle(),
@@ -1087,7 +1091,11 @@ function AppShell({
         setAvatarUrl(resolvedAvatar);
       } finally {
         if (!alive) return;
-        hasRenderedHomepageData = true;
+        try {
+          window.sessionStorage.setItem("om_homepage_loaded_once", "1");
+        } catch {
+          // ignore
+        }
         setShowInitialSkeleton(false);
       }
     })();
