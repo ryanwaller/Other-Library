@@ -1084,14 +1084,18 @@ function SettingsPageContent() {
                 <div className="om-list">
                   {acceptedSharedCatalogs.map((row, idx) => (
                     <div key={row.id} className="om-list-row" style={idx === acceptedSharedCatalogs.length - 1 ? { borderBottom: "none" } : undefined}>
-                      <div style={{ minWidth: 0 }}>{row.catalog?.name ?? `Catalog ${row.catalog_id}`}</div>
-                      <button
-                        className="text-muted"
-                        style={{ textDecoration: "underline", marginLeft: "auto" }}
-                        onClick={() => void leaveSharedCatalog(row.catalog_id)}
-                      >
-                        Leave
-                      </button>
+                      <div className="row" style={{ alignItems: "baseline", justifyContent: "space-between", gap: "var(--space-md)", flexWrap: "nowrap" }}>
+                        <div style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {row.catalog?.name ?? `Catalog ${row.catalog_id}`}
+                        </div>
+                        <button
+                          className="text-muted"
+                          style={{ textDecoration: "underline", marginLeft: "auto", flexShrink: 0 }}
+                          onClick={() => void leaveSharedCatalog(row.catalog_id)}
+                        >
+                          Leave
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
