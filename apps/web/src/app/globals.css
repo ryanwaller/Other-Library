@@ -1104,12 +1104,12 @@ a.text-muted:hover {
   height: calc(var(--text-line) * 1em) !important;
 }
 
-.om-book-detail-grid input.om-inline-control:focus,
-.om-book-detail-grid input.om-inline-control:focus-visible,
-.om-book-detail-grid select.om-inline-control:focus,
-.om-book-detail-grid select.om-inline-control:focus-visible,
-.om-book-detail-grid textarea.om-inline-control:focus,
-.om-book-detail-grid textarea.om-inline-control:focus-visible {
+.om-book-detail-grid input.om-inline-control:not(:disabled):focus,
+.om-book-detail-grid input.om-inline-control:not(:disabled):focus-visible,
+.om-book-detail-grid select.om-inline-control:not(:disabled):focus,
+.om-book-detail-grid select.om-inline-control:not(:disabled):focus-visible,
+.om-book-detail-grid textarea.om-inline-control:not(:disabled):focus,
+.om-book-detail-grid textarea.om-inline-control:not(:disabled):focus-visible {
   border: 0 !important;
   border-bottom: 0 !important;
   outline: 0 !important;
