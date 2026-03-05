@@ -182,7 +182,7 @@ function SettingsPageContent() {
   });
   const [usernameEdited, setUsernameEdited] = useState(false);
   const [displayNameEdited, setDisplayNameEdited] = useState(false);
-  const [tab, setTab] = useState<"profile" | "follows" | "borrows" | "catalog" | "shared" | "account">("profile");
+  const [tab, setTab] = useState<"profile" | "follows" | "loans" | "catalog" | "shared" | "account">("profile");
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [sharedCatalogsBusy, setSharedCatalogsBusy] = useState(false);
   const [sharedCatalogsError, setSharedCatalogsError] = useState<string | null>(null);
@@ -222,8 +222,10 @@ function SettingsPageContent() {
 
   useEffect(() => {
     const raw = String(searchParams.get("tab") ?? "").trim().toLowerCase();
-    if (raw === "profile" || raw === "follows" || raw === "borrows" || raw === "catalog" || raw === "shared" || raw === "account") {
+    if (raw === "profile" || raw === "follows" || raw === "loans" || raw === "catalog" || raw === "shared" || raw === "account") {
       setTab(raw as any);
+    } else if (raw === "borrows") {
+      setTab("loans");
     }
   }, [searchParams]);
 
@@ -719,7 +721,7 @@ function SettingsPageContent() {
             <div className="admin-tabbar" style={{ flexWrap: "nowrap", overflowX: "auto", whiteSpace: "nowrap" }}>
               <button type="button" onClick={() => setTab("profile")} aria-current={tab === "profile" ? "page" : undefined}>Profile</button>
               <button type="button" onClick={() => setTab("follows")} aria-current={tab === "follows" ? "page" : undefined}>Follows</button>
-              <button type="button" onClick={() => setTab("borrows")} aria-current={tab === "borrows" ? "page" : undefined}>Borrows</button>
+              <button type="button" onClick={() => setTab("loans")} aria-current={tab === "loans" ? "page" : undefined}>Loans</button>
               <button type="button" onClick={() => setTab("catalog")} aria-current={tab === "catalog" ? "page" : undefined}>Catalog Import</button>
               <button type="button" onClick={() => setTab("shared")} aria-current={tab === "shared" ? "page" : undefined}>Shared catalogs</button>
               <button type="button" onClick={() => setTab("account")} aria-current={tab === "account" ? "page" : undefined}>Account</button>
@@ -952,7 +954,7 @@ function SettingsPageContent() {
             </div>
           ) : null}
 
-          {tab === "borrows" ? (
+          {tab === "loans" ? (
             <div className="card">
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
                 <div style={{ width: 120 }} className="text-muted">Borrowable</div>
@@ -1151,6 +1153,19 @@ function SettingsPageContent() {
                                     >
                                       {m.accepted_at ? "Delete" : "Rescind"}
                                     </button>
+                                    {!m.accepted_at ? (
+                                      <button
+                                        type="button"
+                                        className="text-muted"
+                                        style={{ textDecoration: "underline" }}
+                                        onClick={() => {
+                                          if (!window.confirm("Delete this pending invite?")) return;
+                                          void removeOwnedSharedMember(row.catalog.id, m.user_id);
+                                        }}
+                                      >
+                                        Delete
+                                      </button>
+                                    ) : null}
                                   </div>
                                 </div>
                               );

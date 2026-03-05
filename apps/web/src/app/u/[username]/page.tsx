@@ -80,7 +80,7 @@ export default async function PublicProfilePage({
 
   const booksRes = await supabase
     .from("user_books")
-    .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path)")
+    .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind))")
     .eq("owner_id", profile.id)
     .order("created_at", { ascending: false })
     .limit(1000);

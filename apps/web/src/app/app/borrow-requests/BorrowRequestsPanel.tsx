@@ -6,6 +6,10 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
 
+function notifyBorrowRequestsChanged() {
+  window.dispatchEvent(new Event("om:borrow-requests-changed"));
+}
+
 type BorrowRequest = {
   id: number;
   user_book_id: number;
@@ -53,6 +57,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
   const [profilesById, setProfilesById] = useState<Record<string, ProfileLite>>({});
   const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<string, string>>({});
   const [booksById, setBooksById] = useState<Record<number, BookLite>>({});
+  const [deleteBusyId, setDeleteBusyId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -172,6 +177,22 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
+  async function deleteConversation(requestId: number) {
+    if (!supabase || !userId) return;
+    if (!window.confirm("Delete this conversation?")) return;
+    setDeleteBusyId(requestId);
+    try {
+      const res = await supabase.rpc("delete_borrow_conversation", { input_borrow_request_id: requestId });
+      if (res.error) throw new Error(res.error.message);
+      notifyBorrowRequestsChanged();
+      await refresh();
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to delete conversation");
+    } finally {
+      setDeleteBusyId(null);
+    }
+  }
+
   if (!supabase) {
     if (embedded) {
       return (
@@ -204,8 +225,9 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
             style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: embedded ? "var(--space-xl)" : undefined }}
           >
             <div>Requests from other readers</div>
-            <div className="text-muted">{busy ? "Loading…" : error ? error : ""}</div>
+            <div className="text-muted">{incomingRows.length}</div>
           </div>
+          <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{busy ? "Loading…" : error ? error : ""}</div>
 
           <div style={{ marginTop: "var(--space-md)" }} className="om-list">
             {incomingRows.length === 0 ? (
@@ -245,9 +267,19 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                     ) : null}
 
                     <div style={{ marginTop: "var(--space-8)" }}>
-                      <Link href={embedded ? `/app/messages/${r.id}?back=${encodeURIComponent("/app/settings?tab=borrows")}` : `/app/messages/${r.id}`}>
+                      <Link href={embedded ? `/app/messages/${r.id}?back=${encodeURIComponent("/app/settings?tab=loans")}` : `/app/messages/${r.id}`}>
                         View conversation
                       </Link>
+                      {" · "}
+                      <button
+                        type="button"
+                        className="text-muted"
+                        style={{ textDecoration: "underline", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer" }}
+                        disabled={deleteBusyId === r.id}
+                        onClick={() => void deleteConversation(r.id)}
+                      >
+                        {deleteBusyId === r.id ? "Deleting…" : "Delete"}
+                      </button>
                     </div>
                   </div>
                 );
@@ -297,9 +329,19 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                     ) : null}
 
                     <div style={{ marginTop: "var(--space-8)" }}>
-                      <Link href={embedded ? `/app/messages/${r.id}?back=${encodeURIComponent("/app/settings?tab=borrows")}` : `/app/messages/${r.id}`}>
+                      <Link href={embedded ? `/app/messages/${r.id}?back=${encodeURIComponent("/app/settings?tab=loans")}` : `/app/messages/${r.id}`}>
                         View conversation
                       </Link>
+                      {" · "}
+                      <button
+                        type="button"
+                        className="text-muted"
+                        style={{ textDecoration: "underline", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer" }}
+                        disabled={deleteBusyId === r.id}
+                        onClick={() => void deleteConversation(r.id)}
+                      >
+                        {deleteBusyId === r.id ? "Deleting…" : "Delete"}
+                      </button>
                     </div>
                   </div>
                 );

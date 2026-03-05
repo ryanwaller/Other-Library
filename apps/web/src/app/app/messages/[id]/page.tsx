@@ -70,6 +70,7 @@ export default function MessageThreadPage() {
 
   const [thread, setThread] = useState<Msg[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [deletedAtForMe, setDeletedAtForMe] = useState<string | null>(null);
 
   const [draft, setDraft] = useState("");
   const [sendState, setSendState] = useState<{ busy: boolean; error: string | null; message: string | null }>({ busy: false, error: null, message: null });
@@ -106,6 +107,7 @@ export default function MessageThreadPage() {
       if (!next) {
         setReq(null);
         setThread([]);
+        setDeletedAtForMe(null);
         setBook(null);
         setProfilesById({});
         setAvatarUrlByUserId({});
@@ -114,6 +116,7 @@ export default function MessageThreadPage() {
       if (next.kind !== "borrow") {
         setReq(null);
         setThread([]);
+        setDeletedAtForMe(null);
         setBook(null);
         setProfilesById({});
         setAvatarUrlByUserId({});
@@ -121,6 +124,15 @@ export default function MessageThreadPage() {
         return;
       }
       setReq(next);
+
+      const deletedRes = await supabase
+        .from("borrow_request_deleted_for")
+        .select("deleted_at")
+        .eq("borrow_request_id", requestId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      const deletedAt = deletedRes.error ? null : ((deletedRes.data as any)?.deleted_at ? String((deletedRes.data as any).deleted_at) : null);
+      setDeletedAtForMe(deletedAt);
 
       // Mark read (so the red badge clears immediately).
       if (markedReadForId !== next.id) {
@@ -162,6 +174,7 @@ export default function MessageThreadPage() {
         .from("borrow_request_messages")
         .select("id,sender_id,message,created_at")
         .eq("borrow_request_id", requestId)
+        .gt("created_at", deletedAt || "1970-01-01T00:00:00Z")
         .order("created_at", { ascending: true })
         .limit(500);
       setThreadLoading(false);
@@ -321,7 +334,7 @@ export default function MessageThreadPage() {
       )}
 
       <div className="om-thread" style={{ marginTop: "var(--space-14)" }}>
-        {req?.message ? (
+        {req?.message && !deletedAtForMe ? (
           <div className="om-thread-msg">
             <div className="text-muted">{requesterName}</div>
             <div style={{ whiteSpace: "pre-wrap" }}>{req.message}</div>
@@ -329,7 +342,7 @@ export default function MessageThreadPage() {
         ) : null}
 
         {thread.length === 0 ? null : (
-          <div style={{ marginTop: req?.message ? 10 : 0, display: "flex", flexDirection: "column", gap: "var(--space-10)" }}>
+          <div style={{ marginTop: req?.message && !deletedAtForMe ? 10 : 0, display: "flex", flexDirection: "column", gap: "var(--space-10)" }}>
             {thread.map((m) => {
               const ev = parseEventMessage(m.message);
               if (ev) {

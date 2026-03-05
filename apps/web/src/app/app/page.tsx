@@ -2771,9 +2771,20 @@ function AppShell({
                           <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
                             <span className="text-muted">pending</span>
                             {iAmOwner ? (
-                              <button className="text-muted" onClick={() => void removeCatalogMember(lib.id, m.user_id)}>
-                                Rescind
-                              </button>
+                              <>
+                                <button className="text-muted" onClick={() => void removeCatalogMember(lib.id, m.user_id)}>
+                                  Rescind
+                                </button>
+                                <button
+                                  className="text-muted"
+                                  onClick={() => {
+                                    if (!window.confirm("Delete this pending invite?")) return;
+                                    void removeCatalogMember(lib.id, m.user_id);
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </>
                             ) : null}
                           </div>
                         </div>

@@ -74,6 +74,20 @@ export default function PublicBookList({
   // Use state for filters so we can clear them instantly
   const [activeFilters, setActiveFilters] = useState(initialFilters);
 
+  function setFilterAndUrl(key: "author" | "subject" | "tag" | "category" | "publisher", value?: string) {
+    const next = { ...activeFilters };
+    if (value && value.trim()) {
+      (next as any)[key] = value;
+    } else {
+      delete (next as any)[key];
+    }
+    setActiveFilters(next);
+    const params = new URLSearchParams(window.location.search);
+    if (value && value.trim()) params.set(key, value);
+    else params.delete(key);
+    window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+  }
+
   const filteredGroups = useMemo(() => {
     // 1. Filter books based on activeFilters and searchQuery
     const filtered = allBooks.filter((b) => {
@@ -88,6 +102,14 @@ export default function PublicBookList({
       if (activeFilters.publisher) {
         const pub = b.publisher_override || b.edition?.publisher;
         if (String(pub ?? "").toLowerCase() !== activeFilters.publisher.toLowerCase()) return false;
+      }
+      if (activeFilters.tag) {
+        const tags = (b.book_tags ?? [])
+          .map((bt) => bt?.tag)
+          .filter((t): t is NonNullable<typeof t> => Boolean(t))
+          .filter((t) => t.kind === "tag")
+          .map((t) => String(t.name ?? "").toLowerCase());
+        if (!tags.includes(activeFilters.tag.toLowerCase())) return false;
       }
       
       if (searchQuery.trim()) {
@@ -168,6 +190,31 @@ export default function PublicBookList({
   }, [viewMode, effectiveCols]);
 
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
+  const availableSubjects = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          allBooks
+            .flatMap((b) => (b.subjects_override ?? b.edition?.subjects ?? []) as string[])
+            .map((s) => String(s ?? "").trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [allBooks]
+  );
+  const availableTags = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          allBooks
+            .flatMap((b) => (b.book_tags ?? []).map((bt) => bt?.tag).filter((t): t is NonNullable<typeof t> => Boolean(t)))
+            .filter((t) => t.kind === "tag")
+            .map((t) => String(t.name ?? "").trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [allBooks]
+  );
   const effectiveLibraries = useMemo(() => {
     if (libraries.length > 0) return libraries;
     const ids = Array.from(new Set(filteredGroups.map((g) => g.libraryId))).filter((id) => Number.isFinite(id) && id > 0);
@@ -297,31 +344,11 @@ export default function PublicBookList({
             <ActiveFilterDisplay
               pairs={(() => {
                 const pairs: FilterPair[] = [];
-                if (activeFilters.category) pairs.push({ label: "Category", value: activeFilters.category, key: "category", onClear: () => {
-                  const next = { ...activeFilters }; delete next.category; setActiveFilters(next);
-                  const params = new URLSearchParams(window.location.search); params.delete("category");
-                  window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
-                }});
-                if (activeFilters.tag) pairs.push({ label: "Tag", value: activeFilters.tag, key: "tag", onClear: () => {
-                  const next = { ...activeFilters }; delete next.tag; setActiveFilters(next);
-                  const params = new URLSearchParams(window.location.search); params.delete("tag");
-                  window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
-                }});
-                if (activeFilters.author) pairs.push({ label: "Author", value: activeFilters.author, key: "author", onClear: () => {
-                  const next = { ...activeFilters }; delete next.author; setActiveFilters(next);
-                  const params = new URLSearchParams(window.location.search); params.delete("author");
-                  window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
-                }});
-                if (activeFilters.subject) pairs.push({ label: "Subject", value: activeFilters.subject, key: "subject", onClear: () => {
-                  const next = { ...activeFilters }; delete next.subject; setActiveFilters(next);
-                  const params = new URLSearchParams(window.location.search); params.delete("subject");
-                  window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
-                }});
-                if (activeFilters.publisher) pairs.push({ label: "Publisher", value: activeFilters.publisher, key: "publisher", onClear: () => {
-                  const next = { ...activeFilters }; delete next.publisher; setActiveFilters(next);
-                  const params = new URLSearchParams(window.location.search); params.delete("publisher");
-                  window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
-                }});
+                if (activeFilters.category) pairs.push({ label: "Category", value: activeFilters.category, key: "category", onClear: () => setFilterAndUrl("category") });
+                if (activeFilters.tag) pairs.push({ label: "Tag", value: activeFilters.tag, key: "tag", onClear: () => setFilterAndUrl("tag") });
+                if (activeFilters.author) pairs.push({ label: "Author", value: activeFilters.author, key: "author", onClear: () => setFilterAndUrl("author") });
+                if (activeFilters.subject) pairs.push({ label: "Subject", value: activeFilters.subject, key: "subject", onClear: () => setFilterAndUrl("subject") });
+                if (activeFilters.publisher) pairs.push({ label: "Publisher", value: activeFilters.publisher, key: "publisher", onClear: () => setFilterAndUrl("publisher") });
                 return pairs;
               })()}
               onClearAll={() => {
@@ -372,6 +399,18 @@ export default function PublicBookList({
               <option value="earliest">earliest</option>
               <option value="title_asc">title A-Z</option>
               <option value="title_desc">title Z-A</option>
+            </select>
+            <select className="om-filter-control" value={activeFilters.subject ?? ""} onChange={(e) => setFilterAndUrl("subject", e.target.value || undefined)}>
+              <option value="">subject</option>
+              {availableSubjects.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <select className="om-filter-control" value={activeFilters.tag ?? ""} onChange={(e) => setFilterAndUrl("tag", e.target.value || undefined)}>
+              <option value="">tag</option>
+              {availableTags.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
             </select>
           </div>
         )}

@@ -63,7 +63,29 @@ export default function MessagesPage() {
         .order("updated_at", { ascending: false })
         .limit(200);
       if (res.error) throw new Error(res.error.message);
-      const nextRows = ((((res.data as any) ?? []) as BorrowRequestRow[]) ?? []).filter((r) => r.kind === "borrow");
+      const allRows = ((((res.data as any) ?? []) as BorrowRequestRow[]) ?? []).filter((r) => r.kind === "borrow");
+      const allRequestIds = Array.from(new Set(allRows.map((r) => r.id).filter((n) => Number.isFinite(n))));
+      let deletedAtByRequestId: Record<number, string> = {};
+      if (allRequestIds.length > 0) {
+        const delRes = await supabase
+          .from("borrow_request_deleted_for")
+          .select("borrow_request_id,deleted_at")
+          .eq("user_id", userId)
+          .in("borrow_request_id", allRequestIds);
+        if (!delRes.error) {
+          for (const row of (delRes.data as any[]) ?? []) {
+            const id = Number((row as any).borrow_request_id);
+            const deletedAt = String((row as any).deleted_at ?? "");
+            if (!Number.isFinite(id) || !deletedAt) continue;
+            deletedAtByRequestId[id] = deletedAt;
+          }
+        }
+      }
+      const nextRows = allRows.filter((r) => {
+        const deletedAt = deletedAtByRequestId[r.id];
+        if (!deletedAt) return true;
+        return Date.parse(String(r.updated_at ?? "")) > Date.parse(deletedAt);
+      });
       setRows(nextRows);
 
       const userIds = Array.from(new Set(nextRows.flatMap((r) => [r.owner_id, r.requester_id]).filter(Boolean)));

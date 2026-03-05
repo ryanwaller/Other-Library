@@ -371,7 +371,7 @@ export default function GlobalNav() {
             ) : null}
 
             {sessionUserId && pendingIncomingBorrows > 0 ? (
-              <Link href="/app/settings?tab=borrows" aria-label={`${pendingIncomingBorrows} pending incoming borrow requests`} style={{ textDecoration: "none" }}>
+              <Link href="/app/settings?tab=loans" aria-label={`${pendingIncomingBorrows} pending incoming borrow requests`} style={{ textDecoration: "none" }}>
                 <span className="om-nav-badge om-nav-badge--circle" style={{ background: "#b00020" }}>
                   {pendingIncomingBorrows}
                 </span>
