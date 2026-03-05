@@ -283,7 +283,7 @@ export default function MessageThreadPage() {
       return;
     }
     notifyBorrowRequestsChanged();
-    router.push(backHref);
+    router.push("/app/settings?tab=loans");
     router.refresh();
   }
 
