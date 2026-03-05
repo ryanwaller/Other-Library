@@ -2704,27 +2704,6 @@ function AppShell({
 
       <div style={{ height: "var(--catalog-top-gap)" }} />
 
-      {libraryState.busy && renderLibraries.length === 0 ? (
-        <div className="card" style={{ marginTop: 0 }}>
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-            <span className="text-muted">Loading catalogs…</span>
-            <span className="text-muted">0&nbsp;&nbsp;books</span>
-          </div>
-          <div
-            style={{
-              marginTop: "var(--space-md)",
-              display: "grid",
-              gridTemplateColumns: `repeat(${Math.min(isMobile ? 2 : gridCols, 4)}, minmax(0, 1fr))`,
-              gap: "var(--space-md)"
-            }}
-          >
-            {Array.from({ length: Math.min(isMobile ? 2 : gridCols, 4) }).map((_, i) => (
-              <div key={`boot-skeleton-${i}`} className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
-            ))}
-          </div>
-        </div>
-      ) : null}
-
       {renderLibraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];
         const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
@@ -2965,7 +2944,7 @@ export default function AppPage() {
           <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.</div>
         </div>
       ) : !sessionLoaded ? (
-        <div className="card">Loading…</div>
+        <div style={{ minHeight: "40vh" }} aria-hidden="true" />
       ) : session ? (
         <Suspense fallback={<div className="card">Loading…</div>}>
           <AppWithFilters session={session} />
