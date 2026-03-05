@@ -608,15 +608,12 @@ function AppShell({
       const vm = window.localStorage.getItem("om_viewMode");
       const gc = window.localStorage.getItem("om_gridCols");
       const sm = window.localStorage.getItem("om_sortMode");
-      const cm = window.localStorage.getItem("om_categoryMode");
-      const vis = window.localStorage.getItem("om_visibilityMode");
-      const tm = window.localStorage.getItem("om_tagMode");
+      window.localStorage.removeItem("om_categoryMode");
+      window.localStorage.removeItem("om_tagMode");
+      window.localStorage.removeItem("om_visibilityMode");
       if (vm === "grid" || vm === "list") setViewMode(vm);
       if (gc === "1" || gc === "2" || gc === "4" || gc === "8") setGridCols(Number(gc) as any);
       if (sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
-      if (cm && typeof cm === "string") setCategoryMode(cm);
-      if (tm && typeof tm === "string") setTagMode(tm);
-      if (vis === "all" || vis === "public" || vis === "private") setVisibilityMode(vis);
     } catch {
       // ignore
     }
@@ -627,13 +624,10 @@ function AppShell({
       window.localStorage.setItem("om_viewMode", viewMode);
       window.localStorage.setItem("om_gridCols", String(gridCols));
       window.localStorage.setItem("om_sortMode", sortMode);
-      if (!filterCategory) window.localStorage.setItem("om_categoryMode", categoryMode);
-      if (!filterTag) window.localStorage.setItem("om_tagMode", tagMode);
-      window.localStorage.setItem("om_visibilityMode", visibilityMode);
     } catch {
       // ignore
     }
-  }, [viewMode, gridCols, sortMode, categoryMode, filterCategory, tagMode, filterTag, visibilityMode]);
+  }, [viewMode, gridCols, sortMode]);
 
   useEffect(() => {
     const normalized = (filterCategory ?? "").trim();
