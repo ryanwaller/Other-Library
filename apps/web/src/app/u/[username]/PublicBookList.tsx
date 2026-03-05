@@ -494,7 +494,6 @@ export default function PublicBookList({
       {showLibraryBlocks ? (
         <div style={{ display: "flex", flexDirection: "column" }}>
           {effectiveLibraries
-            .filter(lib => filteredGroups.some(g => g.libraryId === lib.id))
             .map((lib, idx) => {
             const libGroups = filteredGroups.filter(g => g.libraryId === lib.id);
             const collapsed = !!collapsedByLibraryId[lib.id];
@@ -518,7 +517,7 @@ export default function PublicBookList({
                     </button>
                     <div className="row" style={{ flex: 1, justifyContent: "space-between", alignItems: "baseline", minWidth: 0 }}>
                       <div className="row" style={{ alignItems: "center", gap: "var(--space-sm)", minWidth: 0, flexShrink: 1 }}>
-                        <button onClick={toggle} style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left" }}>
+                        <button onClick={toggle} style={{ padding: 0, border: "none", background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left" }}>
                           {lib.name}
                         </button>
                         {(lib.memberPreviews ?? []).length > 0 ? (
