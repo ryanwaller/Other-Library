@@ -6,13 +6,29 @@ export async function GET(req: Request) {
     const current = await requireUser(req);
     const admin = requireAdminClient();
 
+    let ownedRows: any[];
     const ownedRes = await admin
       .from("libraries")
       .select("id,name,created_at,sort_order,owner_id")
       .eq("owner_id", current.id)
       .order("sort_order", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true });
-    if (ownedRes.error) throw new Error(ownedRes.error.message);
+    if (!ownedRes.error) {
+      ownedRows = (ownedRes.data ?? []) as any[];
+    } else {
+      const msg = (ownedRes.error.message ?? "").toLowerCase();
+      if (msg.includes("sort_order") && msg.includes("does not exist")) {
+        const fallback = await admin
+          .from("libraries")
+          .select("id,name,created_at,owner_id")
+          .eq("owner_id", current.id)
+          .order("created_at", { ascending: true });
+        if (fallback.error) throw new Error(fallback.error.message);
+        ownedRows = ((fallback.data ?? []) as any[]).map((l) => ({ ...l, sort_order: null }));
+      } else {
+        throw new Error(ownedRes.error.message);
+      }
+    }
 
     const membershipsRes = await admin
       .from("catalog_members")
@@ -32,7 +48,7 @@ export async function GET(req: Request) {
     for (const m of acceptedMemberships) roleByCatalog.set(m.catalog_id, m.role);
 
     const membershipCatalogIds = Array.from(new Set(acceptedMemberships.map((m) => m.catalog_id)));
-    const sharedIds = membershipCatalogIds.filter((id) => !((ownedRes.data ?? []) as any[]).some((l) => Number(l.id) === id));
+    const sharedIds = membershipCatalogIds.filter((id) => !ownedRows.some((l) => Number(l.id) === id));
 
     let sharedLibs: any[] = [];
     if (sharedIds.length > 0) {
@@ -40,7 +56,7 @@ export async function GET(req: Request) {
       if (!libsRes.error) sharedLibs = (libsRes.data ?? []) as any[];
     }
 
-    const all = [...((ownedRes.data ?? []) as any[]), ...sharedLibs];
+    const all = [...ownedRows, ...sharedLibs];
     const byId = new Map<number, any>();
     for (const l of all) byId.set(Number(l.id), l);
 

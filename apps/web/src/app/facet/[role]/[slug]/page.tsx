@@ -129,12 +129,24 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
   const libraryNameById: Record<number, string> = {};
   const librarySortById: Record<number, number> = {};
   if (libraryIds.length > 0) {
+    let libraryRows: any[];
     const librariesRes = await supabase.from("libraries").select("id,name,sort_order").in("id", libraryIds);
-    for (const row of librariesRes.data ?? []) {
-      const id = Number((row as any).id);
+    if (!librariesRes.error) {
+      libraryRows = (librariesRes.data ?? []) as any[];
+    } else {
+      const msg = (librariesRes.error.message ?? "").toLowerCase();
+      if (msg.includes("sort_order") && msg.includes("does not exist")) {
+        const fallback = await supabase.from("libraries").select("id,name").in("id", libraryIds);
+        libraryRows = ((fallback.data ?? []) as any[]).map((r) => ({ ...r, sort_order: null }));
+      } else {
+        libraryRows = [];
+      }
+    }
+    for (const row of libraryRows) {
+      const id = Number(row.id);
       if (!Number.isFinite(id)) continue;
-      libraryNameById[id] = String((row as any).name ?? "").trim() || `Catalog ${id}`;
-      const sortOrder = Number((row as any).sort_order);
+      libraryNameById[id] = String(row.name ?? "").trim() || `Catalog ${id}`;
+      const sortOrder = Number(row.sort_order);
       librarySortById[id] = Number.isFinite(sortOrder) ? sortOrder : 0;
     }
   }
