@@ -2878,11 +2878,7 @@ export default function BookDetailPage() {
                     : mergeState.message
                   : mergeUndoSnapshot
                     ? <button onClick={() => void undoMerge()} disabled={mergeState.busy} className="text-muted">Undo merge</button>
-                    : saveState.message
-                      ? saveState.error
-                        ? `${saveState.message} (${saveState.error})`
-                        : saveState.message
-                      : busy
+                    : busy
                         ? "Loading…"
                         : error
                           ? error

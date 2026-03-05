@@ -12,7 +12,9 @@ export function effectiveTitleFor(b: PublicBook): string {
 export function effectiveAuthorsFor(b: PublicBook): string[] {
   const override = (b.authors_override ?? []).filter(Boolean);
   if (override.length > 0) return override;
-  return (b.edition?.authors ?? []).filter(Boolean);
+  const editionAuthors = (b.edition?.authors ?? []).filter(Boolean);
+  if (editionAuthors.length > 0) return editionAuthors;
+  return (b.editors_override ?? []).filter(Boolean);
 }
 
 export function effectiveSubjectsFor(b: PublicBook): string[] {

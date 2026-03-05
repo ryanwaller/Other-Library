@@ -365,6 +365,7 @@ function AppShell({
   const [coverInputKeyByBookId, setCoverInputKeyByBookId] = useState<Record<number, number>>({});
 
   const [items, setItems] = useState<CatalogItem[]>([]);
+  const [booksLoading, setBooksLoading] = useState(false);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [gridCols, setGridCols] = useState<1 | 2 | 4 | 8>(4);
@@ -625,6 +626,7 @@ function AppShell({
 
   async function refreshAllBooks(targetLibraryIds?: number[]) {
     if (!supabase) return;
+    setBooksLoading(true);
     const ids = Array.from(new Set((targetLibraryIds ?? libraries.map((l) => l.id)).filter((n) => Number.isFinite(n) && n > 0)));
     const endpoint = ids.length > 0 ? `/api/catalog/home?catalog_ids=${encodeURIComponent(ids.join(","))}` : "/api/catalog/home";
     try {
@@ -655,12 +657,17 @@ function AppShell({
         }
         return;
       }
+      setDebugBooksSource("books:failed");
+      setItems([]);
+      return;
     } catch (err: any) {
       setDebugLastError(String(err?.message ?? "server_home_failed"));
+      setDebugBooksSource("books:failed");
+      setItems([]);
+      return;
+    } finally {
+      setBooksLoading(false);
     }
-    setDebugBooksSource("books:failed");
-    setItems([]);
-    return;
   }
 
   async function hydrateLibraryMemberPreviews(baseList: LibrarySummary[]) {
@@ -2749,6 +2756,7 @@ function AppShell({
       {renderLibraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];
         const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
+        const showBookSkeleton = booksLoading && groups.length === 0;
         const memberState = membersByCatalogId[lib.id] ?? { busy: false, error: null, members: [], inviteInput: "", inviteBusy: false };
         const acceptedMembers = memberState.members.filter((m) => m.accepted_at);
         const pendingMembers = memberState.members.filter((m) => !m.accepted_at);
@@ -2782,6 +2790,11 @@ function AppShell({
               searchQuery={searchQuery}
               renderBooks={(limit) => (
                 <div style={{ display: viewMode === "grid" ? "grid" : "flex", flexDirection: viewMode === "list" ? "column" : undefined, gridTemplateColumns: viewMode === "grid" ? `repeat(${effectiveCols}, minmax(0, 1fr))` : undefined, gap: "var(--space-md)" }}>
+                  {showBookSkeleton
+                    ? Array.from({ length: Math.min(4, Math.max(1, effectiveCols)) }).map((_, i) => (
+                        <div key={`skeleton-${lib.id}-${i}`} className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
+                      ))
+                    : null}
                   {groups.slice(0, limit).map(g => (
                     <BookCard
                       key={g.key}
