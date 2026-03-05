@@ -230,6 +230,8 @@ export default function MessagesPage() {
                 const avatarUrl = avatarUrlByUserId[otherId] ?? null;
                 const book = booksById[r.user_book_id];
                 const title = (book?.title_override ?? "").trim() || book?.edition?.title || "(untitled)";
+                const ownerUsername = profilesById[r.owner_id]?.username ?? null;
+                const bookHref = ownerUsername ? `/u/${ownerUsername}/b/${r.user_book_id}` : `/app/books/${r.user_book_id}`;
                 const lastMsg = lastMsgByRequestId[r.id] ?? null;
                 const preview = (lastMsg?.message ?? r.message ?? "").trim();
                 const lastReadAt = readAtByRequestId[r.id] ?? null;
@@ -254,7 +256,7 @@ export default function MessagesPage() {
 
                     <div style={{ marginTop: "var(--space-8)" }}>
                       <span className="text-muted">{book?.object_type || "book"}: </span>
-                      <Link href={`/app/books/${r.user_book_id}`}>{title}</Link>
+                      <Link href={bookHref}>{title}</Link>
                     </div>
 
                     {preview ? (

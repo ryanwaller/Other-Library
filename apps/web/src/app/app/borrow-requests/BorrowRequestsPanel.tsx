@@ -265,6 +265,8 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                 const avatarUrl = avatarUrlByUserId[r.requester_id] ?? null;
                 const book = booksById[r.user_book_id];
                 const title = (book?.title_override ?? "").trim() || book?.edition?.title || "(untitled)";
+                const ownerUsername = profilesById[r.owner_id]?.username ?? null;
+                const bookHref = ownerUsername ? `/u/${ownerUsername}/b/${r.user_book_id}` : (book ? `/app/books/${book.id}` : null);
                 const preview = oneLinePreview(r.message);
                 return (
                   <div key={r.id} className="om-list-row" style={idx === incomingRows.length - 1 ? { borderBottom: "none" } : undefined}>
@@ -281,7 +283,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                         <div className="om-request-sentence">
                           <Link href={`/u/${requester?.username || r.requester_id}`}>{requester?.username || r.requester_id}</Link>
                           {" wants "}
-                          {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
+                          {bookHref ? <Link href={bookHref}>{title}</Link> : <span>{title}</span>}
                         </div>
                       </div>
                       <div className="text-muted om-request-status">{statusLabel(r.status)}</div>
@@ -328,6 +330,8 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                 const avatarUrl = (userId ? avatarUrlByUserId[userId] : null) ?? null;
                 const book = booksById[r.user_book_id];
                 const title = (book?.title_override ?? "").trim() || book?.edition?.title || "(untitled)";
+                const ownerUsername = owner?.username ?? null;
+                const bookHref = ownerUsername ? `/u/${ownerUsername}/b/${r.user_book_id}` : (book ? `/app/books/${book.id}` : null);
                 const preview = oneLinePreview(r.message);
                 return (
                   <div key={r.id} className="om-list-row" style={idx === outgoingRows.length - 1 ? { borderBottom: "none" } : undefined}>
@@ -343,7 +347,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                         </Link>
                         <div className="om-request-sentence">
                           You asked <Link href={`/u/${owner?.username || r.owner_id}`}>{owner?.username || r.owner_id}</Link> for{" "}
-                          {book ? <Link href={`/app/books/${book.id}`}>{title}</Link> : <span>{title}</span>}
+                          {bookHref ? <Link href={bookHref}>{title}</Link> : <span>{title}</span>}
                         </div>
                       </div>
                       <div className="text-muted om-request-status">{statusLabel(r.status)}</div>

@@ -317,6 +317,8 @@ export default function MessageThreadPage() {
   const title = ((book?.title_override ?? "").trim() || book?.edition?.title || "(untitled)") as string;
   const ownerName = profilesById[req?.owner_id ?? ""]?.username ?? "someone";
   const requesterName = profilesById[req?.requester_id ?? ""]?.username ?? "someone";
+  const ownerUsername = req?.owner_id ? profilesById[req.owner_id]?.username : null;
+  const scopedBookHref = req ? (ownerUsername ? `/u/${ownerUsername}/b/${req.user_book_id}` : `/app/books/${req.user_book_id}`) : "/app";
 
   function statusLabel(status: BorrowRequestRow["status"]): string {
     if (status === "approved") return "Approved";
@@ -356,7 +358,7 @@ export default function MessageThreadPage() {
 
           <div style={{ marginTop: "var(--space-8)" }}>
             <span className="text-muted">{book?.object_type || "book"}: </span>
-            <Link href={`/app/books/${req.user_book_id}`}>{title}</Link>
+            <Link href={scopedBookHref}>{title}</Link>
           </div>
         </div>
       )}
