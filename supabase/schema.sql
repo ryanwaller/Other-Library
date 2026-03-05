@@ -15,7 +15,7 @@ create table if not exists public.profiles (
   username text not null unique,
   display_name text,
   bio text,
-  visibility text not null default 'followers_only' check (visibility in ('followers_only', 'public')),
+  visibility text not null default 'public' check (visibility in ('followers_only', 'public')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -61,8 +61,8 @@ declare
 begin
   uname := coalesce(nullif(new.raw_user_meta_data->>'username', ''), public.generate_default_username(new.id));
 
-  insert into public.profiles (id, username, display_name)
-  values (new.id, uname, coalesce(nullif(new.raw_user_meta_data->>'display_name', ''), uname))
+  insert into public.profiles (id, username, display_name, visibility)
+  values (new.id, uname, coalesce(nullif(new.raw_user_meta_data->>'display_name', ''), uname), 'public')
   on conflict (id) do nothing;
 
   return new;

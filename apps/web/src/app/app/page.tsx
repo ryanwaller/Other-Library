@@ -2932,7 +2932,7 @@ export default function AppPage() {
           <AppWithFilters session={session} />
         </Suspense>
       ) : (
-        <SignInCard note="Followers-only by default; public is optional later." />
+        <SignInCard note="Profiles are public by default." />
       )}
     </main>
   );
