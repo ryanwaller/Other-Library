@@ -834,7 +834,7 @@ a.text-muted:hover {
 }
 
 .om-borrow-requests-panel .om-avatar-img {
-  transform: none;
+  transform: translateY(1px);
 }
 
 .om-thread {
