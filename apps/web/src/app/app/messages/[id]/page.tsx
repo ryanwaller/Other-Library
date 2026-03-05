@@ -140,6 +140,13 @@ export default function MessageThreadPage() {
     () => reopenRequested || hasReplyAfterDeleteNotice,
     [reopenRequested, hasReplyAfterDeleteNotice]
   );
+  const latestDeleteNoticeIndex = useMemo(() => {
+    for (let i = thread.length - 1; i >= 0; i -= 1) {
+      const raw = String(thread[i]?.message ?? "").trim();
+      if (/deleted this conversation\.\s*also delete\?/i.test(raw)) return i;
+    }
+    return -1;
+  }, [thread]);
   const otherUserId = useMemo(() => {
     if (!req || !userId) return null;
     return userId === req.owner_id ? req.requester_id : req.owner_id;
@@ -455,10 +462,11 @@ export default function MessageThreadPage() {
 
         {thread.length === 0 ? null : (
           <div style={{ marginTop: req?.message && !deletedAtForMe ? 10 : 0, display: "flex", flexDirection: "column", gap: "var(--space-10)" }}>
-            {thread.map((m) => {
+            {thread.map((m, idx) => {
               const raw = String(m.message ?? "").trim();
               const isDeleteNotice = /deleted this conversation\.\s*also delete\?/i.test(raw);
               if (isDeleteNotice) {
+                if (idx !== latestDeleteNoticeIndex) return null;
                 if (threadReopened) return null;
                 const deleteNoticeText = m.sender_id === userId ? "You deleted this conversation." : raw;
                 return (
