@@ -3659,6 +3659,7 @@ export default function BookDetailPage() {
                           value={formPublishDate}
                           onChange={(e) => setFormPublishDate(e.target.value)}
                           onKeyDown={(e) => onEnter(e, () => void saveEdits())}
+                          placeholder="Add date"
                         />
                       ) : (
                         displayPublishDate
@@ -3833,6 +3834,7 @@ export default function BookDetailPage() {
                         value={formDescription}
                         onChange={(e) => setFormDescription(e.target.value)}
                         rows={1}
+                        placeholder="Add description"
                         style={{ overflow: "hidden", resize: "none", marginTop: "var(--space-sm)" }}
                       />
                     ) : (
@@ -3930,9 +3932,7 @@ export default function BookDetailPage() {
                                 ? copiesCountState.error
                                 : copiesCountState.busy
                                   ? "…"
-                                  : copiesCount !== null
-                                    ? `${copiesCount}`
-                                    : ""}
+                                  : ""}
                           </div>
                         </>
                       ) : (

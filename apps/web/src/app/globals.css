@@ -1091,6 +1091,23 @@ a.text-muted:hover {
   min-height: calc(var(--text-line) * 1em) !important;
 }
 
+.om-book-detail-grid input.om-inline-control,
+.om-book-detail-grid select.om-inline-control {
+  height: calc(var(--text-line) * 1em) !important;
+}
+
+.om-book-detail-grid input.om-inline-control:focus,
+.om-book-detail-grid input.om-inline-control:focus-visible,
+.om-book-detail-grid select.om-inline-control:focus,
+.om-book-detail-grid select.om-inline-control:focus-visible,
+.om-book-detail-grid textarea.om-inline-control:focus,
+.om-book-detail-grid textarea.om-inline-control:focus-visible {
+  border: 0 !important;
+  border-bottom: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
 .om-catalog-caret {
   display: inline-block;
   width: 10px;
