@@ -146,9 +146,8 @@ export default function LibraryBlock({
                     onClick={() => onStartEdit(libraryId, libraryName)}
                     className="om-library-edit-trigger"
                     style={{
-                      padding: "0 0 9px",
+                      padding: 0,
                       border: "none",
-                      borderBottom: "1px solid transparent",
                       background: "transparent",
                       textDecoration: "none",
                       textAlign: "left"
@@ -164,9 +163,8 @@ export default function LibraryBlock({
                     }}
                     disabled={busy}
                     style={{
-                      padding: "0 0 9px",
+                      padding: 0,
                       border: "none",
-                      borderBottom: "1px solid transparent",
                       background: "transparent",
                       textAlign: "left",
                       font: "inherit",
