@@ -18,6 +18,7 @@ export async function GET(req: Request) {
     const admin = requireAdminClient();
     const url = new URL(req.url);
     const idsRaw = String(url.searchParams.get("catalog_ids") ?? "").trim();
+    const lite = String(url.searchParams.get("lite") ?? "") === "1";
     const requestedIds = parseCatalogIds(idsRaw);
 
     const ownedRes = await admin.from("libraries").select("id").eq("owner_id", current.id);
@@ -83,12 +84,25 @@ export async function GET(req: Request) {
 
     let books: any[] = [];
     if (allowedIds.length > 0) {
+      const liteSelect =
+        "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date)";
       const fullSelect =
         "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
       const basicSelect =
         "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
       const minimalSelect =
         "id,library_id,created_at,visibility,title_override,authors_override,subjects_override,publisher_override,designers_override,group_label,decade";
+
+      if (lite) {
+        const liteRes = await admin
+          .from("user_books")
+          .select(liteSelect)
+          .in("library_id", allowedIds)
+          .order("created_at", { ascending: false })
+          .limit(800);
+        books = (liteRes.error ? [] : liteRes.data) as any[];
+        return NextResponse.json({ ok: true, catalogs, books });
+      }
 
       const fullRes = await admin
         .from("user_books")

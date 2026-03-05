@@ -45,6 +45,7 @@ export default function GlobalNav() {
   const [followersCount, setFollowersCount] = useState<number>(0);
   const [followingCount, setFollowingCount] = useState<number>(0);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [navMetricsReady, setNavMetricsReady] = useState(false);
 
   async function signOut() {
     try {
@@ -63,6 +64,18 @@ export default function GlobalNav() {
   }, []);
 
   useEffect(() => {
+    let t: number | null = null;
+    const raf = window.requestAnimationFrame(() => {
+      t = window.setTimeout(() => setNavMetricsReady(true), 500);
+    });
+    return () => {
+      window.cancelAnimationFrame(raf);
+      if (t) window.clearTimeout(t);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!navMetricsReady) return;
     let alive = true;
     let timer: number | null = null;
 
@@ -93,9 +106,10 @@ export default function GlobalNav() {
       if (timer) window.clearInterval(timer);
       window.removeEventListener("om:follows-changed", refreshPending);
     };
-  }, [sessionUserId]);
+  }, [sessionUserId, navMetricsReady]);
 
   useEffect(() => {
+    if (!navMetricsReady) return;
     let alive = true;
     let timer: number | null = null;
 
@@ -149,9 +163,10 @@ export default function GlobalNav() {
       if (timer) window.clearInterval(timer);
       window.removeEventListener("om:borrow-requests-changed", refreshPendingIncomingBorrows);
     };
-  }, [sessionUserId]);
+  }, [sessionUserId, navMetricsReady]);
 
   useEffect(() => {
+    if (!navMetricsReady) return;
     let alive = true;
     let timer: number | null = null;
 
@@ -194,9 +209,10 @@ export default function GlobalNav() {
       if (timer) window.clearInterval(timer);
       window.removeEventListener("om:catalog-members-changed", refreshPendingCatalogInvites);
     };
-  }, [sessionUserId]);
+  }, [sessionUserId, navMetricsReady]);
 
   useEffect(() => {
+    if (!navMetricsReady) return;
     let alive = true;
     let timer: number | null = null;
 
@@ -226,9 +242,10 @@ export default function GlobalNav() {
       if (timer) window.clearInterval(timer);
       window.removeEventListener("om:follows-changed", refreshCounts);
     };
-  }, [sessionUserId]);
+  }, [sessionUserId, navMetricsReady]);
 
   useEffect(() => {
+    if (!navMetricsReady) return;
     let alive = true;
     let timer: number | null = null;
 
@@ -277,7 +294,7 @@ export default function GlobalNav() {
       if (timer) window.clearInterval(timer);
       window.removeEventListener("om:borrow-requests-changed", refreshUnreadThreads);
     };
-  }, [sessionUserId]);
+  }, [sessionUserId, navMetricsReady]);
 
   useEffect(() => {
     let alive = true;

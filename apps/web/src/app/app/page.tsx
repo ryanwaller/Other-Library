@@ -624,37 +624,51 @@ function AppShell({
     setTagMode(normalized);
   }, [filterTag]);
 
-  async function refreshAllBooks(targetLibraryIds?: number[]) {
+  async function applyBooksFromServer(serverRows: any[], source: string) {
+    const client = supabase;
+    if (!client) return;
+    setDebugBooksSource(source);
+    setItems(serverRows as any);
+    const serverPaths = Array.from(
+      new Set([
+        ...serverRows
+          .flatMap((r) => (Array.isArray(r.media) ? r.media : []))
+          .map((m: any) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
+          .filter(Boolean),
+        ...serverRows
+          .filter((r: any) => r.cover_crop && typeof r.cover_original_url === "string" && r.cover_original_url)
+          .map((r: any) => r.cover_original_url as string)
+      ])
+    );
+    const serverMissing = serverPaths.filter((p) => !mediaUrlsByPath[p]);
+    if (serverMissing.length > 0) {
+      const signedServer = await client.storage.from("user-book-media").createSignedUrls(serverMissing, 60 * 60);
+      if (!signedServer.error && signedServer.data) {
+        const nextMap: Record<string, string> = {};
+        for (const s of signedServer.data) if (s.path && s.signedUrl) nextMap[s.path] = s.signedUrl;
+        setMediaUrlsByPath((prev) => ({ ...prev, ...nextMap }));
+      }
+    }
+  }
+
+  async function refreshAllBooks(targetLibraryIds?: number[], options?: { fastFirst?: boolean }) {
     if (!supabase) return;
     setBooksLoading(true);
     const ids = Array.from(new Set((targetLibraryIds ?? libraries.map((l) => l.id)).filter((n) => Number.isFinite(n) && n > 0)));
-    const endpoint = ids.length > 0 ? `/api/catalog/home?catalog_ids=${encodeURIComponent(ids.join(","))}` : "/api/catalog/home";
+    const idsQuery = ids.length > 0 ? `catalog_ids=${encodeURIComponent(ids.join(","))}` : "";
+    const endpoint = idsQuery ? `/api/catalog/home?${idsQuery}` : "/api/catalog/home";
+    const liteEndpoint = idsQuery ? `/api/catalog/home?${idsQuery}&lite=1` : "/api/catalog/home?lite=1";
     try {
+      if (options?.fastFirst) {
+        const liteHome = await catalogApi<{ ok: true; books: any[] }>(liteEndpoint, { method: "GET" });
+        if (Array.isArray(liteHome.books)) {
+          await applyBooksFromServer(liteHome.books as any[], ids.length > 0 ? "books:server-home-lite" : "books:server-home-lite-noids");
+          setBooksLoading(false);
+        }
+      }
       const serverHome = await catalogApi<{ ok: true; books: any[] }>(endpoint, { method: "GET" });
       if (Array.isArray(serverHome.books)) {
-        const serverRows = serverHome.books as any[];
-        setDebugBooksSource(ids.length > 0 ? "books:server-home" : "books:server-home-noids");
-        setItems(serverRows as any);
-        const serverPaths = Array.from(
-          new Set([
-            ...serverRows
-              .flatMap((r) => (Array.isArray(r.media) ? r.media : []))
-              .map((m: any) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
-              .filter(Boolean),
-            ...serverRows
-              .filter((r: any) => r.cover_crop && typeof r.cover_original_url === "string" && r.cover_original_url)
-              .map((r: any) => r.cover_original_url as string)
-          ])
-        );
-        const serverMissing = serverPaths.filter((p) => !mediaUrlsByPath[p]);
-        if (serverMissing.length > 0) {
-          const signedServer = await supabase.storage.from("user-book-media").createSignedUrls(serverMissing, 60 * 60);
-          if (!signedServer.error && signedServer.data) {
-            const nextMap: Record<string, string> = {};
-            for (const s of signedServer.data) if (s.path && s.signedUrl) nextMap[s.path] = s.signedUrl;
-            setMediaUrlsByPath((prev) => ({ ...prev, ...nextMap }));
-          }
-        }
+        await applyBooksFromServer(serverHome.books as any[], ids.length > 0 ? "books:server-home" : "books:server-home-noids");
         return;
       }
       setDebugBooksSource("books:failed");
@@ -668,89 +682,6 @@ function AppShell({
     } finally {
       setBooksLoading(false);
     }
-  }
-
-  async function hydrateLibraryMemberPreviews(baseList: LibrarySummary[]) {
-    if (!supabase) return;
-    const libraryIds = baseList.map((l) => l.id).filter((n) => Number.isFinite(n) && n > 0);
-    if (libraryIds.length === 0) return;
-    const membersRes = await supabase
-      .from("catalog_members")
-      .select("catalog_id,user_id,accepted_at")
-      .in("catalog_id", libraryIds)
-      .not("accepted_at", "is", null);
-    const memberRows = (membersRes.error ? [] : ((membersRes.data ?? []) as any[])).filter((r) => String(r.user_id) !== userId);
-    const memberIds = Array.from(new Set(memberRows.map((r) => String(r.user_id)).filter(Boolean)));
-    let profileById: Record<string, { username: string; avatar_path: string | null }> = {};
-    if (memberIds.length > 0) {
-      const pr = await supabase.from("profiles").select("id,username,avatar_path").in("id", memberIds);
-      if (!pr.error) {
-        profileById = Object.fromEntries(
-          ((pr.data ?? []) as any[]).map((p) => [String(p.id), { username: String(p.username ?? ""), avatar_path: p.avatar_path ? String(p.avatar_path) : null }])
-        );
-      }
-    }
-
-    const avatarByPath: Record<string, string> = {};
-    const avatarPaths = Array.from(
-      new Set(
-        Object.values(profileById)
-          .map((p) => (p.avatar_path ?? "").trim())
-          .filter(Boolean)
-      )
-    );
-    const directUrls = avatarPaths.filter((p) => /^https?:\/\//i.test(p));
-    for (const p of directUrls) avatarByPath[p] = p;
-    const storagePaths = avatarPaths.filter((p) => !/^https?:\/\//i.test(p));
-    if (storagePaths.length > 0) {
-      const signed = await supabase.storage.from("avatars").createSignedUrls(storagePaths, 60 * 30);
-      if (!signed.error && Array.isArray(signed.data)) {
-        for (const row of signed.data) {
-          if (row.path && row.signedUrl) avatarByPath[row.path] = row.signedUrl;
-        }
-      }
-      for (const path of storagePaths) {
-        if (avatarByPath[path]) continue;
-        const pub = supabase.storage.from("avatars").getPublicUrl(path);
-        const fallback = String(pub.data?.publicUrl ?? "").trim();
-        if (fallback) avatarByPath[path] = fallback;
-      }
-    }
-
-    const membersByCatalog: Record<number, Array<{ userId: string; username: string; avatarUrl: string | null; acceptedAt: string }>> = {};
-    for (const r of memberRows) {
-      const cid = Number(r.catalog_id);
-      const uid = String(r.user_id);
-      const prof = profileById[uid];
-      if (!prof?.username) continue;
-      if (!membersByCatalog[cid]) membersByCatalog[cid] = [];
-      membersByCatalog[cid].push({
-        userId: uid,
-        username: prof.username,
-        avatarUrl: prof.avatar_path ? avatarByPath[prof.avatar_path] ?? null : null,
-        acceptedAt: String(r.accepted_at ?? "")
-      });
-    }
-
-    const previewsByCatalog: Record<number, Array<{ userId: string; username: string; avatarUrl: string | null }>> = {};
-    for (const [cidRaw, rows] of Object.entries(membersByCatalog)) {
-      const cid = Number(cidRaw);
-      previewsByCatalog[cid] = rows
-        .sort((a, b) => Date.parse(a.acceptedAt) - Date.parse(b.acceptedAt))
-        .slice(0, 10)
-        .map((m) => ({ userId: m.userId, username: m.username, avatarUrl: m.avatarUrl }));
-    }
-
-    setLibraries((prev) =>
-      prev.map((l) => {
-        const next = previewsByCatalog[l.id] ?? [];
-        const prevPreview = l.memberPreviews ?? [];
-        if (prevPreview.length === next.length && prevPreview.every((m, i) => m.userId === next[i]?.userId && m.avatarUrl === next[i]?.avatarUrl)) {
-          return l;
-        }
-        return { ...l, memberPreviews: next };
-      })
-    );
   }
 
   async function refreshLibraries(): Promise<LibrarySummary[]> {
@@ -772,7 +703,6 @@ function AppShell({
 
       if (list.length > 0) {
         setLibraries(list);
-        void hydrateLibraryMemberPreviews(list);
         try {
           const raw = window.localStorage.getItem("om_addLibraryId");
           const parsed = raw ? Number(raw) : NaN;
@@ -790,7 +720,7 @@ function AppShell({
 
       if (list.length === 0) {
         try {
-          const serverHome = await catalogApi<{ ok: true; catalogs: LibrarySummary[]; books: any[] }>("/api/catalog/home", { method: "GET" });
+          const serverHome = await catalogApi<{ ok: true; catalogs: LibrarySummary[]; books: any[] }>("/api/catalog/home?lite=1", { method: "GET" });
           const serverCatalogs = Array.isArray(serverHome.catalogs) ? serverHome.catalogs : [];
           if (serverCatalogs.length > 0) {
             setDebugLibrariesSource("libs:server-home");
@@ -810,7 +740,6 @@ function AppShell({
           }
           if (list.length > 0) {
             setLibraries(list);
-            void hydrateLibraryMemberPreviews(list);
             try {
               const raw = window.localStorage.getItem("om_addLibraryId");
               const parsed = raw ? Number(raw) : NaN;
@@ -940,7 +869,6 @@ function AppShell({
       }
 
       setLibraries(list);
-      void hydrateLibraryMemberPreviews(list);
 
       try {
         const raw = window.localStorage.getItem("om_addLibraryId");
@@ -967,7 +895,6 @@ function AppShell({
           setDebugLibrariesSource("libs:owner-fallback");
           const ownerList = ((ownerFallback.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const })) as LibrarySummary[];
           setLibraries(ownerList);
-          void hydrateLibraryMemberPreviews(ownerList);
           setAddLibraryId(ownerList[0]?.id ?? null);
           setLibraryState({ busy: false, error: null, message: null });
           return ownerList;
@@ -1117,7 +1044,8 @@ function AppShell({
     (async () => {
       if (!supabase) return;
       if (alive) setInitialLoadDone(true);
-      const [profileRes, libs] = await Promise.all([
+      void refreshAllBooks(undefined, { fastFirst: true });
+      const [profileRes] = await Promise.all([
         supabase.from("profiles").select("username,visibility,avatar_path").eq("id", userId).maybeSingle(),
         refreshLibraries()
       ]);
@@ -1127,7 +1055,6 @@ function AppShell({
       const resolvedAvatar = await resolveAvatarUrl(profileData?.avatar_path ?? null);
       if (!alive) return;
       setAvatarUrl(resolvedAvatar);
-      void refreshAllBooks(libs.map((l) => l.id));
     })();
     return () => {
       alive = false;
