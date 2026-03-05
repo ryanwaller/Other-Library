@@ -89,8 +89,26 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
       ]);
       if (incomingRes.error) throw new Error(incomingRes.error.message);
       if (outgoingRes.error) throw new Error(outgoingRes.error.message);
-      const nextIncomingRows = ((incomingRes.data as any) ?? []) as BorrowRequest[];
-      const nextOutgoingRows = ((outgoingRes.data as any) ?? []) as BorrowRequest[];
+      const rawIncomingRows = ((incomingRes.data as any) ?? []) as BorrowRequest[];
+      const rawOutgoingRows = ((outgoingRes.data as any) ?? []) as BorrowRequest[];
+      const requestIds = Array.from(new Set([...rawIncomingRows, ...rawOutgoingRows].map((r) => r.id).filter((n) => Number.isFinite(n))));
+      let deletedIds = new Set<number>();
+      if (requestIds.length > 0) {
+        const delRes = await supabase
+          .from("borrow_request_deleted_for")
+          .select("borrow_request_id")
+          .eq("user_id", userId)
+          .in("borrow_request_id", requestIds);
+        if (!delRes.error) {
+          deletedIds = new Set(
+            ((delRes.data ?? []) as any[])
+              .map((r) => Number(r.borrow_request_id))
+              .filter((n) => Number.isFinite(n))
+          );
+        }
+      }
+      const nextIncomingRows = rawIncomingRows.filter((r) => !deletedIds.has(r.id));
+      const nextOutgoingRows = rawOutgoingRows.filter((r) => !deletedIds.has(r.id));
       setIncomingRows(nextIncomingRows);
       setOutgoingRows(nextOutgoingRows);
 
@@ -270,7 +288,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                       <Link href={embedded ? `/app/messages/${r.id}?back=${encodeURIComponent("/app/settings?tab=loans")}` : `/app/messages/${r.id}`}>
                         View conversation
                       </Link>
-                      {" · "}
+                      {"\u00A0\u00A0"}
                       <button
                         type="button"
                         className="text-muted"
@@ -332,7 +350,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
                       <Link href={embedded ? `/app/messages/${r.id}?back=${encodeURIComponent("/app/settings?tab=loans")}` : `/app/messages/${r.id}`}>
                         View conversation
                       </Link>
-                      {" · "}
+                      {"\u00A0\u00A0"}
                       <button
                         type="button"
                         className="text-muted"
