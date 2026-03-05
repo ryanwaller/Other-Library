@@ -1124,6 +1124,25 @@ a.text-muted:hover {
   box-shadow: none !important;
 }
 
+.om-book-detail-grid input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.om-book-detail-grid textarea,
+.om-book-detail-grid select {
+  border: 0 !important;
+  border-bottom: 0 !important;
+}
+
+.om-book-detail-grid input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+.om-book-detail-grid input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus-visible,
+.om-book-detail-grid textarea:focus,
+.om-book-detail-grid textarea:focus-visible,
+.om-book-detail-grid select:focus,
+.om-book-detail-grid select:focus-visible {
+  border: 0 !important;
+  border-bottom: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
 .om-catalog-caret {
   display: inline-block;
   width: 10px;
