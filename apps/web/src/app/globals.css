@@ -346,7 +346,7 @@ button.muted:focus-visible {
   color: #fff;
   line-height: 1em;
   font-size: calc(var(--text-size-1) - 1px);
-  transform: translateY(1px);
+  transform: translateY(0);
   align-self: center;
   border: 0;
   outline: 0;

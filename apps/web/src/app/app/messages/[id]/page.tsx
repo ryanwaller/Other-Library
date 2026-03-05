@@ -220,7 +220,7 @@ export default function MessageThreadPage() {
     if (!supabase || !userId || !req) return;
     const msg = draft.trim();
     if (!msg) return;
-    if (req.status !== "pending" && req.status !== "approved" && req.status !== "rejected") return;
+    if (req.status !== "pending" && req.status !== "approved" && req.status !== "rejected" && req.status !== "cancelled") return;
     setSendState({ busy: true, error: null, message: "Sending…" });
     const res = await supabase
       .from("borrow_request_messages")
@@ -440,7 +440,7 @@ export default function MessageThreadPage() {
           <div className="row" style={{ gap: "var(--space-10)", flexWrap: "wrap" }}>
             <button
               onClick={send}
-              disabled={sendState.busy || !draft.trim() || !req || (req.status !== "pending" && req.status !== "approved" && req.status !== "rejected")}
+              disabled={sendState.busy || !draft.trim() || !req || (req.status !== "pending" && req.status !== "approved" && req.status !== "rejected" && req.status !== "cancelled")}
             >
               {sendState.busy ? "Sending…" : "Send"}
             </button>
