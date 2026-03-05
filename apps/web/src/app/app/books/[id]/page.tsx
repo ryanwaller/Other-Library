@@ -3914,11 +3914,15 @@ export default function BookDetailPage() {
                           {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length > 0 ? (
                             <span className="om-member-stack" aria-label="Shared catalog members">
                               {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).slice(0, 6).map((m) =>
-                                m.avatarUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img key={m.userId} alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar" />
-                                ) : (
-                                  <span key={m.userId} className="om-member-stack-avatar" title={m.username} />
+                                (
+                                  <Link key={m.userId} href={`/u/${encodeURIComponent(m.username)}`} aria-label={`Open ${m.username}'s profile`} style={{ display: "inline-flex" }}>
+                                    {m.avatarUrl ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar" />
+                                    ) : (
+                                      <span className="om-member-stack-avatar" title={m.username} />
+                                    )}
+                                  </Link>
                                 )
                               )}
                               {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length > 6 ? (
