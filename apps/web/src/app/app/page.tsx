@@ -2925,6 +2925,52 @@ function AppWithFilters({ session }: { session: Session }) {
   );
 }
 
+function AppBootShell() {
+  return (
+    <main className="container" aria-hidden="true">
+      <div style={{ marginTop: "var(--space-16)", display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
+        <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
+          <div className="om-stat-line">
+            <span className="om-stat-pair">
+              <span className="text-muted">Catalogs</span>
+              <span className="text-muted">0</span>
+            </span>
+            <span className="om-stat-pair">
+              <span className="text-muted">Books</span>
+              <span className="text-muted">0</span>
+            </span>
+          </div>
+        </div>
+        <div className="row" style={{ width: "100%", margin: 0, alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
+          <div className="om-inline-search-input" style={{ minWidth: 0, flex: 1, opacity: 0.55 }} />
+          <span className="text-muted">Search</span>
+        </div>
+      </div>
+
+      <div style={{ height: "var(--catalog-top-gap)" }} />
+
+      <div className="card" style={{ marginTop: 0 }}>
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap" }}>
+          <span className="text-muted">Catalog</span>
+          <span className="text-muted">0&nbsp;&nbsp;books</span>
+        </div>
+        <div
+          style={{
+            marginTop: "var(--space-md)",
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            gap: "var(--space-md)"
+          }}
+        >
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={`boot-card-${i}`} className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}
+
 export default function AppPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [sessionLoaded, setSessionLoaded] = useState(false);
@@ -2944,7 +2990,7 @@ export default function AppPage() {
           <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.</div>
         </div>
       ) : !sessionLoaded ? (
-        <div style={{ minHeight: "40vh" }} aria-hidden="true" />
+        <AppBootShell />
       ) : session ? (
         <Suspense fallback={<div className="card">Loading…</div>}>
           <AppWithFilters session={session} />
