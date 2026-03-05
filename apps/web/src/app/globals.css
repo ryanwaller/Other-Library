@@ -114,6 +114,22 @@ body {
   opacity: 0.55;
 }
 
+@keyframes skeletonPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.skeleton {
+  background: var(--placeholder-bg);
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+  border-radius: 2px;
+}
+
 a, 
 button.muted,
 button.om-filter-link,

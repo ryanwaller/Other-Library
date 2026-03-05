@@ -9,6 +9,7 @@ import SignInCard from "../components/SignInCard";
 import BulkBar from "./components/BulkBar";
 import LibraryBlock from "./components/LibraryBlock";
 import BookCard from "./components/BookCard";
+import HomepageSkeleton from "./components/HomepageSkeleton";
 import { useBookScanner } from "../../hooks/useBookScanner";
 import dynamic from "next/dynamic";
 import ActiveFilterDisplay, { type FilterPair } from "../../components/ActiveFilterDisplay";
@@ -65,6 +66,8 @@ type CatalogMemberView = {
   profile: { id: string; username: string; display_name: string | null; avatar_path: string | null; email: string | null } | null;
   avatar_url: string | null;
 };
+
+let hasRenderedHomepageData = false;
 
 function parseCsvToObjects(text: string): Array<Record<string, string>> {
   const src = (text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -465,6 +468,7 @@ function AppShell({
   const autoReducedGridColsRef = useRef<4 | 8 | null>(null);
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, true | undefined>>({});
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [showInitialSkeleton, setShowInitialSkeleton] = useState(!hasRenderedHomepageData);
 
   const [stagedCsvData, setStagedCsvData] = useState<string | null>(null);
   const [stagedCsvFilename, setStagedCsvFilename] = useState<string | null>(null);
@@ -1068,22 +1072,33 @@ function AppShell({
     (async () => {
       if (!supabase) return;
       if (alive) setInitialLoadDone(true);
-      void refreshAllBooks(undefined, { fastFirst: true });
-      const [profileRes] = await Promise.all([
-        supabase.from("profiles").select("username,visibility,avatar_path").eq("id", userId).maybeSingle(),
-        refreshLibraries()
-      ]);
-      const profileData = profileRes.data;
-      if (!alive) return;
-      if (profileData) setProfile(profileData);
-      const resolvedAvatar = await resolveAvatarUrl(profileData?.avatar_path ?? null);
-      if (!alive) return;
-      setAvatarUrl(resolvedAvatar);
+      if (!hasRenderedHomepageData && alive) setShowInitialSkeleton(true);
+      try {
+        const [profileRes] = await Promise.all([
+          supabase.from("profiles").select("username,visibility,avatar_path").eq("id", userId).maybeSingle(),
+          refreshLibraries(),
+          refreshAllBooks(undefined, { fastFirst: true })
+        ]);
+        const profileData = profileRes.data;
+        if (!alive) return;
+        if (profileData) setProfile(profileData);
+        const resolvedAvatar = await resolveAvatarUrl(profileData?.avatar_path ?? null);
+        if (!alive) return;
+        setAvatarUrl(resolvedAvatar);
+      } finally {
+        if (!alive) return;
+        hasRenderedHomepageData = true;
+        setShowInitialSkeleton(false);
+      }
     })();
     return () => {
       alive = false;
     };
   }, [userId]);
+
+  if (showInitialSkeleton) {
+    return <HomepageSkeleton />;
+  }
 
   async function addByIsbnValue(isbnValue: string): Promise<number> {
     if (!supabase) throw new Error("Supabase is not configured");
@@ -2925,52 +2940,6 @@ function AppWithFilters({ session }: { session: Session }) {
   );
 }
 
-function AppBootShell() {
-  return (
-    <main className="container" aria-hidden="true">
-      <div style={{ marginTop: "var(--space-16)", display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
-        <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
-          <div className="om-stat-line">
-            <span className="om-stat-pair">
-              <span className="text-muted">Catalogs</span>
-              <span className="text-muted">0</span>
-            </span>
-            <span className="om-stat-pair">
-              <span className="text-muted">Books</span>
-              <span className="text-muted">0</span>
-            </span>
-          </div>
-        </div>
-        <div className="row" style={{ width: "100%", margin: 0, alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
-          <div className="om-inline-search-input" style={{ minWidth: 0, flex: 1, opacity: 0.55 }} />
-          <span className="text-muted">Search</span>
-        </div>
-      </div>
-
-      <div style={{ height: "var(--catalog-top-gap)" }} />
-
-      <div className="card" style={{ marginTop: 0 }}>
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap" }}>
-          <span className="text-muted">Catalog</span>
-          <span className="text-muted">0&nbsp;&nbsp;books</span>
-        </div>
-        <div
-          style={{
-            marginTop: "var(--space-md)",
-            display: "grid",
-            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-            gap: "var(--space-md)"
-          }}
-        >
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={`boot-card-${i}`} className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
-          ))}
-        </div>
-      </div>
-    </main>
-  );
-}
-
 export default function AppPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [authState, setAuthState] = useState<"loading" | "authed" | "guest">("loading");
@@ -3021,9 +2990,9 @@ export default function AppPage() {
           <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.</div>
         </div>
       ) : authState === "loading" ? (
-        <AppBootShell />
+        <HomepageSkeleton />
       ) : authState === "authed" && session ? (
-        <Suspense fallback={<div className="card">Loading…</div>}>
+        <Suspense fallback={<HomepageSkeleton />}>
           <AppWithFilters session={session} />
         </Suspense>
       ) : (
