@@ -416,9 +416,10 @@ export default function MessageThreadPage() {
               const raw = String(m.message ?? "").trim();
               const isDeleteNotice = /deleted this conversation\.\s*also delete\?/i.test(raw);
               if (isDeleteNotice) {
+                const deleteNoticeText = m.sender_id === userId ? "You deleted this conversation." : raw;
                 return (
                   <div key={m.id} className="om-thread-msg">
-                    <div>{raw}</div>
+                    <div>{deleteNoticeText}</div>
                     {m.sender_id !== userId ? (
                       <div style={{ marginTop: "var(--space-sm)" }}>
                         <a

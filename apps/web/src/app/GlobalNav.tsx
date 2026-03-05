@@ -345,13 +345,6 @@ export default function GlobalNav() {
 
   const messagesBadge = useMemo(() => {
     if (unreadThreads <= 0) return null;
-    const status = String(unreadLatestStatus ?? "").toLowerCase();
-    if (unreadThreads === 1 && (status === "approved" || status === "rejected")) {
-      return {
-        text: status === "approved" ? "✓" : "×",
-        bg: status === "approved" ? "#0b6b2e" : "#b00020"
-      };
-    }
     return { text: String(unreadThreads), bg: "#b00020" };
   }, [unreadThreads, unreadLatestStatus]);
 
