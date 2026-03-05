@@ -663,6 +663,89 @@ function AppShell({
     return;
   }
 
+  async function hydrateLibraryMemberPreviews(baseList: LibrarySummary[]) {
+    if (!supabase) return;
+    const libraryIds = baseList.map((l) => l.id).filter((n) => Number.isFinite(n) && n > 0);
+    if (libraryIds.length === 0) return;
+    const membersRes = await supabase
+      .from("catalog_members")
+      .select("catalog_id,user_id,accepted_at")
+      .in("catalog_id", libraryIds)
+      .not("accepted_at", "is", null);
+    const memberRows = (membersRes.error ? [] : ((membersRes.data ?? []) as any[])).filter((r) => String(r.user_id) !== userId);
+    const memberIds = Array.from(new Set(memberRows.map((r) => String(r.user_id)).filter(Boolean)));
+    let profileById: Record<string, { username: string; avatar_path: string | null }> = {};
+    if (memberIds.length > 0) {
+      const pr = await supabase.from("profiles").select("id,username,avatar_path").in("id", memberIds);
+      if (!pr.error) {
+        profileById = Object.fromEntries(
+          ((pr.data ?? []) as any[]).map((p) => [String(p.id), { username: String(p.username ?? ""), avatar_path: p.avatar_path ? String(p.avatar_path) : null }])
+        );
+      }
+    }
+
+    const avatarByPath: Record<string, string> = {};
+    const avatarPaths = Array.from(
+      new Set(
+        Object.values(profileById)
+          .map((p) => (p.avatar_path ?? "").trim())
+          .filter(Boolean)
+      )
+    );
+    const directUrls = avatarPaths.filter((p) => /^https?:\/\//i.test(p));
+    for (const p of directUrls) avatarByPath[p] = p;
+    const storagePaths = avatarPaths.filter((p) => !/^https?:\/\//i.test(p));
+    if (storagePaths.length > 0) {
+      const signed = await supabase.storage.from("avatars").createSignedUrls(storagePaths, 60 * 30);
+      if (!signed.error && Array.isArray(signed.data)) {
+        for (const row of signed.data) {
+          if (row.path && row.signedUrl) avatarByPath[row.path] = row.signedUrl;
+        }
+      }
+      for (const path of storagePaths) {
+        if (avatarByPath[path]) continue;
+        const pub = supabase.storage.from("avatars").getPublicUrl(path);
+        const fallback = String(pub.data?.publicUrl ?? "").trim();
+        if (fallback) avatarByPath[path] = fallback;
+      }
+    }
+
+    const membersByCatalog: Record<number, Array<{ userId: string; username: string; avatarUrl: string | null; acceptedAt: string }>> = {};
+    for (const r of memberRows) {
+      const cid = Number(r.catalog_id);
+      const uid = String(r.user_id);
+      const prof = profileById[uid];
+      if (!prof?.username) continue;
+      if (!membersByCatalog[cid]) membersByCatalog[cid] = [];
+      membersByCatalog[cid].push({
+        userId: uid,
+        username: prof.username,
+        avatarUrl: prof.avatar_path ? avatarByPath[prof.avatar_path] ?? null : null,
+        acceptedAt: String(r.accepted_at ?? "")
+      });
+    }
+
+    const previewsByCatalog: Record<number, Array<{ userId: string; username: string; avatarUrl: string | null }>> = {};
+    for (const [cidRaw, rows] of Object.entries(membersByCatalog)) {
+      const cid = Number(cidRaw);
+      previewsByCatalog[cid] = rows
+        .sort((a, b) => Date.parse(a.acceptedAt) - Date.parse(b.acceptedAt))
+        .slice(0, 10)
+        .map((m) => ({ userId: m.userId, username: m.username, avatarUrl: m.avatarUrl }));
+    }
+
+    setLibraries((prev) =>
+      prev.map((l) => {
+        const next = previewsByCatalog[l.id] ?? [];
+        const prevPreview = l.memberPreviews ?? [];
+        if (prevPreview.length === next.length && prevPreview.every((m, i) => m.userId === next[i]?.userId && m.avatarUrl === next[i]?.avatarUrl)) {
+          return l;
+        }
+        return { ...l, memberPreviews: next };
+      })
+    );
+  }
+
   async function refreshLibraries(): Promise<LibrarySummary[]> {
     if (!supabase) return [];
     setLibraryState({ busy: true, error: null, message: null });
@@ -682,6 +765,7 @@ function AppShell({
 
       if (list.length > 0) {
         setLibraries(list);
+        void hydrateLibraryMemberPreviews(list);
         try {
           const raw = window.localStorage.getItem("om_addLibraryId");
           const parsed = raw ? Number(raw) : NaN;
@@ -719,6 +803,7 @@ function AppShell({
           }
           if (list.length > 0) {
             setLibraries(list);
+            void hydrateLibraryMemberPreviews(list);
             try {
               const raw = window.localStorage.getItem("om_addLibraryId");
               const parsed = raw ? Number(raw) : NaN;
@@ -830,75 +915,6 @@ function AppShell({
         }
       }
 
-      const libraryIds = list.map((l) => l.id).filter((n) => Number.isFinite(n) && n > 0);
-      if (libraryIds.length > 0) {
-        const membersRes = await supabase
-          .from("catalog_members")
-          .select("catalog_id,user_id,accepted_at")
-          .in("catalog_id", libraryIds)
-          .not("accepted_at", "is", null);
-        const memberRows = (membersRes.error ? [] : ((membersRes.data ?? []) as any[])).filter((r) => String(r.user_id) !== userId);
-        const memberIds = Array.from(new Set(memberRows.map((r) => String(r.user_id)).filter(Boolean)));
-        let profileById: Record<string, { username: string; avatar_path: string | null }> = {};
-        if (memberIds.length > 0) {
-          const pr = await supabase.from("profiles").select("id,username,avatar_path").in("id", memberIds);
-          if (!pr.error) {
-            profileById = Object.fromEntries(
-              ((pr.data ?? []) as any[]).map((p) => [String(p.id), { username: String(p.username ?? ""), avatar_path: p.avatar_path ? String(p.avatar_path) : null }])
-            );
-          }
-        }
-
-        const avatarByPath: Record<string, string> = {};
-        const avatarPaths = Array.from(
-          new Set(
-            Object.values(profileById)
-              .map((p) => (p.avatar_path ?? "").trim())
-              .filter(Boolean)
-          )
-        );
-        const directUrls = avatarPaths.filter((p) => /^https?:\/\//i.test(p));
-        for (const p of directUrls) avatarByPath[p] = p;
-        const storagePaths = avatarPaths.filter((p) => !/^https?:\/\//i.test(p));
-        if (storagePaths.length > 0) {
-          const signed = await supabase.storage.from("avatars").createSignedUrls(storagePaths, 60 * 30);
-          if (!signed.error && Array.isArray(signed.data)) {
-            for (const row of signed.data) {
-              if (row.path && row.signedUrl) avatarByPath[row.path] = row.signedUrl;
-            }
-          }
-          for (const path of storagePaths) {
-            if (avatarByPath[path]) continue;
-            const pub = supabase.storage.from("avatars").getPublicUrl(path);
-            const fallback = String(pub.data?.publicUrl ?? "").trim();
-            if (fallback) avatarByPath[path] = fallback;
-          }
-        }
-
-        const membersByCatalog: Record<number, Array<{ userId: string; username: string; avatarUrl: string | null; acceptedAt: string }>> = {};
-        for (const r of memberRows) {
-          const cid = Number(r.catalog_id);
-          const uid = String(r.user_id);
-          const prof = profileById[uid];
-          if (!prof?.username) continue;
-          if (!membersByCatalog[cid]) membersByCatalog[cid] = [];
-          membersByCatalog[cid].push({
-            userId: uid,
-            username: prof.username,
-            avatarUrl: prof.avatar_path ? avatarByPath[prof.avatar_path] ?? null : null,
-            acceptedAt: String(r.accepted_at ?? "")
-          });
-        }
-
-        list = list.map((l) => ({
-          ...l,
-          memberPreviews: (membersByCatalog[l.id] ?? [])
-            .sort((a, b) => Date.parse(a.acceptedAt) - Date.parse(b.acceptedAt))
-            .slice(0, 10)
-            .map((m) => ({ userId: m.userId, username: m.username, avatarUrl: m.avatarUrl }))
-        }));
-      }
-
       try {
         const raw = window.localStorage.getItem("om_libraryOrder");
         const order = (raw ?? "")
@@ -917,6 +933,7 @@ function AppShell({
       }
 
       setLibraries(list);
+      void hydrateLibraryMemberPreviews(list);
 
       try {
         const raw = window.localStorage.getItem("om_addLibraryId");
@@ -943,6 +960,7 @@ function AppShell({
           setDebugLibrariesSource("libs:owner-fallback");
           const ownerList = ((ownerFallback.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const })) as LibrarySummary[];
           setLibraries(ownerList);
+          void hydrateLibraryMemberPreviews(ownerList);
           setAddLibraryId(ownerList[0]?.id ?? null);
           setLibraryState({ busy: false, error: null, message: null });
           return ownerList;
@@ -1091,6 +1109,7 @@ function AppShell({
     let alive = true;
     (async () => {
       if (!supabase) return;
+      if (alive) setInitialLoadDone(true);
       const [profileRes, libs] = await Promise.all([
         supabase.from("profiles").select("username,visibility,avatar_path").eq("id", userId).maybeSingle(),
         refreshLibraries()
@@ -1101,8 +1120,7 @@ function AppShell({
       const resolvedAvatar = await resolveAvatarUrl(profileData?.avatar_path ?? null);
       if (!alive) return;
       setAvatarUrl(resolvedAvatar);
-      await refreshAllBooks(libs.map((l) => l.id));
-      if (alive) setInitialLoadDone(true);
+      void refreshAllBooks(libs.map((l) => l.id));
     })();
     return () => {
       alive = false;
@@ -2325,8 +2343,6 @@ function AppShell({
     if (tagMode === "all") return;
     if (!availableTags.some((t) => t === tagMode)) setTagMode("all");
   }, [availableTags, tagMode, filterTag]);
-
-  if (!initialLoadDone) return null;
 
   return (
     <>
