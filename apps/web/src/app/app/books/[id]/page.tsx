@@ -1132,6 +1132,7 @@ export default function BookDetailPage() {
   const showNotesSection = editMode || Boolean((formNotes ?? "").trim());
   const showLocationSection = editMode || Boolean((formLocation ?? "").trim());
   const showShelfSection = editMode || Boolean((formShelf ?? "").trim());
+  const showLocationBlock = showLocationSection || showShelfSection;
 
   const effectiveSubjects = useMemo(() => {
     if ((facetDraft.subject ?? []).length > 0) return uniqStrings(facetDraft.subject);
@@ -2752,6 +2753,9 @@ export default function BookDetailPage() {
   }
 
   if (!initialLoadDone) return null;
+  const showUrlSection = Boolean(publicBookUrl);
+  const showDividerBorrowableLocation = showLocationBlock || showUrlSection;
+  const showDividerShelfUrl = showShelfSection && showUrlSection;
 
   return (
     <main className="container">
@@ -4002,7 +4006,7 @@ export default function BookDetailPage() {
                     ) : null}
                   </div>
 
-                  {showNotesSection ? <hr className="divider" /> : null}
+                  <hr className="divider" />
                   <div className="meta-list" style={{ gap: 0 }}>
                     <div className="row om-row-baseline">
                       <div style={{ minWidth: 110 }} className="text-muted">
@@ -4096,9 +4100,9 @@ export default function BookDetailPage() {
 
                   </div>
 
-                  {showLocationSection || showShelfSection ? (
+                  {showDividerBorrowableLocation ? <hr className="divider" /> : null}
+                  {showLocationBlock ? (
                     <>
-                      <hr className="divider" />
                     <div className="meta-list" style={{ gap: 0 }}>
                       {showLocationSection ? (
                         <div className="row om-row-baseline">
@@ -4143,7 +4147,7 @@ export default function BookDetailPage() {
                     </>
                   ) : null}
 
-                  {showShelfSection && Boolean(publicBookUrl) ? <hr className="divider" /> : null}
+                  {showDividerShelfUrl ? <hr className="divider" /> : null}
                   {publicBookUrl ? (
                     <div style={{ marginTop: 16 }}>
                       <div className="om-edit-label">URL</div>
