@@ -545,7 +545,7 @@ export default function PublicBookList({
           <div className="om-filter-row" style={{ marginTop: "var(--space-10)", marginBottom: 4, gap: "var(--space-10)", alignItems: "center" }}>
             <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as "grid" | "list")}>
               <option value="grid">grid</option>
-              {isMobile && <option value="list">list</option>}
+              <option value="list">list</option>
             </select>
             {viewMode === "grid" && (
               <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as 1 | 2 | 4 | 8)}>

@@ -2682,7 +2682,7 @@ function AppShell({
         )}
 
       {sortOpen && (
-        <div className="om-filter-row" style={{ marginTop: 16, marginBottom: "var(--space-14)", flexWrap: isMobile ? "wrap" : "nowrap", gap: "var(--space-10)", alignItems: "center" }}>
+        <div className="om-filter-row" style={{ marginTop: "var(--space-10)", marginBottom: 4, gap: "var(--space-10)", alignItems: "center" }}>
           <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
             <option value="grid">grid</option>
             <option value="list">list</option>
@@ -2706,14 +2706,22 @@ function AppShell({
             <option value="title_asc">title A-Z</option>
             <option value="title_desc">title Z-A</option>
           </select>
-          <button ref={tagButtonRef} onClick={() => (tagMenu.open ? closeTagMenu() : openTagMenu())} className={`om-filter-control${tagMenu.open ? " is-open" : ""}`} style={{ minWidth: 120 }}>
-            <span>{(filterTag ?? tagMode ?? "tag")}</span>
-            <span className="om-filter-caret" />
-          </button>
-          <button ref={categoryButtonRef} onClick={() => (categoryMenu.open ? closeCategoryMenu() : openCategoryMenu())} className={`om-filter-control${categoryMenu.open ? " is-open" : ""}`} style={{ minWidth: 160 }}>
-            <span>{((filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : "category")}</span>
-            <span className="om-filter-caret" />
-          </button>
+          <select className="om-filter-control" value={filterCategory ?? ""} onChange={(e) => setUrlFilters({ category: e.target.value || null })}>
+            <option value="">category</option>
+            {availableCategories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <select className="om-filter-control" value={filterTag ?? ""} onChange={(e) => setUrlFilters({ tag: e.target.value || null })}>
+            <option value="">tags</option>
+            {availableTags.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
           <select className="om-filter-control" value={filterDecade ?? ""} onChange={(e) => setUrlFilters({ decade: e.target.value || null })}>
             <option value="">decade</option>
             {DECADE_OPTIONS.map((decade) => (
@@ -2723,34 +2731,10 @@ function AppShell({
             ))}
           </select>
           <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
-            <option value="all">all</option>
+            <option value="all">visibility</option>
             <option value="public">public</option>
             <option value="private">private</option>
           </select>
-        </div>
-      )}
-
-      {tagMenu.open && (
-        <div ref={tagMenuRef} className="om-popover" style={{ position: "fixed", top: tagMenu.top, left: tagMenu.left, minWidth: tagMenu.minWidth, maxHeight: 320, overflow: "auto", zIndex: 1001 }}>
-          <input placeholder="Search…" value={tagSearch} onChange={(e) => setTagSearch(e.target.value)} style={{ width: "100%", marginBottom: "var(--space-8)", position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
-            <button onClick={() => { setUrlFilters({ tag: null }); closeTagMenu(); }} style={{ textAlign: "left" }}>tags</button>
-            {availableTags.filter(t => t.toLowerCase().includes(tagSearch.trim().toLowerCase())).slice(0, 400).map(t => (
-              <button key={t} onClick={() => { setUrlFilters({ tag: t }); closeTagMenu(); }} style={{ textAlign: "left" }}>{t}</button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {categoryMenu.open && (
-        <div ref={categoryMenuRef} className="om-popover" style={{ position: "fixed", top: categoryMenu.top, left: categoryMenu.left, minWidth: categoryMenu.minWidth, maxHeight: 320, overflow: "auto", zIndex: 1001 }}>
-          <input placeholder="Search…" value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)} style={{ width: "100%", marginBottom: "var(--space-8)", position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
-            <button onClick={() => { setUrlFilters({ category: null }); closeCategoryMenu(); }} style={{ textAlign: "left" }}>all</button>
-            {availableCategories.filter(c => c.toLowerCase().includes(categorySearch.trim().toLowerCase())).slice(0, 400).map(c => (
-              <button key={c} onClick={() => { setUrlFilters({ category: c }); closeCategoryMenu(); }} style={{ textAlign: "left" }}>{c}</button>
-            ))}
-          </div>
         </div>
       )}
 
