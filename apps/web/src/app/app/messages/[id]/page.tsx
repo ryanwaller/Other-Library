@@ -289,6 +289,23 @@ export default function MessageThreadPage() {
     router.refresh();
   }
 
+  async function reopenConversationForMe() {
+    if (!supabase || !req || !userId) return;
+    setDeleteState({ busy: true, error: null });
+    const res = await supabase
+      .from("borrow_request_deleted_for")
+      .delete()
+      .eq("borrow_request_id", req.id)
+      .eq("user_id", userId);
+    if (res.error) {
+      setDeleteState({ busy: false, error: res.error.message });
+      return;
+    }
+    setDeletedAtForMe(null);
+    setDeleteState({ busy: false, error: null });
+    notifyBorrowRequestsChanged();
+  }
+
   if (!supabase) {
     return (
       <main className="container">
@@ -393,6 +410,22 @@ export default function MessageThreadPage() {
                         >
                           {deleteState.busy ? "Deleting…" : "Delete"}
                         </a>
+                        {req?.status === "approved" ? (
+                          <>
+                            {"\u00A0\u00A0"}
+                            <a
+                              href={`/app/messages/${req.id}`}
+                              className="text-muted"
+                              style={{ textDecoration: "underline" }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                void reopenConversationForMe();
+                              }}
+                            >
+                              {deleteState.busy ? "Reopening…" : "Reopen"}
+                            </a>
+                          </>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
