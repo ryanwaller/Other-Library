@@ -44,8 +44,79 @@ export async function GET(req: Request, ctx: { params: Promise<{ username: strin
 
     const librariesRes = await admin.from("libraries").select("id,name").in("id", sharedCatalogIds);
     const libraries = ((librariesRes.error ? [] : librariesRes.data) ?? [])
-      .map((l: any) => ({ id: Number(l.id), name: String(l.name ?? `Catalog ${l.id}`) }))
+      .map((l: any) => ({ id: Number(l.id), name: String(l.name ?? `Catalog ${l.id}`), member_previews: [] as Array<{ user_id: string; username: string; avatar_url: string | null }> }))
       .filter((l: any) => Number.isFinite(l.id) && l.id > 0);
+
+    const membersRes = await admin
+      .from("catalog_members")
+      .select("catalog_id,user_id,accepted_at")
+      .in("catalog_id", sharedCatalogIds)
+      .not("accepted_at", "is", null);
+    const memberRows = ((membersRes.error ? [] : membersRes.data) ?? [])
+      .map((r: any) => ({
+        catalog_id: Number(r.catalog_id),
+        user_id: String(r.user_id),
+        accepted_at: String(r.accepted_at ?? "")
+      }))
+      .filter((r: any) => Number.isFinite(r.catalog_id) && r.catalog_id > 0 && r.user_id && r.user_id !== targetId);
+
+    const memberIds = Array.from(new Set(memberRows.map((r: any) => r.user_id)));
+    let profilesById: Record<string, { username: string; avatar_path: string | null }> = {};
+    if (memberIds.length > 0) {
+      const pr = await admin.from("profiles").select("id,username,avatar_path").in("id", memberIds);
+      if (!pr.error) {
+        profilesById = Object.fromEntries(
+          ((pr.data ?? []) as any[])
+            .filter((p) => p?.id && p?.username)
+            .map((p) => [String(p.id), { username: String(p.username), avatar_path: p.avatar_path ? String(p.avatar_path) : null }])
+        );
+      }
+    }
+
+    const avatarByPath: Record<string, string> = {};
+    const avatarPaths = Array.from(
+      new Set(
+        Object.values(profilesById)
+          .map((p) => (p.avatar_path ?? "").trim())
+          .filter(Boolean)
+      )
+    );
+    const directUrls = avatarPaths.filter((p) => /^https?:\/\//i.test(p));
+    for (const p of directUrls) avatarByPath[p] = p;
+    const storagePaths = avatarPaths.filter((p) => !/^https?:\/\//i.test(p));
+    if (storagePaths.length > 0) {
+      const signed = await admin.storage.from("avatars").createSignedUrls(storagePaths, 60 * 30);
+      if (!signed.error && Array.isArray(signed.data)) {
+        for (const row of signed.data) {
+          if (row.path && row.signedUrl) avatarByPath[row.path] = row.signedUrl;
+        }
+      }
+      for (const path of storagePaths) {
+        if (avatarByPath[path]) continue;
+        const pub = admin.storage.from("avatars").getPublicUrl(path);
+        const fallback = String(pub.data?.publicUrl ?? "").trim();
+        if (fallback) avatarByPath[path] = fallback;
+      }
+    }
+
+    const previewsByCatalog: Record<number, Array<{ user_id: string; username: string; avatar_url: string | null; accepted_at: string }>> = {};
+    for (const row of memberRows) {
+      const profile = profilesById[row.user_id];
+      if (!profile?.username) continue;
+      if (!previewsByCatalog[row.catalog_id]) previewsByCatalog[row.catalog_id] = [];
+      previewsByCatalog[row.catalog_id].push({
+        user_id: row.user_id,
+        username: profile.username,
+        avatar_url: profile.avatar_path ? avatarByPath[profile.avatar_path] ?? null : null,
+        accepted_at: row.accepted_at
+      });
+    }
+    for (const lib of libraries) {
+      lib.member_previews = (previewsByCatalog[lib.id] ?? [])
+        .sort((a, b) => Date.parse(a.accepted_at) - Date.parse(b.accepted_at))
+        .slice(0, 10)
+        .map((m) => ({ user_id: m.user_id, username: m.username, avatar_url: m.avatar_url }));
+    }
 
     const booksRes = await admin
       .from("user_books")

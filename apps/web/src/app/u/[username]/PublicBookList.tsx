@@ -27,6 +27,9 @@ type Props = {
   initialFilters: { author?: string; subject?: string; tag?: string; category?: string; publisher?: string };
 };
 
+type MemberPreview = { userId: string; username: string; avatarUrl: string | null };
+type PublicLibrary = { id: number; name: string; memberPreviews?: MemberPreview[] };
+
 export default function PublicBookList({
   libraries,
   allBooks,
@@ -43,7 +46,7 @@ export default function PublicBookList({
   const [sortOpen, setSortOpen] = useState(false);
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, boolean>>({});
   const [sharedBooks, setSharedBooks] = useState<PublicBook[]>([]);
-  const [sharedLibraries, setSharedLibraries] = useState<Array<{ id: number; name: string }>>([]);
+  const [sharedLibraries, setSharedLibraries] = useState<PublicLibrary[]>([]);
   const [sharedSignedMap, setSharedSignedMap] = useState<Record<string, string>>({});
 
   const [isMobile, setIsMobile] = useState(false);
@@ -99,7 +102,21 @@ export default function PublicBookList({
       if (!alive) return;
       if (!res.ok) return;
       const books = Array.isArray((json as any)?.books) ? ((json as any).books as PublicBook[]) : [];
-      const libs = Array.isArray((json as any)?.libraries) ? (((json as any).libraries as any[]).map((l) => ({ id: Number(l.id), name: String(l.name ?? "") }))) : [];
+      const libs = Array.isArray((json as any)?.libraries)
+        ? (((json as any).libraries as any[]).map((l) => ({
+            id: Number(l.id),
+            name: String(l.name ?? ""),
+            memberPreviews: Array.isArray(l.member_previews)
+              ? (l.member_previews as any[])
+                  .map((m) => ({
+                    userId: String(m.user_id ?? ""),
+                    username: String(m.username ?? ""),
+                    avatarUrl: m.avatar_url ? String(m.avatar_url) : null
+                  }))
+                  .filter((m) => !!m.userId && !!m.username)
+              : []
+          })))
+        : [];
       const signed = ((json as any)?.signed_map ?? {}) as Record<string, string>;
       setSharedBooks(books);
       setSharedLibraries(libs.filter((l) => Number.isFinite(l.id) && l.id > 0));
@@ -260,17 +277,22 @@ export default function PublicBookList({
       ).sort((a, b) => a.localeCompare(b)),
     [mergedAllBooks]
   );
-  const effectiveLibraries = useMemo(() => {
+  const effectiveLibraries = useMemo<PublicLibrary[]>(() => {
     const merged = [...libraries, ...sharedLibraries];
-    const byId = new Map<number, { id: number; name: string }>();
+    const byId = new Map<number, PublicLibrary>();
     for (const l of merged) {
       const id = Number(l.id);
       if (!Number.isFinite(id) || id <= 0) continue;
-      byId.set(id, { id, name: String(l.name ?? `Catalog ${id}`) });
+      const existing = byId.get(id);
+      byId.set(id, {
+        id,
+        name: String(l.name ?? `Catalog ${id}`),
+        memberPreviews: (l as any).memberPreviews ?? existing?.memberPreviews ?? []
+      });
     }
     if (byId.size > 0) return Array.from(byId.values());
     const ids = Array.from(new Set(filteredGroups.map((g) => g.libraryId))).filter((id) => Number.isFinite(id) && id > 0);
-    return ids.map((id) => ({ id, name: `Catalog ${id}` }));
+    return ids.map((id) => ({ id, name: `Catalog ${id}`, memberPreviews: [] }));
   }, [libraries, sharedLibraries, filteredGroups]);
 
   const renderBook = (g: CatalogGroup) => {
@@ -495,9 +517,30 @@ export default function PublicBookList({
                       <span className="om-catalog-caret" data-collapsed={collapsed ? "true" : "false"} aria-hidden="true" />
                     </button>
                     <div className="row" style={{ flex: 1, justifyContent: "space-between", alignItems: "baseline", minWidth: 0 }}>
-                      <button onClick={toggle} style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left" }}>
-                        {lib.name}
-                      </button>
+                      <div className="row" style={{ alignItems: "center", gap: "var(--space-sm)", minWidth: 0, flexShrink: 1 }}>
+                        <button onClick={toggle} style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left" }}>
+                          {lib.name}
+                        </button>
+                        {(lib.memberPreviews ?? []).length > 0 ? (
+                          <span className="om-member-stack" aria-label="Shared catalog members">
+                            {(lib.memberPreviews ?? []).slice(0, 6).map((m) => (
+                              <Link key={m.userId} href={`/u/${m.username}`} aria-label={`Open ${m.username}'s profile`} title={m.username}>
+                                {m.avatarUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar" />
+                                ) : (
+                                  <span className="om-member-stack-avatar" />
+                                )}
+                              </Link>
+                            ))}
+                            {(lib.memberPreviews ?? []).length > 6 ? (
+                              <span className="om-member-stack-overflow" title={`${(lib.memberPreviews ?? []).length - 6} more members`}>
+                                +{(lib.memberPreviews ?? []).length - 6}
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : null}
+                      </div>
                       <span className="text-muted" style={{ marginLeft: "var(--space-md)", whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
                         {libGroups.length}&nbsp;&nbsp;book{libGroups.length === 1 ? "" : "s"}
                       </span>
