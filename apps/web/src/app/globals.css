@@ -313,6 +313,11 @@ button.muted:focus-visible {
   align-items: center;
 }
 
+.om-member-stack > a {
+  display: inline-flex;
+  line-height: 0;
+}
+
 .om-member-stack-avatar {
   width: 16px;
   height: 16px;
@@ -323,7 +328,7 @@ button.muted:focus-visible {
   display: inline-block;
 }
 
-.om-member-stack-avatar + .om-member-stack-avatar {
+.om-member-stack > * + * {
   margin-left: 3px;
 }
 

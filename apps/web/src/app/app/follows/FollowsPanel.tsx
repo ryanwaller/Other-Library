@@ -312,7 +312,7 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
                         displayName={profilesById[pid]?.display_name ?? null}
                         username={username}
                         rightSlot={
-                          <div className="row" style={{ minWidth: 220, width: 220, justifyContent: "space-between", gap: "var(--space-lg)" }}>
+                          <div className="row no-wrap" style={{ justifyContent: "flex-end" }}>
                             <button onClick={() => approve(pid)} disabled={actionBusyKey !== null}>
                               {actionBusyKey === `approve:${pid}` ? "Approving…" : "Approve"}
                             </button>
