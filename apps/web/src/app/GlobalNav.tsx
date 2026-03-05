@@ -116,7 +116,29 @@ export default function GlobalNav() {
         setPendingIncomingBorrows(0);
         return;
       }
-      setPendingIncomingBorrows(Array.isArray(res.data) ? res.data.length : 0);
+      const ids = ((res.data ?? []) as any[])
+        .map((r) => Number(r.id))
+        .filter((n) => Number.isFinite(n));
+      if (ids.length === 0) {
+        setPendingIncomingBorrows(0);
+        return;
+      }
+      const del = await supabase
+        .from("borrow_request_deleted_for")
+        .select("borrow_request_id")
+        .eq("user_id", sessionUserId)
+        .in("borrow_request_id", ids);
+      if (!alive) return;
+      if (del.error) {
+        setPendingIncomingBorrows(ids.length);
+        return;
+      }
+      const hidden = new Set(
+        ((del.data ?? []) as any[])
+          .map((r) => Number(r.borrow_request_id))
+          .filter((n) => Number.isFinite(n))
+      );
+      setPendingIncomingBorrows(ids.filter((id) => !hidden.has(id)).length);
     }
 
     refreshPendingIncomingBorrows();
