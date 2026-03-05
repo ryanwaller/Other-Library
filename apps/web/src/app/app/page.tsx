@@ -334,6 +334,18 @@ function AppShell({
     const qs = params.toString();
     router.push(`/app${qs ? `?${qs}` : ""}`);
   }
+
+  function clearAllFilters() {
+    setTagMode("all");
+    setCategoryMode("all");
+    setVisibilityMode("all");
+    setSearchQuery("");
+    try {
+      router.replace("/app");
+    } catch {
+      if (typeof window !== "undefined") window.location.assign("/app");
+    }
+  }
   type CsvImportRow = {
     title: string;
     isbn: string | null;
@@ -2474,7 +2486,7 @@ function AppShell({
                 if (filterDecade) pairs.push({ label: "Decade", value: filterDecade, key: "decade", onClear: () => clearFilter("decade") });
                 return pairs;
               })()}
-              onClearAll={() => { setTagMode("all"); setCategoryMode("all"); setSearchQuery(""); router.push("/app"); }}
+              onClearAll={clearAllFilters}
             />
           </div>
         </div>
