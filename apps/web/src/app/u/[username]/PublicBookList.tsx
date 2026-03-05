@@ -8,6 +8,7 @@ import CoverImage from "../../../components/CoverImage";
 import ActiveFilterDisplay, { type FilterPair } from "../../../components/ActiveFilterDisplay";
 import PagedBookList from "../../app/components/PagedBookList";
 import type { PublicBook, CatalogGroup } from "../../../lib/types";
+import { supabase } from "../../../lib/supabaseClient";
 import { 
   effectiveTitleFor, 
   effectiveAuthorsFor, 
@@ -41,6 +42,9 @@ export default function PublicBookList({
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [sortOpen, setSortOpen] = useState(false);
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, boolean>>({});
+  const [sharedBooks, setSharedBooks] = useState<PublicBook[]>([]);
+  const [sharedLibraries, setSharedLibraries] = useState<Array<{ id: number; name: string }>>([]);
+  const [sharedSignedMap, setSharedSignedMap] = useState<Record<string, string>>({});
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -74,6 +78,47 @@ export default function PublicBookList({
   // Use state for filters so we can clear them instantly
   const [activeFilters, setActiveFilters] = useState(initialFilters);
 
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!supabase) return;
+      const sess = await supabase.auth.getSession();
+      const token = sess.data.session?.access_token ?? null;
+      if (!token) {
+        if (!alive) return;
+        setSharedBooks([]);
+        setSharedLibraries([]);
+        setSharedSignedMap({});
+        return;
+      }
+      const res = await fetch(`/api/public-profile/${encodeURIComponent(username)}/shared`, {
+        method: "GET",
+        headers: { authorization: `Bearer ${token}` }
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!alive) return;
+      if (!res.ok) return;
+      const books = Array.isArray((json as any)?.books) ? ((json as any).books as PublicBook[]) : [];
+      const libs = Array.isArray((json as any)?.libraries) ? (((json as any).libraries as any[]).map((l) => ({ id: Number(l.id), name: String(l.name ?? "") }))) : [];
+      const signed = ((json as any)?.signed_map ?? {}) as Record<string, string>;
+      setSharedBooks(books);
+      setSharedLibraries(libs.filter((l) => Number.isFinite(l.id) && l.id > 0));
+      setSharedSignedMap(signed && typeof signed === "object" ? signed : {});
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [username]);
+
+  const mergedAllBooks = useMemo(() => {
+    const byId = new Map<number, PublicBook>();
+    for (const b of allBooks) byId.set(Number(b.id), b);
+    for (const b of sharedBooks) byId.set(Number(b.id), b);
+    return Array.from(byId.values());
+  }, [allBooks, sharedBooks]);
+
+  const combinedSignedMap = useMemo(() => ({ ...sharedSignedMap, ...signedMap }), [sharedSignedMap, signedMap]);
+
   function setFilterAndUrl(key: "author" | "subject" | "tag" | "category" | "publisher", value?: string) {
     const next = { ...activeFilters };
     if (value && value.trim()) {
@@ -90,7 +135,7 @@ export default function PublicBookList({
 
   const filteredGroups = useMemo(() => {
     // 1. Filter books based on activeFilters and searchQuery
-    const filtered = allBooks.filter((b) => {
+    const filtered = mergedAllBooks.filter((b) => {
       if (activeFilters.author) {
         const authors = effectiveAuthorsFor(b).map(s => String(s).toLowerCase());
         if (!authors.includes(activeFilters.author.toLowerCase())) return false;
@@ -178,7 +223,7 @@ export default function PublicBookList({
     }
 
     return groups;
-  }, [allBooks, activeFilters, searchQuery, sortMode]);
+  }, [mergedAllBooks, activeFilters, searchQuery, sortMode]);
 
   const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
 
@@ -194,32 +239,39 @@ export default function PublicBookList({
     () =>
       Array.from(
         new Set(
-          allBooks
+          mergedAllBooks
             .flatMap((b) => (b.subjects_override ?? b.edition?.subjects ?? []) as string[])
             .map((s) => String(s ?? "").trim())
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b)),
-    [allBooks]
+    [mergedAllBooks]
   );
   const availableTags = useMemo(
     () =>
       Array.from(
         new Set(
-          allBooks
+          mergedAllBooks
             .flatMap((b) => (b.book_tags ?? []).map((bt) => bt?.tag).filter((t): t is NonNullable<typeof t> => Boolean(t)))
             .filter((t) => t.kind === "tag")
             .map((t) => String(t.name ?? "").trim())
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b)),
-    [allBooks]
+    [mergedAllBooks]
   );
   const effectiveLibraries = useMemo(() => {
-    if (libraries.length > 0) return libraries;
+    const merged = [...libraries, ...sharedLibraries];
+    const byId = new Map<number, { id: number; name: string }>();
+    for (const l of merged) {
+      const id = Number(l.id);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      byId.set(id, { id, name: String(l.name ?? `Catalog ${id}`) });
+    }
+    if (byId.size > 0) return Array.from(byId.values());
     const ids = Array.from(new Set(filteredGroups.map((g) => g.libraryId))).filter((id) => Number.isFinite(id) && id > 0);
     return ids.map((id) => ({ id, name: `Catalog ${id}` }));
-  }, [libraries, filteredGroups]);
+  }, [libraries, sharedLibraries, filteredGroups]);
 
   const renderBook = (g: CatalogGroup) => {
     const b = g.primary;
@@ -236,13 +288,13 @@ export default function PublicBookList({
         .map((c) => {
           const cover = (c.media ?? []).find((m) => m.kind === "cover");
           if (!cover) return null;
-          return signedMap[cover.storage_path] ?? null;
+          return combinedSignedMap[cover.storage_path] ?? null;
         })
         .find(Boolean) ?? e?.cover_url ?? null;
     const cropData = g.copies.find((c) => c.cover_crop)?.cover_crop ?? null;
     const originalSrc =
       g.copies
-        .map((c) => (c.cover_original_url ? signedMap[c.cover_original_url] : null))
+        .map((c) => (c.cover_original_url ? combinedSignedMap[c.cover_original_url] : null))
         .find(Boolean) ?? null;
     const href = `/u/${username}/b/${bookIdSlug(b.id, title)}`;
 
