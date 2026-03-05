@@ -3847,6 +3847,7 @@ export default function BookDetailPage() {
 
               {isOwner ? (
                 <>
+                  <hr className="divider" />
                   <div className="meta-list">
                     <div className="row om-row-baseline">
                       <div style={{ minWidth: 110 }} className="text-muted">
