@@ -1082,6 +1082,7 @@ a.text-muted:hover {
 /* Keep edit-detail rows from "jumping" when controls gain focus. */
 .om-book-detail-grid .om-row-baseline {
   min-height: calc(var(--text-line) * 1em);
+  align-items: center;
 }
 
 .om-book-detail-grid .om-inline-control,
