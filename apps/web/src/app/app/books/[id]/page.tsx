@@ -246,6 +246,13 @@ function parseAuthorsInput(input: string): string[] {
   return out;
 }
 
+function normalizePublishDateForStorage(input: string): string | null {
+  const trimmed = String(input ?? "").trim();
+  if (!trimmed) return null;
+  if (/^\d{4}$/.test(trimmed)) return `${trimmed}-01-01`;
+  return trimmed;
+}
+
 function facetHref(role: string, name: string): string {
   const mapping: Record<string, string> = {
     author: "author",
@@ -1667,7 +1674,7 @@ export default function BookDetailPage() {
       printer_override: printer_override || null,
       materials_override: materials_override || null,
       edition_override: formEditionOverride.trim() ? formEditionOverride.trim() : null,
-      publish_date_override: formPublishDate.trim() ? formPublishDate.trim() : null,
+      publish_date_override: normalizePublishDateForStorage(formPublishDate),
       description_override: formDescription.trim() ? formDescription.trim() : null,
       subjects_override: subjects_override.length > 0 ? subjects_override : [],
       location: formLocation.trim() ? formLocation.trim() : null,
@@ -2523,7 +2530,8 @@ export default function BookDetailPage() {
       // Additive linking: preserve existing effective values via overrides so nothing is "lost" when edition_id changes.
       const currentTitle = (formTitle.trim() ? formTitle.trim() : String(book.edition?.title ?? "").trim()) || null;
       const currentPublisher = (formPublisher.trim() ? formPublisher.trim() : String(book.edition?.publisher ?? "").trim()) || null;
-      const currentPublishDate = (formPublishDate.trim() ? formPublishDate.trim() : String(book.edition?.publish_date ?? "").trim()) || null;
+    const currentPublishDate =
+      normalizePublishDateForStorage(formPublishDate) ?? normalizePublishDateForStorage(String(book.edition?.publish_date ?? "").trim());
       const currentDescription = (formDescription.trim() ? formDescription.trim() : String(book.edition?.description ?? "").trim()) || null;
 
       const currentAuthors = (effectiveAuthors ?? []).map((a) => String(a ?? "").trim()).filter(Boolean);

@@ -58,6 +58,7 @@ type PublicBookDetail = {
   } | null;
   media: Array<{ id: number; kind: "cover" | "image"; storage_path: string; caption: string | null; created_at: string }>;
   book_tags?: Array<{ tag: { id: number; name: string; kind: "tag" | "category" } | null }>;
+  book_entities?: Array<{ role: string; position: number | null; entity: { id: string; name: string; slug: string } | null }> | null;
 };
 
 function parseBookId(idSlug: string): number | null {
@@ -142,7 +143,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const bookRes = await supabase
     .from("user_books")
     .select(
-      "*,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
+      "*,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))"
     )
     .eq("id", bookId)
     .eq("owner_id", profile.id)
@@ -206,7 +207,18 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   ).map(String);
   const subjects = effectiveSubjects.slice().sort((a, b) => a.localeCompare(b));
   const allTags = ((book.book_tags ?? []).map((bt) => bt?.tag).filter(Boolean) as Array<{ id: number; name: string; kind: "tag" | "category" }>);
-  const categories = allTags.filter((t) => t.kind === "category").map((t) => String(t.name ?? "").trim()).filter(Boolean);
+  const categorySet = new Set<string>(
+    allTags
+      .filter((t) => t.kind === "category")
+      .map((t) => String(t.name ?? "").trim())
+      .filter(Boolean)
+  );
+  for (const row of book.book_entities ?? []) {
+    if (String(row?.role ?? "").trim() !== "category") continue;
+    const name = String(row?.entity?.name ?? "").trim();
+    if (name) categorySet.add(name);
+  }
+  const categories = Array.from(categorySet.values());
   const tags = allTags.filter((t) => t.kind === "tag").map((t) => String(t.name ?? "").trim()).filter(Boolean);
 
   const paths = Array.from(new Set([
