@@ -2973,13 +2973,44 @@ function AppBootShell() {
 
 export default function AppPage() {
   const [session, setSession] = useState<Session | null>(null);
-  const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [authState, setAuthState] = useState<"loading" | "authed" | "guest">("loading");
 
   useEffect(() => {
-    if (!supabase) { setSessionLoaded(true); return; }
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setSessionLoaded(true); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => { setSession(newSession); setSessionLoaded(true); });
-    return () => sub.subscription.unsubscribe();
+    if (!supabase) {
+      setAuthState("guest");
+      return;
+    }
+    let alive = true;
+    let guestTimer: number | null = null;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!alive) return;
+      const s = data.session ?? null;
+      setSession(s);
+      if (s) {
+        setAuthState("authed");
+      } else {
+        // Grace window prevents guest flash while auth session restores.
+        guestTimer = window.setTimeout(() => {
+          if (!alive) return;
+          setAuthState("guest");
+        }, 700);
+      }
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!alive) return;
+      if (guestTimer) {
+        window.clearTimeout(guestTimer);
+        guestTimer = null;
+      }
+      const s = newSession ?? null;
+      setSession(s);
+      setAuthState(s ? "authed" : "guest");
+    });
+    return () => {
+      alive = false;
+      if (guestTimer) window.clearTimeout(guestTimer);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   return (
@@ -2989,9 +3020,9 @@ export default function AppPage() {
           <div>Supabase is not configured.</div>
           <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. See <a href="/setup">/setup</a>.</div>
         </div>
-      ) : !sessionLoaded ? (
+      ) : authState === "loading" ? (
         <AppBootShell />
-      ) : session ? (
+      ) : authState === "authed" && session ? (
         <Suspense fallback={<div className="card">Loading…</div>}>
           <AppWithFilters session={session} />
         </Suspense>
