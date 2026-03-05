@@ -1089,6 +1089,14 @@ a.text-muted:hover {
 .om-book-detail-grid .pill-token-input {
   line-height: var(--text-line) !important;
   min-height: calc(var(--text-line) * 1em) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  box-sizing: border-box !important;
+  position: relative;
+  top: 0;
+  transform: none !important;
 }
 
 .om-book-detail-grid input.om-inline-control,

@@ -650,6 +650,23 @@ export default function BookDetailPage() {
   }, [editMode, formDescription]);
 
   useEffect(() => {
+    if (!editMode) return;
+    let raf = 0;
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target || !target.closest(".om-book-detail-grid")) return;
+      const x = window.scrollX;
+      const y = window.scrollY;
+      raf = window.requestAnimationFrame(() => window.scrollTo(x, y));
+    };
+    window.addEventListener("focusin", onFocusIn);
+    return () => {
+      window.removeEventListener("focusin", onFocusIn);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, [editMode]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     // Ensure navigation to a new detail page always starts at the top on mobile.
     window.scrollTo(0, 0);
