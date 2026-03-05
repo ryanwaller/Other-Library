@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
+import Link from "next/link";
 import { usePagination } from "../hooks/usePagination";
 
 export default function LibraryBlock({
@@ -178,11 +179,20 @@ export default function LibraryBlock({
                 {(memberPreviews ?? []).length > 0 ? (
                   <span className="om-member-stack" aria-label="Shared catalog members">
                     {(memberPreviews ?? []).slice(0, 6).map((m) =>
-                      m.avatarUrl ? (
+                      m.username ? (
+                        <Link key={m.userId} href={`/u/${m.username}`} aria-label={`Open ${m.username}'s profile`} title={m.username}>
+                          {m.avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar" />
+                          ) : (
+                            <span className="om-member-stack-avatar" />
+                          )}
+                        </Link>
+                      ) : m.avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img key={m.userId} alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar" />
+                        <img key={m.userId} alt="" src={m.avatarUrl} className="om-member-stack-avatar" />
                       ) : (
-                        <span key={m.userId} className="om-member-stack-avatar" title={m.username} />
+                        <span key={m.userId} className="om-member-stack-avatar" />
                       )
                     )}
                     {(memberPreviews ?? []).length > 6 ? (
