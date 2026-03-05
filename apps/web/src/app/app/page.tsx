@@ -2734,7 +2734,7 @@ function AppShell({
         <div ref={tagMenuRef} className="om-popover" style={{ position: "fixed", top: tagMenu.top, left: tagMenu.left, minWidth: tagMenu.minWidth, maxHeight: 320, overflow: "auto", zIndex: 1001 }}>
           <input placeholder="Search…" value={tagSearch} onChange={(e) => setTagSearch(e.target.value)} style={{ width: "100%", marginBottom: "var(--space-8)", position: "sticky", top: 0, background: "var(--bg)", zIndex: 2 }} />
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
-            <button onClick={() => { setUrlFilters({ tag: null }); closeTagMenu(); }} style={{ textAlign: "left" }}>all</button>
+            <button onClick={() => { setUrlFilters({ tag: null }); closeTagMenu(); }} style={{ textAlign: "left" }}>tags</button>
             {availableTags.filter(t => t.toLowerCase().includes(tagSearch.trim().toLowerCase())).slice(0, 400).map(t => (
               <button key={t} onClick={() => { setUrlFilters({ tag: t }); closeTagMenu(); }} style={{ textAlign: "left" }}>{t}</button>
             ))}

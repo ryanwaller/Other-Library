@@ -25,7 +25,7 @@ type Props = {
   profileId: string;
   signedMap: Record<string, string>;
   showLibraryBlocks: boolean;
-  initialFilters: { author?: string; subject?: string; tag?: string; category?: string; publisher?: string; decade?: string };
+  initialFilters: { author?: string; tag?: string; category?: string; publisher?: string; decade?: string; subject?: string };
 };
 
 type MemberPreview = { userId: string; username: string; avatarUrl: string | null };
@@ -167,7 +167,7 @@ export default function PublicBookList({
 
   const combinedSignedMap = useMemo(() => ({ ...sharedSignedMap, ...signedMap }), [sharedSignedMap, signedMap]);
 
-  function setFilterAndUrl(key: "author" | "subject" | "tag" | "category" | "publisher" | "decade", value?: string) {
+  function setFilterAndUrl(key: "author" | "tag" | "category" | "publisher" | "decade" | "subject", value?: string) {
     const next = { ...activeFilters };
     if (value && value.trim()) {
       (next as any)[key] = value;
@@ -188,13 +188,17 @@ export default function PublicBookList({
         const authors = effectiveAuthorsFor(b).map(s => String(s).toLowerCase());
         if (!authors.includes(activeFilters.author.toLowerCase())) return false;
       }
-      if (activeFilters.subject) {
-        const subjects = (b.subjects_override ?? b.edition?.subjects ?? []).map(s => String(s).toLowerCase());
-        if (!subjects.includes(activeFilters.subject.toLowerCase())) return false;
-      }
       if (activeFilters.publisher) {
         const pub = b.publisher_override || b.edition?.publisher;
         if (String(pub ?? "").toLowerCase() !== activeFilters.publisher.toLowerCase()) return false;
+      }
+      if (activeFilters.category) {
+        const categories = (b.book_tags ?? [])
+          .map((bt) => bt?.tag)
+          .filter((t): t is NonNullable<typeof t> => Boolean(t))
+          .filter((t) => t.kind === "category")
+          .map((t) => String(t.name ?? "").toLowerCase());
+        if (!categories.includes(activeFilters.category.toLowerCase())) return false;
       }
       if (activeFilters.decade) {
         const decade = String(b.decade ?? "").toLowerCase();
@@ -247,14 +251,33 @@ export default function PublicBookList({
         return score(b) - score(a);
       })[0]!;
 
+      const tagNames = Array.from(
+        new Set(
+          sorted
+            .flatMap((copy) => (copy.book_tags ?? []).map((bt) => bt?.tag).filter((t): t is NonNullable<typeof t> => Boolean(t)))
+            .filter((t) => t.kind === "tag")
+            .map((t) => String(t.name ?? "").trim())
+            .filter(Boolean)
+        )
+      );
+      const categoryNames = Array.from(
+        new Set(
+          sorted
+            .flatMap((copy) => (copy.book_tags ?? []).map((bt) => bt?.tag).filter((t): t is NonNullable<typeof t> => Boolean(t)))
+            .filter((t) => t.kind === "category")
+            .map((t) => String(t.name ?? "").trim())
+            .filter(Boolean)
+        )
+      );
+
       return { 
         key, 
         libraryId: primary.library_id, 
         primary, 
         copies: sorted,
         copiesCount: sorted.length,
-        tagNames: [], // Not populated in this view currently
-        categoryNames: [],
+        tagNames,
+        categoryNames,
         filterAuthors: effectiveAuthorsFor(primary),
         filterSubjects: (primary.subjects_override ?? primary.edition?.subjects ?? []) as string[],
         filterPublishers: [primary.publisher_override || primary.edition?.publisher || ""],
@@ -293,13 +316,14 @@ export default function PublicBookList({
   }, [viewMode, effectiveCols]);
 
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
-  const availableSubjects = useMemo(
+  const availableCategories = useMemo(
     () =>
       Array.from(
         new Set(
           mergedAllBooks
-            .flatMap((b) => (b.subjects_override ?? b.edition?.subjects ?? []) as string[])
-            .map((s) => String(s ?? "").trim())
+            .flatMap((b) => (b.book_tags ?? []).map((bt) => bt?.tag).filter((t): t is NonNullable<typeof t> => Boolean(t)))
+            .filter((t) => t.kind === "category")
+            .map((t) => String(t.name ?? "").trim())
             .filter(Boolean)
         )
       ).sort((a, b) => a.localeCompare(b)),
@@ -475,7 +499,6 @@ export default function PublicBookList({
                 if (activeFilters.category) pairs.push({ label: "Category", value: activeFilters.category, key: "category", onClear: () => setFilterAndUrl("category") });
                 if (activeFilters.tag) pairs.push({ label: "Tag", value: activeFilters.tag, key: "tag", onClear: () => setFilterAndUrl("tag") });
                 if (activeFilters.author) pairs.push({ label: "Author", value: activeFilters.author, key: "author", onClear: () => setFilterAndUrl("author") });
-                if (activeFilters.subject) pairs.push({ label: "Subject", value: activeFilters.subject, key: "subject", onClear: () => setFilterAndUrl("subject") });
                 if (activeFilters.publisher) pairs.push({ label: "Publisher", value: activeFilters.publisher, key: "publisher", onClear: () => setFilterAndUrl("publisher") });
                 if (activeFilters.decade) pairs.push({ label: "Decade", value: activeFilters.decade, key: "decade", onClear: () => setFilterAndUrl("decade") });
                 return pairs;
@@ -529,14 +552,14 @@ export default function PublicBookList({
               <option value="title_asc">title A-Z</option>
               <option value="title_desc">title Z-A</option>
             </select>
-            <select className="om-filter-control" value={activeFilters.subject ?? ""} onChange={(e) => setFilterAndUrl("subject", e.target.value || undefined)}>
-              <option value="">subject</option>
-              {availableSubjects.map((s) => (
+            <select className="om-filter-control" value={activeFilters.category ?? ""} onChange={(e) => setFilterAndUrl("category", e.target.value || undefined)}>
+              <option value="">category</option>
+              {availableCategories.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
             <select className="om-filter-control" value={activeFilters.tag ?? ""} onChange={(e) => setFilterAndUrl("tag", e.target.value || undefined)}>
-              <option value="">tag</option>
+              <option value="">tags</option>
               {availableTags.map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
