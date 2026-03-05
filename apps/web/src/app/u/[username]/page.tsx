@@ -73,10 +73,21 @@ export default async function PublicProfilePage({
     avatarUrl = signed.data?.signedUrl ?? null;
   }
 
-  const followersCountRes = await supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("followee_id", profile.id).eq("status", "approved");
-  const followingCountRes = await supabase.from("follows").select("followee_id", { count: "exact", head: true }).eq("follower_id", profile.id).eq("status", "approved");
-  const followersCount = followersCountRes.count;
-  const followingCount = followingCountRes.count;
+  let followersCount: number | null = null;
+  let followingCount: number | null = null;
+  const followCountsRes = await supabase.rpc("get_follow_counts", { target_username: profile.username });
+  if (!followCountsRes.error) {
+    const row = Array.isArray(followCountsRes.data) ? ((followCountsRes.data[0] as any) ?? null) : ((followCountsRes.data as any) ?? null);
+    followersCount = row && row.followers_count != null ? Number(row.followers_count) : null;
+    followingCount = row && row.following_count != null ? Number(row.following_count) : null;
+  } else {
+    const [followersCountRes, followingCountRes] = await Promise.all([
+      supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("followee_id", profile.id).eq("status", "approved"),
+      supabase.from("follows").select("followee_id", { count: "exact", head: true }).eq("follower_id", profile.id).eq("status", "approved")
+    ]);
+    followersCount = followersCountRes.count ?? null;
+    followingCount = followingCountRes.count ?? null;
+  }
 
   const booksRes = await supabase
     .from("user_books")
