@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { supabase } from "../../lib/supabaseClient";
 
 interface Props {
   avatarUrl: string | null;
@@ -24,6 +25,31 @@ export default function PublicProfileHeader({
   followButton,
   bio
 }: Props) {
+  const [isSelf, setIsSelf] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!supabase) {
+        if (alive) setIsSelf(false);
+        return;
+      }
+      const { data } = await supabase.auth.getSession();
+      const uid = data.session?.user?.id ?? null;
+      if (!uid) {
+        if (alive) setIsSelf(false);
+        return;
+      }
+      const meRes = await supabase.from("profiles").select("username").eq("id", uid).maybeSingle();
+      const meUsername = String((meRes.data as any)?.username ?? "").trim().toLowerCase();
+      if (!alive) return;
+      setIsSelf(Boolean(meUsername) && meUsername === String(username ?? "").trim().toLowerCase());
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [username]);
+
   const avatar = avatarUrl ? (
     <div style={{ width: 48, height: 48, borderRadius: 999, overflow: "hidden", border: "1px solid var(--border-avatar)" }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -74,6 +100,7 @@ export default function PublicProfileHeader({
             Following
           </Link>
           <span>{followingCount ?? "—"}</span>
+          {isSelf ? <span className="text-muted">This is you</span> : null}
         </span>
         {followButton}
       </div>
