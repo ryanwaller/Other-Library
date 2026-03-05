@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
@@ -53,10 +53,8 @@ function parseEventMessage(raw: string): { status: "approved" | "rejected" | "ca
 export default function MessageThreadPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const searchParams = useSearchParams();
   const requestId = Number(params?.id);
-  const rawBack = searchParams.get("back");
-  const backHref = rawBack && rawBack.startsWith("/") ? rawBack : "/app/borrow-requests";
+  const backHref = "/app/settings?tab=loans";
 
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
