@@ -197,6 +197,9 @@ export default function PublicBookList({
     for (const b of sharedBooks) byId.set(Number(b.id), b);
     return Array.from(byId.values());
   }, [allBooks, sharedBooks]);
+  const sharedBookIds = useMemo(() => {
+    return new Set(sharedBooks.map((b) => Number(b.id)).filter((id) => Number.isFinite(id) && id > 0));
+  }, [sharedBooks]);
 
   const combinedSignedMap = useMemo(() => ({ ...sharedSignedMap, ...signedMap }), [sharedSignedMap, signedMap]);
 
@@ -407,7 +410,7 @@ export default function PublicBookList({
       g.copies
         .map((c) => (c.cover_original_url ? combinedSignedMap[c.cover_original_url] : null))
         .find(Boolean) ?? null;
-    const href = `/u/${username}/b/${bookIdSlug(b.id, title)}`;
+    const href = sharedBookIds.has(Number(b.id)) && !!sessionUserId ? `/app/books/${b.id}` : `/u/${username}/b/${bookIdSlug(b.id, title)}`;
 
     if (viewMode === "list") {
       return (
