@@ -126,6 +126,8 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
   let followersCount: number | null = null;
   let followingCount: number | null = null;
+  const authUserRes = await supabase.auth.getUser();
+  const viewerId = String(authUserRes.data.user?.id ?? "").trim() || null;
   const followCountsRes = await supabase.rpc("get_follow_counts", { target_username: profile.username });
   if (!followCountsRes.error) {
     const row = Array.isArray(followCountsRes.data) ? ((followCountsRes.data[0] as any) ?? null) : ((followCountsRes.data as any) ?? null);
@@ -146,7 +148,6 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       "*,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))"
     )
     .eq("id", bookId)
-    .eq("owner_id", profile.id)
     .maybeSingle();
 
   if (bookRes.error) {
@@ -164,6 +165,44 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
   const book = (bookRes.data ?? null) as unknown as PublicBookDetail | null;
   if (!book) {
+    return (
+      <main className="container">
+        <div className="card">
+          <div>
+            <Link href={`/u/${profile.username}`}>@{profile.username}</Link>
+          </div>
+          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
+            Book not found (or private).
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  let canViewInContext = String(book.owner_id ?? "") === String(profile.id ?? "");
+  if (!canViewInContext) {
+    const requiredIds = Array.from(new Set([String(profile.id ?? ""), String(viewerId ?? "")].filter(Boolean)));
+    if (requiredIds.length > 0) {
+      const membershipsRes = await supabase
+        .from("catalog_members")
+        .select("user_id,accepted_at")
+        .eq("catalog_id", Number(book.library_id))
+        .in("user_id", requiredIds)
+        .not("accepted_at", "is", null);
+      if (!membershipsRes.error) {
+        const memberSet = new Set(
+          ((membershipsRes.data ?? []) as any[])
+            .map((r) => String(r.user_id ?? "").trim())
+            .filter(Boolean)
+        );
+        const profileIsMember = memberSet.has(String(profile.id));
+        const viewerAllowed = viewerId ? memberSet.has(String(viewerId)) : false;
+        canViewInContext = profileIsMember && viewerAllowed;
+      }
+    }
+  }
+
+  if (!canViewInContext) {
     return (
       <main className="container">
         <div className="card">
