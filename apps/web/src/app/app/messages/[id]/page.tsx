@@ -79,6 +79,7 @@ export default function MessageThreadPage() {
   const [markedReadForId, setMarkedReadForId] = useState<number | null>(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+  const [deletedLocally, setDeletedLocally] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -266,8 +267,10 @@ export default function MessageThreadPage() {
   async function deleteConversationForMe() {
     if (!supabase || !req) return;
     setDeleteState({ busy: true, error: null });
+    setDeletedLocally(true);
     const res = await supabase.rpc("delete_borrow_conversation", { input_borrow_request_id: req.id });
     if (res.error) {
+      setDeletedLocally(false);
       setDeleteState({ busy: false, error: res.error.message });
       return;
     }
@@ -367,9 +370,17 @@ export default function MessageThreadPage() {
                     <div>{raw}</div>
                     {m.sender_id !== userId ? (
                       <div style={{ marginTop: "var(--space-sm)" }}>
-                        <button onClick={() => void deleteConversationForMe()} disabled={deleteState.busy}>
+                        <a
+                          href="/app/settings?tab=loans"
+                          className="text-muted"
+                          style={{ textDecoration: "underline" }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            void deleteConversationForMe();
+                          }}
+                        >
                           {deleteState.busy ? "Deleting…" : "Delete"}
-                        </button>
+                        </a>
                       </div>
                     ) : null}
                   </div>
@@ -401,6 +412,7 @@ export default function MessageThreadPage() {
         )}
       </div>
 
+      {!deletedAtForMe && !deletedLocally ? (
       <div style={{ marginTop: "var(--space-14)" }}>
         <textarea
           value={draft}
@@ -448,6 +460,7 @@ export default function MessageThreadPage() {
           </div>
         </div>
       </div>
+      ) : null}
     </main>
   );
 }
