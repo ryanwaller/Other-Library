@@ -9,9 +9,16 @@ export type PublicBook = {
   editors_override?: string[] | null;
   subjects_override: string[] | null;
   publisher_override: string | null;
+  materials_override?: string | null;
   designers_override?: string[] | null;
   group_label?: string | null;
+  object_type?: string | null;
   decade?: string | null;
+  publish_date_override?: string | null;
+  description_override?: string | null;
+  location?: string | null;
+  shelf?: string | null;
+  status?: string | null;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
   edition: { 

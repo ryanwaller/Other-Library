@@ -14,7 +14,7 @@ export default async function PublicProfilePage({
   searchParams
 }: { 
   params: Promise<{ username: string }>,
-  searchParams: Promise<{ author?: string; tag?: string; subject?: string; category?: string; publisher?: string }>
+  searchParams: Promise<{ author?: string; tag?: string; subject?: string; category?: string; publisher?: string; decade?: string }>
 }) {
   const { username } = await params;
   const rawParams = await searchParams;
@@ -23,6 +23,7 @@ export default async function PublicProfilePage({
   const filterSubject = rawParams.subject ? decodeURIComponent(rawParams.subject) : undefined;
   const filterCategory = rawParams.category ? decodeURIComponent(rawParams.category) : undefined;
   const filterPublisher = rawParams.publisher ? decodeURIComponent(rawParams.publisher) : undefined;
+  const filterDecade = rawParams.decade ? decodeURIComponent(rawParams.decade) : undefined;
 
   const usernameNorm = (username ?? "").trim().toLowerCase();
   const supabase = getServerSupabase();
@@ -163,7 +164,7 @@ export default async function PublicProfilePage({
             profileId={profile.id}
             signedMap={signedMap}
             showLibraryBlocks={showLibraryBlocks}
-            initialFilters={{ author: filterAuthor, subject: filterSubject, tag: filterTag, category: filterCategory, publisher: filterPublisher }}
+            initialFilters={{ author: filterAuthor, subject: filterSubject, tag: filterTag, category: filterCategory, publisher: filterPublisher, decade: filterDecade }}
           />
         </AddToLibraryProvider>
       </div>

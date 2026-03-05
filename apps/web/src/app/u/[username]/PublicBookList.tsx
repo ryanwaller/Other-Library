@@ -9,6 +9,7 @@ import ActiveFilterDisplay, { type FilterPair } from "../../../components/Active
 import PagedBookList from "../../app/components/PagedBookList";
 import type { PublicBook, CatalogGroup } from "../../../lib/types";
 import { supabase } from "../../../lib/supabaseClient";
+import { DECADE_OPTIONS } from "../../../lib/decades";
 import { 
   effectiveTitleFor, 
   effectiveAuthorsFor, 
@@ -24,7 +25,7 @@ type Props = {
   profileId: string;
   signedMap: Record<string, string>;
   showLibraryBlocks: boolean;
-  initialFilters: { author?: string; subject?: string; tag?: string; category?: string; publisher?: string };
+  initialFilters: { author?: string; subject?: string; tag?: string; category?: string; publisher?: string; decade?: string };
 };
 
 type MemberPreview = { userId: string; username: string; avatarUrl: string | null };
@@ -166,7 +167,7 @@ export default function PublicBookList({
 
   const combinedSignedMap = useMemo(() => ({ ...sharedSignedMap, ...signedMap }), [sharedSignedMap, signedMap]);
 
-  function setFilterAndUrl(key: "author" | "subject" | "tag" | "category" | "publisher", value?: string) {
+  function setFilterAndUrl(key: "author" | "subject" | "tag" | "category" | "publisher" | "decade", value?: string) {
     const next = { ...activeFilters };
     if (value && value.trim()) {
       (next as any)[key] = value;
@@ -195,6 +196,10 @@ export default function PublicBookList({
         const pub = b.publisher_override || b.edition?.publisher;
         if (String(pub ?? "").toLowerCase() !== activeFilters.publisher.toLowerCase()) return false;
       }
+      if (activeFilters.decade) {
+        const decade = String(b.decade ?? "").toLowerCase();
+        if (decade !== activeFilters.decade.toLowerCase()) return false;
+      }
       if (activeFilters.tag) {
         const tags = (b.book_tags ?? [])
           .map((bt) => bt?.tag)
@@ -210,7 +215,13 @@ export default function PublicBookList({
         const authors = effectiveAuthorsFor(b).join(" ").toLowerCase();
         const subjects = (b.subjects_override ?? b.edition?.subjects ?? []).join(" ").toLowerCase();
         const pub = (b.publisher_override || b.edition?.publisher || "").toLowerCase();
-        if (!title.includes(q) && !authors.includes(q) && !subjects.includes(q) && !pub.includes(q)) return false;
+        const tags = (b.book_tags ?? [])
+          .map((bt) => bt?.tag)
+          .filter((t): t is NonNullable<typeof t> => Boolean(t))
+          .map((t) => String(t.name ?? "").toLowerCase())
+          .join(" ");
+        const decades = String(b.decade ?? "").toLowerCase();
+        if (!title.includes(q) && !authors.includes(q) && !subjects.includes(q) && !pub.includes(q) && !tags.includes(q) && !decades.includes(q)) return false;
       }
       return true;
     });
@@ -307,6 +318,14 @@ export default function PublicBookList({
       ).sort((a, b) => a.localeCompare(b)),
     [mergedAllBooks]
   );
+  const availableDecades = useMemo(() => {
+    const present = new Set(
+      mergedAllBooks
+        .map((b) => String(b.decade ?? "").trim())
+        .filter(Boolean)
+    );
+    return DECADE_OPTIONS.filter((d) => present.has(d));
+  }, [mergedAllBooks]);
   const effectiveLibraries = useMemo<PublicLibrary[]>(() => {
     const merged = [...libraries, ...sharedLibraries];
     const byId = new Map<number, PublicLibrary>();
@@ -373,7 +392,7 @@ export default function PublicBookList({
                         <span className="text-muted">{a}</span>
                       ) : (
                         <button 
-                          onClick={() => setActiveFilters({ author: a })}
+                          onClick={() => setFilterAndUrl("author", a)}
                           className="om-filter-link"
                           style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
                         >
@@ -419,7 +438,7 @@ export default function PublicBookList({
                     <span className="text-muted">{a}</span>
                   ) : (
                     <button 
-                      onClick={() => setActiveFilters({ author: a })}
+                      onClick={() => setFilterAndUrl("author", a)}
                       className="om-filter-link"
                       style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
                     >
@@ -458,6 +477,7 @@ export default function PublicBookList({
                 if (activeFilters.author) pairs.push({ label: "Author", value: activeFilters.author, key: "author", onClear: () => setFilterAndUrl("author") });
                 if (activeFilters.subject) pairs.push({ label: "Subject", value: activeFilters.subject, key: "subject", onClear: () => setFilterAndUrl("subject") });
                 if (activeFilters.publisher) pairs.push({ label: "Publisher", value: activeFilters.publisher, key: "publisher", onClear: () => setFilterAndUrl("publisher") });
+                if (activeFilters.decade) pairs.push({ label: "Decade", value: activeFilters.decade, key: "decade", onClear: () => setFilterAndUrl("decade") });
                 return pairs;
               })()}
               onClearAll={() => {
@@ -519,6 +539,12 @@ export default function PublicBookList({
               <option value="">tag</option>
               {availableTags.map((t) => (
                 <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <select className="om-filter-control" value={activeFilters.decade ?? ""} onChange={(e) => setFilterAndUrl("decade", e.target.value || undefined)}>
+              <option value="">decade</option>
+              {(availableDecades.length > 0 ? availableDecades : DECADE_OPTIONS).map((d) => (
+                <option key={d} value={d}>{d}</option>
               ))}
             </select>
           </div>

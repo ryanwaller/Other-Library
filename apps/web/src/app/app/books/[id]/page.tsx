@@ -8,6 +8,7 @@ import { supabase } from "../../../../lib/supabaseClient";
 import { isValidTrimSize, convertTrimUnit, formatTrimRatio, type TrimUnit } from "../../../../lib/trimSize";
 import { bookIdSlug } from "../../../../lib/slug";
 import { formatDateShort } from "../../../../lib/formatDate";
+import { DECADE_OPTIONS } from "../../../../lib/decades";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
 import SignInCard from "../../../components/SignInCard";
 import EntityTokenField from "../../components/EntityTokenField";
@@ -3784,15 +3785,12 @@ export default function BookDetailPage() {
                       {editMode ? (
                         <select className="om-inline-control" value={formDecade || ""} onChange={(e) => setFormDecade(e.target.value)}>
                           <option value="">Choose a decade</option>
-                          <option value="Prewar">Prewar</option>
-                          <option value="1950s">1950s</option>
-                          <option value="1960s">1960s</option>
-                          <option value="1970s">1970s</option>
-                          <option value="1980s">1980s</option>
-                          <option value="1990s">1990s</option>
-                          <option value="2000s">2000s</option>
-                          <option value="2010s">2010s</option>
-                          <option value="2020s">2020s</option>
+                          {DECADE_OPTIONS.map((decade) => (
+                            <option key={decade} value={decade}>
+                              {decade}
+                            </option>
+                          ))}
+                          {formDecade && !DECADE_OPTIONS.includes(formDecade) ? <option value={formDecade}>{formDecade}</option> : null}
                         </select>
                       ) : (
                         <Link href={`/app?decade=${encodeURIComponent((book?.decade ?? "").trim())}`}>

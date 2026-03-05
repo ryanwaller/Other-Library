@@ -29,6 +29,7 @@ import {
   tryParseUrl,
   parseTitleAndAuthor
 } from "../../lib/isbn";
+import { DECADE_OPTIONS } from "../../lib/decades";
 
 const BookScannerModal = dynamic(() => import("../../components/BookScannerModal"), { ssr: false });
 
@@ -1690,15 +1691,18 @@ function AppShell({
     return inserted.data.id as number;
   }
 
-  function setUrlFilters(next: { tag?: string | null; category?: string | null }) {
+  function setUrlFilters(next: { tag?: string | null; category?: string | null; decade?: string | null }) {
     const params = new URLSearchParams();
     const nextTag = typeof next.tag === "string" ? next.tag : next.tag === null ? "" : (filterTag ?? "");
     const nextCategory = typeof next.category === "string" ? next.category : next.category === null ? "" : (filterCategory ?? "");
+    const nextDecade = typeof next.decade === "string" ? next.decade : next.decade === null ? "" : (filterDecade ?? "");
 
     const tagVal = nextTag.trim();
     const catVal = nextCategory.trim();
+    const decadeVal = nextDecade.trim();
     if (tagVal && tagVal !== "all") params.set("tag", tagVal);
     if (catVal && catVal !== "all") params.set("category", catVal);
+    if (decadeVal) params.set("decade", decadeVal);
     if (filterAuthor) params.set("author", filterAuthor);
     if (filterSubject) params.set("subject", filterSubject);
     if (filterPublisher) params.set("publisher", filterPublisher);
@@ -2257,10 +2261,44 @@ function AppShell({
     }
     if (q) {
       groups = groups.filter((g) => {
-        const title = (g.title ?? "").toLowerCase();
-        const authors = (g.filterAuthors ?? []).join(" ").toLowerCase();
-        const tags = (g.tagNames ?? []).join(" ").toLowerCase();
-        return title.includes(q) || authors.includes(q) || tags.includes(q);
+        const haystackParts: string[] = [];
+        haystackParts.push(g.title ?? "");
+        haystackParts.push((g.filterAuthors ?? []).join(" "));
+        haystackParts.push((g.tagNames ?? []).join(" "));
+        haystackParts.push((g.categoryNames ?? []).join(" "));
+        haystackParts.push((g.filterSubjects ?? []).join(" "));
+        haystackParts.push((g.filterPublishers ?? []).join(" "));
+        haystackParts.push((g.filterDesigners ?? []).join(" "));
+        haystackParts.push((g.filterGroups ?? []).join(" "));
+        haystackParts.push((g.filterDecades ?? []).join(" "));
+        for (const c of g.copies ?? []) {
+          haystackParts.push(String(c.edition?.isbn13 ?? ""));
+          haystackParts.push(String(c.edition?.isbn10 ?? ""));
+          haystackParts.push(String(c.publisher_override ?? ""));
+          haystackParts.push(String(c.edition?.publisher ?? ""));
+          haystackParts.push(String(c.description_override ?? ""));
+          haystackParts.push(String(c.edition?.description ?? ""));
+          haystackParts.push(String(c.materials_override ?? ""));
+          haystackParts.push(String(c.group_label ?? ""));
+          haystackParts.push(String(c.object_type ?? ""));
+          haystackParts.push(String((c as any).location ?? ""));
+          haystackParts.push(String((c as any).shelf ?? ""));
+          haystackParts.push(String((c as any).notes ?? ""));
+          haystackParts.push(String(c.decade ?? ""));
+          haystackParts.push(String(c.publish_date_override ?? ""));
+          haystackParts.push(String(c.edition?.publish_date ?? ""));
+          haystackParts.push((c.editors_override ?? []).join(" "));
+          haystackParts.push((c.designers_override ?? []).join(" "));
+          haystackParts.push((c.subjects_override ?? c.edition?.subjects ?? []).join(" "));
+          haystackParts.push(
+            (c.book_tags ?? [])
+              .map((bt) => bt?.tag)
+              .filter((t) => Boolean(t))
+              .map((t: any) => String(t.name ?? ""))
+              .join(" ")
+          );
+        }
+        return haystackParts.join(" ").toLowerCase().includes(q);
       });
     }
 
@@ -2676,6 +2714,14 @@ function AppShell({
             <span>{((filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : "category")}</span>
             <span className="om-filter-caret" />
           </button>
+          <select className="om-filter-control" value={filterDecade ?? ""} onChange={(e) => setUrlFilters({ decade: e.target.value || null })}>
+            <option value="">decade</option>
+            {DECADE_OPTIONS.map((decade) => (
+              <option key={decade} value={decade}>
+                {decade}
+              </option>
+            ))}
+          </select>
           <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
             <option value="all">all</option>
             <option value="public">public</option>

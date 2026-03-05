@@ -19,7 +19,9 @@ export const dynamic = "force-dynamic";
 type PublicBookDetail = {
   id: number;
   owner_id: string;
+  library_id: number;
   visibility: "inherit" | "followers_only" | "public";
+  status: string | null;
   title_override: string | null;
   authors_override: string[] | null;
   editors_override: string[] | null;
@@ -37,6 +39,9 @@ type PublicBookDetail = {
   subjects_override: string[] | null;
   borrowable_override: boolean | null;
   borrow_request_scope_override: string | null;
+  location: string | null;
+  shelf: string | null;
+  notes: string | null;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
   edition: {
@@ -52,6 +57,7 @@ type PublicBookDetail = {
     cover_url: string | null;
   } | null;
   media: Array<{ id: number; kind: "cover" | "image"; storage_path: string; caption: string | null; created_at: string }>;
+  book_tags?: Array<{ tag: { id: number; name: string; kind: "tag" | "category" } | null }>;
 };
 
 function parseBookId(idSlug: string): number | null {
@@ -136,7 +142,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const bookRes = await supabase
     .from("user_books")
     .select(
-      "*,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at)"
+      "*,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))"
     )
     .eq("id", bookId)
     .eq("owner_id", profile.id)
@@ -199,6 +205,9 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       : ((book.edition?.subjects ?? []).filter(Boolean) as string[])
   ).map(String);
   const subjects = effectiveSubjects.slice().sort((a, b) => a.localeCompare(b));
+  const allTags = ((book.book_tags ?? []).map((bt) => bt?.tag).filter(Boolean) as Array<{ id: number; name: string; kind: "tag" | "category" }>);
+  const categories = allTags.filter((t) => t.kind === "category").map((t) => String(t.name ?? "").trim()).filter(Boolean);
+  const tags = allTags.filter((t) => t.kind === "tag").map((t) => String(t.name ?? "").trim()).filter(Boolean);
 
   const paths = Array.from(new Set([
     ...(book.media ?? []).map((m) => m.storage_path).filter(Boolean),
@@ -233,6 +242,32 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     | "following";
   const effectiveBorrowable = book.borrowable_override === null || book.borrowable_override === undefined ? borrowableDefault : Boolean(book.borrowable_override);
   const effectiveBorrowScope = borrowScopeDefault;
+  const effectiveVisibility = book.visibility === "inherit" ? (profile.visibility === "public" ? "public" : "private") : (book.visibility === "public" ? "public" : "private");
+  const effectiveStatus = String(book.status ?? "").trim();
+  const locationText = String(book.location ?? "").trim();
+  const shelfText = String(book.shelf ?? "").trim();
+  const notesText = String(book.notes ?? "").trim();
+
+  let catalogName = "Catalog";
+  if (Number.isFinite(Number(book.library_id)) && Number(book.library_id) > 0) {
+    const libRes = await supabase.from("libraries").select("name").eq("id", Number(book.library_id)).maybeSingle();
+    const libName = String((libRes.data as any)?.name ?? "").trim();
+    if (libName) catalogName = libName;
+  }
+
+  let copiesCount = 1;
+  if (book.edition?.id) {
+    const copiesRes = await supabase
+      .from("user_books")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", profile.id)
+      .eq("library_id", Number(book.library_id))
+      .eq("edition_id", book.edition.id);
+    if (!copiesRes.error && typeof copiesRes.count === "number" && copiesRes.count > 0) {
+      copiesCount = copiesRes.count;
+    }
+  }
+  const publicBookPath = `/u/${profile.username}/b/${canonical}`;
 
   return (
     <main className="container">
@@ -415,6 +450,122 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   </div>
                 </div>
               ) : null}
+
+              <hr className="divider" />
+              <div className="meta-list" style={{ gap: 0 }}>
+                <div className="row om-row-baseline">
+                  <div style={{ minWidth: 110 }} className="text-muted">
+                    Catalog
+                  </div>
+                  <div>{catalogName}</div>
+                </div>
+
+                <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                  <div style={{ minWidth: 110 }} className="text-muted">
+                    Copies
+                  </div>
+                  <div>{copiesCount}</div>
+                </div>
+
+                {categories.length > 0 ? (
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                    <div style={{ minWidth: 110 }} className="text-muted">
+                      Categories
+                    </div>
+                    <div className="om-hanging-value">
+                      {categories.map((name, idx) => (
+                        <span key={`cat-${name}`}>
+                          <Link href={`/u/${profile.username}?category=${encodeURIComponent(name)}`}>{name}</Link>
+                          {idx < categories.length - 1 ? <span>, </span> : null}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {tags.length > 0 ? (
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                    <div style={{ minWidth: 110 }} className="text-muted">
+                      Tags
+                    </div>
+                    <div className="om-hanging-value">
+                      {tags.map((name, idx) => (
+                        <span key={`tag-${name}`}>
+                          <Link href={`/u/${profile.username}?tag=${encodeURIComponent(name)}`}>{name}</Link>
+                          {idx < tags.length - 1 ? <span>, </span> : null}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {notesText ? (
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                    <div style={{ minWidth: 110 }} className="text-muted">
+                      Notes
+                    </div>
+                    <div style={{ whiteSpace: "pre-wrap" }}>{notesText}</div>
+                  </div>
+                ) : null}
+              </div>
+
+              <hr className="divider" />
+              <div className="meta-list" style={{ gap: 0 }}>
+                <div className="row om-row-baseline">
+                  <div style={{ minWidth: 110 }} className="text-muted">
+                    Visibility
+                  </div>
+                  <div>{effectiveVisibility}</div>
+                </div>
+
+                {effectiveStatus ? (
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                    <div style={{ minWidth: 110 }} className="text-muted">
+                      Status
+                    </div>
+                    <div>{effectiveStatus}</div>
+                  </div>
+                ) : null}
+
+                <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                  <div style={{ minWidth: 110 }} className="text-muted">
+                    Borrowable
+                  </div>
+                  <div>{effectiveBorrowable ? "yes" : "no"}</div>
+                </div>
+              </div>
+
+              {(locationText || shelfText) ? <hr className="divider" /> : null}
+              {(locationText || shelfText) ? (
+                <div className="meta-list" style={{ gap: 0 }}>
+                  {locationText ? (
+                    <div className="row om-row-baseline">
+                      <div style={{ minWidth: 110 }} className="text-muted">
+                        Location
+                      </div>
+                      <div>{locationText}</div>
+                    </div>
+                  ) : null}
+                  {shelfText ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">
+                        Shelf
+                      </div>
+                      <div>{shelfText}</div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <hr className="divider" />
+              <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                <div style={{ minWidth: 110 }} className="text-muted">
+                  URL
+                </div>
+                <div style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                  <Link href={publicBookPath}>{publicBookPath}</Link>
+                </div>
+              </div>
 
               <div style={{ marginTop: "var(--space-md)" }}>
                 <BorrowRequestWidget
