@@ -89,6 +89,14 @@ export default function MessageThreadPage() {
   }, []);
 
   const isOwner = useMemo(() => Boolean(userId && req?.owner_id && userId === req.owner_id), [userId, req?.owner_id]);
+  const hasDeleteNoticeFromOther = useMemo(
+    () =>
+      thread.some((m) => {
+        const raw = String(m.message ?? "").trim();
+        return /deleted this conversation\.\s*also delete\?/i.test(raw) && m.sender_id !== userId;
+      }),
+    [thread, userId]
+  );
   const otherUserId = useMemo(() => {
     if (!req || !userId) return null;
     return userId === req.owner_id ? req.requester_id : req.owner_id;
@@ -412,7 +420,7 @@ export default function MessageThreadPage() {
         )}
       </div>
 
-      {!deletedAtForMe && !deletedLocally ? (
+      {!deletedAtForMe && !deletedLocally && !hasDeleteNoticeFromOther ? (
       <div style={{ marginTop: "var(--space-14)" }}>
         <textarea
           value={draft}
