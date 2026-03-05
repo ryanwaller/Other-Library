@@ -1079,6 +1079,17 @@ a.text-muted:hover {
   border-bottom: 0 !important;
 }
 
+/* Keep edit-detail rows from "jumping" when controls gain focus. */
+.om-book-detail-grid .om-row-baseline {
+  min-height: calc(var(--text-line) * 1em);
+}
+
+.om-book-detail-grid .om-inline-control,
+.om-book-detail-grid .pill-token-input {
+  line-height: var(--text-line) !important;
+  min-height: calc(var(--text-line) * 1em) !important;
+}
+
 .om-catalog-caret {
   display: inline-block;
   width: 10px;
