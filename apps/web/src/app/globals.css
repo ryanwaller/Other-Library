@@ -797,7 +797,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 
 .om-borrow-requests-panel .om-request-line {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
   gap: var(--space-md);
   flex-wrap: nowrap;
@@ -805,7 +805,7 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 
 .om-borrow-requests-panel .om-request-sentence-wrap {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-md);
   min-width: 0;
   flex: 1 1 auto;
@@ -820,9 +820,12 @@ input[type="range"]:focus-visible::-moz-range-thumb {
 
 .om-borrow-requests-panel .om-request-status {
   white-space: nowrap;
-  align-self: flex-start;
+  align-self: baseline;
   line-height: inherit;
-  transform: translateY(-1px);
+  display: inline-block;
+  min-width: 80px;
+  text-align: right;
+  transform: none;
 }
 
 .om-borrow-requests-panel .om-avatar-img {

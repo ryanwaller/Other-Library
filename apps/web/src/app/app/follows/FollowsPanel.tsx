@@ -119,16 +119,32 @@ export default function FollowsPanel({ embedded = false }: { embedded?: boolean 
       }
       setProfilesById(pmap);
 
-      const avatarPaths = Array.from(new Set(Object.values(pmap).map((p) => p.avatar_path).filter(Boolean))) as string[];
+      const avatarPaths = Array.from(
+        new Set(
+          Object.values(pmap)
+            .map((p) => (p.avatar_path ?? "").trim())
+            .filter(Boolean)
+        )
+      );
       if (avatarPaths.length === 0) {
         setAvatarUrlsByPath({});
         return;
       }
 
-      const signed = await supabase.storage.from("avatars").createSignedUrls(avatarPaths, 60 * 30);
       const amap: Record<string, string> = {};
-      for (const s of signed.data ?? []) {
-        if (s.path && s.signedUrl) amap[s.path] = s.signedUrl;
+      const direct = avatarPaths.filter((p) => /^https?:\/\//i.test(p));
+      for (const p of direct) amap[p] = p;
+      const storagePaths = avatarPaths.filter((p) => !/^https?:\/\//i.test(p));
+      if (storagePaths.length > 0) {
+        const signed = await supabase.storage.from("avatars").createSignedUrls(storagePaths, 60 * 30);
+        for (const s of signed.data ?? []) {
+          if (s.path && s.signedUrl) amap[s.path] = s.signedUrl;
+        }
+        for (const p of storagePaths) {
+          if (amap[p]) continue;
+          const fallback = String(supabase.storage.from("avatars").getPublicUrl(p).data?.publicUrl ?? "").trim();
+          if (fallback) amap[p] = fallback;
+        }
       }
       setAvatarUrlsByPath(amap);
     } catch (e: any) {

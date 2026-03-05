@@ -122,7 +122,7 @@ function AdminListItem({
 }) {
   return (
     <div className="om-list-row">
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-md)" }}>
         <div className={showAvatar ? "om-avatar-lockup" : undefined} style={{ minWidth: 0, wordBreak: "break-word", flex: 1 }}>
           {showAvatar ? (
             avatarUrl ? (
@@ -136,7 +136,7 @@ function AdminListItem({
             {primaryHref ? <Link href={primaryHref}>{primary}</Link> : primary}
           </div>
         </div>
-        {actions ? <div className="row" style={{ gap: "var(--space-10)", justifyContent: "flex-end" }}>{actions}</div> : null}
+        {actions ? <div className="row" style={{ gap: "var(--space-10)", justifyContent: "flex-end", alignItems: "flex-start" }}>{actions}</div> : null}
       </div>
       <div className="admin-meta-line" style={{ marginTop: 4 }}>
         {meta.map((pair, idx) => (
@@ -359,16 +359,27 @@ export default function AdminPage() {
         setAvatarUrlsByPath({});
         return;
       }
-      const paths = Array.from(new Set((usersData?.users ?? []).map((u) => u.avatar_path).filter(Boolean))) as string[];
+      const paths = Array.from(new Set((usersData?.users ?? []).map((u) => (u.avatar_path ?? "").trim()).filter(Boolean)));
       if (paths.length === 0) {
         setAvatarUrlsByPath({});
         return;
       }
-      const signed = await supabase.storage.from("avatars").createSignedUrls(paths, 60 * 30);
-      if (!alive) return;
       const map: Record<string, string> = {};
-      for (const row of signed.data ?? []) {
-        if (row.path && row.signedUrl) map[row.path] = row.signedUrl;
+      const direct = paths.filter((p) => /^https?:\/\//i.test(p));
+      for (const p of direct) map[p] = p;
+      const storagePaths = paths.filter((p) => !/^https?:\/\//i.test(p));
+      if (storagePaths.length > 0) {
+        const signed = await supabase.storage.from("avatars").createSignedUrls(storagePaths, 60 * 30);
+        if (!alive) return;
+        for (const row of signed.data ?? []) {
+          if (row.path && row.signedUrl) map[row.path] = row.signedUrl;
+        }
+        for (const p of storagePaths) {
+          if (map[p]) continue;
+          const pub = supabase.storage.from("avatars").getPublicUrl(p);
+          const fallback = String(pub.data?.publicUrl ?? "").trim();
+          if (fallback) map[p] = fallback;
+        }
       }
       setAvatarUrlsByPath(map);
     })();

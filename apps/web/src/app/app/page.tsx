@@ -2385,7 +2385,7 @@ function AppShell({
               )}
               <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                 <input
-                  placeholder={showScan ? "enter ISBN…" : "Enter ISBN, URL, or title/author"}
+                  placeholder="Add ISBN, URL, or title/author"
                   value={addInput}
                   onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); }}
                   onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
@@ -2772,7 +2772,7 @@ function AppShell({
                             <span className="text-muted">pending</span>
                             {iAmOwner ? (
                               <button className="text-muted" onClick={() => void removeCatalogMember(lib.id, m.user_id)}>
-                                Cancel
+                                Rescind
                               </button>
                             ) : null}
                           </div>

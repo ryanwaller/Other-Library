@@ -37,6 +37,7 @@ export default function GlobalNav() {
   const [me, setMe] = useState<{ username: string; avatar_path: string | null; role?: string | null; status?: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<number>(0);
+  const [pendingIncomingBorrows, setPendingIncomingBorrows] = useState<number>(0);
   const [pendingCatalogInvites, setPendingCatalogInvites] = useState<number>(0);
   const [unreadThreads, setUnreadThreads] = useState<number>(0);
   const [unreadLatestId, setUnreadLatestId] = useState<number | null>(null);
@@ -91,6 +92,39 @@ export default function GlobalNav() {
       alive = false;
       if (timer) window.clearInterval(timer);
       window.removeEventListener("om:follows-changed", refreshPending);
+    };
+  }, [sessionUserId]);
+
+  useEffect(() => {
+    let alive = true;
+    let timer: number | null = null;
+
+    async function refreshPendingIncomingBorrows() {
+      if (!supabase || !sessionUserId) {
+        setPendingIncomingBorrows(0);
+        return;
+      }
+      const res = await supabase
+        .from("borrow_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_id", sessionUserId)
+        .eq("kind", "borrow")
+        .eq("status", "pending");
+      if (!alive) return;
+      if (res.error) {
+        setPendingIncomingBorrows(0);
+        return;
+      }
+      setPendingIncomingBorrows(res.count ?? 0);
+    }
+
+    refreshPendingIncomingBorrows();
+    timer = window.setInterval(refreshPendingIncomingBorrows, 30_000);
+    window.addEventListener("om:borrow-requests-changed", refreshPendingIncomingBorrows);
+    return () => {
+      alive = false;
+      if (timer) window.clearInterval(timer);
+      window.removeEventListener("om:borrow-requests-changed", refreshPendingIncomingBorrows);
     };
   }, [sessionUserId]);
 
@@ -249,9 +283,19 @@ export default function GlobalNav() {
       setIsAdmin(String(next.role ?? "") === "admin" && String(next.status ?? "") !== "disabled");
 
       if (next.avatar_path) {
-        const signed = await supabase.storage.from("avatars").createSignedUrl(next.avatar_path, 60 * 30);
+        const path = String(next.avatar_path ?? "").trim();
+        if (/^https?:\/\//i.test(path)) {
+          setAvatarUrl(path);
+          return;
+        }
+        const signed = await supabase.storage.from("avatars").createSignedUrl(path, 60 * 30);
         if (!alive) return;
-        setAvatarUrl(signed.data?.signedUrl ?? null);
+        if (signed.data?.signedUrl) {
+          setAvatarUrl(signed.data.signedUrl);
+        } else {
+          const pub = supabase.storage.from("avatars").getPublicUrl(path);
+          setAvatarUrl(pub.data?.publicUrl ?? null);
+        }
       } else {
         setAvatarUrl(null);
       }
@@ -321,6 +365,14 @@ export default function GlobalNav() {
               <Link href="/app/follows" aria-label={`${pendingRequests} pending follow requests`} style={{ textDecoration: "none" }}>
                 <span className="om-nav-badge om-nav-badge--circle" style={{ background: "#b00020" }}>
                   {pendingRequests}
+                </span>
+              </Link>
+            ) : null}
+
+            {sessionUserId && pendingIncomingBorrows > 0 ? (
+              <Link href="/app/settings?tab=borrows" aria-label={`${pendingIncomingBorrows} pending incoming borrow requests`} style={{ textDecoration: "none" }}>
+                <span className="om-nav-badge om-nav-badge--circle" style={{ background: "#b00020" }}>
+                  {pendingIncomingBorrows}
                 </span>
               </Link>
             ) : null}

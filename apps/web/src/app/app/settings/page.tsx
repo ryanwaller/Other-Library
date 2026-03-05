@@ -183,6 +183,7 @@ function SettingsPageContent() {
   const [usernameEdited, setUsernameEdited] = useState(false);
   const [displayNameEdited, setDisplayNameEdited] = useState(false);
   const [tab, setTab] = useState<"profile" | "follows" | "borrows" | "catalog" | "shared" | "account">("profile");
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [sharedCatalogsBusy, setSharedCatalogsBusy] = useState(false);
   const [sharedCatalogsError, setSharedCatalogsError] = useState<string | null>(null);
   const [pendingSharedCatalogs, setPendingSharedCatalogs] = useState<
@@ -331,6 +332,15 @@ function SettingsPageContent() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, accessToken]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const sync = () => setIsMobileViewport(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     setEmailDraft(sessionEmail ?? "");
@@ -911,30 +921,27 @@ function SettingsPageContent() {
               </div>
 
               <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
-                <div style={{ width: 120 }} className="text-muted">Library visibility</div>
+                <div style={{ width: 120 }} className="text-muted">Privacy</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <select
                     value={profileForm.visibility}
                     onChange={(e) => setProfileForm((p) => ({ ...p, visibility: (e.target.value === "public" ? "public" : "followers_only") as any }))}
                   >
-                    <option value="followers_only">followers_only</option>
-                    <option value="public">public</option>
+                    <option value="followers_only">Followers only</option>
+                    <option value="public">Public</option>
                   </select>
-                  <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
-                    {profileForm.visibility === "public" ? "Anyone can view /u/username" : "Only approved followers (and public book overrides)."}
-                  </div>
                 </div>
               </div>
 
               <div className="row om-settings-row" style={{ gap: "var(--space-md)", justifyContent: "space-between", alignItems: "baseline" }}>
-                <button onClick={saveProfile} disabled={profileSaveState.busy || usernameSaveBlocked}>
-                  {profileSaveState.busy ? "Saving…" : "Save profile"}
-                </button>
                 {profile ? (
                   <a href={`/u/${profile.username}`} target="_blank" rel="noreferrer" className="text-muted">
                     View public profile
                   </a>
                 ) : null}
+                <button onClick={saveProfile} disabled={profileSaveState.busy || usernameSaveBlocked}>
+                  {profileSaveState.busy ? "Saving…" : "Save"}
+                </button>
               </div>
             </div>
           ) : null}
@@ -1142,7 +1149,7 @@ function SettingsPageContent() {
                                       style={{ textDecoration: "underline" }}
                                       onClick={() => void removeOwnedSharedMember(row.catalog.id, m.user_id)}
                                     >
-                                      Delete
+                                      {m.accepted_at ? "Delete" : "Rescind"}
                                     </button>
                                   </div>
                                 </div>
@@ -1226,7 +1233,7 @@ function SettingsPageContent() {
                   />
                 </div>
               </div>
-              <div className="row om-settings-row" style={{ alignItems: "baseline" }}>
+              <div className="row om-settings-row" style={{ alignItems: "baseline", flexWrap: "nowrap" }}>
                 <div style={{ width: 120 }} className="text-muted">Confirm</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <div className="om-settings-inline-action">
@@ -1246,7 +1253,7 @@ function SettingsPageContent() {
                         onClick={savePassword}
                         disabled={passwordState.busy}
                       >
-                        {passwordState.busy ? "Saving…" : "Save password"}
+                        {passwordState.busy ? "Saving…" : "Save"}
                       </button>
                     ) : null}
                   </div>
@@ -1265,7 +1272,7 @@ function SettingsPageContent() {
                     <input
                       value={deleteConfirm}
                       onChange={(e) => setDeleteConfirm(e.target.value)}
-                      placeholder="This is permanent. Type DELETE to confirm."
+                      placeholder={isMobileViewport ? "" : "This is permanent. Type DELETE to confirm."}
                       style={{ flex: "1 1 auto", minWidth: 0 }}
                     />
                     {deleteConfirm.trim() ? (

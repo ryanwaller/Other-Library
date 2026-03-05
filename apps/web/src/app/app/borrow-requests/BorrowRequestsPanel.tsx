@@ -111,10 +111,30 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
           setProfilesById(map);
 
           const urls: Record<string, string> = {};
+          const idByPath: Record<string, string[]> = {};
           for (const p of Object.values(map)) {
-            if (!p.avatar_path) continue;
-            const signed = await supabase.storage.from("avatars").createSignedUrl(p.avatar_path, 60 * 30);
-            if (signed.data?.signedUrl) urls[p.id] = signed.data.signedUrl;
+            const path = String(p.avatar_path ?? "").trim();
+            if (!path) continue;
+            if (!idByPath[path]) idByPath[path] = [];
+            idByPath[path].push(p.id);
+          }
+          const allPaths = Object.keys(idByPath);
+          const direct = allPaths.filter((p) => /^https?:\/\//i.test(p));
+          for (const path of direct) {
+            for (const id of idByPath[path] ?? []) urls[id] = path;
+          }
+          const storagePaths = allPaths.filter((p) => !/^https?:\/\//i.test(p));
+          if (storagePaths.length > 0) {
+            const signed = await supabase.storage.from("avatars").createSignedUrls(storagePaths, 60 * 30);
+            const signedByPath: Record<string, string> = {};
+            for (const row of signed.data ?? []) {
+              if (row.path && row.signedUrl) signedByPath[row.path] = row.signedUrl;
+            }
+            for (const path of storagePaths) {
+              const resolved = signedByPath[path] ?? String(supabase.storage.from("avatars").getPublicUrl(path).data?.publicUrl ?? "");
+              if (!resolved) continue;
+              for (const id of idByPath[path] ?? []) urls[id] = resolved;
+            }
           }
           setAvatarUrlByUserId(urls);
         }
