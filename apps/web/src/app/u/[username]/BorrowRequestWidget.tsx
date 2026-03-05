@@ -29,6 +29,7 @@ export default function BorrowRequestWidget({
   const [message, setMessage] = useState<string>("");
   const [state, setState] = useState<{ busy: boolean; error: string | null; message: string | null }>({ busy: false, error: null, message: null });
   const [existing, setExisting] = useState<{ id: number; kind: "borrow" | "note"; status: string; message: string | null; created_at: string } | null>(null);
+  const [conversationDeleted, setConversationDeleted] = useState<boolean>(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -66,6 +67,27 @@ export default function BorrowRequestWidget({
       alive = false;
     };
   }, [sessionUserId, userBookId]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!supabase || !sessionUserId || !existing?.id) {
+        setConversationDeleted(false);
+        return;
+      }
+      const res = await supabase
+        .from("borrow_request_deleted_for")
+        .select("borrow_request_id")
+        .eq("user_id", sessionUserId)
+        .eq("borrow_request_id", existing.id)
+        .maybeSingle();
+      if (!alive) return;
+      setConversationDeleted(!res.error && Boolean(res.data));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [sessionUserId, existing?.id]);
 
   useEffect(() => {
     let alive = true;
@@ -171,18 +193,29 @@ export default function BorrowRequestWidget({
   }
 
   if (existing) {
+    const statusLabel = existing.status === "rejected" ? "denied" : existing.status;
+    const canReopen = existing.status === "approved" || existing.status === "cancelled";
     return (
       <div>
-        <div className="text-muted">Borrow request: {existing.status}.</div>
+        <div className="text-muted">
+          Borrow request: {statusLabel}.
+          {conversationDeleted ? " Conversation deleted." : ""}
+        </div>
         <div className="row" style={{ marginTop: "var(--space-8)" }}>
-          {existing.status === "pending" ? (
+          {existing.status === "pending" && !conversationDeleted ? (
             <button onClick={cancelRequest} disabled={state.busy}>
               {state.busy ? "…" : "Cancel request"}
             </button>
           ) : null}
-          <Link href={`/app/messages/${existing.id}`} className="text-muted">
-            Open chat
-          </Link>
+          {!conversationDeleted ? (
+            <Link href={`/app/messages/${existing.id}`} className="text-muted">
+              Open chat
+            </Link>
+          ) : canReopen ? (
+            <Link href={`/app/messages/${existing.id}`} className="text-muted">
+              Message again?
+            </Link>
+          ) : null}
           <div className="text-muted">{state.message ? (state.error ? `${state.message} (${state.error})` : state.message) : ""}</div>
         </div>
       </div>

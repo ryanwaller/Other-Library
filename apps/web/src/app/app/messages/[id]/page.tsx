@@ -89,6 +89,10 @@ export default function MessageThreadPage() {
   }, []);
 
   const isOwner = useMemo(() => Boolean(userId && req?.owner_id && userId === req.owner_id), [userId, req?.owner_id]);
+  const canComposeInDeletedThread = useMemo(
+    () => Boolean(deletedAtForMe && req && (req.status === "approved" || req.status === "cancelled")),
+    [deletedAtForMe, req]
+  );
   const hasDeleteNoticeFromOther = useMemo(
     () =>
       thread.some((m) => {
@@ -420,7 +424,7 @@ export default function MessageThreadPage() {
         )}
       </div>
 
-      {!deletedAtForMe && !deletedLocally && !hasDeleteNoticeFromOther ? (
+      {(!deletedAtForMe || canComposeInDeletedThread) && !deletedLocally && !hasDeleteNoticeFromOther ? (
       <div style={{ marginTop: "var(--space-14)" }}>
         <textarea
           value={draft}
