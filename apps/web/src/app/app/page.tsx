@@ -374,6 +374,7 @@ function AppShell({
   const [visibilityMode, setVisibilityMode] = useState<"all" | "public" | "private">("all");
   const [tagMode, setTagMode] = useState<string>("all");
   const [tagSearch, setTagSearch] = useState<string>("");
+  const memberPreviewHydratingRef = useRef(false);
   const [tagMenu, setTagMenu] = useState<{ open: boolean; top: number; left: number; minWidth: number }>({
     open: false,
     top: 0,
@@ -690,16 +691,61 @@ function AppShell({
     }
   }
 
+  function applyLibrarySelection(list: LibrarySummary[]) {
+    try {
+      const raw = window.localStorage.getItem("om_addLibraryId");
+      const parsed = raw ? Number(raw) : NaN;
+      if (Number.isFinite(parsed) && parsed > 0 && list.some((l) => l.id === parsed)) {
+        setAddLibraryId(parsed);
+      } else {
+        setAddLibraryId(list[0]?.id ?? null);
+      }
+    } catch {
+      setAddLibraryId(list[0]?.id ?? null);
+    }
+  }
+
+  async function refreshLibraryMemberPreviewsFromApi() {
+    if (memberPreviewHydratingRef.current) return;
+    memberPreviewHydratingRef.current = true;
+    try {
+      const fullRes = await catalogApi<{ ok: true; catalogs: LibrarySummary[] }>("/api/catalog/list", { method: "GET" });
+      const full = Array.isArray(fullRes.catalogs) ? fullRes.catalogs : [];
+      if (full.length === 0) return;
+      const byId = new Map<number, LibrarySummary>();
+      for (const l of full) byId.set(l.id, l);
+      setLibraries((prev) =>
+        prev.map((l) => {
+          const next = byId.get(l.id);
+          if (!next) return l;
+          const currentPreviews = l.memberPreviews ?? [];
+          const nextPreviews = next.memberPreviews ?? [];
+          if (
+            currentPreviews.length === nextPreviews.length &&
+            currentPreviews.every((m, i) => m.userId === nextPreviews[i]?.userId && m.avatarUrl === nextPreviews[i]?.avatarUrl)
+          ) {
+            return l;
+          }
+          return { ...l, memberPreviews: nextPreviews };
+        })
+      );
+    } catch {
+      // best-effort background hydration
+    } finally {
+      memberPreviewHydratingRef.current = false;
+    }
+  }
+
   async function refreshLibraries(): Promise<LibrarySummary[]> {
     if (!supabase) return [];
     setLibraryState({ busy: true, error: null, message: null });
     try {
       let list: LibrarySummary[] = [];
       try {
-        const listRes = await catalogApi<{ ok: true; catalogs: LibrarySummary[] }>("/api/catalog/list", { method: "GET" });
+        const listRes = await catalogApi<{ ok: true; catalogs: LibrarySummary[] }>("/api/catalog/list?lite=1", { method: "GET" });
         const apiList = Array.isArray(listRes.catalogs) ? listRes.catalogs : [];
         if (apiList.length > 0) {
-          setDebugLibrariesSource("libs:api-list");
+          setDebugLibrariesSource("libs:api-list-lite");
           list = apiList;
         }
       } catch {
@@ -709,17 +755,8 @@ function AppShell({
 
       if (list.length > 0) {
         setLibraries(list);
-        try {
-          const raw = window.localStorage.getItem("om_addLibraryId");
-          const parsed = raw ? Number(raw) : NaN;
-          if (Number.isFinite(parsed) && parsed > 0 && list.some((l) => l.id === parsed)) {
-            setAddLibraryId(parsed);
-          } else {
-            setAddLibraryId(list[0]?.id ?? null);
-          }
-        } catch {
-          setAddLibraryId(list[0]?.id ?? null);
-        }
+        applyLibrarySelection(list);
+        void refreshLibraryMemberPreviewsFromApi();
         setLibraryState({ busy: false, error: null, message: null });
         return list;
       }
@@ -746,17 +783,8 @@ function AppShell({
           }
           if (list.length > 0) {
             setLibraries(list);
-            try {
-              const raw = window.localStorage.getItem("om_addLibraryId");
-              const parsed = raw ? Number(raw) : NaN;
-              if (Number.isFinite(parsed) && parsed > 0 && list.some((l) => l.id === parsed)) {
-                setAddLibraryId(parsed);
-              } else {
-                setAddLibraryId(list[0]?.id ?? null);
-              }
-            } catch {
-              setAddLibraryId(list[0]?.id ?? null);
-            }
+            applyLibrarySelection(list);
+            void refreshLibraryMemberPreviewsFromApi();
             setLibraryState({ busy: false, error: null, message: null });
             return list;
           }
@@ -875,18 +903,8 @@ function AppShell({
       }
 
       setLibraries(list);
-
-      try {
-        const raw = window.localStorage.getItem("om_addLibraryId");
-        const parsed = raw ? Number(raw) : NaN;
-        if (Number.isFinite(parsed) && parsed > 0 && list.some((l) => l.id === parsed)) {
-          setAddLibraryId(parsed);
-        } else {
-          setAddLibraryId(list[0]?.id ?? null);
-        }
-      } catch {
-        setAddLibraryId(list[0]?.id ?? null);
-      }
+      applyLibrarySelection(list);
+      void refreshLibraryMemberPreviewsFromApi();
 
       setLibraryState({ busy: false, error: null, message: null });
       return list;
@@ -2685,6 +2703,27 @@ function AppShell({
       />
 
       <div style={{ height: "var(--catalog-top-gap)" }} />
+
+      {libraryState.busy && renderLibraries.length === 0 ? (
+        <div className="card" style={{ marginTop: 0 }}>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+            <span className="text-muted">Loading catalogs…</span>
+            <span className="text-muted">0&nbsp;&nbsp;books</span>
+          </div>
+          <div
+            style={{
+              marginTop: "var(--space-md)",
+              display: "grid",
+              gridTemplateColumns: `repeat(${Math.min(isMobile ? 2 : gridCols, 4)}, minmax(0, 1fr))`,
+              gap: "var(--space-md)"
+            }}
+          >
+            {Array.from({ length: Math.min(isMobile ? 2 : gridCols, 4) }).map((_, i) => (
+              <div key={`boot-skeleton-${i}`} className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {renderLibraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];

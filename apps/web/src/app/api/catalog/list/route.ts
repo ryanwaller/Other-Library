@@ -5,6 +5,8 @@ export async function GET(req: Request) {
   try {
     const current = await requireUser(req);
     const admin = requireAdminClient();
+    const url = new URL(req.url);
+    const lite = String(url.searchParams.get("lite") ?? "") === "1";
 
     let ownedRows: any[];
     const ownedRes = await admin
@@ -82,6 +84,10 @@ export async function GET(req: Request) {
         memberPreviews: [] as Array<{ userId: string; username: string; avatarUrl: string | null }>
       };
     });
+
+    if (lite) {
+      return NextResponse.json({ ok: true, catalogs });
+    }
 
     const catalogIds = catalogs.map((c) => c.id).filter((id) => Number.isFinite(id) && id > 0);
     if (catalogIds.length > 0) {
