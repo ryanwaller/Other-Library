@@ -40,13 +40,7 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  // Marketing hosts should not expose /app URLs; send to app subdomain.
-  if (isMarketingHost(host) && pathname.startsWith("/app")) {
-    const dest = new URL(req.url);
-    dest.hostname = appHostFor(host);
-    dest.pathname = pathname.replace(/^\/app/, "") || "/";
-    return NextResponse.redirect(dest);
-  }
+  // Keep /app URLs on the current host to avoid cross-host reload redirects.
 
   return NextResponse.next();
 }
