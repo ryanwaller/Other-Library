@@ -1640,6 +1640,16 @@ function AppShell({
         }).select("id").single();
         if (inserted.error) throw new Error(inserted.error.message);
         editionId = inserted.data.id;
+      } else if ((data.cover_url ?? "").trim()) {
+        // Backfill a missing edition cover when this ISBN already exists.
+        const cover = (data.cover_url ?? "").trim();
+        const currentEdition = await supabase.from("editions").select("cover_url").eq("id", editionId).maybeSingle();
+        if (!currentEdition.error) {
+          const existingCover = String(currentEdition.data?.cover_url ?? "").trim();
+          if (!existingCover) {
+            await supabase.from("editions").update({ cover_url: cover }).eq("id", editionId);
+          }
+        }
       }
     }
     const insertPayload: Record<string, unknown> = { owner_id: userId, library_id: selectedLibraryId, edition_id: editionId ?? null };
@@ -1651,8 +1661,17 @@ function AppShell({
     }
     const created = await supabase.from("user_books").insert(insertPayload).select("id").single();
     if (created.error) throw new Error(created.error.message);
+    const createdId = created.data.id as number;
+    const coverUrl = (data.cover_url ?? "").trim();
+    if (coverUrl) {
+      try {
+        await importCoverForBook(createdId, coverUrl);
+      } catch {
+        // Non-fatal: edition cover_url fallback still applies.
+      }
+    }
     await refreshAllBooks();
-    return created.data.id as number;
+    return createdId;
   }
 
   async function confirmAddFromPreview() {
