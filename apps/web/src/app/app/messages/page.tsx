@@ -81,11 +81,7 @@ export default function MessagesPage() {
           }
         }
       }
-      const nextRows = allRows.filter((r) => {
-        const deletedAt = deletedAtByRequestId[r.id];
-        if (!deletedAt) return true;
-        return Date.parse(String(r.updated_at ?? "")) > Date.parse(deletedAt);
-      });
+      const nextRows = allRows.filter((r) => !deletedAtByRequestId[r.id]);
       setRows(nextRows);
 
       const userIds = Array.from(new Set(nextRows.flatMap((r) => [r.owner_id, r.requester_id]).filter(Boolean)));

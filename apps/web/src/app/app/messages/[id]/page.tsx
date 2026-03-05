@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
@@ -51,6 +51,7 @@ function parseEventMessage(raw: string): { status: "approved" | "rejected" | "ca
 }
 
 export default function MessageThreadPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const requestId = Number(params?.id);
@@ -77,6 +78,7 @@ export default function MessageThreadPage() {
   const [statusState, setStatusState] = useState<{ busy: boolean; error: string | null; message: string | null }>({ busy: false, error: null, message: null });
   const [markedReadForId, setMarkedReadForId] = useState<number | null>(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [deleteState, setDeleteState] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
 
   useEffect(() => {
     if (!supabase) return;
@@ -261,6 +263,19 @@ export default function MessageThreadPage() {
     window.setTimeout(() => setStatusState({ busy: false, error: null, message: null }), 900);
   }
 
+  async function deleteConversationForMe() {
+    if (!supabase || !req) return;
+    setDeleteState({ busy: true, error: null });
+    const res = await supabase.rpc("delete_borrow_conversation", { input_borrow_request_id: req.id });
+    if (res.error) {
+      setDeleteState({ busy: false, error: res.error.message });
+      return;
+    }
+    notifyBorrowRequestsChanged();
+    router.push(backHref);
+    router.refresh();
+  }
+
   if (!supabase) {
     return (
       <main className="container">
@@ -344,6 +359,22 @@ export default function MessageThreadPage() {
         {thread.length === 0 ? null : (
           <div style={{ marginTop: req?.message && !deletedAtForMe ? 10 : 0, display: "flex", flexDirection: "column", gap: "var(--space-10)" }}>
             {thread.map((m) => {
+              const raw = String(m.message ?? "").trim();
+              const isDeleteNotice = /deleted this conversation\.\s*also delete\?/i.test(raw);
+              if (isDeleteNotice) {
+                return (
+                  <div key={m.id} className="om-thread-msg">
+                    <div>{raw}</div>
+                    {m.sender_id !== userId ? (
+                      <div style={{ marginTop: "var(--space-sm)" }}>
+                        <button onClick={() => void deleteConversationForMe()} disabled={deleteState.busy}>
+                          {deleteState.busy ? "Deleting…" : "Delete"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              }
               const ev = parseEventMessage(m.message);
               if (ev) {
                 const evClass =
@@ -413,6 +444,7 @@ export default function MessageThreadPage() {
               </button>
             ) : null}
             <span className="text-muted">{statusState.message ? (statusState.error ? `${statusState.message} (${statusState.error})` : statusState.message) : ""}</span>
+            <span className="text-muted">{deleteState.error ? `Delete failed (${deleteState.error})` : ""}</span>
           </div>
         </div>
       </div>

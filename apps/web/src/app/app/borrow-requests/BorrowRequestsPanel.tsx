@@ -58,6 +58,7 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
   const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<string, string>>({});
   const [booksById, setBooksById] = useState<Record<number, BookLite>>({});
   const [deleteBusyId, setDeleteBusyId] = useState<number | null>(null);
+  const [locallyHiddenIds, setLocallyHiddenIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (!supabase) return;
@@ -107,8 +108,8 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
           );
         }
       }
-      const nextIncomingRows = rawIncomingRows.filter((r) => !deletedIds.has(r.id));
-      const nextOutgoingRows = rawOutgoingRows.filter((r) => !deletedIds.has(r.id));
+      const nextIncomingRows = rawIncomingRows.filter((r) => !deletedIds.has(r.id) && !locallyHiddenIds.has(r.id));
+      const nextOutgoingRows = rawOutgoingRows.filter((r) => !deletedIds.has(r.id) && !locallyHiddenIds.has(r.id));
       setIncomingRows(nextIncomingRows);
       setOutgoingRows(nextOutgoingRows);
 
@@ -193,18 +194,26 @@ export default function BorrowRequestsPanel({ embedded = false }: { embedded?: b
   useEffect(() => {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, locallyHiddenIds]);
 
   async function deleteConversation(requestId: number) {
     if (!supabase || !userId) return;
     if (!window.confirm("Delete this conversation?")) return;
     setDeleteBusyId(requestId);
     try {
+      setLocallyHiddenIds((prev) => new Set([...prev, requestId]));
+      setIncomingRows((prev) => prev.filter((r) => r.id !== requestId));
+      setOutgoingRows((prev) => prev.filter((r) => r.id !== requestId));
       const res = await supabase.rpc("delete_borrow_conversation", { input_borrow_request_id: requestId });
       if (res.error) throw new Error(res.error.message);
       notifyBorrowRequestsChanged();
       await refresh();
     } catch (e: any) {
+      setLocallyHiddenIds((prev) => {
+        const next = new Set(prev);
+        next.delete(requestId);
+        return next;
+      });
       setError(e?.message ?? "Failed to delete conversation");
     } finally {
       setDeleteBusyId(null);
