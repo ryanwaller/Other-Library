@@ -11,6 +11,8 @@ import SignInCard from "../../components/SignInCard";
 import FollowsPanel from "../follows/FollowsPanel";
 import BorrowRequestsPanel from "../borrow-requests/BorrowRequestsPanel";
 
+const SETTINGS_TAB_STORAGE_KEY = "om_settings_tab";
+
 const RESERVED_USERNAMES = [
   "app",
   "api",
@@ -224,10 +226,29 @@ function SettingsPageContent() {
     const raw = String(searchParams.get("tab") ?? "").trim().toLowerCase();
     if (raw === "profile" || raw === "follows" || raw === "loans" || raw === "catalog" || raw === "shared" || raw === "account") {
       setTab(raw as any);
-    } else if (raw === "borrows") {
+      return;
+    }
+    if (raw === "borrows") {
       setTab("loans");
+      return;
+    }
+    try {
+      const saved = String(window.localStorage.getItem(SETTINGS_TAB_STORAGE_KEY) ?? "").trim().toLowerCase();
+      if (saved === "profile" || saved === "follows" || saved === "loans" || saved === "catalog" || saved === "shared" || saved === "account") {
+        setTab(saved as any);
+      }
+    } catch {
+      // ignore
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, tab);
+    } catch {
+      // ignore
+    }
+  }, [tab]);
 
   async function refreshSharedCatalogs() {
     if (!accessToken) {

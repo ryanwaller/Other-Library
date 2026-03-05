@@ -776,6 +776,11 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   color: var(--muted);
 }
 
+button.text-muted:hover,
+a.text-muted:hover {
+  color: var(--fg);
+}
+
 .om-list {
   display: flex;
   flex-direction: column;
