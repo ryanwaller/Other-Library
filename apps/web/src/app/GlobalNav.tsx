@@ -106,16 +106,17 @@ export default function GlobalNav() {
       }
       const res = await supabase
         .from("borrow_requests")
-        .select("id", { count: "exact", head: true })
+        .select("id")
         .eq("owner_id", sessionUserId)
         .eq("kind", "borrow")
-        .eq("status", "pending");
+        .eq("status", "pending")
+        .limit(500);
       if (!alive) return;
       if (res.error) {
         setPendingIncomingBorrows(0);
         return;
       }
-      setPendingIncomingBorrows(res.count ?? 0);
+      setPendingIncomingBorrows(Array.isArray(res.data) ? res.data.length : 0);
     }
 
     refreshPendingIncomingBorrows();

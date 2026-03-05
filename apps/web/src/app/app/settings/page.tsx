@@ -1272,7 +1272,7 @@ function SettingsPageContent() {
                     <input
                       value={deleteConfirm}
                       onChange={(e) => setDeleteConfirm(e.target.value)}
-                      placeholder={isMobileViewport ? "" : "This is permanent. Type DELETE to confirm."}
+                      placeholder={isMobileViewport ? "Type DELETE to confirm." : "This is permanent. Type DELETE to confirm."}
                       style={{ flex: "1 1 auto", minWidth: 0 }}
                     />
                     {deleteConfirm.trim() ? (
@@ -1282,7 +1282,7 @@ function SettingsPageContent() {
                         className="text-muted"
                         style={{ whiteSpace: "nowrap", flexShrink: 0, textDecoration: "underline" }}
                       >
-                        {deleteState.busy ? "Deleting…" : "Delete Account"}
+                        {deleteState.busy ? "Deleting…" : "Delete"}
                       </button>
                     ) : null}
                   </div>
