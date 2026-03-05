@@ -3471,6 +3471,7 @@ export default function BookDetailPage() {
               </div>
 
               <div style={{ marginTop: "var(--space-14)" }}>
+                {editMode || facetView.author.length > 0 ? <hr className="divider" /> : null}
                 {editMode || facetView.author.length > 0 ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="text-muted">
@@ -3848,7 +3849,7 @@ export default function BookDetailPage() {
               {isOwner ? (
                 <>
                   <hr className="divider" />
-                  <div className="meta-list">
+                  <div className="meta-list" style={{ gap: 0 }}>
                     <div className="row om-row-baseline">
                       <div style={{ minWidth: 110 }} className="text-muted">
                         Catalog
@@ -3998,7 +3999,7 @@ export default function BookDetailPage() {
                     ) : null}
                   </div>
 
-                  <div className="meta-list">
+                  <div className="meta-list" style={{ gap: 0 }}>
                     <div className="row om-row-baseline">
                       <div style={{ minWidth: 110 }} className="text-muted">
                         Visibility
@@ -4092,7 +4093,7 @@ export default function BookDetailPage() {
                   </div>
 
                   {editMode || Boolean((formLocation ?? "").trim()) || Boolean((formShelf ?? "").trim()) ? (
-                    <div className="meta-list">
+                    <div className="meta-list" style={{ gap: 0 }}>
                       {editMode || Boolean((formLocation ?? "").trim()) ? (
                         <div className="row om-row-baseline">
                           <div style={{ minWidth: 110 }} className="text-muted">
