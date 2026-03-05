@@ -3875,7 +3875,7 @@ export default function BookDetailPage() {
                           </div>
                         </>
                       ) : (
-                        <div className="row" style={{ alignItems: "center", gap: 6, flexWrap: "nowrap" }}>
+                        <div className="row" style={{ alignItems: "center", gap: "var(--space-sm)", flexWrap: "nowrap" }}>
                           <span>{libraries.find((l) => l.id === formLibraryId)?.name ?? "—"}</span>
                           {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length > 0 ? (
                             <span className="om-member-stack" aria-label="Shared catalog members">

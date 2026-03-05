@@ -140,59 +140,61 @@ export default function LibraryBlock({
             </span>
           ) : (
             <div className="row" style={{ flex: 1, justifyContent: "space-between", alignItems: "baseline", minWidth: 0 }}>
-              {manageMode ? (
-                <button
-                  onClick={() => onStartEdit(libraryId, libraryName)}
-                  className="om-library-edit-trigger"
-                  style={{
-                    padding: "0 0 9px",
-                    border: "none",
-                    borderBottom: "1px solid transparent",
-                    background: "transparent",
-                    textDecoration: "none",
-                    textAlign: "left"
-                  }}
-                  aria-label="Rename catalog"
-                >
-                  {libraryName}
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    onToggleCollapsed(libraryId);
-                  }}
-                  disabled={busy}
-                  style={{
-                    padding: "0 0 9px",
-                    border: "none",
-                    borderBottom: "1px solid transparent",
-                    background: "transparent",
-                    textAlign: "left",
-                    font: "inherit",
-                    color: "inherit",
-                    cursor: busy ? "default" : "pointer"
-                  }}
-                >
-                  {libraryName}
-                </button>
-              )}
-              {(memberPreviews ?? []).length > 0 ? (
-                <span className="om-member-stack" aria-label="Shared catalog members">
-                  {(memberPreviews ?? []).slice(0, 6).map((m) =>
-                    m.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img key={m.userId} alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar" />
-                    ) : (
-                      <span key={m.userId} className="om-member-stack-avatar" title={m.username} />
-                    )
-                  )}
-                  {(memberPreviews ?? []).length > 6 ? (
-                    <span className="om-member-stack-overflow" title={`${(memberPreviews ?? []).length - 6} more members`}>
-                      +{(memberPreviews ?? []).length - 6}
-                    </span>
-                  ) : null}
-                </span>
-              ) : null}
+              <div className="row" style={{ alignItems: "center", gap: "var(--space-sm)", minWidth: 0, flexShrink: 1 }}>
+                {manageMode ? (
+                  <button
+                    onClick={() => onStartEdit(libraryId, libraryName)}
+                    className="om-library-edit-trigger"
+                    style={{
+                      padding: "0 0 9px",
+                      border: "none",
+                      borderBottom: "1px solid transparent",
+                      background: "transparent",
+                      textDecoration: "none",
+                      textAlign: "left"
+                    }}
+                    aria-label="Rename catalog"
+                  >
+                    {libraryName}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      onToggleCollapsed(libraryId);
+                    }}
+                    disabled={busy}
+                    style={{
+                      padding: "0 0 9px",
+                      border: "none",
+                      borderBottom: "1px solid transparent",
+                      background: "transparent",
+                      textAlign: "left",
+                      font: "inherit",
+                      color: "inherit",
+                      cursor: busy ? "default" : "pointer"
+                    }}
+                  >
+                    {libraryName}
+                  </button>
+                )}
+                {(memberPreviews ?? []).length > 0 ? (
+                  <span className="om-member-stack" aria-label="Shared catalog members">
+                    {(memberPreviews ?? []).slice(0, 6).map((m) =>
+                      m.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={m.userId} alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar" />
+                      ) : (
+                        <span key={m.userId} className="om-member-stack-avatar" title={m.username} />
+                      )
+                    )}
+                    {(memberPreviews ?? []).length > 6 ? (
+                      <span className="om-member-stack-overflow" title={`${(memberPreviews ?? []).length - 6} more members`}>
+                        +{(memberPreviews ?? []).length - 6}
+                      </span>
+                    ) : null}
+                  </span>
+                ) : null}
+              </div>
               <span className="text-muted" style={{ marginLeft: "var(--space-md)", whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
                 {bookCount}&nbsp;&nbsp;book{bookCount === 1 ? "" : "s"}
               </span>

@@ -311,7 +311,6 @@ button.muted:focus-visible {
 .om-member-stack {
   display: inline-flex;
   align-items: center;
-  margin-left: var(--space-sm);
 }
 
 .om-member-stack-avatar {
