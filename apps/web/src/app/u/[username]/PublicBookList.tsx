@@ -35,7 +35,7 @@ export default function PublicBookList({
   allBooks,
   username,
   signedMap,
-  showLibraryBlocks,
+  showLibraryBlocks: _showLibraryBlocks,
   initialFilters
 }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,6 +48,8 @@ export default function PublicBookList({
   const [sharedBooks, setSharedBooks] = useState<PublicBook[]>([]);
   const [sharedLibraries, setSharedLibraries] = useState<PublicLibrary[]>([]);
   const [sharedSignedMap, setSharedSignedMap] = useState<Record<string, string>>({});
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [authResolved, setAuthResolved] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -82,16 +84,44 @@ export default function PublicBookList({
   const [activeFilters, setActiveFilters] = useState(initialFilters);
 
   useEffect(() => {
+    if (!supabase) {
+      setAuthResolved(true);
+      setSessionUserId(null);
+      return;
+    }
+    let alive = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!alive) return;
+      setSessionUserId(data.session?.user?.id ?? null);
+      setAuthResolved(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (!alive) return;
+      setSessionUserId(next?.user?.id ?? null);
+      setAuthResolved(true);
+    });
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
     let alive = true;
     (async () => {
       if (!supabase) return;
-      const sess = await supabase.auth.getSession();
-      const token = sess.data.session?.access_token ?? null;
-      if (!token) {
+      if (!authResolved) return;
+      if (!sessionUserId) {
         if (!alive) return;
         setSharedBooks([]);
         setSharedLibraries([]);
         setSharedSignedMap({});
+        return;
+      }
+      const sess = await supabase.auth.getSession();
+      const token = sess.data.session?.access_token ?? null;
+      if (!token) {
+        if (!alive) return;
         return;
       }
       const res = await fetch(`/api/public-profile/${encodeURIComponent(username)}/shared`, {
@@ -125,7 +155,7 @@ export default function PublicBookList({
     return () => {
       alive = false;
     };
-  }, [username]);
+  }, [username, authResolved, sessionUserId]);
 
   const mergedAllBooks = useMemo(() => {
     const byId = new Map<number, PublicBook>();
@@ -294,6 +324,11 @@ export default function PublicBookList({
     const ids = Array.from(new Set(filteredGroups.map((g) => g.libraryId))).filter((id) => Number.isFinite(id) && id > 0);
     return ids.map((id) => ({ id, name: `Catalog ${id}`, memberPreviews: [] }));
   }, [libraries, sharedLibraries, filteredGroups]);
+
+  const showLibraryBlocks = useMemo(() => {
+    const DEFAULT_LIBRARY_NAME = "Your catalog";
+    return effectiveLibraries.length > 1 || (effectiveLibraries.length === 1 && effectiveLibraries[0]?.name !== DEFAULT_LIBRARY_NAME);
+  }, [effectiveLibraries]);
 
   const renderBook = (g: CatalogGroup) => {
     const b = g.primary;
