@@ -3851,7 +3851,6 @@ export default function BookDetailPage() {
                         value={formDescription}
                         onChange={(e) => setFormDescription(e.target.value)}
                         rows={1}
-                        placeholder="Add description"
                         style={{ overflow: "hidden", resize: "none", marginTop: "var(--space-sm)" }}
                       />
                     ) : (

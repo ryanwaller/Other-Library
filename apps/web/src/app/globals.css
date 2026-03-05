@@ -1104,6 +1104,14 @@ a.text-muted:hover {
   height: calc(var(--text-line) * 1em) !important;
 }
 
+.om-book-detail-grid select.om-inline-control {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 4'%3E%3Cpath d='M0 0h6L3 4z' fill='%23777777'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 6px 4px;
+  background-position: left center;
+  padding-left: 10px !important;
+}
+
 .om-book-detail-grid input.om-inline-control:not(:disabled):focus,
 .om-book-detail-grid input.om-inline-control:not(:disabled):focus-visible,
 .om-book-detail-grid select.om-inline-control:not(:disabled):focus,
