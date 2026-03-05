@@ -2740,30 +2740,36 @@ function AppShell({
             <option value="title_asc">title A-Z</option>
             <option value="title_desc">title Z-A</option>
           </select>
-          <select className="om-filter-control" value={filterCategory ?? ""} onChange={(e) => setUrlFilters({ category: e.target.value || null })}>
-            <option value="">category</option>
-            {availableCategories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <select className="om-filter-control" value={filterTag ?? ""} onChange={(e) => setUrlFilters({ tag: e.target.value || null })}>
-            <option value="">tags</option>
-            {availableTags.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          <select className="om-filter-control" value={filterDecade ?? ""} onChange={(e) => setUrlFilters({ decade: e.target.value || null })}>
-            <option value="">decade</option>
-            {availableDecades.map((decade) => (
-              <option key={decade} value={decade}>
-                {decade}
-              </option>
-            ))}
-          </select>
+          {(availableCategories.length > 0 || !!(filterCategory ?? "").trim()) && (
+            <select className="om-filter-control" value={filterCategory ?? ""} onChange={(e) => setUrlFilters({ category: e.target.value || null })}>
+              <option value="">category</option>
+              {availableCategories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          )}
+          {(availableTags.length > 0 || !!(filterTag ?? "").trim()) && (
+            <select className="om-filter-control" value={filterTag ?? ""} onChange={(e) => setUrlFilters({ tag: e.target.value || null })}>
+              <option value="">tags</option>
+              {availableTags.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          )}
+          {(availableDecades.length > 0 || !!(filterDecade ?? "").trim()) && (
+            <select className="om-filter-control" value={filterDecade ?? ""} onChange={(e) => setUrlFilters({ decade: e.target.value || null })}>
+              <option value="">decade</option>
+              {availableDecades.map((decade) => (
+                <option key={decade} value={decade}>
+                  {decade}
+                </option>
+              ))}
+            </select>
+          )}
           <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
             <option value="all">visibility</option>
             <option value="public">public</option>

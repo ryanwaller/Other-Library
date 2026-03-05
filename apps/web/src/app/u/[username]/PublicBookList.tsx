@@ -565,24 +565,30 @@ export default function PublicBookList({
               <option value="title_asc">title A-Z</option>
               <option value="title_desc">title Z-A</option>
             </select>
-            <select className="om-filter-control" value={activeFilters.category ?? ""} onChange={(e) => setFilterAndUrl("category", e.target.value || undefined)}>
-              <option value="">category</option>
-              {availableCategories.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-            <select className="om-filter-control" value={activeFilters.tag ?? ""} onChange={(e) => setFilterAndUrl("tag", e.target.value || undefined)}>
-              <option value="">tags</option>
-              {availableTags.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-            <select className="om-filter-control" value={activeFilters.decade ?? ""} onChange={(e) => setFilterAndUrl("decade", e.target.value || undefined)}>
-              <option value="">decade</option>
-              {(availableDecades.length > 0 ? availableDecades : DECADE_OPTIONS).map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+            {(availableCategories.length > 0 || !!(activeFilters.category ?? "").trim()) && (
+              <select className="om-filter-control" value={activeFilters.category ?? ""} onChange={(e) => setFilterAndUrl("category", e.target.value || undefined)}>
+                <option value="">category</option>
+                {availableCategories.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            )}
+            {(availableTags.length > 0 || !!(activeFilters.tag ?? "").trim()) && (
+              <select className="om-filter-control" value={activeFilters.tag ?? ""} onChange={(e) => setFilterAndUrl("tag", e.target.value || undefined)}>
+                <option value="">tags</option>
+                {availableTags.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            )}
+            {(availableDecades.length > 0 || !!(activeFilters.decade ?? "").trim()) && (
+              <select className="om-filter-control" value={activeFilters.decade ?? ""} onChange={(e) => setFilterAndUrl("decade", e.target.value || undefined)}>
+                <option value="">decade</option>
+                {availableDecades.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            )}
           </div>
         )}
       </div>
