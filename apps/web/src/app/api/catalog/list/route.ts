@@ -8,8 +8,9 @@ export async function GET(req: Request) {
 
     const ownedRes = await admin
       .from("libraries")
-      .select("id,name,created_at,owner_id")
+      .select("id,name,created_at,sort_order,owner_id")
       .eq("owner_id", current.id)
+      .order("sort_order", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true });
     if (ownedRes.error) throw new Error(ownedRes.error.message);
 
@@ -43,14 +44,23 @@ export async function GET(req: Request) {
     const byId = new Map<number, any>();
     for (const l of all) byId.set(Number(l.id), l);
 
-    const catalogs = Array.from(byId.values()).map((l) => {
+    const catalogs = Array.from(byId.values())
+      .sort((a, b) => {
+        const aOrder = a.sort_order != null ? Number(a.sort_order) : null;
+        const bOrder = b.sort_order != null ? Number(b.sort_order) : null;
+        if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
+        if (aOrder !== null) return -1;
+        if (bOrder !== null) return 1;
+        return Date.parse(String(a.created_at ?? "")) - Date.parse(String(b.created_at ?? ""));
+      })
+      .map((l) => {
       const id = Number(l.id);
       const role = roleByCatalog.get(id) ?? (String(l.owner_id ?? "") === current.id ? "owner" : "editor");
       return {
         id,
         name: String(l.name ?? `Catalog ${id}`),
         created_at: String(l.created_at ?? new Date(0).toISOString()),
-        sort_order: null,
+        sort_order: l.sort_order != null ? Number(l.sort_order) : null,
         owner_id: l.owner_id ? String(l.owner_id) : null,
         myRole: role,
         memberPreviews: [] as Array<{ userId: string; username: string; avatarUrl: string | null }>
@@ -120,7 +130,7 @@ export async function GET(req: Request) {
       for (const c of catalogs) {
         c.memberPreviews = (byCatalog[c.id] ?? [])
           .sort((a, b) => Date.parse(a.acceptedAt) - Date.parse(b.acceptedAt))
-          .slice(0, 3)
+          .slice(0, 10)
           .map((m) => ({ userId: m.userId, username: m.username, avatarUrl: m.avatarUrl }));
       }
     }

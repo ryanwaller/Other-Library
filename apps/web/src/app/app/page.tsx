@@ -1816,6 +1816,14 @@ function AppShell({
   }
 
   useEffect(() => {
+    if (!bulkMode) return;
+    for (const lib of libraries) {
+      void loadCatalogMembers(lib.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulkMode]);
+
+  useEffect(() => {
     if (!tagMenu.open && !categoryMenu.open) return;
     const onPointerDown = (ev: PointerEvent) => {
       const target = ev.target as Node | null;
@@ -2715,7 +2723,7 @@ function AppShell({
                 </div>
               )}
             />
-            {bulkMode && editingLibraryId === lib.id ? (
+            {bulkMode ? (
               <div className="card" style={{ marginTop: "var(--space-sm)" }}>
                 <div className="text-muted">Members</div>
 
