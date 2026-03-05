@@ -1129,6 +1129,9 @@ export default function BookDetailPage() {
     if (userId && book.owner_id === userId) return "Your copies";
     return "Copies";
   }, [book?.owner_id, userId]);
+  const showNotesSection = editMode || Boolean((formNotes ?? "").trim());
+  const showLocationSection = editMode || Boolean((formLocation ?? "").trim());
+  const showShelfSection = editMode || Boolean((formShelf ?? "").trim());
 
   const effectiveSubjects = useMemo(() => {
     if ((facetDraft.subject ?? []).length > 0) return uniqStrings(facetDraft.subject);
@@ -3974,7 +3977,7 @@ export default function BookDetailPage() {
                       </div>
                     ) : null}
 
-                    {editMode || Boolean((formNotes ?? "").trim()) ? (
+                    {showNotesSection ? (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                         <div style={{ minWidth: 110 }} className="text-muted">
                           Notes
@@ -3999,6 +4002,7 @@ export default function BookDetailPage() {
                     ) : null}
                   </div>
 
+                  {showNotesSection ? <hr className="divider" /> : null}
                   <div className="meta-list" style={{ gap: 0 }}>
                     <div className="row om-row-baseline">
                       <div style={{ minWidth: 110 }} className="text-muted">
@@ -4092,9 +4096,11 @@ export default function BookDetailPage() {
 
                   </div>
 
-                  {editMode || Boolean((formLocation ?? "").trim()) || Boolean((formShelf ?? "").trim()) ? (
+                  {showLocationSection || showShelfSection ? (
+                    <>
+                      <hr className="divider" />
                     <div className="meta-list" style={{ gap: 0 }}>
-                      {editMode || Boolean((formLocation ?? "").trim()) ? (
+                      {showLocationSection ? (
                         <div className="row om-row-baseline">
                           <div style={{ minWidth: 110 }} className="text-muted">
                             Location
@@ -4114,7 +4120,7 @@ export default function BookDetailPage() {
                           </div>
                         ) : null}
 
-                        {editMode || Boolean((formShelf ?? "").trim()) ? (
+                        {showShelfSection ? (
                           <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                             <div style={{ minWidth: 110 }} className="text-muted">
                               Shelf
@@ -4134,8 +4140,10 @@ export default function BookDetailPage() {
                           </div>
                         ) : null}
                       </div>
+                    </>
                   ) : null}
 
+                  {showShelfSection && Boolean(publicBookUrl) ? <hr className="divider" /> : null}
                   {publicBookUrl ? (
                     <div style={{ marginTop: 16 }}>
                       <div className="om-edit-label">URL</div>
