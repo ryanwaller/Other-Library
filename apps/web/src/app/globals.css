@@ -243,9 +243,21 @@ button.muted:focus-visible {
   text-decoration: underline;
 }
 
+.om-book-title,
+.book-title {
+  display: block;
+  width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .om-book-secondary {
   color: var(--muted);
   margin-top: var(--space-sm);
+  text-align: left;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .om-cover-slot {

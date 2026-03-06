@@ -143,7 +143,7 @@ export default function BookCard({
             {coverEl}
           </Link>
           <div style={{ marginTop: "var(--space-md)" }}>
-            <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-10)", alignItems: "baseline" }}>
+            <div style={{ width: "100%" }}>
               <Link href={href} style={{ color: "inherit", textDecoration: "none" }} className="om-book-card-link" onClick={onOpen}>
                 <span className="om-book-title">{title}</span>
               </Link>
@@ -178,7 +178,7 @@ export default function BookCard({
             {coverEl}
           </Link>
           <div style={{ marginTop: "var(--space-14)" }}>
-            <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-10)", alignItems: "baseline" }}>
+            <div style={{ width: "100%" }}>
               <Link href={href} style={{ color: "inherit", textDecoration: "none" }} className="om-book-card-link" onClick={onOpen}>
                 <span className="om-book-title">{title}</span>
               </Link>
