@@ -69,7 +69,7 @@ export default function BookCard({
       return [...authors.slice(0, 2), "+ more"];
     }
     if (gridCols === 8 && authors.length > 1) {
-      return [`${authors[0]} + more`];
+      return [authors[0], "+ more"];
     }
     return authors;
   }, [gridCols, authors, isMobile]);
@@ -152,9 +152,7 @@ export default function BookCard({
               <div className="om-book-secondary">
                 {truncatedAuthors.map((author, index) => (
                   <span key={author}>
-                    {gridCols === 8 && authors.length > 1 ? (
-                      <span>{author}</span>
-                    ) : isMobile && author === "+ more" ? (
+                    {author === "+ more" ? (
                       <span className="text-muted">{author}</span>
                     ) : (
                       <Link
@@ -187,9 +185,7 @@ export default function BookCard({
               <div className="om-book-secondary">
                 {truncatedAuthors.map((author, index) => (
                   <span key={author}>
-                    {gridCols === 8 && authors.length > 1 ? (
-                      <span>{author}</span>
-                    ) : isMobile && author === "+ more" ? (
+                    {author === "+ more" ? (
                       <span className="text-muted">{author}</span>
                     ) : (
                       <Link

@@ -253,11 +253,26 @@ button.muted:focus-visible {
 }
 
 .om-book-secondary {
+  display: block;
+  width: 100%;
   color: var(--muted);
   margin-top: var(--space-sm);
   text-align: left;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.om-book-secondary button,
+.om-book-secondary a,
+.om-book-secondary span {
+  text-align: left;
+  vertical-align: baseline;
+}
+
+.om-book-secondary button.om-filter-link {
+  display: inline;
+  line-height: inherit;
+  white-space: normal;
 }
 
 .om-cover-slot {

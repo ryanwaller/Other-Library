@@ -393,9 +393,12 @@ export default function PublicBookList({
     const title = effectiveTitleFor(b);
     const authors = effectiveAuthorsFor(b);
 
-    const truncatedAuthors = isMobile && authors.length > 2
-      ? [...authors.slice(0, 2), "+ more"]
-      : authors;
+    const truncatedAuthors =
+      gridCols === 8 && authors.length > 1
+        ? [authors[0], "+ more"]
+        : isMobile && authors.length > 2
+          ? [...authors.slice(0, 2), "+ more"]
+          : authors;
 
     const coverUrl =
       g.copies
@@ -426,7 +429,7 @@ export default function PublicBookList({
               {truncatedAuthors.length > 0
                 ? truncatedAuthors.map((a, idx) => (
                     <span key={a}>
-                      {isMobile && a === "+ more" ? (
+                      {a === "+ more" ? (
                         <span className="text-muted">{a}</span>
                       ) : (
                         <button 
@@ -472,7 +475,7 @@ export default function PublicBookList({
           {truncatedAuthors.length > 0
             ? truncatedAuthors.map((a, idx) => (
                 <span key={a}>
-                  {isMobile && a === "+ more" ? (
+                  {a === "+ more" ? (
                     <span className="text-muted">{a}</span>
                   ) : (
                     <button 
