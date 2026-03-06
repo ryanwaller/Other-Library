@@ -131,13 +131,6 @@ export default function LibraryBlock({
                   </button>
                 </div>
               ) : null}
-              <button
-                onClick={() => onDelete(libraryId)}
-                disabled={busy}
-                style={{ marginLeft: "auto", paddingBottom: 9, borderBottom: "1px solid transparent" }}
-              >
-                Delete
-              </button>
             </span>
           ) : (
             <div className="row" style={{ flex: 1, justifyContent: "space-between", alignItems: "baseline", minWidth: 0 }}>
@@ -210,8 +203,17 @@ export default function LibraryBlock({
           )}
         </div>
 
-        {reorderMode ? (
+        {(reorderMode || manageMode) && !isEditing ? (
           <div className="row" style={{ gap: "var(--space-10)", marginLeft: "var(--space-md)", alignItems: "baseline" }}>
+            {manageMode ? (
+              <button
+                onClick={() => onDelete(libraryId)}
+                disabled={busy}
+                style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", textDecoration: "underline" }}
+              >
+                Delete
+              </button>
+            ) : null}
             {index > 0 ? (
               <button
                 onClick={() => onMoveUp(libraryId)}
