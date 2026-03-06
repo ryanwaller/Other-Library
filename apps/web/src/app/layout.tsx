@@ -4,17 +4,17 @@ import GlobalNav from "./GlobalNav";
 import FeedbackWidget from "./components/FeedbackWidget";
 
 export const metadata: Metadata = {
-  title: "You like the books?!",
-  description: "A minimal social book catalog.",
+  title: "Other Library",
+  description: "You like the books?!",
   openGraph: {
-    title: "You like the books?!",
-    description: "A minimal social book catalog.",
-    siteName: "Other Library"
+    title: "Other Library",
+    description: "You like the books?!",
+    siteName: "other-library.com"
   },
   twitter: {
     card: "summary",
-    title: "You like the books?!",
-    description: "A minimal social book catalog."
+    title: "Other Library",
+    description: "You like the books?!"
   }
 };
 
