@@ -109,6 +109,7 @@ function SettingsPageContent() {
   const accessToken = session?.access_token ?? null;
 
   const [profile, setProfile] = useState<{
+    email: string | null;
     username: string;
     display_name: string | null;
     bio: string | null;
@@ -223,6 +224,7 @@ function SettingsPageContent() {
       }>;
     }>
   >([]);
+  const accountEmail = (profile?.email ?? sessionEmail ?? null);
 
   useEffect(() => {
     const raw = String(searchParams.get("tab") ?? "").trim().toLowerCase();
@@ -368,8 +370,9 @@ function SettingsPageContent() {
   }, []);
 
   useEffect(() => {
-    setEmailDraft(sessionEmail ?? "");
-  }, [sessionEmail]);
+    if (emailFocused || emailState.busy) return;
+    setEmailDraft(accountEmail ?? "");
+  }, [accountEmail, emailFocused, emailState.busy]);
 
   useEffect(() => {
     let alive = true;
@@ -383,7 +386,7 @@ function SettingsPageContent() {
       setError(null);
       const res = await supabase
         .from("profiles")
-        .select("username,display_name,bio,visibility,avatar_path,borrowable_default,borrow_request_scope")
+        .select("email,username,display_name,bio,visibility,avatar_path,borrowable_default,borrow_request_scope")
         .eq("id", userId)
         .maybeSingle();
       if (!alive) return;
@@ -695,13 +698,14 @@ function SettingsPageContent() {
       return;
     }
     setSession((prev) => (prev ? ({ ...prev, user: { ...prev.user, email: next } } as Session) : prev));
+    setProfile((prev) => (prev ? { ...prev, email: next } : prev));
     setEmailState({ busy: false, error: null, message: "Saved" });
     window.setTimeout(() => setEmailState({ busy: false, error: null, message: null }), 900);
   }
 
   async function savePassword() {
     if (!supabase) return;
-    const email = (sessionEmail ?? "").trim();
+    const email = (accountEmail ?? "").trim();
     if (!email) {
       setPasswordState({ busy: false, error: "No email on this session.", message: "Failed" });
       return;
