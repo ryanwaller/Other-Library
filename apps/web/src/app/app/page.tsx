@@ -1125,10 +1125,6 @@ function AppShell({
     };
   }, [userId]);
 
-  if (showInitialSkeleton) {
-    return <HomepageSkeleton />;
-  }
-
   async function addByIsbnValue(isbnValue: string): Promise<number> {
     if (!supabase) throw new Error("Supabase is not configured");
     if (!addLibraryId) throw new Error("Choose a catalog first");
@@ -2416,6 +2412,10 @@ function AppShell({
     if (tagMode === "all") return;
     if (!availableTags.some((t) => t === tagMode)) setTagMode("all");
   }, [availableTags, tagMode, filterTag]);
+
+  if (showInitialSkeleton) {
+    return <HomepageSkeleton />;
+  }
 
   return (
     <>
