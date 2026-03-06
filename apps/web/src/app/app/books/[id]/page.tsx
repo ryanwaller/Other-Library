@@ -9,6 +9,7 @@ import { isValidTrimSize, convertTrimUnit, formatTrimRatio, type TrimUnit } from
 import { bookIdSlug } from "../../../../lib/slug";
 import { formatDateShort } from "../../../../lib/formatDate";
 import { DECADE_OPTIONS } from "../../../../lib/decades";
+import { loadBookNavContext, type BookNavContext } from "../../../../lib/bookNav";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
 import SignInCard from "../../../components/SignInCard";
 import EntityTokenField from "../../components/EntityTokenField";
@@ -336,6 +337,10 @@ export default function BookDetailPage() {
   const [findMoreOpen, setFindMoreOpen] = useState(false);
   const [coverToolsOpen, setCoverToolsOpen] = useState(false);
   const [coverExpanded, setCoverExpanded] = useState(false);
+  const [bookNavContext, setBookNavContext] = useState<BookNavContext | null>(null);
+  const [swipeOffsetX, setSwipeOffsetX] = useState(0);
+  const [swipeAnimating, setSwipeAnimating] = useState(false);
+  const swipeHorizontalLockRef = useRef(false);
   const editSnapshotRef = useRef<{
     formTitle: string;
     formAuthors: string;
@@ -526,6 +531,10 @@ export default function BookDetailPage() {
   const imageMedia = useMemo(() => (book?.media ?? []).filter((m) => m.kind === "image") ?? [], [book]);
 
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const swipeBlockedRef = useRef(false);
+  const swipeNavigateTimerRef = useRef<number | null>(null);
+  const swipeScrollLockRef = useRef(false);
 
   useEffect(() => {
     if (lightboxIndex === null) return;
@@ -539,6 +548,19 @@ export default function BookDetailPage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [lightboxIndex, imageMedia.length]);
+
+  useEffect(() => {
+    return () => {
+      if (swipeNavigateTimerRef.current) {
+        window.clearTimeout(swipeNavigateTimerRef.current);
+        swipeNavigateTimerRef.current = null;
+      }
+      if (typeof document !== "undefined") {
+        document.body.style.overflow = "";
+        document.documentElement.style.overflow = "";
+      }
+    };
+  }, []);
 
   const [mergeSource, setMergeSource] = useState<MergeSource | null>(null);
   const [mergeState, setMergeState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
@@ -614,6 +636,12 @@ export default function BookDetailPage() {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSession(newSession));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    setBookNavContext(loadBookNavContext());
+    setSwipeOffsetX(0);
+    setSwipeAnimating(false);
+  }, [bookId]);
 
   useEffect(() => {
     setEditMode(false);
@@ -1484,6 +1512,18 @@ export default function BookDetailPage() {
     return book?.edition?.id ?? null;
   }, [book]);
 
+  const swipeNav = useMemo(() => {
+    if (!bookNavContext || !book) return { prevId: null as number | null, nextId: null as number | null };
+    if (bookNavContext.libraryId !== book.library_id) return { prevId: null as number | null, nextId: null as number | null };
+    const currentIndex = bookNavContext.bookIds.indexOf(book.id);
+    if (currentIndex === -1) return { prevId: null as number | null, nextId: null as number | null };
+    return {
+      prevId: currentIndex > 0 ? bookNavContext.bookIds[currentIndex - 1] ?? null : null,
+      nextId: currentIndex < bookNavContext.bookIds.length - 1 ? bookNavContext.bookIds[currentIndex + 1] ?? null : null
+    };
+  }, [bookNavContext, book]);
+  const swipeBlurPx = isNarrow && Math.abs(swipeOffsetX) > 0 ? Math.min(4.25, 0.65 + Math.abs(swipeOffsetX) / 26) : 0;
+
   async function copyPublicLink() {
     if (!publicBookUrl) return;
     setShareState({ error: null, message: null });
@@ -1494,6 +1534,110 @@ export default function BookDetailPage() {
     } catch (e: any) {
       setShareState({ error: e?.message ?? "Copy failed", message: "Copy failed" });
     }
+  }
+
+  function navigateToSiblingBook(targetBookId: number | null) {
+    if (!targetBookId || !Number.isFinite(targetBookId) || targetBookId === bookId) return;
+    router.push(`/app/books/${targetBookId}`);
+  }
+
+  function lockSwipeScroll() {
+    if (swipeScrollLockRef.current || typeof document === "undefined") return;
+    swipeScrollLockRef.current = true;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+  }
+
+  function unlockSwipeScroll() {
+    if (!swipeScrollLockRef.current || typeof document === "undefined") return;
+    swipeScrollLockRef.current = false;
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+  }
+
+  function handleCoverTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    if (!isNarrow || editMode || coverToolsOpen || lightboxIndex !== null) return;
+    if (!swipeNav.prevId && !swipeNav.nextId) return;
+    if (swipeNavigateTimerRef.current) {
+      window.clearTimeout(swipeNavigateTimerRef.current);
+      swipeNavigateTimerRef.current = null;
+    }
+    setSwipeAnimating(false);
+    const touch = event.touches[0];
+    if (!touch) return;
+    swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+    swipeBlockedRef.current = false;
+    swipeHorizontalLockRef.current = false;
+  }
+
+  function handleCoverTouchMove(event: React.TouchEvent<HTMLDivElement>) {
+    if (!swipeStartRef.current || swipeBlockedRef.current) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    const dx = touch.clientX - swipeStartRef.current.x;
+    const dy = touch.clientY - swipeStartRef.current.y;
+    if (Math.abs(dy) > 18 && Math.abs(dy) > Math.abs(dx)) {
+      swipeBlockedRef.current = true;
+      unlockSwipeScroll();
+      setSwipeAnimating(true);
+      setSwipeOffsetX(0);
+      return;
+    }
+    if (swipeHorizontalLockRef.current || (Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(dy) * 1.02)) {
+      swipeHorizontalLockRef.current = true;
+      lockSwipeScroll();
+      event.preventDefault();
+      const damped = Math.max(-88, Math.min(88, dx * 0.2));
+      setSwipeAnimating(false);
+      setSwipeOffsetX(damped);
+    }
+  }
+
+  function handleCoverTouchEnd(event: React.TouchEvent<HTMLDivElement>) {
+    if (!swipeStartRef.current) return;
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (swipeBlockedRef.current) {
+      swipeBlockedRef.current = false;
+      swipeHorizontalLockRef.current = false;
+      unlockSwipeScroll();
+      setSwipeAnimating(true);
+      setSwipeOffsetX(0);
+      return;
+    }
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    swipeHorizontalLockRef.current = false;
+    unlockSwipeScroll();
+    if (Math.abs(dx) < 72 || Math.abs(dx) <= Math.abs(dy) * 1.05) {
+      setSwipeAnimating(true);
+      setSwipeOffsetX(0);
+      return;
+    }
+    const targetBookId = dx < 0 ? swipeNav.nextId : swipeNav.prevId;
+    if (!targetBookId) {
+      setSwipeAnimating(true);
+      setSwipeOffsetX(0);
+      return;
+    }
+    const settleOffset = dx < 0 ? -Math.min(window.innerWidth * 0.12, 62) : Math.min(window.innerWidth * 0.12, 62);
+    setSwipeAnimating(true);
+    setSwipeOffsetX(settleOffset);
+    swipeNavigateTimerRef.current = window.setTimeout(() => {
+      swipeNavigateTimerRef.current = null;
+      navigateToSiblingBook(targetBookId);
+    }, 110);
+  }
+
+  function handleCoverTouchCancel() {
+    swipeStartRef.current = null;
+    swipeBlockedRef.current = false;
+    swipeHorizontalLockRef.current = false;
+    unlockSwipeScroll();
+    setSwipeAnimating(true);
+    setSwipeOffsetX(0);
   }
 
   /** Metadata panel unit toggle: converts values and syncs formTrimUnit. */
@@ -2798,7 +2942,15 @@ export default function BookDetailPage() {
           <div>Invalid book id.</div>
         </div>
       ) : (
-        <div className="card">
+        <div
+          className="card"
+          style={{
+            transform: swipeOffsetX ? `translate3d(${swipeOffsetX}px, 0, 0)` : undefined,
+            filter: swipeBlurPx > 0 ? `blur(${swipeBlurPx}px)` : undefined,
+            transition: swipeAnimating ? "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), filter 220ms ease-out" : "none",
+            willChange: isNarrow ? "transform, filter" : undefined
+          }}
+        >
           <div
             className="om-book-detail-grid"
             style={{
@@ -3280,10 +3432,15 @@ export default function BookDetailPage() {
                   padding: 0,
                   overflow: "hidden",
                   display: coverEditorSrc ? "block" : "flex",
+                  touchAction: "pan-y",
                   filter: coverEditorSrc
                     ? `brightness(${editorState.brightness}) contrast(${editorState.contrast})`
                     : undefined
                 }}
+                onTouchStart={handleCoverTouchStart}
+                onTouchMove={handleCoverTouchMove}
+                onTouchEnd={handleCoverTouchEnd}
+                onTouchCancel={handleCoverTouchCancel}
               >
                 {coverEditorSrc ? (
                   <CoverEditor

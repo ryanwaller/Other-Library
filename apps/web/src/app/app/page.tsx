@@ -30,6 +30,7 @@ import {
   parseTitleAndAuthor
 } from "../../lib/isbn";
 import { DECADE_OPTIONS } from "../../lib/decades";
+import { saveBookNavContext } from "../../lib/bookNav";
 
 const BookScannerModal = dynamic(() => import("../../components/BookScannerModal"), { ssr: false });
 
@@ -829,6 +830,17 @@ function AppShell({
     window.addEventListener("om:home-reset-filters", onReset);
     return () => window.removeEventListener("om:home-reset-filters", onReset);
   }, [router]);
+
+  function storeBookNavContext(libraryId: number, orderedBookIds: number[]) {
+    const bookIds = orderedBookIds.filter((id) => Number.isFinite(id) && id > 0);
+    if (bookIds.length === 0) return;
+    saveBookNavContext({
+      bookIds,
+      libraryId,
+      source: "app-home",
+      ts: Date.now()
+    });
+  }
 
   async function applyBooksFromServer(serverRows: any[], source: string, requestSeq?: number) {
     const client = supabase;
@@ -3232,6 +3244,7 @@ function AppShell({
                       ))
                     : null}
                   {groups.slice(0, limit).map((g) => {
+                    const orderedBookIds = groups.map((group) => Number(group.primary.id)).filter((id) => Number.isFinite(id) && id > 0);
                     const coverMedia = g.primary.media.find((m) => m.kind === "cover") ?? g.primary.media.find((m) => m.kind === "image") ?? g.primary.media[0];
                     const coverPath = toStoragePathCandidate(coverMedia?.storage_path ?? null);
                     const mediaCoverUrl = toDisplayCoverUrl(mediaUrlsByPath, supabase, coverPath);
@@ -3256,6 +3269,7 @@ function AppShell({
                         href={`/app/books/${g.primary.id}`}
                         coverUrl={coverUrl}
                         originalSrc={originalSrc}
+                        onOpen={() => storeBookNavContext(lib.id, orderedBookIds)}
                         cropData={g.primary.cover_crop}
                         onDeleteCopy={() => deleteEntry(g.primary.id)}
                         deleteState={deleteStateByBookId[g.primary.id]}

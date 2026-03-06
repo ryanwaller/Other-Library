@@ -2,8 +2,18 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "../../../../lib/supabaseAdmin";
 
 function isLocalHost(host: string): boolean {
-  const value = String(host ?? "").toLowerCase();
-  return value.includes("localhost") || value.includes("127.0.0.1");
+  const value = String(host ?? "").toLowerCase().split(":")[0] ?? "";
+  if (!value) return false;
+  if (value === "localhost" || value === "127.0.0.1" || value === "0.0.0.0") return true;
+  if (value.endsWith(".local")) return true;
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(value)) return true;
+  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(value)) return true;
+  const match172 = value.match(/^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
+  if (match172) {
+    const secondOctet = Number(match172[1]);
+    if (secondOctet >= 16 && secondOctet <= 31) return true;
+  }
+  return false;
 }
 
 export async function POST(req: Request) {
@@ -42,4 +52,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err?.message ?? "dev_bypass_failed" }, { status: 500 });
   }
 }
-

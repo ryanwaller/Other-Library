@@ -21,6 +21,7 @@ export default function BookCard({
   coverUrl,
   cropData,
   originalSrc,
+  onOpen,
   onDeleteCopy,
   deleteState,
   hideCopyCount,
@@ -39,6 +40,7 @@ export default function BookCard({
   coverUrl: string | null;
   cropData?: any | null;
   originalSrc?: string | null;
+  onOpen?: () => void;
   onDeleteCopy: () => void;
   deleteState: { busy: boolean; error: string | null; message: string | null } | undefined;
   hideCopyCount?: boolean;
@@ -88,14 +90,14 @@ export default function BookCard({
     return (
       <div className="card" style={{ display: "grid", gridTemplateColumns: bulkMode ? "26px 70px 1fr" : "70px 1fr", gap: "var(--space-md)", alignItems: "start" }}>
         {bulkMode ? <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" /> : null}
-        <Link href={href} style={{ display: "block" }} className="om-book-card-link">
+        <Link href={href} style={{ display: "block" }} className="om-book-card-link" onClick={onOpen}>
           <div className="om-cover-slot" style={{ width: 70, height: "auto" }}>
             <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto" }} objectFit="contain" />
           </div>
         </Link>
         <div>
           <div>
-            <Link href={href} className="om-book-card-link" style={{ color: "inherit", textDecoration: "none" }}>
+            <Link href={href} className="om-book-card-link" style={{ color: "inherit", textDecoration: "none" }} onClick={onOpen}>
               <span className="om-book-title">{title}</span>
             </Link>
           </div>
@@ -137,12 +139,12 @@ export default function BookCard({
 
       {bulkMode ? (
         <>
-          <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link">
+          <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link" onClick={onOpen}>
             {coverEl}
           </Link>
           <div style={{ marginTop: "var(--space-md)" }}>
             <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-10)", alignItems: "baseline" }}>
-              <Link href={href} style={{ color: "inherit", textDecoration: "none" }} className="om-book-card-link">
+              <Link href={href} style={{ color: "inherit", textDecoration: "none" }} className="om-book-card-link" onClick={onOpen}>
                 <span className="om-book-title">{title}</span>
               </Link>
             </div>
@@ -172,12 +174,12 @@ export default function BookCard({
         </>
       ) : (
         <>
-          <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link">
+          <Link href={href} style={{ display: "block", textDecoration: "none" }} className="om-book-card-link" onClick={onOpen}>
             {coverEl}
           </Link>
           <div style={{ marginTop: "var(--space-14)" }}>
             <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-10)", alignItems: "baseline" }}>
-              <Link href={href} style={{ color: "inherit", textDecoration: "none" }} className="om-book-card-link">
+              <Link href={href} style={{ color: "inherit", textDecoration: "none" }} className="om-book-card-link" onClick={onOpen}>
                 <span className="om-book-title">{title}</span>
               </Link>
             </div>

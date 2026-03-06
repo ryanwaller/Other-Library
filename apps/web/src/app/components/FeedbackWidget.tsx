@@ -137,7 +137,16 @@ export default function FeedbackWidget() {
   return (
     <div style={{ position: "fixed", left: 20, bottom: 20, zIndex: 1200 }}>
       {open ? (
-        <div style={{ width: 320, marginBottom: 10, padding: "var(--space-md)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 0 }}>
+        <div
+          style={{
+            width: "min(360px, calc(100vw - 40px))",
+            marginBottom: 10,
+            padding: "var(--space-md)",
+            background: "var(--bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 0
+          }}
+        >
           <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>
             {pageTitle}
           </div>
