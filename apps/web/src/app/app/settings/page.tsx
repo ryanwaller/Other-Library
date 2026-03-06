@@ -665,18 +665,36 @@ function SettingsPageContent() {
   }
 
   async function saveEmail() {
-    if (!supabase) return;
+    if (!supabase || !accessToken) return;
     const next = emailDraft.trim();
     if (!next) {
       setEmailState({ busy: false, error: "Email is required.", message: "Failed" });
       return;
     }
     setEmailState({ busy: true, error: null, message: "Saving…" });
-    const res = await supabase.auth.updateUser({ email: next });
-    if (res.error) {
-      setEmailState({ busy: false, error: res.error.message, message: "Failed" });
+    const res = await fetch("/api/account/email", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ email: next })
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const raw = String(json?.error ?? "Failed");
+      const friendly =
+        raw === "invalid_email"
+          ? "Email address is invalid."
+          : raw === "email_taken"
+            ? "That email address is already in use."
+            : raw === "not_authenticated"
+              ? "Please sign in again."
+              : raw;
+      setEmailState({ busy: false, error: friendly, message: "Failed" });
       return;
     }
+    setSession((prev) => (prev ? ({ ...prev, user: { ...prev.user, email: next } } as Session) : prev));
     setEmailState({ busy: false, error: null, message: "Saved" });
     window.setTimeout(() => setEmailState({ busy: false, error: null, message: null }), 900);
   }
