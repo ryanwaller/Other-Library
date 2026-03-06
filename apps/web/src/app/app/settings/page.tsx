@@ -674,7 +674,7 @@ function SettingsPageContent() {
       setEmailState({ busy: false, error: "Email is required.", message: "Failed" });
       return;
     }
-    setEmailState({ busy: true, error: null, message: "Saving…" });
+    setEmailState({ busy: true, error: null, message: "Saving" });
     const res = await fetch("/api/account/email", {
       method: "POST",
       headers: {
@@ -1300,7 +1300,9 @@ function SettingsPageContent() {
                         saveEmail();
                       }}
                     />
-                    {emailFocused ? (
+                    {emailState.busy || (!emailState.error && emailState.message === "Saved") ? (
+                      <span className="text-muted">{emailState.message}</span>
+                    ) : emailFocused ? (
                       <button
                         className="text-muted"
                         style={{ textDecoration: "underline" }}
@@ -1308,12 +1310,12 @@ function SettingsPageContent() {
                         onClick={saveEmail}
                         disabled={emailState.busy || !emailDraft.trim()}
                       >
-                        {emailState.busy ? "Saving…" : "Save email"}
+                        Save email
                       </button>
                     ) : null}
                   </div>
                   <div className="row" style={{ marginTop: "var(--space-sm)", alignItems: "baseline" }}>
-                    <div className="text-muted">{emailState.message ? (emailState.error ? `${emailState.message} (${emailState.error})` : emailState.message) : ""}</div>
+                    <div className="text-muted">{emailState.error ? `${emailState.message ?? "Failed"} (${emailState.error})` : ""}</div>
                   </div>
                 </div>
               </div>
