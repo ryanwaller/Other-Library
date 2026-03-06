@@ -201,6 +201,7 @@ function AdminPageInner() {
 
   const [invitesSearchDraft, setInvitesSearchDraft] = useState("");
   const [invitesSearch, setInvitesSearch] = useState("");
+  const [invitesStatus, setInvitesStatus] = useState<"pending" | "used">("pending");
   const [invitesDir, setInvitesDir] = useState<"asc" | "desc">("desc");
   const [invitesPage, setInvitesPage] = useState(1);
   const [invitesPageSize, setInvitesPageSize] = useState(20);
@@ -312,6 +313,7 @@ function AdminPageInner() {
     try {
       const params = new URLSearchParams({
         q: invitesSearch,
+        status: invitesStatus,
         sort: "created_at",
         dir: invitesDir,
         page: String(invitesPage),
@@ -355,7 +357,7 @@ function AdminPageInner() {
     if (!token || tab !== "invites") return;
     refreshInvites();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, tab, invitesSearch, invitesDir, invitesPage, invitesPageSize]);
+  }, [token, tab, invitesSearch, invitesStatus, invitesDir, invitesPage, invitesPageSize]);
 
   const userTotalPages = usersData ? Math.max(1, Math.ceil(usersData.total / usersData.pageSize)) : 1;
   const waitTotalPages = waitlistData ? Math.max(1, Math.ceil(waitlistData.total / waitlistData.pageSize)) : 1;
@@ -619,6 +621,17 @@ function AdminPageInner() {
               {tab === "invites" ? (
                 <>
                   <select
+                    value={invitesStatus}
+                    onChange={(e) => {
+                      setInvitesPage(1);
+                      setInvitesStatus(e.target.value as "pending" | "used");
+                    }}
+                    className="om-filter-control"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="used">Used</option>
+                  </select>
+                  <select
                     value={invitesDir}
                     onChange={(e) => {
                       setInvitesPage(1);
@@ -881,21 +894,60 @@ function AdminPageInner() {
                       primary={primary}
                       primaryHref={hasUsername ? `/u/${encodeURIComponent(String(invite.username).trim())}` : null}
                       actions={
-                        copiedLinkForId === invite.id ? (
-                          <span>Copied</span>
-                        ) : (
-                          <button
-                            onClick={async () => {
-                              const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(invite.token)}`;
-                              await navigator.clipboard.writeText(link);
-                              setInviteLink(link);
-                              setCopiedLinkForId(invite.id);
-                              window.setTimeout(() => setCopiedLinkForId(null), 1500);
-                            }}
-                          >
-                            Copy link
-                          </button>
-                        )
+                        <>
+                          {copiedLinkForId === invite.id ? (
+                            <span>Copied</span>
+                          ) : (
+                            <button
+                              onClick={async () => {
+                                const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(invite.token)}`;
+                                await navigator.clipboard.writeText(link);
+                                setInviteLink(link);
+                                setCopiedLinkForId(invite.id);
+                                window.setTimeout(() => setCopiedLinkForId(null), 1500);
+                              }}
+                            >
+                              Copy link
+                            </button>
+                          )}
+                          {status === "pending" ? (
+                            <button
+                              className="text-muted"
+                              onClick={async () => {
+                                if (!window.confirm("Rescind this pending invite?")) return;
+                                setBusy(true);
+                                setError(null);
+                                const previousInvitesData = invitesData;
+                                setInvitesData((prev) => {
+                                  if (!prev) return prev;
+                                  return {
+                                    ...prev,
+                                    invites: prev.invites.filter((row) => row.id !== invite.id),
+                                    total: Math.max(0, prev.total - 1),
+                                    metrics: {
+                                      ...prev.metrics,
+                                      total: Math.max(0, prev.metrics.total - 1),
+                                      pending: Math.max(0, prev.metrics.pending - 1)
+                                    }
+                                  };
+                                });
+                                try {
+                                  await api(`/api/admin/invites/${encodeURIComponent(invite.id)}`, { method: "DELETE", token });
+                                  await refreshInvites();
+                                  await refreshSummary();
+                                } catch (e: any) {
+                                  setInvitesData(previousInvitesData);
+                                  setError(e?.message ?? "Rescind failed");
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                              disabled={busy}
+                            >
+                              Rescind
+                            </button>
+                          ) : null}
+                        </>
                       }
                       meta={[
                         { label: "Status", value: titleCase(status) },

@@ -335,6 +335,7 @@ export default function BookDetailPage() {
   const [editMode, setEditMode] = useState(false);
   const [findMoreOpen, setFindMoreOpen] = useState(false);
   const [coverToolsOpen, setCoverToolsOpen] = useState(false);
+  const [coverExpanded, setCoverExpanded] = useState(false);
   const editSnapshotRef = useRef<{
     formTitle: string;
     formAuthors: string;
@@ -2800,7 +2801,13 @@ export default function BookDetailPage() {
         <div className="card">
           <div
             className="om-book-detail-grid"
-            style={{ marginTop: "var(--space-10)", rowGap: 12, columnGap: 14, alignItems: "start", gridTemplateColumns: isNarrow ? "1fr" : "220px minmax(0, 1fr)" }}
+            style={{
+              marginTop: "var(--space-10)",
+              rowGap: 12,
+              columnGap: 14,
+              alignItems: "start",
+              gridTemplateColumns: isNarrow ? "1fr" : coverExpanded ? "minmax(0, 1fr) minmax(0, 1fr)" : "220px minmax(0, 1fr)"
+            }}
           >
             <div style={{ gridColumn: "1 / -1", marginBottom: 0 }}>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: "var(--space-10)" }}>
@@ -3337,16 +3344,31 @@ export default function BookDetailPage() {
                           {coverUrl ? "Edit cover" : "Add cover"}
                         </span>
                       )}
-                      
-                      {coverToolsOpen && (
-                        <button 
-                          className="text-muted" 
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); cancelCoverEdit(); }}
-                          disabled={coverState.busy}
-                        >
-                          Cancel
-                        </button>
-                      )}
+
+                      <div className="row" style={{ gap: "var(--space-md)", alignItems: "baseline", justifyContent: "flex-end" }}>
+                        {!isNarrow && coverUrl ? (
+                          <button
+                            className="text-muted"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setCoverExpanded((prev) => !prev);
+                            }}
+                            disabled={coverState.busy}
+                          >
+                            {coverExpanded ? "Smaller" : "Bigger"}
+                          </button>
+                        ) : null}
+                        {coverToolsOpen ? (
+                          <button
+                            className="text-muted"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); cancelCoverEdit(); }}
+                            disabled={coverState.busy}
+                          >
+                            Cancel
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </summary>
                   <div style={{ marginTop: 0 }}>

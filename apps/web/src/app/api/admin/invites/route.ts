@@ -20,6 +20,10 @@ function normalizeDir(input: string | null): "asc" | "desc" {
   return input === "asc" ? "asc" : "desc";
 }
 
+function normalizeStatus(input: string | null): "pending" | "used" {
+  return input === "used" ? "used" : "pending";
+}
+
 function newToken(): string {
   return crypto.randomBytes(24).toString("base64url");
 }
@@ -34,10 +38,12 @@ export async function GET(req: Request) {
     const q = (url.searchParams.get("q") ?? "").trim();
     const sort = normalizeSort(url.searchParams.get("sort"));
     const dir = normalizeDir(url.searchParams.get("dir"));
+    const status = normalizeStatus(url.searchParams.get("status"));
     const pageSize = clampInt(url.searchParams.get("pageSize"), 20, 1, 200);
     const page = clampInt(url.searchParams.get("page"), 1, 1, 10_000);
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
+    const nowIso = new Date().toISOString();
 
     let query = admin
       .from("invites")
@@ -46,6 +52,11 @@ export async function GET(req: Request) {
       .order("id", { ascending: true })
       .range(from, to);
     if (q) query = query.ilike("email", `%${q}%`);
+    if (status === "used") {
+      query = query.not("used_at", "is", null);
+    } else {
+      query = query.is("used_at", null).or(`expires_at.is.null,expires_at.gte.${nowIso}`);
+    }
 
     const res = await query;
     if (res.error) return NextResponse.json({ error: res.error.message }, { status: 500 });
@@ -78,7 +89,6 @@ export async function GET(req: Request) {
         display_name: profile?.display_name ?? null
       };
     });
-    const nowIso = new Date().toISOString();
     const [mTotal, mUsed, mExpired] = await Promise.all([
       admin.from("invites").select("id", { count: "exact", head: true }),
       admin.from("invites").select("id", { count: "exact", head: true }).not("used_at", "is", null),
