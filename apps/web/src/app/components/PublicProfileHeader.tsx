@@ -30,20 +30,24 @@ export default function PublicProfileHeader({
   useEffect(() => {
     let alive = true;
     (async () => {
-      if (!supabase) {
+      try {
+        if (!supabase) {
+          if (alive) setIsSelf(false);
+          return;
+        }
+        const { data } = await supabase.auth.getSession();
+        const uid = data.session?.user?.id ?? null;
+        if (!uid) {
+          if (alive) setIsSelf(false);
+          return;
+        }
+        const meRes = await supabase.from("profiles").select("username").eq("id", uid).maybeSingle();
+        const meUsername = String((meRes.data as any)?.username ?? "").trim().toLowerCase();
+        if (!alive) return;
+        setIsSelf(Boolean(meUsername) && meUsername === String(username ?? "").trim().toLowerCase());
+      } catch {
         if (alive) setIsSelf(false);
-        return;
       }
-      const { data } = await supabase.auth.getSession();
-      const uid = data.session?.user?.id ?? null;
-      if (!uid) {
-        if (alive) setIsSelf(false);
-        return;
-      }
-      const meRes = await supabase.from("profiles").select("username").eq("id", uid).maybeSingle();
-      const meUsername = String((meRes.data as any)?.username ?? "").trim().toLowerCase();
-      if (!alive) return;
-      setIsSelf(Boolean(meUsername) && meUsername === String(username ?? "").trim().toLowerCase());
     })();
     return () => {
       alive = false;
