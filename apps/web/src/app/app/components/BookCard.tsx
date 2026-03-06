@@ -120,9 +120,7 @@ export default function BookCard({
                   </span>
                 ))}
               </>
-            ) : (
-              isbn13 || ""
-            )}
+            ) : null}
           </div>
         </div>
       </div>

@@ -472,7 +472,7 @@ export default function PublicBookList({
                       {idx < truncatedAuthors.length - 1 ? <span>, </span> : null}
                     </span>
                   ))
-                : "—"}
+                : null}
             </div>
           </div>
           <div style={{ marginLeft: "auto" }}>
@@ -518,7 +518,7 @@ export default function PublicBookList({
                   {idx < truncatedAuthors.length - 1 ? <span>, </span> : null}
                 </span>
               ))
-            : "—"}
+            : null}
         </div>
       </div>
     );
