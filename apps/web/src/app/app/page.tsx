@@ -1005,13 +1005,11 @@ function AppShell({
       }
       if (isStale()) return;
       setDebugBooksSource("books:failed");
-      setItems([]);
       return;
     } catch (err: any) {
       if (isStale()) return;
       setDebugLastError(String(err?.message ?? "server_home_failed"));
       setDebugBooksSource("books:failed");
-      setItems([]);
       return;
     } finally {
       if (!isStale()) setBooksLoading(false);
