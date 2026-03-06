@@ -39,6 +39,9 @@ export default function PublicBookList({
   showLibraryBlocks: _showLibraryBlocks,
   initialFilters
 }: Props) {
+  const PUBLIC_VIEW_MODE_KEY = "om_public_viewMode";
+  const PUBLIC_GRID_COLS_KEY = "om_public_gridCols";
+  const PUBLIC_SORT_MODE_KEY = "om_public_sortMode";
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [gridCols, setGridCols] = useState<1 | 2 | 4 | 8>(4);
@@ -80,6 +83,32 @@ export default function PublicBookList({
       return prev;
     });
   }, [isMobile]);
+
+  useEffect(() => {
+    try {
+      const vm = window.localStorage.getItem(PUBLIC_VIEW_MODE_KEY);
+      const gc = window.localStorage.getItem(PUBLIC_GRID_COLS_KEY);
+      const sm = window.localStorage.getItem(PUBLIC_SORT_MODE_KEY);
+      if (vm === "grid" || vm === "list") setViewMode(vm);
+      if (gc === "1" || gc === "2" || gc === "4" || gc === "8") setGridCols(Number(gc) as 1 | 2 | 4 | 8);
+      if (sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
+    } catch {
+      // ignore
+    }
+  }, [PUBLIC_GRID_COLS_KEY, PUBLIC_SORT_MODE_KEY, PUBLIC_VIEW_MODE_KEY]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(PUBLIC_VIEW_MODE_KEY, viewMode);
+      window.localStorage.setItem(
+        PUBLIC_GRID_COLS_KEY,
+        String(isMobile && autoReducedGridColsRef.current ? autoReducedGridColsRef.current : gridCols)
+      );
+      window.localStorage.setItem(PUBLIC_SORT_MODE_KEY, sortMode);
+    } catch {
+      // ignore
+    }
+  }, [PUBLIC_GRID_COLS_KEY, PUBLIC_SORT_MODE_KEY, PUBLIC_VIEW_MODE_KEY, gridCols, isMobile, sortMode, viewMode]);
 
   // Use state for filters so we can clear them instantly
   const [activeFilters, setActiveFilters] = useState(initialFilters);
@@ -554,7 +583,14 @@ export default function PublicBookList({
               <option value="list">list</option>
             </select>
             {viewMode === "grid" && (
-              <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as 1 | 2 | 4 | 8)}>
+              <select
+                className="om-filter-control"
+                value={gridCols}
+                onChange={(e) => {
+                  autoReducedGridColsRef.current = null;
+                  setGridCols(Number(e.target.value) as 1 | 2 | 4 | 8);
+                }}
+              >
                 {isMobile && <option value={1}>1</option>}
                 <option value={2}>2</option>
                 {!isMobile && (
