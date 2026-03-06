@@ -2954,7 +2954,18 @@ function AppShell({
               onCancelEdit={cancelEditLibrary}
               onDelete={deleteLibrary}
               collapsed={!!collapsedByLibraryId[lib.id]}
-              onToggleCollapsed={(id) => setCollapsedByLibraryId(prev => { const n = { ...prev }; if (n[id]) delete n[id]; else n[id] = true; return n; })}
+              onToggleCollapsed={(id) =>
+                setCollapsedByLibraryId((prev) => {
+                  const n = { ...prev };
+                  const nextCollapsed = !n[id];
+                  if (n[id]) delete n[id];
+                  else n[id] = true;
+                  if (nextCollapsed && membersEditorCatalogId === id) {
+                    setMembersEditorCatalogId(null);
+                  }
+                  return n;
+                })
+              }
               onMoveUp={(id) => moveLibrary(id, -1)}
               onMoveDown={(id) => moveLibrary(id, 1)}
               viewMode={viewMode}
