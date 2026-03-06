@@ -19,6 +19,8 @@ export type PublicBook = {
   location?: string | null;
   shelf?: string | null;
   status?: string | null;
+  primary_cover_ref?: string | null;
+  resolved_cover_url?: string | null;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
   edition: { 

@@ -12,6 +12,126 @@ function parseCatalogIds(raw: string): number[] {
   );
 }
 
+function isStoragePath(value: string): boolean {
+  const v = value.trim();
+  if (!v) return false;
+  return !/^https?:\/\//i.test(v) && !/^data:/i.test(v);
+}
+
+function normalizeStoragePath(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const withoutLeadingSlash = trimmed.replace(/^\/+/, "");
+  return isStoragePath(withoutLeadingSlash) ? withoutLeadingSlash : null;
+}
+
+function withoutStoragePathPrefix(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const marker = "user-book-media/";
+  if (trimmed.startsWith("public/") && trimmed.includes(marker)) {
+    const idx = trimmed.indexOf(marker);
+    return normalizeStoragePath(trimmed.slice(idx + marker.length));
+  }
+  if (trimmed.includes(`/${marker}`)) {
+    const idx = trimmed.indexOf(`/${marker}`);
+    return normalizeStoragePath(trimmed.slice(idx + `/${marker}`.length));
+  }
+  if (trimmed.includes(marker)) {
+    const idx = trimmed.indexOf(marker);
+    return normalizeStoragePath(trimmed.slice(idx + marker.length));
+  }
+  try {
+    const url = new URL(trimmed);
+    const { pathname } = url;
+    if (pathname.includes(marker)) {
+      const idx = pathname.indexOf(marker);
+      return normalizeStoragePath(pathname.slice(idx + marker.length));
+    }
+  } catch {
+    // ignore URL parse failures
+  }
+  return null;
+}
+
+function toStoragePathCandidate(value: string | null | undefined): string | null {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return null;
+  const normalizedInput = trimmed.startsWith("/") ? trimmed.replace(/^\/+/, "") : trimmed;
+  const bucketPath = withoutStoragePathPrefix(normalizedInput);
+  if (bucketPath) return bucketPath;
+  if (isStoragePath(normalizedInput)) return normalizeStoragePath(normalizedInput);
+  return null;
+}
+
+function toResolvedExternalCoverUrl(value: string, origin: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (!/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^https:\/\//i.test(trimmed)) return trimmed;
+  return `${origin}/api/image-proxy?url=${encodeURIComponent(trimmed)}`;
+}
+
+function derivePrimaryCoverRef(row: any, primaryCoverRefById: Map<number, string | null>): string | null {
+  const rowId = Number(row?.id);
+  const preferred = primaryCoverRefById.get(rowId) ?? null;
+  if (preferred) return preferred;
+  const coverOriginal = String(row?.cover_original_url ?? "").trim();
+  if (coverOriginal) return coverOriginal;
+  const media = Array.isArray(row?.media) ? row.media : [];
+  const coverMedia = media.find((m: any) => m?.kind === "cover") ?? media.find((m: any) => m?.kind === "image") ?? media[0] ?? null;
+  const mediaPath = String(coverMedia?.storage_path ?? "").trim();
+  if (mediaPath) return mediaPath;
+  const editionCover = String(row?.edition?.cover_url ?? "").trim();
+  return editionCover || null;
+}
+
+async function attachResolvedCoverUrls(req: Request, admin: ReturnType<typeof requireAdminClient>, rows: any[]) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows;
+
+  const origin = new URL(req.url).origin;
+  const bookIds = Array.from(new Set(rows.map((row) => Number(row?.id)).filter((id) => Number.isFinite(id) && id > 0)));
+
+  const primaryCoverRefById = new Map<number, string | null>();
+  if (bookIds.length > 0) {
+    const primaryRes = await admin.from("user_books").select("id,primary_cover_ref").in("id", bookIds);
+    if (!primaryRes.error) {
+      for (const row of (primaryRes.data ?? []) as any[]) {
+        primaryCoverRefById.set(Number(row.id), typeof row.primary_cover_ref === "string" ? row.primary_cover_ref.trim() || null : null);
+      }
+    }
+  }
+
+  const refs = rows.map((row) => derivePrimaryCoverRef(row, primaryCoverRefById));
+  const storageRefs = Array.from(new Set(refs.map((ref) => toStoragePathCandidate(ref)).filter(Boolean) as string[]));
+  const signedByPath = new Map<string, string>();
+  if (storageRefs.length > 0) {
+    const signedRes = await admin.storage.from("user-book-media").createSignedUrls(storageRefs, 60 * 60);
+    if (!signedRes.error) {
+      for (const item of signedRes.data ?? []) {
+        if (item.path && item.signedUrl) signedByPath.set(item.path, item.signedUrl);
+      }
+    }
+  }
+
+  return rows.map((row, index) => {
+    const primaryCoverRef = refs[index] ?? null;
+    const storagePath = toStoragePathCandidate(primaryCoverRef);
+    const resolvedCoverUrl =
+      storagePath
+        ? signedByPath.get(storagePath) ?? null
+        : primaryCoverRef
+          ? toResolvedExternalCoverUrl(primaryCoverRef, origin)
+          : null;
+    return {
+      ...row,
+      primary_cover_ref: primaryCoverRef,
+      resolved_cover_url: resolvedCoverUrl
+    };
+  });
+}
+
 export async function GET(req: Request) {
   try {
     const current = await requireUser(req);
@@ -160,7 +280,7 @@ export async function GET(req: Request) {
       return { rows: (res.error ? [] : (res.data as any[])) ?? [], error: res.error ?? null };
     };
 
-    if (lite) {
+      if (lite) {
       const liteRes = await fetchBooks(liteSelect);
       if (liteRes.error) {
         const fullRes = await fetchBooks(fullSelect);
@@ -178,7 +298,7 @@ export async function GET(req: Request) {
       } else {
         books = liteRes.rows;
       }
-
+      books = await attachResolvedCoverUrls(req, admin, books);
       return NextResponse.json({ ok: true, catalogs, books });
     }
 
@@ -211,6 +331,7 @@ export async function GET(req: Request) {
           books = (minimalRes.error ? [] : minimalRes.data) as any[];
         }
       }
+      books = await attachResolvedCoverUrls(req, admin, books);
     }
 
     return NextResponse.json({ ok: true, catalogs, books });

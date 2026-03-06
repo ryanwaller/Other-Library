@@ -3243,15 +3243,10 @@ function AppShell({
                     : null}
                   {groups.slice(0, limit).map((g) => {
                     const orderedBookIds = groups.map((group) => Number(group.primary.id)).filter((id) => Number.isFinite(id) && id > 0);
-                    const coverMedia = g.primary.media.find((m) => m.kind === "cover") ?? g.primary.media.find((m) => m.kind === "image") ?? g.primary.media[0];
-                    const coverPath = toStoragePathCandidate(coverMedia?.storage_path ?? null);
-                    const mediaCoverUrl = toDisplayCoverUrl(mediaUrlsByPath, supabase, coverPath);
-                    const originalSrc = toDisplayCoverUrl(mediaUrlsByPath, supabase, g.primary.cover_original_url ?? null);
-                    const coverUrl =
-                      mediaCoverUrl ??
-                      toDisplayCoverUrl(mediaUrlsByPath, supabase, g.primary.edition?.cover_url ?? null) ??
-                      g.primary.edition?.cover_url ??
-                      null;
+                    const resolvedCoverUrl =
+                      typeof g.primary.resolved_cover_url === "string" && g.primary.resolved_cover_url.trim()
+                        ? g.primary.resolved_cover_url
+                        : null;
                     return (
                       <BookCard
                         key={g.key}
@@ -3265,8 +3260,8 @@ function AppShell({
                         tags={g.tagNames}
                         copiesCount={g.copiesCount}
                         href={`/app/books/${g.primary.id}`}
-                        coverUrl={coverUrl}
-                        originalSrc={originalSrc}
+                        coverUrl={resolvedCoverUrl}
+                        originalSrc={resolvedCoverUrl}
                         onOpen={() => storeBookNavContext(lib.id, orderedBookIds)}
                         cropData={g.primary.cover_crop}
                         onDeleteCopy={() => deleteEntry(g.primary.id)}
