@@ -43,11 +43,9 @@ export default function OverviewSkeleton({ showToolbar = true, catalogCount = 2 
               <Skeleton style={{ width: 72, height: 16 }} />
             </div>
             <div
+              className="om-skeleton-card-grid"
               style={{
-                marginTop: "var(--space-md)",
-                display: "grid",
-                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-                gap: "var(--space-md)"
+                marginTop: "var(--space-md)"
               }}
             >
               {Array.from({ length: 4 }).map((__, i) => (
@@ -65,4 +63,3 @@ export default function OverviewSkeleton({ showToolbar = true, catalogCount = 2 
     </main>
   );
 }
-

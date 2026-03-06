@@ -67,7 +67,8 @@ export async function GET(req: Request) {
             created_at: String(l.created_at ?? new Date(0).toISOString()),
             sort_order: Number.isFinite(Number(l.sort_order)) ? Number(l.sort_order) : null,
             owner_id: l.owner_id ? String(l.owner_id) : null,
-            myRole: roleByCatalog.get(id) ?? (ownedIds.includes(id) ? "owner" : "editor")
+            myRole: roleByCatalog.get(id) ?? (ownedIds.includes(id) ? "owner" : "editor"),
+            memberPreviews: [] as Array<{ userId: string; username: string; avatarUrl: string | null }>
           };
         });
       } else {
@@ -77,32 +78,109 @@ export async function GET(req: Request) {
           created_at: new Date(0).toISOString(),
           sort_order: null,
           owner_id: null,
-          myRole: roleByCatalog.get(id) ?? (ownedIds.includes(id) ? "owner" : "editor")
+          myRole: roleByCatalog.get(id) ?? (ownedIds.includes(id) ? "owner" : "editor"),
+          memberPreviews: [] as Array<{ userId: string; username: string; avatarUrl: string | null }>
         }));
+      }
+    }
+
+    catalogs = catalogs
+      .slice()
+      .sort((a, b) => {
+        const aOrder = a.sort_order != null ? Number(a.sort_order) : null;
+        const bOrder = b.sort_order != null ? Number(b.sort_order) : null;
+        if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
+        if (aOrder !== null) return -1;
+        if (bOrder !== null) return 1;
+        const aTs = Date.parse(String(a.created_at ?? ""));
+        const bTs = Date.parse(String(b.created_at ?? ""));
+        if (Number.isFinite(aTs) && Number.isFinite(bTs) && aTs !== bTs) return aTs - bTs;
+        return Number(a.id) - Number(b.id);
+      });
+
+    if (allowedIds.length > 0) {
+      const membersRes = await admin
+        .from("catalog_members")
+        .select("catalog_id,user_id,accepted_at")
+        .in("catalog_id", allowedIds)
+        .not("accepted_at", "is", null);
+      const memberRows = (membersRes.error ? [] : ((membersRes.data ?? []) as any[])).filter((r) => String(r.user_id) !== current.id);
+      const memberIds = Array.from(new Set(memberRows.map((r) => String(r.user_id)).filter(Boolean)));
+      let profileById: Record<string, { username: string; avatar_path: string | null }> = {};
+      if (memberIds.length > 0) {
+        const pr = await admin.from("profiles").select("id,username,avatar_path").in("id", memberIds);
+        if (!pr.error) {
+          profileById = Object.fromEntries(
+            ((pr.data ?? []) as any[]).map((p) => [String(p.id), { username: String(p.username ?? ""), avatar_path: p.avatar_path ? String(p.avatar_path) : null }])
+          );
+        }
+      }
+
+      const byCatalog: Record<number, Array<{ userId: string; username: string; avatarUrl: string | null; acceptedAt: string }>> = {};
+      for (const r of memberRows) {
+        const cid = Number(r.catalog_id);
+        const uid = String(r.user_id);
+        const p = profileById[uid];
+        if (!p?.username) continue;
+        if (!byCatalog[cid]) byCatalog[cid] = [];
+        byCatalog[cid].push({
+          userId: uid,
+          username: p.username,
+          avatarUrl: null,
+          acceptedAt: String(r.accepted_at ?? "")
+        });
+      }
+
+      for (const c of catalogs) {
+        c.memberPreviews = (byCatalog[c.id] ?? [])
+          .sort((a, b) => Date.parse(a.acceptedAt) - Date.parse(b.acceptedAt))
+          .slice(0, 10)
+          .map((m) => ({ userId: m.userId, username: m.username, avatarUrl: m.avatarUrl }));
       }
     }
 
     let books: any[] = [];
     if (allowedIds.length > 0) {
       const liteSelect =
-        "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))";
+        "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))";
       const fullSelect =
         "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))";
       const basicSelect =
         "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))";
-      const minimalSelect =
-        "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade";
+    const minimalSelect =
+      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade";
 
-      if (lite) {
-        const liteRes = await admin
-          .from("user_books")
-          .select(liteSelect)
-          .in("library_id", allowedIds)
-          .order("created_at", { ascending: false })
-          .limit(800);
-        books = (liteRes.error ? [] : liteRes.data) as any[];
-        return NextResponse.json({ ok: true, catalogs, books });
+    const fetchBooks = async (select: string): Promise<{ rows: any[]; error: unknown }> => {
+      const res = await admin
+        .from("user_books")
+        .select(select)
+        .in("library_id", allowedIds)
+        .order("created_at", { ascending: false })
+        .limit(800);
+      return { rows: (res.error ? [] : (res.data as any[])) ?? [], error: res.error ?? null };
+    };
+
+    if (lite) {
+      const liteRes = await fetchBooks(liteSelect);
+      if (liteRes.error) {
+        const fullRes = await fetchBooks(fullSelect);
+        if (!fullRes.error) {
+          books = fullRes.rows;
+        } else {
+          const basicRes = await fetchBooks(basicSelect);
+          if (!basicRes.error) {
+            books = basicRes.rows;
+          } else {
+            const minimalRes = await fetchBooks(minimalSelect);
+            books = minimalRes.rows;
+          }
+        }
+      } else {
+        books = liteRes.rows;
       }
+
+      return NextResponse.json({ ok: true, catalogs, books });
+    }
 
       const fullRes = await admin
         .from("user_books")

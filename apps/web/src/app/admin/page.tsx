@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
@@ -157,7 +157,7 @@ function AdminListItem({
   );
 }
 
-export default function AdminPage() {
+function AdminPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [session, setSession] = useState<Session | null>(null);
@@ -971,5 +971,13 @@ export default function AdminPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense fallback={<main className="container" />}>
+      <AdminPageInner />
+    </Suspense>
   );
 }

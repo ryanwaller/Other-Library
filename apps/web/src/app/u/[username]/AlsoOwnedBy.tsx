@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
-import IdentityRow from "../../components/IdentityRow";
 
 type AlsoOwnedRow = {
   id: number;
@@ -105,35 +104,43 @@ export default function AlsoOwnedBy({
 
   return (
     <>
-    <hr style={{ border: 0, borderTop: "1px solid var(--border)", margin: "var(--space-16) 0" }} />
-    <div>
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <div>Also owned by</div>
-        <div className="text-muted">{owners.length}</div>
-      </div>
-      {owners.length === 0 ? (
-        <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
-          None found.
-        </div>
-      ) : (
-        <div style={{ marginTop: "var(--space-10)", display: "flex", flexDirection: "column", gap: "var(--space-10)" }}>
-          {owners.map((r) => {
+      <hr style={{ border: 0, borderTop: "1px solid var(--border)", margin: "var(--space-16) 0" }} />
+      <div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "0 var(--space-8)",
+            rowGap: "var(--space-8)",
+            color: "var(--muted)"
+          }}
+        >
+          <span>Also owned by</span>
+          {owners.map((r, index) => {
             const username = r.owner?.username ?? "";
             const avatarPath = r.owner?.avatar_path ?? null;
             const avatarUrl = avatarPath ? avatarUrlsByPath[avatarPath] ?? null : null;
             return (
-              <IdentityRow
-                key={r.owner_id}
-                avatarUrl={avatarUrl}
-                displayName={null}
-                username={username}
-                rightSlot={<span className="text-muted">{r.copies > 1 ? `(${r.copies})` : ""}</span>}
-              />
+              <span key={r.owner_id} style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                <Link href={`/u/${encodeURIComponent(username)}`} className="om-avatar-link" aria-label={`Open ${username}'s profile`}>
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img alt={username} src={avatarUrl} className="om-member-stack-avatar om-member-stack-avatar-detail-down" />
+                  ) : (
+                    <span className="om-member-stack-avatar om-member-stack-avatar-detail-down" title={username} style={{ background: "var(--bg-muted)" }} />
+                  )}
+                </Link>
+                <Link href={`/u/${encodeURIComponent(username)}`} className="text-muted">
+                  {username}
+                </Link>
+                {r.copies > 1 ? ` (${r.copies})` : ""}
+                {index < owners.length - 1 ? "," : ""}
+              </span>
             );
           })}
         </div>
-      )}
-    </div>
+      </div>
     </>
   );
 }

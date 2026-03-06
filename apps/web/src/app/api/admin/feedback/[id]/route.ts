@@ -41,3 +41,24 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 }
 
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  try {
+    await requireAdmin(req);
+    const admin = getSupabaseAdmin();
+    if (!admin) return NextResponse.json({ error: "admin_not_configured" }, { status: 500 });
+
+    const { id } = await ctx.params;
+    const feedbackId = String(id ?? "").trim();
+    if (!feedbackId) return NextResponse.json({ error: "invalid_feedback_id" }, { status: 400 });
+
+    const res = await admin.from("feedback").delete().eq("id", feedbackId).select("id").maybeSingle();
+    if (res.error) return NextResponse.json({ error: res.error.message }, { status: 500 });
+    if (!res.data) return NextResponse.json({ error: "feedback_not_found" }, { status: 404 });
+
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    const msg = e?.message ?? "forbidden";
+    const status = msg === "not_authenticated" ? 401 : msg === "forbidden" ? 403 : 400;
+    return NextResponse.json({ error: msg }, { status });
+  }
+}

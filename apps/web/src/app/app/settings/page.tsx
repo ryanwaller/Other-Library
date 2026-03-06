@@ -157,6 +157,8 @@ function SettingsPageContent() {
     error: null,
     message: null
   });
+  const [avatarUploadLabel, setAvatarUploadLabel] = useState("Upload");
+  const avatarUploadResetTimerRef = useRef<number | null>(null);
 
   const [emailDraft, setEmailDraft] = useState<string>("");
   const [emailFocused, setEmailFocused] = useState(false);
@@ -410,6 +412,14 @@ function SettingsPageContent() {
   }, [userId]);
 
   useEffect(() => {
+    return () => {
+      if (avatarUploadResetTimerRef.current) {
+        window.clearTimeout(avatarUploadResetTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     let alive = true;
     (async () => {
       if (!supabase || !profile?.avatar_path) {
@@ -627,8 +637,30 @@ function SettingsPageContent() {
       setAvatarCrop({ x: 0, y: 0 });
       setAvatarZoom(1);
       setAvatarState({ busy: false, error: null, message: "Uploaded" });
+      setAvatarUploadLabel("Uploaded");
+      if (avatarUploadResetTimerRef.current) {
+        window.clearTimeout(avatarUploadResetTimerRef.current);
+      }
+      avatarUploadResetTimerRef.current = window.setTimeout(() => {
+        setAvatarUploadLabel("Upload");
+      }, 2200);
     } catch (e: any) {
       setAvatarState({ busy: false, error: e?.message ?? "Failed", message: "Failed" });
+    }
+  }
+
+  async function openAvatarRecrop() {
+    if (!avatarUrl || !supabase) return;
+    setAvatarState({ busy: true, error: null, message: null });
+    try {
+      const fileRes = await fetch(avatarUrl);
+      const blob = await fileRes.blob();
+      const mime = blob.type || "image/jpeg";
+      const file = new File([blob], "avatar.jpg", { type: mime });
+      setPendingAvatar(file);
+      setAvatarState({ busy: false, error: null, message: null });
+    } catch (e: any) {
+      setAvatarState({ busy: false, error: e?.message ?? "Could not load avatar for crop.", message: "Failed" });
     }
   }
 
@@ -766,7 +798,13 @@ function SettingsPageContent() {
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <div className="row" style={{ gap: "var(--space-10)", alignItems: "center", flexWrap: "wrap" }}>
                     {avatarUrl ? (
-                      <a href={avatarUrl} target="_blank" rel="noreferrer" aria-label="Open avatar">
+                      <button
+                        type="button"
+                        onClick={() => void openAvatarRecrop()}
+                        aria-label="Re-crop avatar"
+                        className="om-avatar-link"
+                        style={{ padding: 0, background: "transparent", border: "none" }}
+                      >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           alt=""
@@ -779,23 +817,34 @@ function SettingsPageContent() {
                             border: "1px solid var(--border-avatar)"
                           }}
                         />
-                      </a>
+                      </button>
                     ) : (
-                      <div
-                        style={{
-                          width: "var(--avatar-size)",
-                          height: "var(--avatar-size)",
-                          borderRadius: 999,
-                          border: "1px solid var(--border-avatar)"
-                        }}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => avatarInputRef.current?.click()}
+                        aria-label="Upload avatar"
+                        className="om-avatar-link"
+                        style={{ padding: 0, background: "transparent", border: "none", width: "var(--avatar-size)", height: "var(--avatar-size)", borderRadius: 999 }}
+                      >
+                        <div
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            borderRadius: 999,
+                            border: "1px solid var(--border-avatar)"
+                          }}
+                        />
+                      </button>
                     )}
                     <input
                       ref={avatarInputRef}
                       type="file"
                       accept="image/*"
                       style={{ display: "none" }}
-                      onChange={(e) => setPendingAvatar((e.target.files ?? [])[0] ?? null)}
+                      onChange={(e) => {
+                        setAvatarUploadLabel("Upload");
+                        setPendingAvatar((e.target.files ?? [])[0] ?? null);
+                      }}
                     />
                     <button
                       type="button"
@@ -803,7 +852,7 @@ function SettingsPageContent() {
                       style={{ textDecoration: "underline" }}
                       onClick={() => avatarInputRef.current?.click()}
                     >
-                      Upload
+                      {avatarUploadLabel}
                     </button>
                     {pendingAvatar ? (
                       <button

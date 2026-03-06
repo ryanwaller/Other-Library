@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 
 type FeedbackStatus = "new" | "reviewing" | "resolved" | "wont_fix";
-type FeedbackCategory = "bug" | "feels_wrong" | "feature_idea" | "other";
+type FeedbackStatusAction = FeedbackStatus | "delete";
+type FeedbackCategory = "bug" | "feels_wrong" | "feature_idea" | "spacing_issue" | "other";
+type FeedbackDeviceType = "desktop" | "mobile" | "tablet" | "unknown";
 
 type FeedbackRow = {
   id: string;
@@ -15,6 +17,7 @@ type FeedbackRow = {
   message: string;
   screenshot_path: string | null;
   screenshot_url: string | null;
+  device_type?: FeedbackDeviceType | null;
   status: FeedbackStatus;
   admin_notes: string | null;
   created_at: string;
@@ -38,6 +41,7 @@ const CATEGORIES: Array<{ key: FeedbackCategory; label: string }> = [
   { key: "bug", label: "Bug" },
   { key: "feels_wrong", label: "Feels wrong" },
   { key: "feature_idea", label: "Feature idea" },
+  { key: "spacing_issue", label: "Spacing issue" },
   { key: "other", label: "Other" }
 ];
 
@@ -62,9 +66,18 @@ function categoryLabel(category: FeedbackCategory): string {
   return found ? found.label : "Other";
 }
 
+function deviceLabel(deviceType: FeedbackRow["device_type"]): string {
+  if (deviceType === "mobile") return "Mobile";
+  if (deviceType === "tablet") return "Tablet";
+  if (deviceType === "desktop") return "Desktop";
+  return "Unknown";
+}
+
 export default function AdminFeedbackBoard({ token }: { token: string }) {
   const [statusFilter, setStatusFilter] = useState<"all" | FeedbackStatus>("all");
   const [categoryFilter, setCategoryFilter] = useState<"all" | FeedbackCategory>("all");
+  const [pageFilter, setPageFilter] = useState<string>("all");
+  const [deviceFilter, setDeviceFilter] = useState<"all" | FeedbackDeviceType>("all");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<FeedbackRow[]>([]);
@@ -111,35 +124,78 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
     if (!res.ok) throw new Error(String((json as any)?.error ?? "feedback_patch_failed"));
   }
 
+  async function deleteRow(id: string) {
+    const res = await fetch(`/api/admin/feedback/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${token}` }
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(String((json as any)?.error ?? "feedback_delete_failed"));
+  }
+
   const grouped = useMemo(() => {
+    const rowsByPage = pageFilter === "all" ? rows : rows.filter((row) => String(row.page_title ?? "").trim() === pageFilter);
+    const rowsByDevice = deviceFilter === "all" ? rowsByPage : rowsByPage.filter((row) => (row.device_type ?? "unknown") === deviceFilter);
     const map: Record<FeedbackStatus, FeedbackRow[]> = { new: [], reviewing: [], resolved: [], wont_fix: [] };
-    for (const row of rows) map[row.status].push(row);
+    for (const row of rowsByDevice) map[row.status].push(row);
     return map;
+  }, [rows, pageFilter, deviceFilter]);
+  const focusedRows = statusFilter === "all"
+    ? (pageFilter === "all" ? rows : rows.filter((row) => String(row.page_title ?? "").trim() === pageFilter))
+        .filter((row) => (deviceFilter === "all" ? true : (row.device_type ?? "unknown") === deviceFilter)
+        )
+    : grouped[statusFilter];
+  const pageOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of rows) {
+      const title = String(row.page_title ?? "").trim();
+      if (title) set.add(title);
+    }
+    return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
   return (
     <div style={{ marginTop: "var(--space-lg)", width: "calc(100vw - 48px)", marginLeft: "calc(50% - 50vw + 24px)" }}>
-      <div className="row" style={{ gap: "var(--space-8)", alignItems: "center", flexWrap: "wrap" }}>
-        <select className="om-filter-control" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
-          <option value="all">All statuses</option>
-          {STATUSES.map((s) => (
-            <option key={s.key} value={s.key}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-        <select className="om-filter-control" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as any)}>
-          <option value="all">All categories</option>
-          {CATEGORIES.map((c) => (
-            <option key={c.key} value={c.key}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-        <span className="text-muted">Total {rows.length}</span>
-        <button className="om-inline-link-muted" onClick={() => void load()} disabled={busy}>
-          Refresh
-        </button>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-8)", flexWrap: "wrap" }}>
+        <div className="row" style={{ gap: "var(--space-8)", alignItems: "center", flexWrap: "wrap" }}>
+          <select className="om-filter-control" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} style={{ width: 180 }}>
+            <option value="all">All statuses</option>
+            {STATUSES.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <select className="om-filter-control" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as any)} style={{ width: 180 }}>
+            <option value="all">All categories</option>
+            {CATEGORIES.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+          <select className="om-filter-control" value={pageFilter} onChange={(e) => setPageFilter(e.target.value)} style={{ width: 200 }}>
+            <option value="all">All pages</option>
+            {pageOptions.map((page) => (
+              <option key={page} value={page}>
+                {page}
+              </option>
+            ))}
+          </select>
+          <select className="om-filter-control" value={deviceFilter} onChange={(e) => setDeviceFilter(e.target.value as "all" | FeedbackDeviceType)} style={{ width: 170 }}>
+            <option value="all">All devices</option>
+            <option value="desktop">Desktop</option>
+            <option value="mobile">Mobile</option>
+            <option value="tablet">Tablet</option>
+            <option value="unknown">Unknown</option>
+          </select>
+          <button className="om-inline-link-muted" onClick={() => void load()} disabled={busy}>
+            Refresh
+          </button>
+        </div>
+        <span className="text-muted" style={{ marginLeft: "auto", whiteSpace: "nowrap", minWidth: 72, textAlign: "right" }}>
+          {statusFilter === "all" ? `Total ${focusedRows.length}` : ""}
+        </span>
       </div>
 
       {error ? (
@@ -149,92 +205,222 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
       ) : null}
 
       <div style={{ marginTop: "var(--space-lg)", width: "100%", overflowX: "auto" }}>
-        <div style={{ minWidth: 1320, display: "grid", gridTemplateColumns: "repeat(4, minmax(300px, 1fr))", gap: "var(--space-md)" }}>
-          {STATUSES.map((col) => (
-            <div key={col.key} className="card" style={{ minHeight: 220 }}>
-              <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-                <div>{col.label}</div>
-                <span className="text-muted">{grouped[col.key].length}</span>
-              </div>
-              <div style={{ marginTop: "var(--space-md)", display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
-                {grouped[col.key].map((row) => (
-                  <div key={row.id} style={{ border: "1px solid var(--border)", padding: "var(--space-sm)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
-                    <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-8)" }}>
-                      <div className="om-avatar-lockup" style={{ minWidth: 0 }}>
-                        {row.avatar_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img alt="" src={row.avatar_url} style={{ width: 20, height: 20, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border-avatar)" }} />
-                        ) : (
-                          <span style={{ width: 20, height: 20, borderRadius: 999, display: "inline-block", background: "var(--placeholder-bg)" }} />
-                        )}
-                        <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{row.profile?.username || row.user_id.slice(0, 8)}</span>
-                      </div>
-                      <span className="text-muted" style={{ whiteSpace: "nowrap" }}>
-                        {relTime(row.created_at)}
-                      </span>
-                    </div>
-
-                    <div className="row" style={{ gap: "var(--space-8)", alignItems: "center", flexWrap: "wrap" }}>
-                      <a href={row.page_url} target="_blank" rel="noreferrer" className="text-muted">
-                        {row.page_title}
-                      </a>
-                      <span className="om-category-pill">{categoryLabel(row.category)}</span>
-                    </div>
-                    {row.element_context ? <div className="text-muted">{row.element_context}</div> : null}
-                    <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{row.message}</div>
-                    {row.screenshot_url ? (
-                      <button
-                        type="button"
-                        onClick={() => setLightboxUrl(row.screenshot_url || null)}
-                        style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" }}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={row.screenshot_url} alt="" style={{ width: 88, height: 88, objectFit: "cover", border: "1px solid var(--border)" }} />
-                      </button>
-                    ) : null}
-
-                    <div className="row" style={{ gap: "var(--space-8)", alignItems: "baseline", flexWrap: "nowrap" }}>
-                      <select
-                        className="om-filter-control"
-                        value={row.status}
-                        onChange={async (e) => {
-                          const next = e.target.value as FeedbackStatus;
-                          setRows((prev) => prev.map((x) => (x.id === row.id ? { ...x, status: next } : x)));
-                          try {
-                            await patchRow(row.id, { status: next });
-                          } catch {
-                            void load();
-                          }
-                        }}
-                      >
-                        {STATUSES.map((s) => (
-                          <option key={s.key} value={s.key}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <input
-                      value={notesDraft[row.id] ?? ""}
-                      onChange={(e) => setNotesDraft((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                      onBlur={async () => {
-                        const value = String(notesDraft[row.id] ?? "");
-                        if (value === String(row.admin_notes ?? "")) return;
-                        setRows((prev) => prev.map((x) => (x.id === row.id ? { ...x, admin_notes: value } : x)));
-                        try {
-                          await patchRow(row.id, { admin_notes: value });
-                        } catch {
-                          void load();
-                        }
-                      }}
-                      placeholder="Admin notes"
-                      style={{ width: "100%" }}
-                    />
-                  </div>
-                ))}
-              </div>
+        <div style={{ minWidth: 1320, position: "relative", paddingTop: 28 }}>
+          <div className="row" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 24, justifyContent: "space-between", alignItems: "baseline" }}>
+            <div style={{ visibility: statusFilter === "all" ? "hidden" : "visible" }}>
+              {STATUSES.find((s) => s.key === statusFilter)?.label ?? "Status"}
             </div>
-          ))}
+            <span className="text-muted" style={{ whiteSpace: "nowrap", visibility: statusFilter === "all" ? "hidden" : "visible" }}>
+              {String(focusedRows.length)}
+            </span>
+          </div>
+        {statusFilter === "all" ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(300px, 1fr))", gap: "var(--space-md)" }}>
+              {STATUSES.map((col) => (
+                <div key={col.key} className="card" style={{ minHeight: 220 }}>
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                    <div>{col.label}</div>
+                    <span className="text-muted">{grouped[col.key].length}</span>
+                  </div>
+                  <div style={{ marginTop: "var(--space-md)", display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
+                    {grouped[col.key].map((row) => (
+                      <div key={row.id} style={{ border: "1px solid var(--border)", padding: "var(--space-sm)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
+                        <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-8)" }}>
+                          <div className="om-avatar-lockup" style={{ minWidth: 0 }}>
+                            {row.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img alt="" src={row.avatar_url} style={{ width: 20, height: 20, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border-avatar)" }} />
+                            ) : (
+                              <span style={{ width: 20, height: 20, borderRadius: 999, display: "inline-block", background: "var(--placeholder-bg)" }} />
+                            )}
+                            <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{row.profile?.username || row.user_id.slice(0, 8)}</span>
+                          </div>
+                          <span className="text-muted" style={{ whiteSpace: "nowrap" }}>
+                            {relTime(row.created_at)}
+                          </span>
+                        </div>
+
+                        <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-8)" }}>
+                          <div className="row" style={{ gap: "var(--space-8)", alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
+                            <a href={row.page_url} target="_blank" rel="noreferrer" className="text-muted">
+                              {row.page_title}
+                            </a>
+                            <span className="om-category-pill">{categoryLabel(row.category)}</span>
+                          </div>
+                          <span className="text-muted" style={{ whiteSpace: "nowrap", marginLeft: "auto" }}>
+                            {deviceLabel(row.device_type)}
+                          </span>
+                        </div>
+                        <div style={{ borderTop: "1px solid var(--border)", marginTop: "var(--space-8)" }} />
+                        {row.element_context ? <div className="text-muted">{row.element_context}</div> : null}
+                        <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{row.message}</div>
+                        {row.screenshot_url ? (
+                          <button
+                            type="button"
+                            onClick={() => setLightboxUrl(row.screenshot_url || null)}
+                            style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={row.screenshot_url} alt="" style={{ width: 88, height: 88, objectFit: "cover", border: "1px solid var(--border)" }} />
+                          </button>
+                        ) : null}
+
+                        <div style={{ borderTop: "1px solid var(--border)", marginTop: "var(--space-8)" }} />
+                        <input
+                          value={notesDraft[row.id] ?? ""}
+                          onChange={(e) => setNotesDraft((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                          onBlur={async () => {
+                            const value = String(notesDraft[row.id] ?? "");
+                            if (value === String(row.admin_notes ?? "")) return;
+                            setRows((prev) => prev.map((x) => (x.id === row.id ? { ...x, admin_notes: value } : x)));
+                            try {
+                              await patchRow(row.id, { admin_notes: value });
+                            } catch {
+                              void load();
+                            }
+                          }}
+                          placeholder="Admin notes"
+                          style={{ width: "100%", marginTop: "var(--space-8)", border: "none", borderBottom: "none", boxShadow: "none", background: "transparent", paddingLeft: 0, paddingRight: 0 }}
+                        />
+                        <select
+                          className="om-filter-control"
+                          value={row.status}
+                          onChange={async (e) => {
+                            const next = e.target.value as FeedbackStatusAction;
+                            if (next === "delete") {
+                              const ok = window.confirm("Delete this report?");
+                              if (!ok) return;
+                              const prev = rows;
+                              setRows((curr) => curr.filter((x) => x.id !== row.id));
+                              try {
+                                await deleteRow(row.id);
+                              } catch {
+                                setRows(prev);
+                                void load();
+                              }
+                              return;
+                            }
+                            setRows((prev) => prev.map((x) => (x.id === row.id ? { ...x, status: next } : x)));
+                            try {
+                              await patchRow(row.id, { status: next });
+                            } catch {
+                              void load();
+                            }
+                          }}
+                          style={{ width: "100%" }}
+                        >
+                          {STATUSES.map((s) => (
+                            <option key={s.key} value={s.key}>
+                              {s.label}
+                            </option>
+                          ))}
+                          <option value="delete">Delete</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+        ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(300px, 1fr))", gap: "var(--space-md)" }}>
+            {focusedRows.map((row) => (
+              <div key={row.id} style={{ border: "1px solid var(--border)", padding: "var(--space-sm)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-8)" }}>
+                  <div className="om-avatar-lockup" style={{ minWidth: 0 }}>
+                    {row.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img alt="" src={row.avatar_url} style={{ width: 20, height: 20, borderRadius: 999, objectFit: "cover", border: "1px solid var(--border-avatar)" }} />
+                    ) : (
+                      <span style={{ width: 20, height: 20, borderRadius: 999, display: "inline-block", background: "var(--placeholder-bg)" }} />
+                    )}
+                    <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{row.profile?.username || row.user_id.slice(0, 8)}</span>
+                  </div>
+                  <span className="text-muted" style={{ whiteSpace: "nowrap" }}>
+                    {relTime(row.created_at)}
+                  </span>
+                </div>
+
+                <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-8)" }}>
+                  <div className="row" style={{ gap: "var(--space-8)", alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
+                    <a href={row.page_url} target="_blank" rel="noreferrer" className="text-muted">
+                      {row.page_title}
+                    </a>
+                    <span className="om-category-pill">{categoryLabel(row.category)}</span>
+                  </div>
+                  <span className="text-muted" style={{ whiteSpace: "nowrap", marginLeft: "auto" }}>
+                    {deviceLabel(row.device_type)}
+                  </span>
+                </div>
+                <div style={{ borderTop: "1px solid var(--border)", marginTop: "var(--space-8)" }} />
+                {row.element_context ? <div className="text-muted">{row.element_context}</div> : null}
+                <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{row.message}</div>
+                {row.screenshot_url ? (
+                  <button
+                    type="button"
+                    onClick={() => setLightboxUrl(row.screenshot_url || null)}
+                    style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={row.screenshot_url} alt="" style={{ width: 88, height: 88, objectFit: "cover", border: "1px solid var(--border)" }} />
+                  </button>
+                ) : null}
+
+                <div style={{ borderTop: "1px solid var(--border)", marginTop: "var(--space-8)" }} />
+                <input
+                  value={notesDraft[row.id] ?? ""}
+                  onChange={(e) => setNotesDraft((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                  onBlur={async () => {
+                    const value = String(notesDraft[row.id] ?? "");
+                    if (value === String(row.admin_notes ?? "")) return;
+                    setRows((prev) => prev.map((x) => (x.id === row.id ? { ...x, admin_notes: value } : x)));
+                    try {
+                      await patchRow(row.id, { admin_notes: value });
+                    } catch {
+                      void load();
+                    }
+                  }}
+                  placeholder="Admin notes"
+                  style={{ width: "100%", marginTop: "var(--space-8)", border: "none", borderBottom: "none", boxShadow: "none", background: "transparent", paddingLeft: 0, paddingRight: 0 }}
+                />
+                <select
+                  className="om-filter-control"
+                  value={row.status}
+                  onChange={async (e) => {
+                    const next = e.target.value as FeedbackStatusAction;
+                    if (next === "delete") {
+                      const ok = window.confirm("Delete this report?");
+                      if (!ok) return;
+                      const prev = rows;
+                      setRows((curr) => curr.filter((x) => x.id !== row.id));
+                      try {
+                        await deleteRow(row.id);
+                      } catch {
+                        setRows(prev);
+                        void load();
+                      }
+                      return;
+                    }
+                    setRows((prev) => prev.map((x) => (x.id === row.id ? { ...x, status: next } : x)));
+                    try {
+                      await patchRow(row.id, { status: next });
+                    } catch {
+                      void load();
+                    }
+                  }}
+                  style={{ width: "100%" }}
+                >
+                  {STATUSES.map((s) => (
+                    <option key={s.key} value={s.key}>
+                      {s.label}
+                    </option>
+                  ))}
+                  <option value="delete">Delete</option>
+                </select>
+              </div>
+            ))}
+            </div>
+        )}
         </div>
       </div>
 

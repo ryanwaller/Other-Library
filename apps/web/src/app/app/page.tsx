@@ -68,6 +68,117 @@ type CatalogMemberView = {
   avatar_url: string | null;
 };
 
+type CatalogHomeCachePayload = {
+  ts: number;
+  libraries: LibrarySummary[];
+  books: any[];
+};
+
+function isStoragePath(value: string): boolean {
+  const v = (value ?? "").trim();
+  if (!v) return false;
+  return !/^https?:\/\//i.test(v) && !/^data:/i.test(v);
+}
+
+function proxyExternalImageUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (!/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^https:\/\//i.test(trimmed)) return trimmed;
+  if (/^http:\/\//i.test(trimmed)) return `/api/image-proxy?url=${encodeURIComponent(trimmed)}`;
+  return trimmed;
+}
+
+function toStoragePathCandidate(value: string | null | undefined): string | null {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return null;
+
+  const normalizedInput = trimmed.startsWith("/") ? trimmed.replace(/^\/+/, "") : trimmed;
+  const bucketPath = withoutStoragePathPrefix(normalizedInput);
+  if (bucketPath) return bucketPath;
+
+  if (isStoragePath(normalizedInput)) return normalizeStoragePath(normalizedInput);
+  return null;
+}
+
+function withoutStoragePathPrefix(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const marker = "user-book-media/";
+  if (trimmed.startsWith("public/") && trimmed.includes(marker)) {
+    const idx = trimmed.indexOf(marker);
+    return normalizeStoragePath(trimmed.slice(idx + marker.length));
+  }
+  if (trimmed.includes(`/${marker}`)) {
+    const idx = trimmed.indexOf(`/${marker}`);
+    return normalizeStoragePath(trimmed.slice(idx + `/${marker}`.length));
+  }
+  if (trimmed.includes(marker)) {
+    const idx = trimmed.indexOf(marker);
+    return normalizeStoragePath(trimmed.slice(idx + marker.length));
+  }
+  try {
+    const url = new URL(trimmed);
+    const { pathname } = url;
+    if (pathname.includes(marker)) {
+      const idx = pathname.indexOf(marker);
+      return normalizeStoragePath(pathname.slice(idx + marker.length));
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function normalizeStoragePath(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const withoutLeadingSlash = trimmed.replace(/^\/+/, "");
+  return isStoragePath(withoutLeadingSlash) ? withoutLeadingSlash : null;
+}
+
+function toDisplayCoverUrl(mediaUrlsByPath: Record<string, string>, client: any, path?: string | null): string | null {
+  if (typeof path !== "string") return null;
+  const trimmed = path.trim();
+  if (!trimmed) return null;
+  if (!isStoragePath(trimmed)) return proxyExternalImageUrl(trimmed);
+
+  const normalized = toStoragePathCandidate(trimmed);
+  if (!normalized) return null;
+  const direct = mediaUrlsByPath[normalized] ?? mediaUrlsByPath[`/${normalized}`];
+  if (direct) return direct;
+  if (!client) return null;
+  const publicUrl = client.storage.from("user-book-media").getPublicUrl(normalized).data?.publicUrl;
+  return publicUrl ?? null;
+}
+
+const HOMEPAGE_CACHE_KEY = "om_homepage_home_cache_v1";
+const HOMEPAGE_CACHE_TTL_MS = 120_000;
+
+function loadHomepageCache(): CatalogHomeCachePayload | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(HOMEPAGE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CatalogHomeCachePayload;
+    if (!parsed || !Array.isArray(parsed.libraries) || !Array.isArray(parsed.books) || typeof parsed.ts !== "number") return null;
+    if (!Number.isFinite(parsed.ts) || Date.now() - parsed.ts > HOMEPAGE_CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveHomepageCache(payload: CatalogHomeCachePayload) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(HOMEPAGE_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore cache write failures
+  }
+}
+
 function parseCsvToObjects(text: string): Array<Record<string, string>> {
   const src = (text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const rows: string[][] = [];
@@ -389,6 +500,9 @@ function AppShell({
   const [tagMode, setTagMode] = useState<string>("all");
   const [tagSearch, setTagSearch] = useState<string>("");
   const memberPreviewHydratingRef = useRef(false);
+  const sharedRevealDoneRef = useRef(false);
+  const librariesRequestSeqRef = useRef(0);
+  const booksRequestSeqRef = useRef(0);
   const [tagMenu, setTagMenu] = useState<{ open: boolean; top: number; left: number; minWidth: number }>({
     open: false,
     top: 0,
@@ -409,6 +523,7 @@ function AppShell({
   );
 
   const [libraries, setLibraries] = useState<LibrarySummary[]>([]);
+  const [showSharedLibraries, setShowSharedLibraries] = useState(false);
   const [addLibraryId, setAddLibraryId] = useState<number | null>(null);
   const [editingLibraryId, setEditingLibraryId] = useState<number | null>(null);
   const [libraryNameDraft, setLibraryNameDraft] = useState("");
@@ -482,12 +597,7 @@ function AppShell({
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, true | undefined>>({});
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [showInitialSkeleton, setShowInitialSkeleton] = useState(() => {
-    if (typeof window === "undefined") return true;
-    try {
-      return window.sessionStorage.getItem("om_homepage_loaded_once") !== "1";
-    } catch {
-      return true;
-    }
+    return true;
   });
 
   const [stagedCsvData, setStagedCsvData] = useState<string | null>(null);
@@ -644,6 +754,71 @@ function AppShell({
   }, [filterTag]);
 
   useEffect(() => {
+    if (!showSharedLibraries) return;
+    if (!libraries.some((l) => l.myRole === "editor")) return;
+    const timer = window.setTimeout(() => {
+      void refreshLibraryMemberPreviewsFromApi();
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [showSharedLibraries, libraries]);
+
+  function normalizeLibrariesDeterministically(list: LibrarySummary[]): LibrarySummary[] {
+    const byId = new Map<number, LibrarySummary>();
+    for (const l of list) {
+      const id = Number(l.id);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      byId.set(id, {
+        id,
+        name: String(l.name ?? `Catalog ${id}`),
+        created_at: String(l.created_at ?? new Date(0).toISOString()),
+        sort_order: l.sort_order != null && Number.isFinite(Number(l.sort_order)) ? Number(l.sort_order) : null,
+        owner_id: l.owner_id ? String(l.owner_id) : null,
+        myRole: l.myRole === "editor" ? "editor" : "owner",
+        memberPreviews: Array.isArray(l.memberPreviews) ? l.memberPreviews : []
+      });
+    }
+    return Array.from(byId.values()).sort((a, b) => {
+      const aOrder = a.sort_order != null ? Number(a.sort_order) : null;
+      const bOrder = b.sort_order != null ? Number(b.sort_order) : null;
+      if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
+      if (aOrder !== null) return -1;
+      if (bOrder !== null) return 1;
+      const aTs = Date.parse(String(a.created_at ?? ""));
+      const bTs = Date.parse(String(b.created_at ?? ""));
+      if (Number.isFinite(aTs) && Number.isFinite(bTs) && aTs !== bTs) return aTs - bTs;
+      return Number(a.id) - Number(b.id);
+    });
+  }
+
+  async function hydrateFromHomepageCache(cached: CatalogHomeCachePayload, requestSeq?: number) {
+    if (!cached) return;
+    const cachedList = normalizeLibrariesDeterministically(cached.libraries);
+    if (cachedList.length === 0 && cached.books.length === 0) return;
+    setLibraries(cachedList);
+    setDebugLibrariesSource("libs:cache");
+    setBooksLoading(false);
+    applyLibrarySelection(cachedList);
+    if (!sharedRevealDoneRef.current) {
+      setShowSharedLibraries(false);
+      if (typeof window !== "undefined") {
+        window.requestAnimationFrame(() => {
+          setShowSharedLibraries(true);
+          sharedRevealDoneRef.current = true;
+        });
+      } else {
+        setShowSharedLibraries(true);
+        sharedRevealDoneRef.current = true;
+      }
+    } else {
+      setShowSharedLibraries(true);
+    }
+    if (Array.isArray(cached.books) && cached.books.length > 0) {
+      setDebugBooksSource("books:cache");
+      await applyBooksFromServer(cached.books, "books:cache", requestSeq);
+    }
+  }
+
+  useEffect(() => {
     const onReset = () => {
       setTagMode("all");
       setCategoryMode("all");
@@ -655,41 +830,103 @@ function AppShell({
     return () => window.removeEventListener("om:home-reset-filters", onReset);
   }, [router]);
 
-  async function applyBooksFromServer(serverRows: any[], source: string) {
+  async function applyBooksFromServer(serverRows: any[], source: string, requestSeq?: number) {
     const client = supabase;
     if (!client) return;
+    if (typeof requestSeq === "number" && booksRequestSeqRef.current !== requestSeq) return;
     const normalizedRows = (serverRows ?? []).map((r: any) => ({
       ...r,
       media: Array.isArray(r?.media) ? r.media : [],
       book_tags: Array.isArray(r?.book_tags) ? r.book_tags : [],
       edition: r?.edition ?? null
     }));
+    if (typeof requestSeq === "number" && booksRequestSeqRef.current !== requestSeq) return;
     setDebugBooksSource(source);
     setItems(normalizedRows as any);
     const serverPaths = Array.from(
       new Set([
         ...normalizedRows
           .flatMap((r) => (Array.isArray(r.media) ? r.media : []))
-          .map((m: any) => (typeof m?.storage_path === "string" ? m.storage_path : ""))
+          .map((m: any) => toStoragePathCandidate(typeof m?.storage_path === "string" ? m.storage_path : "") ?? "")
           .filter(Boolean),
         ...normalizedRows
-          .filter((r: any) => r.cover_crop && typeof r.cover_original_url === "string" && r.cover_original_url)
-          .map((r: any) => r.cover_original_url as string)
+          .map((r: any) => toStoragePathCandidate(r?.cover_original_url) ?? "")
+          .filter(Boolean),
+        ...normalizedRows
+          .map((r: any) => toStoragePathCandidate(r?.edition?.cover_url) ?? "")
+          .filter(Boolean),
+        ...normalizedRows
+          .map((r: any) => toStoragePathCandidate(r?.cover_crop?.storage_path ?? "") ?? "")
+          .filter(Boolean),
       ])
     );
     const serverMissing = serverPaths.filter((p) => !mediaUrlsByPath[p]);
     if (serverMissing.length > 0) {
-      const signedServer = await client.storage.from("user-book-media").createSignedUrls(serverMissing, 60 * 60);
-      if (!signedServer.error && signedServer.data) {
-        const nextMap: Record<string, string> = {};
-        for (const s of signedServer.data) if (s.path && s.signedUrl) nextMap[s.path] = s.signedUrl;
-        setMediaUrlsByPath((prev) => ({ ...prev, ...nextMap }));
-      }
+      void (async () => {
+        const signedServer = await client.storage.from("user-book-media").createSignedUrls(serverMissing, 60 * 60);
+        if (typeof requestSeq === "number" && booksRequestSeqRef.current !== requestSeq) return;
+        if (!signedServer.error && signedServer.data) {
+          const nextMap: Record<string, string> = {};
+          for (const s of signedServer.data) if (s.path && s.signedUrl) nextMap[s.path] = s.signedUrl;
+          setMediaUrlsByPath((prev) => ({ ...prev, ...nextMap }));
+        }
+      })();
     }
   }
 
-  async function refreshAllBooks(targetLibraryIds?: number[], options?: { fastFirst?: boolean }) {
+  async function fetchBooksDirectFromClient(
+    libraryIds: number[],
+    requestSeq?: number
+  ): Promise<{ ok: true; rows: any[]; source: string } | { ok: false; reason: string }> {
+    if (!supabase) return { ok: false, reason: "client_not_ready" };
+    const ids = Array.from(new Set(libraryIds.filter((n) => Number.isFinite(n) && n > 0)));
+    if (ids.length === 0) return { ok: false, reason: "no_library_ids" };
+
+    const fallbackSelects = [
+      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))",
+      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))",
+      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))",
+      "*"
+    ];
+
+    let lastError: unknown = null;
+    for (let i = 0; i < fallbackSelects.length; i += 1) {
+      const select = fallbackSelects[i];
+      const res = await supabase
+        .from("user_books")
+        .select(select)
+        .in("library_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(1200);
+      if (!res.error) {
+        if (requestSeq != null && booksRequestSeqRef.current !== requestSeq) {
+          return { ok: false, reason: "stale_request" };
+        }
+        const normalized = (res.data ?? []).map((r: any) => ({
+          ...r,
+          media: Array.isArray((r as any)?.media) ? (r as any).media : [],
+          book_tags: Array.isArray((r as any)?.book_tags) ? (r as any).book_tags : [],
+          edition: (r as any)?.edition ?? null
+        }));
+        return {
+          ok: true,
+          rows: normalized as any[],
+          source: `books:client-fallback-${
+            i === 0 ? "rich" : i === 1 ? "semi" : i === 2 ? "minimal" : "raw"
+          }`
+        };
+      }
+      lastError = res.error;
+    }
+
+    return { ok: false, reason: (lastError as any)?.message ?? "client_fallback_failed" };
+  }
+
+  async function refreshAllBooks(targetLibraryIds?: number[], options?: { fastFirst?: boolean; skipSecondApiCall?: boolean }) {
     if (!supabase) return;
+    const requestSeq = booksRequestSeqRef.current + 1;
+    booksRequestSeqRef.current = requestSeq;
+    const isStale = () => booksRequestSeqRef.current !== requestSeq;
     setBooksLoading(true);
     const ids = Array.from(new Set((targetLibraryIds ?? libraries.map((l) => l.id)).filter((n) => Number.isFinite(n) && n > 0)));
     const idsQuery = ids.length > 0 ? `catalog_ids=${encodeURIComponent(ids.join(","))}` : "";
@@ -699,25 +936,73 @@ function AppShell({
       if (options?.fastFirst) {
         const liteHome = await catalogApi<{ ok: true; books: any[] }>(liteEndpoint, { method: "GET" });
         if (Array.isArray(liteHome.books)) {
-          await applyBooksFromServer(liteHome.books as any[], ids.length > 0 ? "books:server-home-lite" : "books:server-home-lite-noids");
-          setBooksLoading(false);
+          await applyBooksFromServer(liteHome.books as any[], ids.length > 0 ? "books:server-home-lite" : "books:server-home-lite-noids", requestSeq);
+          if (options.skipSecondApiCall && liteHome.books.length > 0) {
+            return;
+          }
+          if (!isStale()) setBooksLoading(false);
         }
       }
-      const serverHome = await catalogApi<{ ok: true; books: any[] }>(endpoint, { method: "GET" });
-      if (Array.isArray(serverHome.books)) {
-        await applyBooksFromServer(serverHome.books as any[], ids.length > 0 ? "books:server-home" : "books:server-home-noids");
+      const serverHome = await catalogApi<{ ok: true; catalogs?: LibrarySummary[]; books: any[] }>(endpoint, { method: "GET" });
+      if (isStale()) return;
+      if (!ids.length && Array.isArray(serverHome.catalogs)) {
+        const normalizedCatalogs = normalizeLibrariesDeterministically(serverHome.catalogs as LibrarySummary[]);
+        if (normalizedCatalogs.length > 0) {
+          setDebugLibrariesSource("libs:api-home");
+          setLibraries(normalizedCatalogs);
+          applyLibrarySelection(normalizedCatalogs);
+        }
+      }
+      if (Array.isArray(serverHome.books) && serverHome.books.length > 0) {
+        await applyBooksFromServer(serverHome.books as any[], ids.length > 0 ? "books:server-home" : "books:server-home-noids", requestSeq);
         return;
       }
+      if (Array.isArray(serverHome.books) && serverHome.books.length === 0 && ids.length > 0) {
+        const fallback = await fetchBooksDirectFromClient(ids, requestSeq);
+        if (fallback.ok && !isStale()) {
+          setDebugBooksSource(fallback.source);
+          await applyBooksFromServer(fallback.rows, "books:client-fallback");
+          return;
+        }
+        if (!fallback.ok) {
+          setDebugLastError(fallback.reason);
+        }
+      }
+      if (Array.isArray(serverHome.books) && serverHome.books.length === 0 && ids.length === 0 && supabase) {
+        const ownerFallback = await supabase
+          .from("user_books")
+          .select(
+            "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,notes,edition_id,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date,description,subjects),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))"
+          )
+          .eq("owner_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1200);
+        if (!ownerFallback.error) {
+          const ownerRows = (ownerFallback.data ?? []).map((r: any) => ({
+            ...r,
+            media: Array.isArray(r?.media) ? r.media : [],
+            book_tags: Array.isArray(r?.book_tags) ? r.book_tags : [],
+            edition: (r as any)?.edition ?? null
+          }));
+          if (ownerRows.length > 0) {
+            setDebugBooksSource("books:client-owner-fallback");
+            await applyBooksFromServer(ownerRows, "books:client-owner-fallback", requestSeq);
+            return;
+          }
+        }
+      }
+      if (isStale()) return;
       setDebugBooksSource("books:failed");
       setItems([]);
       return;
     } catch (err: any) {
+      if (isStale()) return;
       setDebugLastError(String(err?.message ?? "server_home_failed"));
       setDebugBooksSource("books:failed");
       setItems([]);
       return;
     } finally {
-      setBooksLoading(false);
+      if (!isStale()) setBooksLoading(false);
     }
   }
 
@@ -768,116 +1053,30 @@ function AppShell({
 
   async function refreshLibraries(): Promise<LibrarySummary[]> {
     if (!supabase) return [];
+    const requestSeq = librariesRequestSeqRef.current + 1;
+    librariesRequestSeqRef.current = requestSeq;
+    const booksRequestSeq = booksRequestSeqRef.current + 1;
+    booksRequestSeqRef.current = booksRequestSeq;
+    const isStale = () => librariesRequestSeqRef.current !== requestSeq;
     setLibraryState({ busy: true, error: null, message: null });
+    setBooksLoading(true);
+
+    const cached = loadHomepageCache();
+    if (cached) {
+      const cachedList = normalizeLibrariesDeterministically(cached.libraries);
+      if (!isStale() && cachedList.length > 0) {
+        await hydrateFromHomepageCache(cached, booksRequestSeqRef.current);
+      }
+    }
+
     try {
-      let list: LibrarySummary[] = [];
-      try {
-        const listRes = await catalogApi<{ ok: true; catalogs: LibrarySummary[] }>("/api/catalog/list?lite=1", { method: "GET" });
-        const apiList = Array.isArray(listRes.catalogs) ? listRes.catalogs : [];
-        if (apiList.length > 0) {
-          setDebugLibrariesSource("libs:api-list-lite");
-          list = apiList;
-        }
-      } catch {
-        setDebugLastError("catalog_list_failed");
-        // fall through to client-side queries
-      }
+      const homeLite = await catalogApi<{ ok: true; catalogs: LibrarySummary[]; books: any[] }>("/api/catalog/home?lite=1", { method: "GET" });
+      if (isStale()) return [];
 
+      const liteBooks = Array.isArray(homeLite.books) ? homeLite.books : [];
+      let list = normalizeLibrariesDeterministically(Array.isArray(homeLite.catalogs) ? homeLite.catalogs : []);
       if (list.length > 0) {
-        setLibraries(list);
-        applyLibrarySelection(list);
-        void refreshLibraryMemberPreviewsFromApi();
-        setLibraryState({ busy: false, error: null, message: null });
-        return list;
-      }
-
-      if (list.length === 0) {
-        try {
-          const serverHome = await catalogApi<{ ok: true; catalogs: LibrarySummary[]; books: any[] }>("/api/catalog/home?lite=1", { method: "GET" });
-          const serverCatalogs = Array.isArray(serverHome.catalogs) ? serverHome.catalogs : [];
-          if (serverCatalogs.length > 0) {
-            setDebugLibrariesSource("libs:server-home");
-            list = serverCatalogs;
-          } else {
-            const rows = Array.isArray(serverHome.books) ? serverHome.books : [];
-            const idsFromBooks = Array.from(new Set(rows.map((r: any) => Number(r.library_id)).filter((n: any) => Number.isFinite(n) && n > 0)));
-            if (idsFromBooks.length > 0) {
-              setDebugLibrariesSource("libs:server-home-derived");
-              list = idsFromBooks.map((id) => ({
-                id,
-                name: `Catalog ${id}`,
-                created_at: new Date(0).toISOString(),
-                myRole: "owner" as const
-              }));
-            }
-          }
-          if (list.length > 0) {
-            setLibraries(list);
-            applyLibrarySelection(list);
-            void refreshLibraryMemberPreviewsFromApi();
-            setLibraryState({ busy: false, error: null, message: null });
-            return list;
-          }
-        } catch {
-          // continue to client fallback
-        }
-      }
-
-      if (list.length === 0) {
-        let ownedList: LibrarySummary[] = [];
-        const resWithOrder = await supabase
-          .from("libraries")
-          .select("id,name,created_at,sort_order,owner_id")
-          .eq("owner_id", userId)
-          .order("sort_order", { ascending: true });
-        if (!resWithOrder.error) {
-          setDebugLibrariesSource("libs:client-owned-sort");
-          ownedList = ((resWithOrder.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
-        } else {
-          const msg = (resWithOrder.error.message ?? "").toLowerCase();
-          if (msg.includes("sort_order") && msg.includes("does not exist")) {
-            const res = await supabase
-              .from("libraries")
-              .select("id,name,created_at,owner_id")
-              .eq("owner_id", userId)
-              .order("created_at", { ascending: true });
-            if (res.error) throw new Error(res.error.message);
-            setDebugLibrariesSource("libs:client-owned-created");
-            ownedList = ((res.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
-          } else {
-            throw new Error(resWithOrder.error.message);
-          }
-        }
-
-        let sharedList: LibrarySummary[] = [];
-        try {
-          const sharedRes = await catalogApi<{ ok: true; shared: Array<{ catalog_id: number; role: "owner" | "editor"; catalog: { id: number; name: string } | null }> }>(
-            "/api/catalog/shared",
-            { method: "GET" }
-          );
-          const acceptedShared = Array.isArray(sharedRes.shared) ? sharedRes.shared : [];
-          if (acceptedShared.length > 0) setDebugLibrariesSource("libs:client-shared");
-          sharedList = acceptedShared
-            .map((r) => {
-              const cid = Number(r.catalog?.id ?? r.catalog_id);
-              if (!Number.isFinite(cid) || cid <= 0) return null;
-              return {
-                id: cid,
-                name: String(r.catalog?.name ?? `Catalog ${cid}`),
-                created_at: new Date(0).toISOString(),
-                sort_order: null,
-                owner_id: null,
-                myRole: r.role === "owner" ? "owner" : "editor"
-              } satisfies LibrarySummary;
-            })
-            .filter(Boolean) as LibrarySummary[];
-        } catch {
-          sharedList = [];
-        }
-
-        const byId = new Map<number, LibrarySummary>();
-        for (const l of [...ownedList, ...sharedList]) byId.set(Number(l.id), l);
-        list = Array.from(byId.values());
+        setDebugLibrariesSource("libs:api-home-lite");
       }
 
       if (list.length === 0) {
@@ -896,7 +1095,7 @@ function AppShell({
           .eq("owner_id", userId)
           .order("created_at", { ascending: true });
         if (res2.error) throw new Error(res2.error.message);
-        list = ((res2.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }));
+        list = normalizeLibrariesDeterministically(((res2.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const })));
       }
 
       if (list.length === 0) {
@@ -912,33 +1111,49 @@ function AppShell({
             created_at: new Date(0).toISOString(),
             myRole: "owner" as const
           }));
+          list = normalizeLibrariesDeterministically(list);
         }
       }
 
-      try {
-        const raw = window.localStorage.getItem("om_libraryOrder");
-        const order = (raw ?? "")
-          .split(",")
-          .map((s) => Number(s.trim()))
-          .filter((n) => Number.isFinite(n) && n > 0);
-        if (order.length > 0) {
-          const rank = new Map<number, number>();
-          order.forEach((id, idx) => rank.set(id, idx));
-          list = list
-            .slice()
-            .sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9) || Date.parse(a.created_at) - Date.parse(b.created_at));
-        }
-      } catch {
-        // ignore
-      }
-
+      if (isStale()) return [];
       setLibraries(list);
+      if (liteBooks.length > 0) {
+        setDebugBooksSource("books:server-home-lite");
+        await applyBooksFromServer(liteBooks, "books:server-home-lite", booksRequestSeq);
+        if (list.length > 0 && liteBooks.length > 0) {
+          saveHomepageCache({
+            ts: Date.now(),
+            libraries: list,
+            books: liteBooks
+          });
+        }
+        setBooksLoading(false);
+      }
+      if (!sharedRevealDoneRef.current) {
+        setShowSharedLibraries(false);
+        if (typeof window !== "undefined") {
+          window.requestAnimationFrame(() => {
+            setShowSharedLibraries(true);
+            sharedRevealDoneRef.current = true;
+          });
+        } else {
+          setShowSharedLibraries(true);
+          sharedRevealDoneRef.current = true;
+        }
+      } else {
+        setShowSharedLibraries(true);
+      }
       applyLibrarySelection(list);
-      void refreshLibraryMemberPreviewsFromApi();
+      if (liteBooks.length === 0) {
+        await refreshAllBooks(list.map((l) => l.id));
+      }
 
+      if (isStale()) return [];
       setLibraryState({ busy: false, error: null, message: null });
+      setBooksLoading(false);
       return list;
     } catch (e: any) {
+      if (isStale()) return [];
       try {
         const ownerFallback = await supabase
           .from("libraries")
@@ -947,9 +1162,17 @@ function AppShell({
           .order("created_at", { ascending: true });
         if (!ownerFallback.error) {
           setDebugLibrariesSource("libs:owner-fallback");
-          const ownerList = ((ownerFallback.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const })) as LibrarySummary[];
-          setLibraries(ownerList);
-          setAddLibraryId(ownerList[0]?.id ?? null);
+          const ownerList = normalizeLibrariesDeterministically(((ownerFallback.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }))) as LibrarySummary[];
+        if (isStale()) return [];
+        setLibraries(ownerList);
+        setShowSharedLibraries(true);
+        setAddLibraryId(ownerList[0]?.id ?? null);
+        try {
+          await refreshAllBooks(ownerList.map((l) => Number(l.id)).filter((id) => Number.isFinite(id) && id > 0));
+        } catch {
+          // Best-effort; keep libraries visible even if books are unavailable.
+        }
+        setBooksLoading(false);
           setLibraryState({ busy: false, error: null, message: null });
           return ownerList;
         }
@@ -961,6 +1184,7 @@ function AppShell({
       setLibraries([]);
       setAddLibraryId(null);
       setLibraryState({ busy: false, error: e?.message ?? "Failed to load catalogs", message: null });
+      setBooksLoading(false);
       return [];
     }
   }
@@ -1098,25 +1322,36 @@ function AppShell({
     (async () => {
       if (!supabase) return;
       if (alive) setInitialLoadDone(true);
+      const profilePromise = supabase
+        .from("profiles")
+        .select("username,visibility,avatar_path")
+        .eq("id", userId)
+        .maybeSingle();
+      const homepageCache = loadHomepageCache();
+
       try {
-        const [profileRes] = await Promise.all([
-          supabase.from("profiles").select("username,visibility,avatar_path").eq("id", userId).maybeSingle(),
-          refreshLibraries(),
-          refreshAllBooks(undefined, { fastFirst: true })
-        ]);
-        const profileData = profileRes.data;
-        if (!alive) return;
-        if (profileData) setProfile(profileData);
-        const resolvedAvatar = await resolveAvatarUrl(profileData?.avatar_path ?? null);
-        if (!alive) return;
-        setAvatarUrl(resolvedAvatar);
+        const hasCachedHomePayload = !!(homepageCache && ((homepageCache.libraries.length > 0 || homepageCache.books.length > 0)));
+        if (hasCachedHomePayload) {
+          void hydrateFromHomepageCache(homepageCache);
+        }
+        void (async () => {
+          try {
+            const profileRes = await profilePromise;
+            const profileData = profileRes.data;
+            if (!alive) return;
+            if (profileData) setProfile(profileData);
+            if (!alive) return;
+            const resolvedAvatar = await resolveAvatarUrl(profileData?.avatar_path ?? null);
+            if (!alive) return;
+            setAvatarUrl(resolvedAvatar);
+          } catch {
+            // best-effort profile load
+          }
+        })();
+
+        await refreshLibraries();
       } finally {
         if (!alive) return;
-        try {
-          window.sessionStorage.setItem("om_homepage_loaded_once", "1");
-        } catch {
-          // ignore
-        }
         setShowInitialSkeleton(false);
       }
     })();
@@ -1694,10 +1929,13 @@ function AppShell({
     if (!addUrlPreview) return;
     setAddState({ busy: true, error: null, message: "Adding…" });
     try {
-      const id = await addEditionData(addUrlPreview, addPreviewLibraryId);
+      await addEditionData(addUrlPreview, addPreviewLibraryId);
       setAddInput("");
       cancelAddPreview();
-      router.push(`/app/books/${id}`);
+      setAddState({ busy: false, error: null, message: "Added" });
+      window.setTimeout(() => {
+        setAddState((prev) => (prev.message === "Added" ? { busy: false, error: null, message: null } : prev));
+      }, 1200);
     } catch (e: any) {
       setAddState({ busy: false, error: e?.message ?? "Failed to add book", message: e?.message ?? "Failed to add book" });
     }
@@ -1706,10 +1944,13 @@ function AppShell({
   async function addFromSearchResultItem(result: typeof addSearchResults[number], targetLibraryId?: number | null) {
     setAddState({ busy: true, error: null, message: "Adding…" });
     try {
-      const id = await addEditionData(result, targetLibraryId);
+      await addEditionData(result, targetLibraryId);
       setAddInput("");
       cancelAddPreview();
-      router.push(`/app/books/${id}`);
+      setAddState({ busy: false, error: null, message: "Added" });
+      window.setTimeout(() => {
+        setAddState((prev) => (prev.message === "Added" ? { busy: false, error: null, message: null } : prev));
+      }, 1200);
     } catch (e: any) {
       setAddState({ busy: false, error: e?.message ?? "Failed to add book", message: e?.message ?? "Failed to add book" });
     }
@@ -2369,6 +2610,13 @@ function AppShell({
       myRole: "owner"
     }));
   }, [libraries, displayGroups]);
+  const ownedRenderLibraries = useMemo(() => renderLibraries.filter((l) => l.myRole !== "editor"), [renderLibraries]);
+  const sharedRenderLibraries = useMemo(() => renderLibraries.filter((l) => l.myRole === "editor"), [renderLibraries]);
+  const displayLibraries = useMemo(
+    () => (showSharedLibraries ? [...ownedRenderLibraries, ...sharedRenderLibraries] : ownedRenderLibraries),
+    [ownedRenderLibraries, sharedRenderLibraries, showSharedLibraries]
+  );
+  const firstSharedDisplayIndex = useMemo(() => displayLibraries.findIndex((l) => l.myRole === "editor"), [displayLibraries]);
 
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
@@ -2440,7 +2688,7 @@ function AppShell({
           <div className="om-stat-line">
             <span className="om-stat-pair">
               <span className="text-muted">Catalogs</span>
-              <span>{renderLibraries.length}</span>
+              <span>{displayLibraries.length}</span>
             </span>
             <span className="om-stat-pair">
               <span className="text-muted">Books</span>
@@ -2817,7 +3065,7 @@ function AppShell({
 
       <div style={{ height: "var(--catalog-top-gap)" }} />
 
-      {renderLibraries.map((lib, idx) => {
+      {displayLibraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];
         const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
         const showBookSkeleton = booksLoading && groups.length === 0;
@@ -2929,6 +3177,11 @@ function AppShell({
         ) : null;
         return (
           <div key={lib.id}>
+            {firstSharedDisplayIndex === idx ? (
+              <div style={{ marginBottom: "var(--space-sm)" }} className="text-muted">
+                Shared with you
+              </div>
+            ) : null}
             <LibraryBlock
               libraryId={lib.id}
               libraryName={lib.name}
@@ -2942,7 +3195,7 @@ function AppShell({
               membersPanel={membersPanel}
               bookCount={groups.length}
               index={idx}
-              total={renderLibraries.length}
+              total={displayLibraries.length}
               busy={libraryState.busy}
               isEditing={editingLibraryId === lib.id}
               nameDraft={libraryNameDraft}
@@ -2978,30 +3231,42 @@ function AppShell({
                         <div key={`skeleton-${lib.id}-${i}`} className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
                       ))
                     : null}
-                  {groups.slice(0, limit).map(g => (
-                    <BookCard
-                      key={g.key}
-                      viewMode={viewMode}
-                      bulkMode={bulkMode}
-                      selected={!!bulkSelectedKeys[g.key]}
-                      onToggleSelected={() => toggleBulkKey(g.key)}
-                      title={g.title}
-                      authors={g.filterAuthors}
-                      isbn13={g.primary.edition?.isbn13 ?? null}
-                      tags={g.tagNames}
-                      copiesCount={g.copiesCount}
-                      href={`/app/books/${g.primary.id}`}
-                      coverUrl={g.primary.media.find(m => m.kind === 'cover')?.storage_path ? (mediaUrlsByPath[g.primary.media.find(m => m.kind === 'cover')!.storage_path] ?? null) : (g.primary.edition?.cover_url ?? null)}
-                      cropData={g.primary.cover_crop}
-                      onDeleteCopy={() => deleteEntry(g.primary.id)}
-                      deleteState={deleteStateByBookId[g.primary.id]}
-                      gridCols={effectiveCols}
-                    />
-                  ))}
+                  {groups.slice(0, limit).map((g) => {
+                    const coverMedia = g.primary.media.find((m) => m.kind === "cover") ?? g.primary.media.find((m) => m.kind === "image") ?? g.primary.media[0];
+                    const coverPath = toStoragePathCandidate(coverMedia?.storage_path ?? null);
+                    const mediaCoverUrl = toDisplayCoverUrl(mediaUrlsByPath, supabase, coverPath);
+                    const originalSrc = toDisplayCoverUrl(mediaUrlsByPath, supabase, g.primary.cover_original_url ?? null);
+                    const coverUrl =
+                      mediaCoverUrl ??
+                      toDisplayCoverUrl(mediaUrlsByPath, supabase, g.primary.edition?.cover_url ?? null) ??
+                      g.primary.edition?.cover_url ??
+                      null;
+                    return (
+                      <BookCard
+                        key={g.key}
+                        viewMode={viewMode}
+                        bulkMode={bulkMode}
+                        selected={!!bulkSelectedKeys[g.key]}
+                        onToggleSelected={() => toggleBulkKey(g.key)}
+                        title={g.title}
+                        authors={g.filterAuthors}
+                        isbn13={g.primary.edition?.isbn13 ?? null}
+                        tags={g.tagNames}
+                        copiesCount={g.copiesCount}
+                        href={`/app/books/${g.primary.id}`}
+                        coverUrl={coverUrl}
+                        originalSrc={originalSrc}
+                        cropData={g.primary.cover_crop}
+                        onDeleteCopy={() => deleteEntry(g.primary.id)}
+                        deleteState={deleteStateByBookId[g.primary.id]}
+                        gridCols={effectiveCols}
+                      />
+                    );
+                  })}
                 </div>
               )}
             />
-            {idx < renderLibraries.length - 1 && <hr className="om-hr" />}
+            {idx < displayLibraries.length - 1 && <hr className="om-hr" />}
           </div>
         );
       })}

@@ -2800,9 +2800,9 @@ export default function BookDetailPage() {
         <div className="card">
           <div
             className="om-book-detail-grid"
-            style={{ marginTop: "var(--space-10)", rowGap: 24, columnGap: 14, alignItems: "start", gridTemplateColumns: isNarrow ? "1fr" : "220px minmax(0, 1fr)" }}
+            style={{ marginTop: "var(--space-10)", rowGap: 12, columnGap: 14, alignItems: "start", gridTemplateColumns: isNarrow ? "1fr" : "220px minmax(0, 1fr)" }}
           >
-            <div style={{ gridColumn: "1 / -1", marginBottom: 16 }}>
+            <div style={{ gridColumn: "1 / -1", marginBottom: 0 }}>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: "var(--space-10)" }}>
                 {/* Left group: primary action + updates indicator */}
                 {isOwner ? (
@@ -3261,6 +3261,7 @@ export default function BookDetailPage() {
                     : null}
                 </div>
               ) : null}
+              <hr className="divider" />
             </div>
             <div>
               <div
@@ -3916,13 +3917,13 @@ export default function BookDetailPage() {
                               {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).slice(0, 6).map((m) =>
                                 (
                                   <Link key={m.userId} href={`/u/${encodeURIComponent(m.username)}`} aria-label={`Open ${m.username}'s profile`} style={{ display: "inline-flex" }}>
-                                    {m.avatarUrl ? (
+                                {m.avatarUrl ? (
                                       // eslint-disable-next-line @next/next/no-img-element
-                                      <img alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar" />
+                                      <img alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar om-member-stack-avatar-detail-up" />
                                     ) : (
-                                      <span className="om-member-stack-avatar" title={m.username} />
+                                      <span className="om-member-stack-avatar om-member-stack-avatar-detail-up" title={m.username} />
                                     )}
-                                  </Link>
+                                </Link>
                                 )
                               )}
                               {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length > 6 ? (

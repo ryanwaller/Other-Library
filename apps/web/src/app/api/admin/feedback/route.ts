@@ -9,9 +9,9 @@ function normStatus(input: string | null): "all" | "new" | "reviewing" | "resolv
   return "all";
 }
 
-function normCategory(input: string | null): "all" | "bug" | "feels_wrong" | "feature_idea" | "other" {
+function normCategory(input: string | null): "all" | "bug" | "feels_wrong" | "feature_idea" | "spacing_issue" | "other" {
   const v = String(input ?? "").trim().toLowerCase();
-  if (v === "bug" || v === "feels_wrong" || v === "feature_idea" || v === "other") return v;
+  if (v === "bug" || v === "feels_wrong" || v === "feature_idea" || v === "spacing_issue" || v === "other") return v;
   return "all";
 }
 
@@ -25,21 +25,64 @@ export async function GET(req: Request) {
     const status = normStatus(url.searchParams.get("status"));
     const category = normCategory(url.searchParams.get("category"));
 
-    let query = admin
-      .from("feedback")
-      .select("id,user_id,page_url,page_title,element_context,category,message,screenshot_path,status,admin_notes,created_at,updated_at,profile:profiles!feedback_user_id_fkey(id,username,display_name,avatar_path)")
-      .order("created_at", { ascending: false });
-    if (status !== "all") query = query.eq("status", status);
-    if (category !== "all") query = query.eq("category", category);
+    const runQuery = async (withScreenshotPath: boolean, withDeviceType: boolean): Promise<any> => {
+      const selectCols = [
+        "id",
+        "user_id",
+        "page_url",
+        "page_title",
+        "element_context",
+        "category",
+        "message",
+        withScreenshotPath ? "screenshot_path" : "",
+        withDeviceType ? "device_type" : "",
+        "status",
+        "admin_notes",
+        "created_at",
+        "updated_at"
+      ]
+        .filter(Boolean)
+        .join(",");
+      let query: any = admin
+        .from("feedback")
+        .select(selectCols)
+        .order("created_at", { ascending: false });
+      if (status !== "all") query = query.eq("status", status);
+      if (category !== "all") query = query.eq("category", category);
+      return await query;
+    };
 
-    const res = await query;
+    let res: any = await runQuery(true, true);
+    if (res.error && /screenshot_path/i.test(String(res.error.message ?? ""))) {
+      res = await runQuery(false, true);
+    }
+    if (res.error && /device_type/i.test(String(res.error.message ?? ""))) {
+      res = await runQuery(false, false);
+    }
     if (res.error) return NextResponse.json({ error: res.error.message }, { status: 500 });
 
     const rows = (res.data ?? []) as any[];
+    const profileIds = Array.from(new Set(rows.map((r) => String(r?.user_id ?? "").trim()).filter(Boolean)));
+    const profileById: Record<string, { id: string; username: string | null; display_name: string | null; avatar_path: string | null }> = {};
+    if (profileIds.length > 0) {
+      const pr = await admin.from("profiles").select("id,username,display_name,avatar_path").in("id", profileIds);
+      if (!pr.error) {
+        for (const p of (pr.data ?? []) as any[]) {
+          const id = String(p?.id ?? "").trim();
+          if (!id) continue;
+          profileById[id] = {
+            id,
+            username: p?.username ?? null,
+            display_name: p?.display_name ?? null,
+            avatar_path: p?.avatar_path ?? null
+          };
+        }
+      }
+    }
     const avatarPaths = Array.from(
       new Set(
         rows
-          .map((r) => String(r?.profile?.avatar_path ?? "").trim())
+          .map((r) => String(profileById[String(r?.user_id ?? "").trim()]?.avatar_path ?? "").trim())
           .filter(Boolean)
       )
     );
@@ -76,10 +119,12 @@ export async function GET(req: Request) {
     }
 
     const feedback = rows.map((r) => {
-      const avatarPath = String(r?.profile?.avatar_path ?? "").trim();
+      const profile = profileById[String(r?.user_id ?? "").trim()] ?? null;
+      const avatarPath = String(profile?.avatar_path ?? "").trim();
       const screenshotPath = String(r?.screenshot_path ?? "").trim();
       return {
         ...r,
+        profile,
         avatar_url: avatarPath ? avatarUrlByPath[avatarPath] ?? null : null,
         screenshot_url: screenshotPath ? screenshotUrlByPath[screenshotPath] ?? null : null
       };
@@ -92,4 +137,3 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: msg }, { status });
   }
 }
-

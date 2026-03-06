@@ -69,7 +69,10 @@ export async function GET(req: Request) {
         if (aOrder !== null && bOrder !== null) return aOrder - bOrder;
         if (aOrder !== null) return -1;
         if (bOrder !== null) return 1;
-        return Date.parse(String(a.created_at ?? "")) - Date.parse(String(b.created_at ?? ""));
+        const aTs = Date.parse(String(a.created_at ?? ""));
+        const bTs = Date.parse(String(b.created_at ?? ""));
+        if (Number.isFinite(aTs) && Number.isFinite(bTs) && aTs !== bTs) return aTs - bTs;
+        return Number(a.id) - Number(b.id);
       })
       .map((l) => {
       const id = Number(l.id);

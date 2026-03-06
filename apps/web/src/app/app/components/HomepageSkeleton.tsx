@@ -9,11 +9,9 @@ function SkeletonCatalogBlock({ showDivider }: { showDivider: boolean }) {
           <Skeleton style={{ width: 72, height: 16 }} />
         </div>
         <div
+          className="om-skeleton-card-grid"
           style={{
-            marginTop: "var(--space-md)",
-            display: "grid",
-            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-            gap: "var(--space-md)"
+            marginTop: "var(--space-md)"
           }}
         >
           {Array.from({ length: 4 }).map((_, i) => (
@@ -64,4 +62,3 @@ export default function HomepageSkeleton() {
     </main>
   );
 }
-

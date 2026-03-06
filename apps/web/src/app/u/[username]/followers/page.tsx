@@ -1,17 +1,8 @@
-import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../lib/supabaseServer";
-import FollowControls from "../FollowControls";
-import IdentityRow from "../../../components/IdentityRow";
+import PublicFollowListClient from "../PublicFollowListClient";
 
 export const dynamic = "force-dynamic";
-
-type MiniProfile = {
-  id: string;
-  username: string;
-  display_name: string | null;
-  avatar_path: string | null;
-};
 
 export default async function PublicFollowersPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
@@ -51,62 +42,5 @@ export default async function PublicFollowersPage({ params }: { params: Promise<
     );
   }
 
-  const listRes = await supabase.rpc("get_followers", { target_username: usernameNorm, page_limit: 200, page_offset: 0 });
-  if (listRes.error) {
-    return (
-      <main className="container">
-        <div className="card">
-          <div>
-            <Link href={`/u/${profile.username}`}>{profile.username}</Link> · followers
-          </div>
-          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
-            Followers list is not visible.
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  const rows = (listRes.data ?? []) as unknown as MiniProfile[];
-  const avatarPaths = Array.from(new Set(rows.map((r) => r.avatar_path).filter(Boolean))) as string[];
-  const signedMap: Record<string, string> = {};
-  if (avatarPaths.length > 0) {
-    const signed = await supabase.storage.from("avatars").createSignedUrls(avatarPaths, 60 * 30);
-    for (const s of signed.data ?? []) {
-      if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;
-    }
-  }
-
-  return (
-    <main className="container">
-      <div className="card">
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <div>
-            <Link href={`/u/${profile.username}`}>{profile.username}</Link> · followers
-          </div>
-          <div className="text-muted">{rows.length}</div>
-        </div>
-      </div>
-
-      <div style={{ marginTop: "var(--space-md)" }}>
-        {rows.length === 0 ? (
-          <div className="text-muted">None.</div>
-        ) : (
-          rows.map((p) => {
-            const avatarUrl = p.avatar_path ? signedMap[p.avatar_path] ?? null : null;
-            return (
-              <div key={p.id} className="card" style={{ marginTop: "var(--space-10)" }}>
-                <IdentityRow
-                  avatarUrl={avatarUrl}
-                  displayName={p.display_name}
-                  username={p.username}
-                  rightSlot={<FollowControls profileId={p.id} profileUsername={p.username} compact />}
-                />
-              </div>
-            );
-          })
-        )}
-      </div>
-    </main>
-  );
+  return <PublicFollowListClient username={String(profile.username ?? usernameNorm)} mode="followers" />;
 }

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import { usePathname } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 
-type FeedbackCategory = "bug" | "feels_wrong" | "feature_idea" | "other";
+type FeedbackCategory = "bug" | "feels_wrong" | "feature_idea" | "spacing_issue" | "other";
 
 function routeTitle(pathname: string): string {
   const p = String(pathname ?? "").trim();
@@ -33,6 +33,8 @@ export default function FeedbackWidget() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [statusText, setStatusText] = useState<string | null>(null);
   const [statusError, setStatusError] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const sentOk = !statusError && statusText === "Sent — thanks";
 
   const pageTitle = useMemo(() => routeTitle(pathname ?? ""), [pathname]);
   const pageUrl = useMemo(() => {
@@ -58,6 +60,23 @@ export default function FeedbackWidget() {
   }, [screenshot]);
 
   if (!supabase || !session) return null;
+
+  function applyScreenshotFile(file: File | null) {
+    if (!file) return;
+    if (!String(file.type ?? "").toLowerCase().startsWith("image/")) return;
+    setScreenshot(file);
+  }
+
+  function onPasteImage(e: ClipboardEvent<HTMLTextAreaElement>) {
+    const items = e.clipboardData?.items ?? [];
+    for (const item of items) {
+      if (!String(item.type ?? "").toLowerCase().startsWith("image/")) continue;
+      const file = item.getAsFile();
+      if (!file) continue;
+      applyScreenshotFile(file);
+      return;
+    }
+  }
 
   async function submitFeedback() {
     if (busy) return;
@@ -93,7 +112,8 @@ export default function FeedbackWidget() {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(String((json as any)?.error ?? "feedback_failed"));
 
-      setStatusText("Sent — thanks");
+      const screenshotDropped = Boolean((json as any)?.screenshot_upload_failed) || Boolean((json as any)?.screenshot_omitted);
+      setStatusText(screenshotDropped ? "Sent — image not attached" : "Sent — thanks");
       setStatusError(false);
       window.setTimeout(() => {
         setOpen(false);
@@ -104,8 +124,10 @@ export default function FeedbackWidget() {
         setPreviewUrl(null);
         setStatusText(null);
       }, 2000);
-    } catch {
-      setStatusText("Couldn't send — try again");
+    } catch (e: any) {
+      const raw = String(e?.message ?? "").trim();
+      const msg = raw && raw !== "feedback_failed" ? raw : "Couldn't send — try again";
+      setStatusText(msg);
       setStatusError(true);
     } finally {
       setBusy(false);
@@ -118,9 +140,6 @@ export default function FeedbackWidget() {
         <div style={{ width: 320, marginBottom: 10, padding: "var(--space-md)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 0 }}>
           <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>
             {pageTitle}
-          </div>
-          <div className="text-muted" style={{ marginBottom: "var(--space-md)", wordBreak: "break-all" }}>
-            {pageUrl}
           </div>
 
           <input
@@ -138,23 +157,57 @@ export default function FeedbackWidget() {
             <option value="bug">Bug</option>
             <option value="feels_wrong">Feels wrong</option>
             <option value="feature_idea">Feature idea</option>
+            <option value="spacing_issue">Spacing issue</option>
             <option value="other">Other</option>
           </select>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onPaste={onPasteImage}
             placeholder="Describe what you noticed"
             style={{ width: "100%", minHeight: 90, marginTop: "var(--space-8)" }}
           />
           <div style={{ marginTop: "var(--space-8)" }}>
             <input
+              ref={fileInputRef}
               type="file"
               accept="image/*"
-              onChange={(e) => setScreenshot((e.target.files ?? [])[0] ?? null)}
+              onChange={(e) => applyScreenshotFile((e.target.files ?? [])[0] ?? null)}
+              style={{ display: "none" }}
             />
+            <button
+              type="button"
+              className="om-inline-link-muted"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Upload screengrab
+            </button>
             {previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={previewUrl} alt="" style={{ marginTop: "var(--space-8)", maxWidth: 96, maxHeight: 96, objectFit: "cover" }} />
+              <div style={{ marginTop: "var(--space-8)", position: "relative", width: 96, height: 96 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={previewUrl} alt="" style={{ width: 96, height: 96, objectFit: "cover" }} />
+                <button
+                  type="button"
+                  aria-label="Remove screenshot"
+                  onClick={() => setScreenshot(null)}
+                  style={{
+                    position: "absolute",
+                    top: 4,
+                    right: 4,
+                    width: 18,
+                    height: 18,
+                    lineHeight: "18px",
+                    textAlign: "center",
+                    border: "1px solid var(--border)",
+                    background: "var(--bg)",
+                    color: "var(--fg)",
+                    cursor: "pointer",
+                    padding: 0
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             ) : null}
           </div>
 
@@ -162,11 +215,15 @@ export default function FeedbackWidget() {
             <button className="om-inline-link-muted" onClick={() => setOpen(false)} disabled={busy}>
               Close
             </button>
-            <button className="om-inline-link-muted" onClick={() => void submitFeedback()} disabled={busy || !message.trim()}>
-              Send
-            </button>
+            {sentOk ? (
+              <span className="text-muted">Sent — thanks</span>
+            ) : (
+              <button className="om-inline-link-muted" onClick={() => void submitFeedback()} disabled={busy || !message.trim()}>
+                Send
+              </button>
+            )}
           </div>
-          {statusText ? (
+          {statusText && !sentOk ? (
             <div className="text-muted" style={{ marginTop: "var(--space-8)", color: statusError ? "var(--danger)" : undefined }}>
               {statusText}
             </div>
