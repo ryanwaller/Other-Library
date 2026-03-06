@@ -8,6 +8,10 @@ export default function LibraryBlock({
   libraryId,
   libraryName,
   memberPreviews,
+  showEditMembers,
+  membersEditorOpen,
+  onToggleMembersEditor,
+  membersPanel,
   bookCount,
   index,
   total,
@@ -33,6 +37,10 @@ export default function LibraryBlock({
   libraryId: number;
   libraryName: string;
   memberPreviews?: Array<{ userId: string; username: string; avatarUrl: string | null }>;
+  showEditMembers?: boolean;
+  membersEditorOpen?: boolean;
+  onToggleMembersEditor?: (libraryId: number) => void;
+  membersPanel?: ReactNode;
   bookCount: number;
   index: number;
   total: number;
@@ -169,7 +177,16 @@ export default function LibraryBlock({
                     {libraryName}
                   </button>
                 )}
-                {(memberPreviews ?? []).length > 0 ? (
+                {manageMode && showEditMembers ? (
+                  <button
+                    type="button"
+                    onClick={() => onToggleMembersEditor?.(libraryId)}
+                    className={membersEditorOpen ? "text-primary" : "text-muted"}
+                    style={{ border: "none", background: "transparent", padding: 0, textDecoration: "underline", cursor: "pointer" }}
+                  >
+                    Edit Members
+                  </button>
+                ) : (memberPreviews ?? []).length > 0 ? (
                   <span className="om-member-stack" aria-label="Shared catalog members">
                     {(memberPreviews ?? []).slice(0, 6).map((m) =>
                       m.username ? (
@@ -239,6 +256,7 @@ export default function LibraryBlock({
       </div>
       {!collapsed && (
         <>
+          {membersPanel}
           {renderBooks(limit)}
           {(bookCount > limit || canSeeLess) && (
             <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: 24, justifyContent: "center" }}>

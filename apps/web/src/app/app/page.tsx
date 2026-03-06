@@ -452,6 +452,7 @@ function AppShell({
       }
     >
   >({});
+  const [membersEditorCatalogId, setMembersEditorCatalogId] = useState<number | null>(null);
 
   const [bulkMode, setBulkMode] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -463,6 +464,7 @@ function AppShell({
     setReorderMode(false);
     setBulkSelectedKeys({});
     setBulkState({ busy: false, error: null, message: null });
+    setMembersEditorCatalogId(null);
   }
 
   const [bulkSelectedKeys, setBulkSelectedKeys] = useState<Record<string, true | undefined>>({});
@@ -2824,12 +2826,120 @@ function AppShell({
         const pendingMembers = memberState.members.filter((m) => !m.accepted_at);
         const selfMember = memberState.members.find((m) => m.user_id === userId) ?? null;
         const iAmOwner = (selfMember?.role ?? lib.myRole) === "owner";
+        const hasSharedCatalogMembers =
+          (lib.memberPreviews ?? []).length > 0 ||
+          acceptedMembers.some((m) => m.user_id !== userId) ||
+          pendingMembers.length > 0;
+        const showMembersEditor = bulkMode && hasSharedCatalogMembers && membersEditorCatalogId === lib.id;
+        const membersPanel = showMembersEditor ? (
+          <div style={{ marginTop: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
+            <div className="text-muted">Members</div>
+
+            <div style={{ marginTop: "var(--space-md)" }}>
+              {acceptedMembers.map((m) => {
+                const display = (m.profile?.display_name ?? "").trim() || m.profile?.username || m.user_id;
+                const username = (m.profile?.username ?? "").trim();
+                const isSelfRow = m.user_id === userId;
+                const isRowOwner = m.role === "owner";
+                const canModify = iAmOwner && !isRowOwner;
+                return (
+                  <div key={m.id} className="row" style={{ justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-sm)" }}>
+                    <div className="om-avatar-lockup">
+                      {m.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img alt="" src={m.avatar_url} className="om-avatar-img" />
+                      ) : (
+                        <div className="om-avatar-img" style={{ background: "var(--placeholder-bg)" }} />
+                      )}
+                      {username && !isSelfRow ? <Link href={`/u/${username}`}>{display}</Link> : <span>{display}</span>}
+                    </div>
+                    <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
+                      {isRowOwner ? <span className="text-muted">owner</span> : <span className="text-muted">editor</span>}
+                      {canModify ? (
+                        <button className="text-muted" onClick={() => void removeCatalogMember(lib.id, m.user_id)}>
+                          Delete
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {pendingMembers.length > 0 ? (
+              <div style={{ marginTop: "var(--space-md)" }}>
+                <div className="text-muted">Pending invitations</div>
+                {pendingMembers.map((m) => {
+                  const display = (m.profile?.display_name ?? "").trim() || m.profile?.username || m.profile?.email || m.user_id;
+                  const username = (m.profile?.username ?? "").trim();
+                  const isSelfRow = m.user_id === userId;
+                  return (
+                    <div key={m.id} className="row" style={{ justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-sm)" }}>
+                      {username && !isSelfRow ? <Link href={`/u/${username}`}>{display}</Link> : <span>{display}</span>}
+                      <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
+                        <span className="text-muted">pending</span>
+                        {iAmOwner ? (
+                          <>
+                            <button className="text-muted" onClick={() => void removeCatalogMember(lib.id, m.user_id)}>
+                              Rescind
+                            </button>
+                            <button
+                              className="text-muted"
+                              onClick={() => {
+                                if (!window.confirm("Delete this pending invite?")) return;
+                                void removeCatalogMember(lib.id, m.user_id);
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {iAmOwner ? (
+              <div className="row" style={{ marginTop: "var(--space-md)", alignItems: "baseline", flexWrap: "nowrap" }}>
+                <input
+                  placeholder="Invite by username or email"
+                  value={memberState.inviteInput}
+                  onChange={(e) =>
+                    setMembersByCatalogId((prev) => ({
+                      ...prev,
+                      [lib.id]: { ...memberState, inviteInput: e.target.value }
+                    }))
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();
+                    void inviteCatalogMember(lib.id);
+                  }}
+                  style={{ minWidth: 0, flex: 1 }}
+                />
+                <button onClick={() => void inviteCatalogMember(lib.id)} disabled={memberState.inviteBusy || !memberState.inviteInput.trim()}>
+                  {memberState.inviteBusy ? "Inviting…" : "Invite"}
+                </button>
+              </div>
+            ) : null}
+            {memberState.error ? <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{memberState.error}</div> : null}
+          </div>
+        ) : null;
         return (
           <div key={lib.id}>
             <LibraryBlock
               libraryId={lib.id}
               libraryName={lib.name}
               memberPreviews={lib.memberPreviews ?? []}
+              showEditMembers={bulkMode && hasSharedCatalogMembers}
+              membersEditorOpen={membersEditorCatalogId === lib.id}
+              onToggleMembersEditor={(catalogId) => {
+                setMembersEditorCatalogId((prev) => (prev === catalogId ? null : catalogId));
+                void loadCatalogMembers(catalogId);
+              }}
+              membersPanel={membersPanel}
               bookCount={groups.length}
               index={idx}
               total={renderLibraries.length}
@@ -2880,102 +2990,6 @@ function AppShell({
                 </div>
               )}
             />
-            {bulkMode ? (
-              <div className="card" style={{ marginTop: "var(--space-sm)" }}>
-                <div className="text-muted">Members</div>
-
-                <div style={{ marginTop: "var(--space-md)" }}>
-                  {acceptedMembers.map((m) => {
-                    const display = (m.profile?.display_name ?? "").trim() || m.profile?.username || m.user_id;
-                    const username = (m.profile?.username ?? "").trim();
-                    const isSelfRow = m.user_id === userId;
-                    const isRowOwner = m.role === "owner";
-                    const canModify = iAmOwner && !isRowOwner;
-                    return (
-                      <div key={m.id} className="row" style={{ justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-sm)" }}>
-                        <div className="om-avatar-lockup">
-                          {m.avatar_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img alt="" src={m.avatar_url} className="om-avatar-img" />
-                          ) : (
-                            <div className="om-avatar-img" style={{ background: "var(--placeholder-bg)" }} />
-                          )}
-                          {username && !isSelfRow ? <Link href={`/u/${username}`}>{display}</Link> : <span>{display}</span>}
-                        </div>
-                        <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
-                          {isRowOwner ? <span className="text-muted">owner</span> : <span className="text-muted">editor</span>}
-                          {canModify ? (
-                            <button className="text-muted" onClick={() => void removeCatalogMember(lib.id, m.user_id)}>
-                              Delete
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {pendingMembers.length > 0 ? (
-                  <div style={{ marginTop: "var(--space-md)" }}>
-                    <div className="text-muted">Pending invitations</div>
-                    {pendingMembers.map((m) => {
-                      const display = (m.profile?.display_name ?? "").trim() || m.profile?.username || m.profile?.email || m.user_id;
-                      const username = (m.profile?.username ?? "").trim();
-                      const isSelfRow = m.user_id === userId;
-                      return (
-                        <div key={m.id} className="row" style={{ justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-sm)" }}>
-                          {username && !isSelfRow ? <Link href={`/u/${username}`}>{display}</Link> : <span>{display}</span>}
-                          <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap" }}>
-                            <span className="text-muted">pending</span>
-                            {iAmOwner ? (
-                              <>
-                                <button className="text-muted" onClick={() => void removeCatalogMember(lib.id, m.user_id)}>
-                                  Rescind
-                                </button>
-                                <button
-                                  className="text-muted"
-                                  onClick={() => {
-                                    if (!window.confirm("Delete this pending invite?")) return;
-                                    void removeCatalogMember(lib.id, m.user_id);
-                                  }}
-                                >
-                                  Delete
-                                </button>
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : null}
-
-                {iAmOwner ? (
-                  <div className="row" style={{ marginTop: "var(--space-md)", alignItems: "baseline", flexWrap: "nowrap" }}>
-                    <input
-                      placeholder="Invite by username or email"
-                      value={memberState.inviteInput}
-                      onChange={(e) =>
-                        setMembersByCatalogId((prev) => ({
-                          ...prev,
-                          [lib.id]: { ...memberState, inviteInput: e.target.value }
-                        }))
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter") return;
-                        e.preventDefault();
-                        void inviteCatalogMember(lib.id);
-                      }}
-                      style={{ minWidth: 0, flex: 1 }}
-                    />
-                    <button onClick={() => void inviteCatalogMember(lib.id)} disabled={memberState.inviteBusy || !memberState.inviteInput.trim()}>
-                      {memberState.inviteBusy ? "Inviting…" : "Invite"}
-                    </button>
-                  </div>
-                ) : null}
-                {memberState.error ? <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>{memberState.error}</div> : null}
-              </div>
-            ) : null}
             {idx < renderLibraries.length - 1 && <hr className="om-hr" />}
           </div>
         );
