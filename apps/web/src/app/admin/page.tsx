@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import SignInCard from "../components/SignInCard";
 import { supabase } from "../../lib/supabaseClient";
 import { formatDateShort } from "../../lib/formatDate";
+import AdminFeedbackBoard from "./AdminFeedbackBoard";
 
 type ProfileRow = {
   id: string;
@@ -67,7 +69,7 @@ type InvitesResponse = {
   metrics: { total: number; pending: number; used: number; expired: number };
 };
 
-type TabKey = "users" | "waitlist" | "invites";
+type TabKey = "users" | "waitlist" | "invites" | "feedback";
 
 type MetaPair = { label: string; value: string | number };
 
@@ -156,6 +158,8 @@ function AdminListItem({
 }
 
 export default function AdminPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [session, setSession] = useState<Session | null>(null);
   const token = session?.access_token ?? "";
 
@@ -208,6 +212,19 @@ export default function AdminPage() {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSession(newSession));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const raw = String(searchParams.get("tab") ?? "").trim().toLowerCase();
+    if (raw === "users" || raw === "waitlist" || raw === "invites" || raw === "feedback") {
+      setTab(raw as TabKey);
+    }
+  }, [searchParams]);
+
+  function setTabAndRoute(next: TabKey) {
+    setTab(next);
+    const url = next === "users" ? "/admin" : `/admin?tab=${encodeURIComponent(next)}`;
+    router.replace(url);
+  }
 
   function handleAuthError(msg: string): boolean {
     if (msg !== "not_authenticated") return false;
@@ -458,16 +475,20 @@ export default function AdminPage() {
 
           <div className="row admin-tabbar-row" style={{ justifyContent: "flex-start", gap: "var(--space-10)", width: "100%", flexWrap: "nowrap" }}>
             <div className="admin-tabbar" style={{ flexWrap: "nowrap", flex: "0 0 auto" }}>
-              <button type="button" onClick={() => setTab("users")} aria-current={tab === "users" ? "page" : undefined}>
+              <button type="button" onClick={() => setTabAndRoute("users")} aria-current={tab === "users" ? "page" : undefined}>
                 Users
               </button>
-              <button type="button" onClick={() => setTab("waitlist")} aria-current={tab === "waitlist" ? "page" : undefined}>
+              <button type="button" onClick={() => setTabAndRoute("waitlist")} aria-current={tab === "waitlist" ? "page" : undefined}>
                 Waitlist
               </button>
-              <button type="button" onClick={() => setTab("invites")} aria-current={tab === "invites" ? "page" : undefined}>
+              <button type="button" onClick={() => setTabAndRoute("invites")} aria-current={tab === "invites" ? "page" : undefined}>
                 Invites
               </button>
+              <button type="button" onClick={() => setTabAndRoute("feedback")} aria-current={tab === "feedback" ? "page" : undefined}>
+                Feedback
+              </button>
             </div>
+            {tab !== "feedback" ? (
             <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0, flex: "1 1 auto", marginLeft: "var(--space-16)", flexWrap: "nowrap", alignItems: "baseline" }}>
               <input
                 value={inviteEmail}
@@ -521,6 +542,7 @@ export default function AdminPage() {
                 )
               ) : null}
             </div>
+            ) : null}
           </div>
 
           {friendlyError ? (
@@ -529,6 +551,7 @@ export default function AdminPage() {
             </div>
           ) : null}
 
+          {tab !== "feedback" ? (
           <div className="row admin-filter-row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)", marginTop: "var(--space-lg)" }}>
             <div className="row admin-filter-left" style={{ gap: "var(--space-8)", alignItems: "center", flex: "1 1 auto", minWidth: 0 }}>
               {tab === "users" ? (
@@ -613,8 +636,9 @@ export default function AdminPage() {
               {searchOpen ? "Done search" : "Search"}
             </button>
           </div>
+          ) : null}
 
-          {searchOpen ? (
+          {searchOpen && tab !== "feedback" ? (
             <div className="row admin-search-row" style={{ marginTop: "var(--space-10)", marginBottom: "var(--space-lg)", gap: "var(--space-8)", alignItems: "center", justifyContent: "flex-end" }}>
               {tab === "users" ? (
                 <>
@@ -694,6 +718,9 @@ export default function AdminPage() {
             </div>
           ) : null}
 
+          {tab === "feedback" ? <AdminFeedbackBoard token={token} /> : null}
+
+          {tab !== "feedback" ? (
           <div className="om-list" style={{ marginTop: searchOpen ? 0 : "var(--space-lg)" }}>
             {tab === "users"
               ? (usersData?.users ?? []).map((u) => {
@@ -880,7 +907,9 @@ export default function AdminPage() {
                 })
               : null}
           </div>
+          ) : null}
 
+          {tab !== "feedback" ? (
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)", marginTop: "var(--space-lg)" }}>
             <div className="text-muted">
               {tab === "users" ? resultLabel(usersData?.page ?? userPage, userTotalPages, usersData?.total ?? 0) : null}
@@ -932,8 +961,9 @@ export default function AdminPage() {
               ) : null}
             </div>
           </div>
+          ) : null}
 
-          {inviteLink ? (
+          {inviteLink && tab !== "feedback" ? (
             <div className="text-muted" style={{ marginTop: "var(--space-8)", wordBreak: "break-all" }}>
               {inviteLink}
             </div>

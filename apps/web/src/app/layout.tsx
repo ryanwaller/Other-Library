@@ -1,5 +1,6 @@
 import "./globals.css";
 import GlobalNav from "./GlobalNav";
+import FeedbackWidget from "./components/FeedbackWidget";
 
 export const metadata = {
   title: "Other Library",
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <GlobalNav />
+        <FeedbackWidget />
         {children}
       </body>
     </html>
