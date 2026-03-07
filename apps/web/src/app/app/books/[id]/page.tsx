@@ -330,29 +330,17 @@ function FieldVisibilityToggle(props: {
   disabled?: boolean;
 }) {
   const { visible, onChange, disabled } = props;
-  if (disabled) return <div style={{ width: 32 }} />;
+  if (disabled) return <span className="om-field-visibility-spacer" aria-hidden="true" />;
   return (
     <button
+      className="om-field-visibility-toggle"
       type="button"
       onMouseDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
         onChange(!visible);
       }}
-      style={{
-        background: "none",
-        border: "none",
-        padding: "0",
-        cursor: "pointer",
-        fontSize: "1.2em",
-        opacity: visible ? 1 : 0.4,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 32,
-        height: 32,
-        borderRadius: "4px"
-      }}
+      data-visible={visible ? "true" : "false"}
       title={visible ? "Visible publicly" : "Hidden from public view"}
     >
       {visible ? "👁" : "🙈"}
