@@ -360,39 +360,6 @@ function FieldVisibilityToggle(props: {
   );
 }
 
-function MetadataRow(props: {
-  label: string;
-  children: ReactNode;
-  visible: boolean;
-  editMode: boolean;
-  onVisibilityChange?: (visible: boolean) => void;
-  hideToggle?: boolean;
-  style?: any;
-  isEmpty?: boolean;
-}) {
-  const { label, children, visible, editMode, onVisibilityChange, hideToggle, style, isEmpty } = props;
-
-  if (!editMode && (!visible || isEmpty)) return null;
-
-  return (
-    <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && !visible ? 0.6 : 1, ...style }}>
-      <div style={{ minWidth: 110 }} className="text-muted">{label}</div>
-      <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-        {children}
-      </div>
-      {editMode && (
-        <div style={{ marginLeft: "var(--space-sm)" }}>
-          <FieldVisibilityToggle 
-            visible={visible} 
-            onChange={onVisibilityChange ?? (() => {})} 
-            disabled={hideToggle}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
 function FacetLinks(props: { role: FacetRole; items: EntityRef[] }) {
   const { role, items } = props;
   return (
@@ -4115,106 +4082,127 @@ export default function BookDetailPage() {
                 {isMusicObject ? (
                   <>
                     {editMode || effectiveAuthors.length > 0 ? <hr className="divider" /> : null}
-                    <MetadataRow
-                      label="Primary artist"
-                      visible={true}
-                      editMode={editMode}
-                      hideToggle={true}
-                    >
-                      {editMode ? (
-                        <input
-                          className="om-inline-control"
-                          value={formMusic.primary_artist ?? ""}
-                          onChange={(e) => setFormMusic((s) => ({ ...s, primary_artist: e.target.value || null }))}
-                          placeholder="Add primary artist"
-                        />
-                      ) : facetView.performer[0] ? (
-                        <FacetLinks role="performer" items={[facetView.performer[0]]} />
-                      ) : (
-                        effectiveAuthors[0] ?? null
-                      )}
-                    </MetadataRow>
+                    {(editMode || effectiveAuthors.length > 0) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Primary artist</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input
+                              className="om-inline-control"
+                              value={formMusic.primary_artist ?? ""}
+                              onChange={(e) => setFormMusic((s) => ({ ...s, primary_artist: e.target.value || null }))}
+                              placeholder="Add primary artist"
+                            />
+                          ) : facetView.performer[0] ? (
+                            <FacetLinks role="performer" items={[facetView.performer[0]]} />
+                          ) : (
+                            effectiveAuthors[0] ?? null
+                          )}
+                        </div>
+                        {editMode && <div style={{ width: 32 }} />}
+                      </div>
+                    )}
 
                     {MUSIC_CONTRIBUTOR_ROLES.map((role) => {
                       if (role === "performer" && !editMode) return null;
                       const items = facetView[role];
                       const names = editMode ? facetDraft[role] : items.map(i => i.name);
                       const visKey = `${role}:${names[0] ?? ""}`;
+                      const isVisible = names.length === 0 || fieldVisibility[visKey] !== false;
                       
-                      return (editMode || items.length > 0) ? (
-                        <MetadataRow
-                          key={role}
-                          label={musicRoleLabel(role)}
-                          visible={names.length === 0 || fieldVisibility[visKey] !== false}
-                          editMode={editMode}
-                          onVisibilityChange={(v) => {
-                            const next = { ...fieldVisibility };
-                            names.forEach(n => next[`${role}:${n}`] = v);
-                            setFieldVisibility(next);
-                          }}
-                        >
-                          {editMode ? (
-                            <EntityTokenField
-                              role={role}
-                              value={facetDraft[role]}
-                              onChange={(next) => setFacetDraft((s) => ({ ...s, [role]: next }))}
-                              placeholder={`Add ${role}`}
-                              disabled={!isOwner || busy || saveState.busy}
-                            />
-                          ) : (
-                            <FacetLinks role={role} items={items} />
+                      return (editMode || (items.length > 0 && isVisible)) ? (
+                        <div key={role} className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && !isVisible ? 0.6 : 1 }}>
+                          <div style={{ minWidth: 110 }} className="text-muted">
+                            {musicRoleLabel(role)}
+                          </div>
+                          <div style={{ flex: "1 1 auto" }}>
+                            {editMode ? (
+                              <EntityTokenField
+                                role={role}
+                                value={facetDraft[role]}
+                                onChange={(next) => setFacetDraft((s) => ({ ...s, [role]: next }))}
+                                placeholder={`Add ${role}`}
+                                disabled={!isOwner || busy || saveState.busy}
+                              />
+                            ) : (
+                              <FacetLinks role={role} items={items} />
+                            )}
+                          </div>
+                          {editMode && (
+                            <div style={{ marginLeft: "var(--space-sm)" }}>
+                              <FieldVisibilityToggle 
+                                visible={isVisible} 
+                                onChange={(v) => {
+                                  const next = { ...fieldVisibility };
+                                  names.forEach(n => next[`${role}:${n}`] = v);
+                                  setFieldVisibility(next);
+                                }} 
+                              />
+                            </div>
                           )}
-                        </MetadataRow>
+                        </div>
                       ) : null;
                     })}
 
-                    <MetadataRow
-                      label="Label"
-                      visible={fieldVisibility.label !== false}
-                      editMode={editMode}
-                      isEmpty={!effectiveMusic.label && facetView.publisher.length === 0}
-                      onVisibilityChange={(v) => toggleFieldVisibility("label")}
-                    >
-                      {editMode ? (
-                        <input className="om-inline-control" value={formMusic.label ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, label: e.target.value || null }))} placeholder="Add label" />
-                      ) : facetView.publisher.length > 0 ? (
-                        <FacetLinks role="publisher" items={facetView.publisher} />
-                      ) : (
-                        effectiveMusic.label
-                      )}
-                    </MetadataRow>
+                    {(editMode || (effectiveMusic.label && fieldVisibility.label !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.label === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Label</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formMusic.label ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, label: e.target.value || null }))} placeholder="Add label" />
+                          ) : facetView.publisher.length > 0 ? (
+                            <FacetLinks role="publisher" items={facetView.publisher} />
+                          ) : (
+                            effectiveMusic.label
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.label !== false} onChange={() => toggleFieldVisibility("label")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                    <MetadataRow
-                      label="Release date"
-                      visible={fieldVisibility.release_date !== false}
-                      editMode={editMode}
-                      isEmpty={!effectiveMusic.release_date}
-                      onVisibilityChange={(v) => toggleFieldVisibility("release_date")}
-                    >
-                      {editMode ? (
-                        <input className="om-inline-control" value={formMusic.release_date ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, release_date: e.target.value || null }))} placeholder="Add release date" />
-                      ) : (
-                        <Link href={musicValueHref(effectiveMusic.release_date ?? "")} style={{ textDecoration: "none" }}>
-                          {formatDateShort(effectiveMusic.release_date || null)}
-                        </Link>
-                      )}
-                    </MetadataRow>
+                    {(editMode || (effectiveMusic.release_date && fieldVisibility.release_date !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.release_date === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Release date</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formMusic.release_date ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, release_date: e.target.value || null }))} placeholder="Add release date" />
+                          ) : (
+                            <Link href={musicValueHref(effectiveMusic.release_date ?? "")} style={{ textDecoration: "none" }}>
+                              {formatDateShort(effectiveMusic.release_date || null)}
+                            </Link>
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.release_date !== false} onChange={() => toggleFieldVisibility("release_date")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                    <MetadataRow
-                      label="Orig. release year"
-                      visible={fieldVisibility.original_release_year !== false}
-                      editMode={editMode}
-                      isEmpty={!effectiveMusic.original_release_year}
-                      onVisibilityChange={(v) => toggleFieldVisibility("original_release_year")}
-                    >
-                      {editMode ? (
-                        <input className="om-inline-control" value={formMusic.original_release_year ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, original_release_year: e.target.value || null }))} placeholder="Add year" />
-                      ) : (
-                        <Link href={musicValueHref(effectiveMusic.original_release_year ?? "")} style={{ textDecoration: "none" }}>
-                          {effectiveMusic.original_release_year}
-                        </Link>
-                      )}
-                    </MetadataRow>
+                    {(editMode || (effectiveMusic.original_release_year && fieldVisibility.original_release_year !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.original_release_year === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Orig. release year</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formMusic.original_release_year ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, original_release_year: e.target.value || null }))} placeholder="Add year" />
+                          ) : (
+                            <Link href={musicValueHref(effectiveMusic.original_release_year ?? "")} style={{ textDecoration: "none" }}>
+                              {effectiveMusic.original_release_year}
+                            </Link>
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.original_release_year !== false} onChange={() => toggleFieldVisibility("original_release_year")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {[
                       ["Format", "format", "select", true],
@@ -4234,245 +4222,273 @@ export default function BookDetailPage() {
                       const pf = protectedField as boolean;
                       const val = (effectiveMusic as any)[k];
                       const empty = val === null || val === undefined || String(val).trim() === "";
-                      return (editMode || !empty) ? (
-                        <MetadataRow
-                          key={k}
-                          label={label as string}
-                          visible={!!(pf || fieldVisibility[k] !== false)}
-                          editMode={editMode}
-                          hideToggle={pf}
-                          isEmpty={empty}
-                          onVisibilityChange={() => toggleFieldVisibility(k)}
-                        >
-                          {editMode ? (
-                            inputKind === "select" ? (
-                              <select
-                                className="om-inline-control"
-                                value={String((formMusic as any)[k] ?? "")}
-                                onChange={(e) => setFormMusic((s) => ({ ...s, [k]: e.target.value || null }))}
-                              >
-                                <option value="">Choose</option>
-                                {(k === "format"
-                                  ? MUSIC_FORMAT_OPTIONS
-                                  : k === "release_type"
-                                    ? MUSIC_RELEASE_TYPE_OPTIONS
-                                    : k === "speed"
-                                      ? MUSIC_SPEED_OPTIONS
-                                      : MUSIC_CHANNEL_OPTIONS
-                                ).map((option) => (
-                                  <option key={option} value={option}>{option}</option>
-                                ))}
-                              </select>
+                      const isVisible = !!(pf || fieldVisibility[k] !== false);
+                      if (!editMode && (empty || !isVisible)) return null;
+
+                      return (
+                        <div key={k} className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && !isVisible ? 0.6 : 1 }}>
+                          <div style={{ minWidth: 110 }} className="text-muted">{label as string}</div>
+                          <div style={{ flex: "1 1 auto" }}>
+                            {editMode ? (
+                              inputKind === "select" ? (
+                                <select
+                                  className="om-inline-control"
+                                  value={String((formMusic as any)[k] ?? "")}
+                                  onChange={(e) => setFormMusic((s) => ({ ...s, [k]: e.target.value || null }))}
+                                >
+                                  <option value="">Choose</option>
+                                  {(k === "format"
+                                    ? MUSIC_FORMAT_OPTIONS
+                                    : k === "release_type"
+                                      ? MUSIC_RELEASE_TYPE_OPTIONS
+                                      : k === "speed"
+                                        ? MUSIC_SPEED_OPTIONS
+                                        : MUSIC_CHANNEL_OPTIONS
+                                  ).map((option) => (
+                                    <option key={option} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  className="om-inline-control"
+                                  value={String((formMusic as any)[k] ?? "")}
+                                  onChange={(e) => setFormMusic((s) => ({ ...s, [k]: e.target.value || null }))}
+                                  placeholder={`Add ${String(label).toLowerCase()}`}
+                                />
+                              )
                             ) : (
-                              <input
-                                className="om-inline-control"
-                                value={String((formMusic as any)[k] ?? "")}
-                                onChange={(e) => setFormMusic((s) => ({ ...s, [k]: e.target.value || null }))}
-                                placeholder={`Add ${String(label).toLowerCase()}`}
-                              />
-                            )
-                          ) : (
-                            <Link href={musicValueHref(String((effectiveMusic as any)[k] ?? ""))} style={{ textDecoration: "none" }}>
-                              {String((effectiveMusic as any)[k] ?? "")}
-                            </Link>
+                              <Link href={musicValueHref(String((effectiveMusic as any)[k] ?? ""))} style={{ textDecoration: "none" }}>
+                                {String((effectiveMusic as any)[k] ?? "")}
+                              </Link>
+                            )}
+                          </div>
+                          {editMode && (
+                            <div style={{ marginLeft: "var(--space-sm)" }}>
+                              <FieldVisibilityToggle visible={isVisible} disabled={pf} onChange={() => toggleFieldVisibility(k)} />
+                            </div>
                           )}
-                        </MetadataRow>
-                      ) : null;
+                        </div>
+                      );
                     })}
 
-                    <MetadataRow
-                      label="Disc count"
-                      visible={fieldVisibility.disc_count !== false}
-                      editMode={editMode}
-                      isEmpty={effectiveMusic.disc_count === null}
-                      onVisibilityChange={() => toggleFieldVisibility("disc_count")}
-                    >
-                      {editMode ? (
-                        <input
-                          className="om-inline-control"
-                          type="number"
-                          min={1}
-                          value={effectiveMusic.disc_count ?? ""}
-                          onChange={(e) => setFormMusic((s) => ({ ...s, disc_count: e.target.value ? Number(e.target.value) : null }))}
-                        />
-                      ) : (
-                        <Link href={musicValueHref(String(effectiveMusic.disc_count ?? ""))} style={{ textDecoration: "none" }}>
-                          {effectiveMusic.disc_count}
-                        </Link>
-                      )}
-                    </MetadataRow>
-
-                    <MetadataRow
-                      label="Limited edition"
-                      visible={fieldVisibility.limited_edition !== false}
-                      editMode={editMode}
-                      isEmpty={effectiveMusic.limited_edition === null}
-                      onVisibilityChange={() => toggleFieldVisibility("limited_edition")}
-                    >
-                      {editMode ? (
-                        <select
-                          className="om-inline-control"
-                          value={effectiveMusic.limited_edition === null ? "" : effectiveMusic.limited_edition ? "yes" : "no"}
-                          onChange={(e) =>
-                            setFormMusic((s) => ({
-                              ...s,
-                              limited_edition: e.target.value === "" ? null : e.target.value === "yes"
-                            }))
-                          }
-                        >
-                          <option value="">Choose</option>
-                          <option value="yes">yes</option>
-                          <option value="no">no</option>
-                        </select>
-                      ) : effectiveMusic.limited_edition === null ? null : effectiveMusic.limited_edition ? (
-                        <Link href={musicValueHref("limited")} style={{ textDecoration: "none" }}>yes</Link>
-                      ) : (
-                        "no"
-                      )}
-                    </MetadataRow>
-
-                    <MetadataRow
-                      label="Reissue"
-                      visible={fieldVisibility.reissue !== false}
-                      editMode={editMode}
-                      isEmpty={effectiveMusic.reissue === null}
-                      onVisibilityChange={() => toggleFieldVisibility("reissue")}
-                    >
-                      {editMode ? (
-                        <select
-                          className="om-inline-control"
-                          value={effectiveMusic.reissue === null ? "" : effectiveMusic.reissue ? "yes" : "no"}
-                          onChange={(e) =>
-                            setFormMusic((s) => ({
-                              ...s,
-                              reissue: e.target.value === "" ? null : e.target.value === "yes"
-                            }))
-                          }
-                        >
-                          <option value="">Choose</option>
-                          <option value="no">No (original release)</option>
-                          <option value="yes">Yes (reissue)</option>
-                        </select>
-                      ) : effectiveMusic.reissue === null ? null : effectiveMusic.reissue ? (
-                        <Link href={musicValueHref("reissue")} style={{ textDecoration: "none" }}>Yes (reissue)</Link>
-                      ) : (
-                        <Link href={musicValueHref("original release")} style={{ textDecoration: "none" }}>No (original release)</Link>
-                      )}
-                    </MetadataRow>
-
-                    <MetadataRow
-                      label="Genres"
-                      visible={fieldVisibility.genres !== false}
-                      editMode={editMode}
-                      isEmpty={musicGenres.length === 0}
-                      onVisibilityChange={() => toggleFieldVisibility("genres")}
-                    >
-                      {editMode ? (
-                        <input
-                          className="om-inline-control"
-                          value={[...effectiveMusic.genres, ...effectiveMusic.styles].join(", ")}
-                          onChange={(e) => {
-                            const next = e.target.value.split(",").map((value) => value.trim()).filter(Boolean);
-                            setFormMusic((s) => ({ ...s, genres: next, styles: [] }));
-                          }}
-                          placeholder="Add genres or styles"
-                        />
-                      ) : (
-                        <span>
-                          {musicGenres.map((value, index, arr) => (
-                            <span key={value}>
-                              <Link href={musicValueHref(value, "subject")} style={{ textDecoration: "none" }}>{value}</Link>
-                              {index < arr.length - 1 ? ", " : ""}
-                            </span>
-                          ))}
-                        </span>
-                      )}
-                    </MetadataRow>
-
-                    <MetadataRow
-                      label="Tracklist"
-                      visible={fieldVisibility.tracklist !== false}
-                      editMode={editMode}
-                      isEmpty={effectiveMusic.tracklist.length === 0}
-                      onVisibilityChange={() => toggleFieldVisibility("tracklist")}
-                      style={{ alignItems: "flex-start" }}
-                    >
-                      {editMode ? (
-                        <textarea
-                          className="om-inline-control"
-                          value={effectiveMusic.tracklist.map((track) => formatMusicTrackLine(track)).join("\n")}
-                          onChange={(e) =>
-                            setFormMusic((s) => ({
-                              ...s,
-                              tracklist: e.target.value
-                                .split("\n")
-                                .map((line) => line.trim())
-                                .filter(Boolean)
-                                .map((line) => ({ position: null, title: line, duration: null, type: null })),
-                              track_count: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean).length || null
-                            }))
-                          }
-                          rows={Math.max(3, effectiveMusic.tracklist.length || 3)}
-                        />
-                      ) : (
-                        <div style={{ display: "grid", gap: "var(--space-4)" }}>
-                          {effectiveMusic.tracklist.map((track, index) => (
-                            <div key={`${track.position ?? ""}-${track.title}-${index}`} className="row om-row-baseline" style={{ gap: "var(--space-sm)" }}>
-                              {track.position ? <div className="text-muted" style={{ minWidth: 32 }}>{track.position}</div> : null}
-                              <div style={{ flex: "1 1 auto" }}>
-                                <Link href={musicValueHref(track.title)} style={{ textDecoration: "none" }}>{track.title}</Link>
-                              </div>
-                              {track.duration ? <div className="text-muted">{track.duration}</div> : null}
-                            </div>
-                          ))}
+                    {(editMode || (effectiveMusic.disc_count !== null && fieldVisibility.disc_count !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.disc_count === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Disc count</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input
+                              className="om-inline-control"
+                              type="number"
+                              min={1}
+                              value={effectiveMusic.disc_count ?? ""}
+                              onChange={(e) => setFormMusic((s) => ({ ...s, disc_count: e.target.value ? Number(e.target.value) : null }))}
+                            />
+                          ) : (
+                            <Link href={musicValueHref(String(effectiveMusic.disc_count ?? ""))} style={{ textDecoration: "none" }}>
+                              {effectiveMusic.disc_count}
+                            </Link>
+                          )}
                         </div>
-                      )}
-                    </MetadataRow>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.disc_count !== false} onChange={() => toggleFieldVisibility("disc_count")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(editMode || (effectiveMusic.limited_edition !== null && fieldVisibility.limited_edition !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.limited_edition === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Limited edition</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <select
+                              className="om-inline-control"
+                              value={effectiveMusic.limited_edition === null ? "" : effectiveMusic.limited_edition ? "yes" : "no"}
+                              onChange={(e) =>
+                                setFormMusic((s) => ({
+                                  ...s,
+                                  limited_edition: e.target.value === "" ? null : e.target.value === "yes"
+                                }))
+                              }
+                            >
+                              <option value="">Choose</option>
+                              <option value="yes">yes</option>
+                              <option value="no">no</option>
+                            </select>
+                          ) : effectiveMusic.limited_edition ? (
+                            <Link href={musicValueHref("limited")} style={{ textDecoration: "none" }}>yes</Link>
+                          ) : (
+                            "no"
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.limited_edition !== false} onChange={() => toggleFieldVisibility("limited_edition")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(editMode || (effectiveMusic.reissue !== null && fieldVisibility.reissue !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.reissue === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Reissue</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <select
+                              className="om-inline-control"
+                              value={effectiveMusic.reissue === null ? "" : effectiveMusic.reissue ? "yes" : "no"}
+                              onChange={(e) =>
+                                setFormMusic((s) => ({
+                                  ...s,
+                                  reissue: e.target.value === "" ? null : e.target.value === "yes"
+                                }))
+                              }
+                            >
+                              <option value="">Choose</option>
+                              <option value="no">No (original release)</option>
+                              <option value="yes">Yes (reissue)</option>
+                            </select>
+                          ) : effectiveMusic.reissue === null ? null : effectiveMusic.reissue ? (
+                            <Link href={musicValueHref("reissue")} style={{ textDecoration: "none" }}>Yes (reissue)</Link>
+                          ) : (
+                            <Link href={musicValueHref("original release")} style={{ textDecoration: "none" }}>No (original release)</Link>
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.reissue !== false} onChange={() => toggleFieldVisibility("reissue")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(editMode || (musicGenres.length > 0 && fieldVisibility.genres !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.genres === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Genres</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input
+                              className="om-inline-control"
+                              value={[...effectiveMusic.genres, ...effectiveMusic.styles].join(", ")}
+                              onChange={(e) => {
+                                const next = e.target.value.split(",").map((value) => value.trim()).filter(Boolean);
+                                setFormMusic((s) => ({ ...s, genres: next, styles: [] }));
+                              }}
+                              placeholder="Add genres or styles"
+                            />
+                          ) : (
+                            <span>
+                              {musicGenres.map((value, index, arr) => (
+                                <span key={value}>
+                                  <Link href={musicValueHref(value, "subject")} style={{ textDecoration: "none" }}>{value}</Link>
+                                  {index < arr.length - 1 ? ", " : ""}
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.genres !== false} onChange={() => toggleFieldVisibility("genres")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(editMode || (effectiveMusic.tracklist.length > 0 && fieldVisibility.tracklist !== false)) && (
+                      <div className="row" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.tracklist === false ? 0.6 : 1, alignItems: "flex-start" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Tracklist</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <textarea
+                              className="om-inline-control"
+                              value={effectiveMusic.tracklist.map((track) => formatMusicTrackLine(track)).join("\n")}
+                              onChange={(e) =>
+                                setFormMusic((s) => ({
+                                  ...s,
+                                  tracklist: e.target.value
+                                    .split("\n")
+                                    .map((line) => line.trim())
+                                    .filter(Boolean)
+                                    .map((line) => ({ position: null, title: line, duration: null, type: null })),
+                                  track_count: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean).length || null
+                                }))
+                              }
+                              rows={Math.max(3, effectiveMusic.tracklist.length || 3)}
+                            />
+                          ) : (
+                            <div style={{ display: "grid", gap: "var(--space-4)" }}>
+                              {effectiveMusic.tracklist.map((track, index) => (
+                                <div key={`${track.position ?? ""}-${track.title}-${index}`} className="row om-row-baseline" style={{ gap: "var(--space-sm)" }}>
+                                  {track.position ? <div className="text-muted" style={{ minWidth: 32 }}>{track.position}</div> : null}
+                                  <div style={{ flex: "1 1 auto" }}>
+                                    <Link href={musicValueHref(track.title)} style={{ textDecoration: "none" }}>{track.title}</Link>
+                                  </div>
+                                  {track.duration ? <div className="text-muted">{track.duration}</div> : null}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.tracklist !== false} onChange={() => toggleFieldVisibility("tracklist")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
                     {editMode || facetView.author.length > 0 ? <hr className="divider" /> : null}
-                    <MetadataRow
-                      label="Authors"
-                      visible={true}
-                      editMode={editMode}
-                      hideToggle={true}
-                      isEmpty={facetView.author.length === 0}
-                    >
-                      <div className="om-hanging-value">
-                        {editMode ? (
-                          <EntityTokenField role="author" value={facetDraft.author} onChange={(next) => { setFacetDraft((s) => ({ ...s, author: next })); setFormAuthors(next.join(", ")); }} placeholder="Add an author" disabled={!isOwner || busy || saveState.busy} />
-                        ) : (
-                          <FacetLinks role="author" items={facetView.author} />
-                        )}
+                    {(editMode || facetView.author.length > 0) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Authors</div>
+                        <div className="om-hanging-value">
+                          {editMode ? (
+                            <EntityTokenField role="author" value={facetDraft.author} onChange={(next) => { setFacetDraft((s) => ({ ...s, author: next })); setFormAuthors(next.join(", ")); }} placeholder="Add an author" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="author" items={facetView.author} />
+                          )}
+                        </div>
+                        {editMode && <div style={{ width: 32 }} />}
                       </div>
-                    </MetadataRow>
+                    )}
+
                     {[
                       ["Editors", "editor", facetView.editor, facetDraft.editor, setFormEditors],
                       ["Designers", "designer", facetView.designer, facetDraft.designer, setFormDesigners]
                     ].map(([label, role, viewItems, draftItems, setForm]) => {
                       const names = editMode ? (draftItems as string[]) : (viewItems as EntityRef[]).map(i => i.name);
                       const visKey = `${role}:${names[0] ?? ""}`;
-                      return (editMode || (viewItems as any[]).length > 0) ? (
-                        <MetadataRow
-                          key={role as string}
-                          label={label as string}
-                          visible={names.length === 0 || fieldVisibility[visKey] !== false}
-                          editMode={editMode}
-                          isEmpty={(viewItems as any[]).length === 0}
-                          onVisibilityChange={(v) => {
-                            const next = { ...fieldVisibility };
-                            names.forEach(n => next[`${role}:${n}`] = v);
-                            setFieldVisibility(next);
-                          }}
-                        >
-                          {editMode ? (
-                            <EntityTokenField role={role as FacetRole} value={draftItems as string[]} onChange={(next) => { setFacetDraft((s) => ({ ...s, [role as string]: next })); (setForm as any)(next.join(", ")); }} placeholder={`Add ${String(label).toLowerCase().replace(/s$/, "")}`} disabled={!isOwner || busy || saveState.busy} />
-                          ) : (
-                            <FacetLinks role={role as FacetRole} items={viewItems as EntityRef[]} />
+                      const isVisible = names.length === 0 || fieldVisibility[visKey] !== false;
+                      if (!editMode && ((viewItems as any[]).length === 0 || !isVisible)) return null;
+
+                      return (
+                        <div key={role as string} className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && !isVisible ? 0.6 : 1 }}>
+                          <div style={{ minWidth: 110 }} className="text-muted">{label as string}</div>
+                          <div style={{ flex: "1 1 auto" }}>
+                            {editMode ? (
+                              <EntityTokenField role={role as FacetRole} value={draftItems as string[]} onChange={(next) => { setFacetDraft((s) => ({ ...s, [role as string]: next })); (setForm as any)(next.join(", ")); }} placeholder={`Add ${String(label).toLowerCase().replace(/s$/, "")}`} disabled={!isOwner || busy || saveState.busy} />
+                            ) : (
+                              <FacetLinks role={role as FacetRole} items={viewItems as EntityRef[]} />
+                            )}
+                          </div>
+                          {editMode && (
+                            <div style={{ marginLeft: "var(--space-sm)" }}>
+                              <FieldVisibilityToggle 
+                                visible={isVisible} 
+                                onChange={(v) => {
+                                  const next = { ...fieldVisibility };
+                                  names.forEach(n => next[`${role}:${n}`] = v);
+                                  setFieldVisibility(next);
+                                }} 
+                              />
+                            </div>
                           )}
-                        </MetadataRow>
-                      ) : null;
+                        </div>
+                      );
                     })}
 
                     {[
@@ -4481,229 +4497,266 @@ export default function BookDetailPage() {
                     ].map(([label, role, viewItems, draftItems, setForm, placeholder]) => {
                       const names = editMode ? (draftItems as string[]) : (viewItems as EntityRef[]).map(i => i.name);
                       const visKey = `${role}:${names[0] ?? ""}`;
-                      return (editMode || (viewItems as any[]).length > 0) ? (
-                        <MetadataRow
-                          key={role as string}
-                          label={label as string}
-                          visible={names.length === 0 || fieldVisibility[visKey] !== false}
-                          editMode={editMode}
-                          isEmpty={(viewItems as any[]).length === 0}
-                          onVisibilityChange={(v) => {
-                            const next = { ...fieldVisibility };
-                            names.forEach(n => next[`${role}:${n}`] = v);
-                            setFieldVisibility(next);
-                          }}
-                        >
-                          {editMode ? (
-                            <EntityTokenField role={role as FacetRole} value={draftItems as string[]} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, [role as string]: only })); (setForm as any)(only[0] ?? ""); }} placeholder={placeholder as string} disabled={!isOwner || busy || saveState.busy} />
-                          ) : (
-                            <FacetLinks role={role as FacetRole} items={viewItems as EntityRef[]} />
+                      const isVisible = names.length === 0 || fieldVisibility[visKey] !== false;
+                      if (!editMode && ((viewItems as any[]).length === 0 || !isVisible)) return null;
+
+                      return (
+                        <div key={role as string} className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && !isVisible ? 0.6 : 1 }}>
+                          <div style={{ minWidth: 110 }} className="text-muted">{label as string}</div>
+                          <div style={{ flex: "1 1 auto" }}>
+                            {editMode ? (
+                              <EntityTokenField role={role as FacetRole} value={draftItems as string[]} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, [role as string]: only })); (setForm as any)(only[0] ?? ""); }} placeholder={placeholder as string} disabled={!isOwner || busy || saveState.busy} />
+                            ) : (
+                              <FacetLinks role={role as FacetRole} items={viewItems as EntityRef[]} />
+                            )}
+                          </div>
+                          {editMode && (
+                            <div style={{ marginLeft: "var(--space-sm)" }}>
+                              <FieldVisibilityToggle 
+                                visible={isVisible} 
+                                onChange={(v) => {
+                                  const next = { ...fieldVisibility };
+                                  names.forEach(n => next[`${role}:${n}`] = v);
+                                  setFieldVisibility(next);
+                                }} 
+                              />
+                            </div>
                           )}
-                        </MetadataRow>
-                      ) : null;
+                        </div>
+                      );
                     })}
 
-                    <MetadataRow
-                      label="Publisher"
-                      visible={fieldVisibility.publisher !== false}
-                      editMode={editMode}
-                      isEmpty={!effectivePublisher.trim() && facetView.publisher.length === 0}
-                      onVisibilityChange={() => toggleFieldVisibility("publisher")}
-                    >
-                      {editMode ? (
-                        <EntityTokenField role="publisher" value={facetDraft.publisher} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, publisher: only })); setFormPublisher(only[0] ?? ""); }} placeholder="Add a publisher" disabled={!isOwner || busy || saveState.busy} />
-                      ) : facetView.publisher.length > 0 ? (
-                        <FacetLinks role="publisher" items={facetView.publisher} />
-                      ) : (
-                        effectivePublisher
-                      )}
-                    </MetadataRow>
-
-                    <MetadataRow
-                      label="Edition"
-                      visible={fieldVisibility.edition !== false}
-                      editMode={editMode}
-                      isEmpty={!formEditionOverride.trim()}
-                      onVisibilityChange={() => toggleFieldVisibility("edition")}
-                    >
-                      {editMode ? (
-                        <input className="om-inline-control" value={formEditionOverride} onChange={(e) => setFormEditionOverride(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add edition" />
-                      ) : (
-                        (formEditionOverride ?? "").trim()
-                      )}
-                    </MetadataRow>
-
-                    <MetadataRow
-                      label="Published"
-                      visible={fieldVisibility.publish_date !== false}
-                      editMode={editMode}
-                      isEmpty={!displayPublishDate || displayPublishDate === "—"}
-                      onVisibilityChange={() => toggleFieldVisibility("publish_date")}
-                    >
-                      {editMode ? (
-                        <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="YYYY-MM-DD" />
-                      ) : (
-                        <Link href={`/app?q=${encodeURIComponent(displayPublishDate)}`} style={{ textDecoration: "none" }}>{displayPublishDate}</Link>
-                      )}
-                    </MetadataRow>
-
-                    <MetadataRow
-                      label="Pages"
-                      visible={fieldVisibility.pages !== false}
-                      editMode={editMode}
-                      isEmpty={!book?.pages}
-                      onVisibilityChange={() => toggleFieldVisibility("pages")}
-                    >
-                      {editMode ? (
-                        <input className="om-inline-control" value={formPages} onChange={(e) => setFormPages(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add page count" />
-                      ) : book?.pages ? String(book.pages) : null}
-                    </MetadataRow>
-
-                    <MetadataRow
-                      label="Trim size"
-                      visible={fieldVisibility.trim_size !== false}
-                      editMode={editMode}
-                      isEmpty={!(book as any)?.trim_width || !(book as any)?.trim_height}
-                      onVisibilityChange={() => toggleFieldVisibility("trim_size")}
-                    >
-                      {editMode ? (
-                        <div className="row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
-                          <input className="om-inline-control" type="number" min={0.01} step={0.01} value={formTrimWidth} onChange={(e) => setFormTrimWidth(e.target.value)} placeholder="W" style={{ width: 72 }} />
-                          <span className="text-muted">×</span>
-                          <input className="om-inline-control" type="number" min={0.01} step={0.01} value={formTrimHeight} onChange={(e) => setFormTrimHeight(e.target.value)} placeholder="H" style={{ width: 72 }} />
-                          <select className="om-inline-control" value={formTrimUnit} onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)} style={{ width: "auto", minWidth: 0 }}>
-                            <option value="in">in</option>
-                            <option value="mm">mm</option>
-                          </select>
+                    {(editMode || (effectivePublisher.trim() && fieldVisibility.publisher !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.publisher === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Publisher</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="publisher" value={facetDraft.publisher} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, publisher: only })); setFormPublisher(only[0] ?? ""); }} placeholder="Add a publisher" disabled={!isOwner || busy || saveState.busy} />
+                          ) : facetView.publisher.length > 0 ? (
+                            <FacetLinks role="publisher" items={facetView.publisher} />
+                          ) : (
+                            effectivePublisher
+                          )}
                         </div>
-                      ) : (book as any)?.trim_width && (book as any)?.trim_height ? (
-                        `${(book as any).trim_width} × ${(book as any).trim_height} ${(book as any).trim_unit ?? "in"}`
-                      ) : null}
-                    </MetadataRow>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.publisher !== false} onChange={() => toggleFieldVisibility("publisher")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(editMode || (formEditionOverride.trim() && fieldVisibility.edition !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.edition === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Edition</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formEditionOverride} onChange={(e) => setFormEditionOverride(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add edition" />
+                          ) : (
+                            (formEditionOverride ?? "").trim()
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.edition !== false} onChange={() => toggleFieldVisibility("edition")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(editMode || (displayPublishDate && displayPublishDate !== "—" && fieldVisibility.publish_date !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.publish_date === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Published</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="YYYY-MM-DD" />
+                          ) : (
+                            <Link href={`/app?q=${encodeURIComponent(displayPublishDate)}`} style={{ textDecoration: "none" }}>{displayPublishDate}</Link>
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.publish_date !== false} onChange={() => toggleFieldVisibility("publish_date")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(editMode || (book?.pages && fieldVisibility.pages !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.pages === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Pages</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formPages} onChange={(e) => setFormPages(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add page count" />
+                          ) : book?.pages ? String(book.pages) : null}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.pages !== false} onChange={() => toggleFieldVisibility("pages")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(editMode || ((book as any)?.trim_width && (book as any)?.trim_height && fieldVisibility.trim_size !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.trim_size === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Trim size</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <div className="row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
+                              <input className="om-inline-control" type="number" min={0.01} step={0.01} value={formTrimWidth} onChange={(e) => setFormTrimWidth(e.target.value)} placeholder="W" style={{ width: 72 }} />
+                              <span className="text-muted">×</span>
+                              <input className="om-inline-control" type="number" min={0.01} step={0.01} value={formTrimHeight} onChange={(e) => setFormTrimHeight(e.target.value)} placeholder="H" style={{ width: 72 }} />
+                              <select className="om-inline-control" value={formTrimUnit} onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)} style={{ width: "auto", minWidth: 0 }}>
+                                <option value="in">in</option>
+                                <option value="mm">mm</option>
+                              </select>
+                            </div>
+                          ) : (book as any)?.trim_width && (book as any)?.trim_height ? (
+                            `${(book as any).trim_width} × ${(book as any).trim_height} ${(book as any).trim_unit ?? "in"}`
+                          ) : null}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.trim_size !== false} onChange={() => toggleFieldVisibility("trim_size")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
 
-
-                <MetadataRow
-                  label="Object type"
-                  visible={fieldVisibility.object_type !== false}
-                  editMode={editMode}
-                  isEmpty={!book?.object_type}
-                  onVisibilityChange={() => toggleFieldVisibility("object_type")}
-                >
-                  {editMode ? (
-                    <select className="om-inline-control" value={formObjectType || "book"} onChange={(e) => handleObjectTypeChange(e.target.value)}>
-                      <option value="book">book</option>
-                      <option value="magazine">magazine</option>
-                      <option value="ephemera">ephemera</option>
-                      <option value="video">video</option>
-                      <option value="music">music</option>
-                    </select>
-                  ) : (
-                    (book?.object_type ?? "").trim()
-                  )}
-                </MetadataRow>
-
-                <MetadataRow
-                  label="Decade"
-                  visible={fieldVisibility.decade !== false}
-                  editMode={editMode}
-                  isEmpty={!(book?.decade ?? "").trim()}
-                  onVisibilityChange={() => toggleFieldVisibility("decade")}
-                >
-                  {editMode ? (
-                    <select className="om-inline-control" value={formDecade || ""} onChange={(e) => setFormDecade(e.target.value)}>
-                      <option value="">Choose a decade</option>
-                      {DECADE_OPTIONS.map((decade) => (
-                        <option key={decade} value={decade}>
-                          {decade}
-                        </option>
-                      ))}
-                      {formDecade && !DECADE_OPTIONS.includes(formDecade) ? <option value={formDecade}>{formDecade}</option> : null}
-                    </select>
-                  ) : (
-                    <Link href={`/app?decade=${encodeURIComponent((book?.decade ?? "").trim())}`} style={{ textDecoration: "none" }}>
-                      {(book?.decade ?? "").trim()}
-                    </Link>
-                  )}
-                </MetadataRow>
-
-                {!isMusicObject && (editMode || facetView.subject.length > 0) && (
-                  <MetadataRow
-                    label="Subjects"
-                    visible={fieldVisibility.subjects !== false}
-                    editMode={editMode}
-                    isEmpty={facetView.subject.length === 0}
-                    onVisibilityChange={() => toggleFieldVisibility("subjects")}
-                  >
-                    {editMode ? (
-                      <EntityTokenField
-                        role="subject"
-                        value={facetDraft.subject}
-                        onChange={(next) => setFacetDraft((s) => ({ ...s, subject: next }))}
-                        placeholder="Add a subject"
-                        disabled={!isOwner || busy || saveState.busy}
-                      />
-                    ) : (
-                      <ExpandableContent
-                        items={facetView.subject}
-                        limit={15}
-                        renderVisible={(visibleItems, isExpanded) => (
-                          <>
-                            <FacetLinks role="subject" items={visibleItems} />
-                            {!isExpanded && facetView.subject.length > 15 ? " …" : ""}
-                          </>
-                        )}
-                      />
-                    )}
-                  </MetadataRow>
-                )}
-
-                {!isMusicObject && (editMode || Boolean(book?.edition?.isbn13 ?? book?.edition?.isbn10)) && (
-                  <MetadataRow
-                    label="ISBN"
-                    visible={fieldVisibility.isbn !== false}
-                    editMode={editMode}
-                    isEmpty={!book?.edition?.isbn13 && !book?.edition?.isbn10}
-                    onVisibilityChange={() => toggleFieldVisibility("isbn")}
-                  >
-                    <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10}</div>
-                  </MetadataRow>
-                )}
-
-                {(editMode || Boolean(effectiveDescription.trim())) && (
-                  <div style={{ marginTop: "var(--space-8)" }}>
-                    <MetadataRow
-                      label="Description"
-                      visible={fieldVisibility.description !== false}
-                      editMode={editMode}
-                      isEmpty={!effectiveDescription.trim()}
-                      onVisibilityChange={() => toggleFieldVisibility("description")}
-                      style={{ display: "block" }}
-                    >
+                {(editMode || (book?.object_type && fieldVisibility.object_type !== false)) && (
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.object_type === false ? 0.6 : 1 }}>
+                    <div style={{ minWidth: 110 }} className="text-muted">Object type</div>
+                    <div style={{ flex: "1 1 auto" }}>
                       {editMode ? (
-                        <textarea
-                          ref={descriptionTextareaRef}
-                          className="om-inline-control"
-                          value={formDescription}
-                          onChange={(e) => setFormDescription(e.target.value)}
-                          rows={1}
-                          style={{ overflow: "hidden", resize: "none", marginTop: "var(--space-sm)" }}
+                        <select className="om-inline-control" value={formObjectType || "book"} onChange={(e) => handleObjectTypeChange(e.target.value)}>
+                          <option value="book">book</option>
+                          <option value="magazine">magazine</option>
+                          <option value="ephemera">ephemera</option>
+                          <option value="video">video</option>
+                          <option value="music">music</option>
+                        </select>
+                      ) : (
+                        (book?.object_type ?? "").trim()
+                      )}
+                    </div>
+                    {editMode && (
+                      <div style={{ marginLeft: "var(--space-sm)" }}>
+                        <FieldVisibilityToggle visible={fieldVisibility.object_type !== false} onChange={() => toggleFieldVisibility("object_type")} />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(editMode || (book?.decade && fieldVisibility.decade !== false)) && (
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.decade === false ? 0.6 : 1 }}>
+                    <div style={{ minWidth: 110 }} className="text-muted">Decade</div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <select className="om-inline-control" value={formDecade || ""} onChange={(e) => setFormDecade(e.target.value)}>
+                          <option value="">Choose a decade</option>
+                          {DECADE_OPTIONS.map((decade) => (
+                            <option key={decade} value={decade}>
+                              {decade}
+                            </option>
+                          ))}
+                          {formDecade && !DECADE_OPTIONS.includes(formDecade) ? <option value={formDecade}>{formDecade}</option> : null}
+                        </select>
+                      ) : (
+                        <Link href={`/app?decade=${encodeURIComponent((book?.decade ?? "").trim())}`} style={{ textDecoration: "none" }}>
+                          {(book?.decade ?? "").trim()}
+                        </Link>
+                      )}
+                    </div>
+                    {editMode && (
+                      <div style={{ marginLeft: "var(--space-sm)" }}>
+                        <FieldVisibilityToggle visible={fieldVisibility.decade !== false} onChange={() => toggleFieldVisibility("decade")} />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!isMusicObject && (editMode || (facetView.subject.length > 0 && fieldVisibility.subjects !== false)) && (
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.subjects === false ? 0.6 : 1 }}>
+                    <div style={{ minWidth: 110 }} className="text-muted">Subjects</div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <EntityTokenField
+                          role="subject"
+                          value={facetDraft.subject}
+                          onChange={(next) => setFacetDraft((s) => ({ ...s, subject: next }))}
+                          placeholder="Add a subject"
+                          disabled={!isOwner || busy || saveState.busy}
                         />
                       ) : (
-                        <div style={{ marginTop: "var(--space-sm)" }}>
-                          <ExpandableContent
-                            items={effectiveDescription.trim().split(/\s+/)}
-                            limit={100}
-                            renderVisible={(visibleItems, isExpanded) => (
-                              <div style={{ whiteSpace: "pre-wrap" }}>
-                                {isExpanded ? effectiveDescription : visibleItems.join(" ") + (effectiveDescription.trim().split(/\s+/).length > 100 ? "…" : "")}
-                              </div>
-                            )}
-                          />
+                        <ExpandableContent
+                          items={facetView.subject}
+                          limit={15}
+                          renderVisible={(visibleItems, isExpanded) => (
+                            <>
+                              <FacetLinks role="subject" items={visibleItems} />
+                              {!isExpanded && facetView.subject.length > 15 ? " …" : ""}
+                            </>
+                          )}
+                        />
+                      )}
+                    </div>
+                    {editMode && (
+                      <div style={{ marginLeft: "var(--space-sm)" }}>
+                        <FieldVisibilityToggle visible={fieldVisibility.subjects !== false} onChange={() => toggleFieldVisibility("subjects")} />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!isMusicObject && (editMode || ((book?.edition?.isbn13 || book?.edition?.isbn10) && fieldVisibility.isbn !== false)) && (
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.isbn === false ? 0.6 : 1 }}>
+                    <div style={{ minWidth: 110 }} className="text-muted">ISBN</div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10}</div>
+                    </div>
+                    {editMode && (
+                      <div style={{ marginLeft: "var(--space-sm)" }}>
+                        <FieldVisibilityToggle visible={fieldVisibility.isbn !== false} onChange={() => toggleFieldVisibility("isbn")} />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(editMode || (effectiveDescription.trim() && fieldVisibility.description !== false)) && (
+                  <div style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.description === false ? 0.6 : 1 }}>
+                    <div className="row om-row-baseline">
+                      <div style={{ minWidth: 110 }} className="text-muted">Description</div>
+                      {editMode && (
+                        <div style={{ marginLeft: "auto" }}>
+                          <FieldVisibilityToggle visible={fieldVisibility.description !== false} onChange={() => toggleFieldVisibility("description")} />
                         </div>
                       )}
-                    </MetadataRow>
+                    </div>
+                    {editMode ? (
+                      <textarea
+                        ref={descriptionTextareaRef}
+                        className="om-inline-control"
+                        value={formDescription}
+                        onChange={(e) => setFormDescription(e.target.value)}
+                        rows={1}
+                        style={{ overflow: "hidden", resize: "none", marginTop: "var(--space-sm)" }}
+                      />
+                    ) : (
+                      <div style={{ marginTop: "var(--space-sm)" }}>
+                        <ExpandableContent
+                          items={effectiveDescription.trim().split(/\s+/)}
+                          limit={100}
+                          renderVisible={(visibleItems, isExpanded) => (
+                            <div style={{ whiteSpace: "pre-wrap" }}>
+                              {isExpanded ? effectiveDescription : visibleItems.join(" ") + (effectiveDescription.trim().split(/\s+/).length > 100 ? "…" : "")}
+                            </div>
+                          )}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -4797,74 +4850,85 @@ export default function BookDetailPage() {
                         <div>{copiesCountState.busy ? "…" : copiesCount !== null ? String(copiesCount) : "—"}</div>
                       )}
                     </div>
-                    {(editMode || facetView.category.length > 0) && (
-                      <MetadataRow
-                        label="Categories"
-                        visible={fieldVisibility.category !== false}
-                        editMode={editMode}
-                        isEmpty={facetView.category.length === 0}
-                        onVisibilityChange={() => toggleFieldVisibility("category")}
-                      >
-                        {editMode ? (
-                          <EntityTokenField
-                            role="category"
-                            value={facetDraft.category}
-                            onChange={(next) => setFacetDraft((s) => ({ ...s, category: next }))}
-                            placeholder="Add a category"
-                            disabled={!isOwner || busy || saveState.busy}
-                          />
-                        ) : (
-                          <FacetLinks role="category" items={facetView.category} />
-                        )}
-                      </MetadataRow>
-                    )}
-
-                    {(editMode || facetView.tag.length > 0) && (
-                      <MetadataRow
-                        label="Tags"
-                        visible={fieldVisibility.tag !== false}
-                        editMode={editMode}
-                        isEmpty={facetView.tag.length === 0}
-                        onVisibilityChange={() => toggleFieldVisibility("tag")}
-                      >
-                        {editMode ? (
-                          <EntityTokenField
-                            role="tag"
-                            value={facetDraft.tag}
-                            onChange={(next) => setFacetDraft((s) => ({ ...s, tag: next }))}
-                            placeholder="Add a tag"
-                            disabled={!isOwner || busy || saveState.busy}
-                          />
-                        ) : (
-                          <FacetLinks role="tag" items={facetView.tag} />
-                        )}
-                      </MetadataRow>
-                    )}
-
-                    {showNotesSection && (
-                      <MetadataRow
-                        label="Notes"
-                        visible={fieldVisibility.notes !== false}
-                        editMode={editMode}
-                        isEmpty={!(formNotes ?? "").trim()}
-                        onVisibilityChange={() => toggleFieldVisibility("notes")}
-                        style={{ alignItems: "flex-start" }}
-                      >
-                        {editMode ? (
-                          <textarea
-                            className="om-inline-control"
-                            value={formNotes}
-                            onChange={(e) => setFormNotes(e.target.value)}
-                            rows={1}
-                            style={{ width: "100%", resize: "none" }}
-                            placeholder="Add notes"
-                          />
-                        ) : (
-                          <div style={{ whiteSpace: "pre-wrap" }}>
-                            {(formNotes ?? "").trim()}
+                    {(editMode || (facetView.category.length > 0 && fieldVisibility.category !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.category === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">
+                          Categories
+                        </div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField
+                              role="category"
+                              value={facetDraft.category}
+                              onChange={(next) => setFacetDraft((s) => ({ ...s, category: next }))}
+                              placeholder="Add a category"
+                              disabled={!isOwner || busy || saveState.busy}
+                            />
+                          ) : (
+                            <FacetLinks role="category" items={facetView.category} />
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.category !== false} onChange={() => toggleFieldVisibility("category")} />
                           </div>
                         )}
-                      </MetadataRow>
+                      </div>
+                    )}
+
+                    {(editMode || (facetView.tag.length > 0 && fieldVisibility.tag !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.tag === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">
+                          Tags
+                        </div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField
+                              role="tag"
+                              value={facetDraft.tag}
+                              onChange={(next) => setFacetDraft((s) => ({ ...s, tag: next }))}
+                              placeholder="Add a tag"
+                              disabled={!isOwner || busy || saveState.busy}
+                            />
+                          ) : (
+                            <FacetLinks role="tag" items={facetView.tag} />
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.tag !== false} onChange={() => toggleFieldVisibility("tag")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {showNotesSection && (editMode || fieldVisibility.notes !== false) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.notes === false ? 0.6 : 1, alignItems: "flex-start" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">
+                          Notes
+                        </div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <textarea
+                              className="om-inline-control"
+                              value={formNotes}
+                              onChange={(e) => setFormNotes(e.target.value)}
+                              rows={1}
+                              style={{ width: "100%", resize: "none" }}
+                              placeholder="Add notes"
+                            />
+                          ) : (
+                            <div style={{ whiteSpace: "pre-wrap" }}>
+                              {(formNotes ?? "").trim()}
+                            </div>
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.notes !== false} onChange={() => toggleFieldVisibility("notes")} />
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -4966,33 +5030,45 @@ export default function BookDetailPage() {
                   {showLocationBlock ? (
                     <>
                     <div className="meta-list" style={{ gap: 0 }}>
-                      <MetadataRow
-                        label="Location"
-                        visible={fieldVisibility.location !== false}
-                        editMode={editMode}
-                        isEmpty={!(formLocation ?? "").trim()}
-                        onVisibilityChange={() => toggleFieldVisibility("location")}
-                      >
-                        {editMode ? (
-                          <input className="om-inline-control" value={formLocation} onChange={(e) => setFormLocation(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Home, Studio…" />
-                        ) : (
-                          (formLocation ?? "").trim()
-                        )}
-                      </MetadataRow>
+                      {(editMode || (formLocation.trim() && fieldVisibility.location !== false)) && (
+                        <div className="row om-row-baseline">
+                          <div style={{ minWidth: 110 }} className="text-muted">
+                            Location
+                          </div>
+                          <div style={{ flex: "1 1 auto" }}>
+                            {editMode ? (
+                              <input className="om-inline-control" value={formLocation} onChange={(e) => setFormLocation(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Home, Studio…" />
+                            ) : (
+                              (formLocation ?? "").trim()
+                            )}
+                          </div>
+                          {editMode && (
+                            <div style={{ marginLeft: "var(--space-sm)" }}>
+                              <FieldVisibilityToggle visible={fieldVisibility.location !== false} onChange={() => toggleFieldVisibility("location")} />
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                      <MetadataRow
-                        label="Shelf"
-                        visible={fieldVisibility.shelf !== false}
-                        editMode={editMode}
-                        isEmpty={!(formShelf ?? "").trim()}
-                        onVisibilityChange={() => toggleFieldVisibility("shelf")}
-                      >
-                        {editMode ? (
-                          <input className="om-inline-control" value={formShelf} onChange={(e) => setFormShelf(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Shelf #" />
-                        ) : (
-                          (formShelf ?? "").trim()
-                        )}
-                      </MetadataRow>
+                      {(editMode || (formShelf.trim() && fieldVisibility.shelf !== false)) && (
+                        <div className="row om-row-baseline" style={{ marginTop: editMode || formLocation.trim() ? "var(--space-8)" : 0 }}>
+                          <div style={{ minWidth: 110 }} className="text-muted">
+                            Shelf
+                          </div>
+                          <div style={{ flex: "1 1 auto" }}>
+                            {editMode ? (
+                              <input className="om-inline-control" value={formShelf} onChange={(e) => setFormShelf(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Shelf #" />
+                            ) : (
+                              (formShelf ?? "").trim()
+                            )}
+                          </div>
+                          {editMode && (
+                            <div style={{ marginLeft: "var(--space-sm)" }}>
+                              <FieldVisibilityToggle visible={fieldVisibility.shelf !== false} onChange={() => toggleFieldVisibility("shelf")} />
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     </>
                   ) : null}
@@ -5031,7 +5107,7 @@ export default function BookDetailPage() {
             </div>
           </div>
 
-          {(isOwner && editMode) || imageMedia.length > 0 ? (
+          {((isOwner && editMode) || imageMedia.length > 0) ? (
             <div style={{ gridColumn: "1 / -1" }}>
               <hr className="divider" />
               {isOwner && editMode ? (
@@ -5112,11 +5188,12 @@ export default function BookDetailPage() {
               ) : null}
             </div>
           ) : null}
-        {editionId ? (
-          <>
-            <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} />
-          </>
-        ) : null}
+
+          {editionId ? (
+            <div style={{ gridColumn: "1 / -1", marginTop: "var(--space-md)" }}>
+              <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} />
+            </div>
+          ) : null}
         </div>
       )}
 
