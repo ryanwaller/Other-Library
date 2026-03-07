@@ -70,4 +70,5 @@ export type CatalogGroup = {
   effectiveVisibility: "public" | "followers_only" | "mixed";
   latestCreatedAt: number;
   earliestCreatedAt: number;
+  sortOrder?: number;
 };

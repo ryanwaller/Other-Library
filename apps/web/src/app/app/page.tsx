@@ -548,7 +548,7 @@ function AppShell({
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [gridCols, setGridCols] = useState<1 | 2 | 4 | 8>(4);
-  const [sortMode, setSortMode] = useState<"latest" | "earliest" | "title_asc" | "title_desc">("latest");
+  const [sortMode, setSortMode] = useState<"custom" | "latest" | "earliest" | "title_asc" | "title_desc">("custom");
   const [categoryMode, setCategoryMode] = useState<string>("all");
   const [visibilityMode, setVisibilityMode] = useState<"all" | "public" | "private">("all");
   const [tagMode, setTagMode] = useState<string>("all");
@@ -580,6 +580,118 @@ function AppShell({
   const [showSharedLibraries, setShowSharedLibraries] = useState(false);
   const [addLibraryId, setAddLibraryId] = useState<number | null>(null);
   const [editingLibraryId, setEditingLibraryId] = useState<number | null>(null);
+  const [rearrangingLibraryId, setRearrangingLibraryId] = useState<number | null>(null);
+  const [draggedItemKey, setDraggedItemKey] = useState<string | null>(null);
+  const [draggedItemLibId, setDraggedItemLibId] = useState<number | null>(null);
+  const [dragOverItemKey, setDragOverItemKey] = useState<string | null>(null);
+  const scrollIntervalRef = useRef<any>(null);
+
+  function handleDragStart(e: React.DragEvent, key: string, libraryId: number) {
+    setDraggedItemKey(key);
+    setDraggedItemLibId(libraryId);
+    e.dataTransfer.effectAllowed = "move";
+    // Create a ghost image or just let default happen
+  }
+
+  function handleDragOver(e: React.DragEvent, key: string) {
+    e.preventDefault();
+    if (draggedItemKey === key) return;
+    setDragOverItemKey(key);
+
+    // Auto-scroll logic
+    const threshold = 100;
+    const speed = 10;
+    if (e.clientY < threshold) {
+      if (!scrollIntervalRef.current) {
+        scrollIntervalRef.current = setInterval(() => window.scrollBy(0, -speed), 16);
+      }
+    } else if (e.clientY > window.innerHeight - threshold) {
+      if (!scrollIntervalRef.current) {
+        scrollIntervalRef.current = setInterval(() => window.scrollBy(0, speed), 16);
+      }
+    } else {
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+    }
+  }
+
+  function handleDragEnd() {
+    setDraggedItemKey(null);
+    setDraggedItemLibId(null);
+    setDragOverItemKey(null);
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+  }
+
+  async function handleDrop(e: React.DragEvent, targetKey: string, targetLibId: number) {
+    e.preventDefault();
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+    const sourceKey = draggedItemKey;
+    if (!sourceKey || sourceKey === targetKey || targetLibId !== draggedItemLibId) {
+      handleDragEnd();
+      return;
+    }
+
+    const libId = targetLibId;
+    const groups = (displayGroupsByLibraryId[libId] ?? []).filter(g => !searchQuery || true); // use current view list
+    const sourceIdx = groups.findIndex(g => g.key === sourceKey);
+    const targetIdx = groups.findIndex(g => g.key === targetKey);
+    if (sourceIdx === -1 || targetIdx === -1) {
+      handleDragEnd();
+      return;
+    }
+
+    // Gap-based sort_order calculation
+    let newOrder: number;
+    if (targetIdx === 0) {
+      newOrder = (groups[0]?.sortOrder ?? 0) - 1000;
+    } else if (targetIdx === groups.length - 1 && sourceIdx < targetIdx) {
+      newOrder = (groups[groups.length - 1]?.sortOrder ?? 0) + 1000;
+    } else {
+      const prevIdx = targetIdx > sourceIdx ? targetIdx : targetIdx - 1;
+      const nextIdx = targetIdx > sourceIdx ? targetIdx + 1 : targetIdx;
+      
+      const prevOrder = groups[prevIdx]?.sortOrder ?? 0;
+      const nextOrder = groups[nextIdx]?.sortOrder ?? (prevOrder + 2000);
+      newOrder = (prevOrder + nextOrder) / 2;
+    }
+
+    // Optimization: if we are dropping directly on an item, we need to decide if it's "before" or "after"
+    // For simplicity, let's just always insert BEFORE the target.
+    const beforeTarget = groups[targetIdx];
+    const afterTarget = targetIdx + 1 < groups.length ? groups[targetIdx + 1] : null;
+    
+    if (targetIdx === 0) {
+      newOrder = (beforeTarget.sortOrder ?? 0) - 1000;
+    } else {
+      const prev = groups[targetIdx - 1];
+      newOrder = ((prev.sortOrder ?? 0) + (beforeTarget.sortOrder ?? 0)) / 2;
+    }
+
+    // Update locally first for snappy UI
+    const sourceGroup = groups[sourceIdx];
+    const updatedItems = items.map(item => {
+      if (sourceGroup.copies.some(c => c.id === item.id)) {
+        return { ...item, sort_order: newOrder };
+      }
+      return item;
+    });
+    setItems(updatedItems);
+    handleDragEnd();
+
+    // Persist to DB
+    if (supabase) {
+      const ids = sourceGroup.copies.map(c => c.id);
+      await supabase.from("user_books").update({ sort_order: newOrder }).in("id", ids);
+    }
+  }
   const [libraryNameDraft, setLibraryNameDraft] = useState("");
   const [newLibraryName, setNewLibraryName] = useState("");
   const [newLibraryFocused, setNewLibraryFocused] = useState(false);
@@ -780,7 +892,7 @@ function AppShell({
       window.localStorage.removeItem("om_visibilityMode");
       if (vm === "grid" || vm === "list") setViewMode(vm);
       if (gc === "1" || gc === "2" || gc === "4" || gc === "8") setGridCols(Number(gc) as any);
-      if (sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
+      if (sm === "custom" || sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
       setSearchQuery(q);
     } catch {
       // ignore
@@ -950,9 +1062,9 @@ function AppShell({
     if (ids.length === 0) return { ok: false, reason: "no_library_ids" };
 
     const fallbackSelects = [
-      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))",
-      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))",
-      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))",
+      "id,library_id,created_at,visibility,sort_order,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))",
+      "id,library_id,created_at,visibility,sort_order,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))",
+      "id,library_id,created_at,visibility,sort_order,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))",
       "*"
     ];
 
@@ -2709,7 +2821,8 @@ function AppShell({
         visibility: visSet.size === 1 ? (primary.visibility as any) : "mixed",
         effectiveVisibility: effVisSet.size === 1 ? ((Array.from(effVisSet.values())[0] as string) === "public" ? "public" : "followers_only") : "mixed",
         latestCreatedAt: Number.isFinite(latest) ? latest : Date.now(),
-        earliestCreatedAt: Number.isFinite(earliest) ? earliest : Date.now()
+        earliestCreatedAt: Number.isFinite(earliest) ? earliest : Date.now(),
+        sortOrder: sorted.reduce((min, c) => Math.min(min, (c as any).sort_order ?? 0), Infinity)
       };
     });
 
@@ -2837,6 +2950,7 @@ function AppShell({
     }
 
     groups.sort((a, b) => {
+      if (sortMode === "custom") return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
       if (sortMode === "latest") return b.latestCreatedAt - a.latestCreatedAt;
       if (sortMode === "earliest") return a.earliestCreatedAt - b.earliestCreatedAt;
       const cmp = normalizeKeyPart(a.title).localeCompare(normalizeKeyPart(b.title));
@@ -3308,12 +3422,12 @@ function AppShell({
           )}
 
           <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
+            <option value="custom">custom order</option>
             <option value="latest">latest</option>
             <option value="earliest">earliest</option>
             <option value="title_asc">title A-Z</option>
             <option value="title_desc">title Z-A</option>
-          </select>
-          {(availableCategories.length > 0 || !!(filterCategory ?? "").trim()) && (
+          </select>          {(availableCategories.length > 0 || !!(filterCategory ?? "").trim()) && (
             <select className="om-filter-control" value={filterCategory ?? ""} onChange={(e) => setUrlFilters({ category: e.target.value || null })}>
               <option value="">category</option>
               {availableCategories.map((c) => (
@@ -3369,6 +3483,13 @@ function AppShell({
       />
 
       <div style={{ height: "var(--catalog-top-gap)" }} />
+
+      {rearrangingLibraryId !== null && (
+        <div className="row" style={{ marginBottom: "var(--space-md)", justifyContent: "space-between", alignItems: "center", background: "var(--bg-muted)", padding: "8px 12px", borderRadius: "4px" }}>
+          <span className="text-muted">Rearranging catalog order</span>
+          <button onClick={() => setRearrangingLibraryId(null)} style={{ textDecoration: "underline" }}>Done</button>
+        </div>
+      )}
 
       {displayLibraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];
@@ -3501,6 +3622,14 @@ function AppShell({
               bookCount={groups.length}
               index={idx}
               total={displayLibraries.length}
+              rearrangingLibraryId={rearrangingLibraryId}
+              onToggleRearrange={(id) => {
+                setRearrangingLibraryId(id);
+                if (id !== null) {
+                  setSortMode("custom");
+                  window.localStorage.setItem("om_sortMode", "custom");
+                }
+              }}
               busy={libraryState.busy}
               isEditing={editingLibraryId === lib.id}
               nameDraft={libraryNameDraft}
@@ -3542,27 +3671,51 @@ function AppShell({
                       typeof g.primary.resolved_cover_url === "string" && g.primary.resolved_cover_url.trim()
                         ? g.primary.resolved_cover_url
                         : null;
+                    
+                    const isRearrangingThis = rearrangingLibraryId === lib.id;
+                    const isDragged = draggedItemKey === g.key;
+                    const isDragOver = dragOverItemKey === g.key;
+
                     return (
-                      <BookCard
+                      <div
                         key={g.key}
-                        viewMode={viewMode}
-                        bulkMode={bulkMode}
-                        selected={!!bulkSelectedKeys[g.key]}
-                        onToggleSelected={() => toggleBulkKey(g.key)}
-                        title={g.title}
-                        authors={g.filterAuthors}
-                        isbn13={g.primary.edition?.isbn13 ?? null}
-                        tags={g.tagNames}
-                        copiesCount={g.copiesCount}
-                        href={`/app/books/${g.primary.id}`}
-                        coverUrl={resolvedCoverUrl}
-                        originalSrc={resolvedCoverUrl}
-                        onOpen={() => storeBookNavContext(lib.id, orderedBookIds)}
-                        cropData={g.primary.cover_crop}
-                        onDeleteCopy={() => deleteEntry(g.primary.id)}
-                        deleteState={deleteStateByBookId[g.primary.id]}
-                        gridCols={effectiveCols}
-                      />
+                        draggable={isRearrangingThis}
+                        onDragStart={(e) => handleDragStart(e, g.key, lib.id)}
+                        onDragOver={(e) => handleDragOver(e, g.key)}
+                        onDragEnd={handleDragEnd}
+                        onDrop={(e) => handleDrop(e, g.key, lib.id)}
+                        style={{
+                          opacity: isDragged ? 0.4 : 1,
+                          cursor: isRearrangingThis ? "grab" : "default",
+                          transition: "transform 0.15s ease",
+                          transform: isDragOver ? "scale(1.02)" : "none",
+                          borderLeft: isDragOver ? "2px solid var(--fg)" : "none",
+                          paddingLeft: isDragOver ? 8 : 0,
+                          position: "relative"
+                        }}
+                      >
+                        <BookCard
+                          viewMode={viewMode}
+                          bulkMode={bulkMode || isRearrangingThis}
+                          selected={!!bulkSelectedKeys[g.key]}
+                          onToggleSelected={() => toggleBulkKey(g.key)}
+                          title={g.title}
+                          authors={g.filterAuthors}
+                          isbn13={g.primary.edition?.isbn13 ?? null}
+                          tags={g.tagNames}
+                          copiesCount={g.copiesCount}
+                          href={isRearrangingThis ? "" : `/app/books/${g.primary.id}`}
+                          coverUrl={resolvedCoverUrl}                          originalSrc={resolvedCoverUrl}
+                          onOpen={() => storeBookNavContext(lib.id, orderedBookIds)}
+                          cropData={g.primary.cover_crop}
+                          onDeleteCopy={() => deleteEntry(g.primary.id)}
+                          deleteState={deleteStateByBookId[g.primary.id]}
+                          gridCols={effectiveCols}
+                        />
+                        {isRearrangingThis && (
+                          <div style={{ position: "absolute", inset: 0, zIndex: 10, cursor: "grab" }} />
+                        )}
+                      </div>
                     );
                   })}
                 </div>

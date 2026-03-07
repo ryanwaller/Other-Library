@@ -18,6 +18,8 @@ export default function LibraryBlock({
   collapsed,
   reorderMode,
   manageMode,
+  rearrangingLibraryId,
+  onToggleRearrange,
   busy,
   isEditing,
   nameDraft,
@@ -47,6 +49,8 @@ export default function LibraryBlock({
   collapsed: boolean;
   reorderMode: boolean;
   manageMode: boolean;
+  rearrangingLibraryId: number | null;
+  onToggleRearrange: (libraryId: number | null) => void;
   busy: boolean;
   isEditing: boolean;
   nameDraft: string;
@@ -225,13 +229,22 @@ export default function LibraryBlock({
         {(reorderMode || manageMode) && !isEditing ? (
           <div className="row" style={{ gap: "var(--space-10)", marginLeft: "var(--space-md)", alignItems: "baseline" }}>
             {manageMode ? (
-              <button
-                onClick={() => onDelete(libraryId)}
-                disabled={busy}
-                style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", textDecoration: "underline" }}
-              >
-                Delete
-              </button>
+              <>
+                <button
+                  onClick={() => onToggleRearrange(rearrangingLibraryId === libraryId ? null : libraryId)}
+                  disabled={busy}
+                  style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", textDecoration: "underline" }}
+                >
+                  {rearrangingLibraryId === libraryId ? "Done" : "Rearrange"}
+                </button>
+                <button
+                  onClick={() => onDelete(libraryId)}
+                  disabled={busy}
+                  style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", textDecoration: "underline" }}
+                >
+                  Delete
+                </button>
+              </>
             ) : null}
             {index > 0 ? (
               <button
