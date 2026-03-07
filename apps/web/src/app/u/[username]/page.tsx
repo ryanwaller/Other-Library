@@ -142,14 +142,14 @@ export default async function PublicProfilePage({
         .filter((id) => Number.isFinite(id) && id > 0)
     )
   );
-  let libraries: Array<{ id: number; name: string }> = [];
+  let libraries: Array<{ id: number; name: string; sort_order: number | null }> = [];
   if (libraryIds.length > 0) {
-    const librariesRes = await supabase.from("libraries").select("id,name").in("id", libraryIds);
+    const librariesRes = await supabase.from("libraries").select("id,name,sort_order").in("id", libraryIds);
     libraries = ((librariesRes.data ?? []) as any[])
-      .map((l) => ({ id: Number(l.id), name: String(l.name ?? `Catalog ${l.id}`) }))
+      .map((l) => ({ id: Number(l.id), name: String(l.name ?? `Catalog ${l.id}`), sort_order: l.sort_order ?? null }))
       .filter((l) => Number.isFinite(l.id) && l.id > 0);
     if (libraries.length === 0) {
-      libraries = libraryIds.map((id) => ({ id, name: `Catalog ${id}` }));
+      libraries = libraryIds.map((id) => ({ id, name: `Catalog ${id}`, sort_order: null }));
     }
   }
 

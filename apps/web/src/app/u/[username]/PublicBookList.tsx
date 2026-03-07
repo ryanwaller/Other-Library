@@ -20,7 +20,7 @@ import {
 type SortMode = "latest" | "earliest" | "title_asc" | "title_desc";
 
 type Props = {
-  libraries: Array<{ id: number; name: string }>;
+  libraries: Array<{ id: number; name: string; sort_order?: number | null }>;
   allBooks: PublicBook[]; // All visible books, unfiltered
   username: string;
   profileId: string;
@@ -31,7 +31,7 @@ type Props = {
 };
 
 type MemberPreview = { userId: string; username: string; avatarUrl: string | null };
-type PublicLibrary = { id: number; name: string; memberPreviews?: MemberPreview[] };
+type PublicLibrary = { id: number; name: string; sort_order?: number | null; memberPreviews?: MemberPreview[] };
 
 export default function PublicBookList({
   libraries,
@@ -431,10 +431,13 @@ export default function PublicBookList({
       byId.set(id, {
         id,
         name: String(l.name ?? `Catalog ${id}`),
+        sort_order: l.sort_order ?? null,
         memberPreviews: (l as any).memberPreviews ?? existing?.memberPreviews ?? []
       });
     }
-    if (byId.size > 0) return Array.from(byId.values());
+    if (byId.size > 0) {
+      return Array.from(byId.values()).sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999));
+    }
     const ids = Array.from(new Set(filteredGroups.map((g) => g.libraryId))).filter((id) => Number.isFinite(id) && id > 0);
     return ids.map((id) => ({ id, name: `Catalog ${id}`, memberPreviews: [] }));
   }, [libraries, sharedLibraries, filteredGroups]);
