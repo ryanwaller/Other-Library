@@ -3541,13 +3541,25 @@ export default function BookDetailPage() {
                         />
                       </div>
                       {(lookupInput.trim() || lookupInputFocused) ? (
-                        <button
-                          onClick={() => smartLookup()}
-                          disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
-                          style={{ whiteSpace: "nowrap", marginLeft: "var(--space-md)" }}
-                        >
-                          Find
-                        </button>
+                        <div className="row" style={{ gap: "var(--space-md)", alignItems: "center" }}>
+                          {lookupInput && (
+                            <button 
+                              type="button" 
+                              onClick={() => setLookupInput("")}
+                              style={{ padding: "0 4px", fontSize: "1.2em", border: 0, background: "none", cursor: "pointer", color: "var(--text-muted)" }}
+                              title="Clear"
+                            >
+                              ×
+                            </button>
+                          )}
+                          <button
+                            onClick={() => smartLookup()}
+                            disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
+                            style={{ whiteSpace: "nowrap" }}
+                          >
+                            Find
+                          </button>
+                        </div>
                       ) : null}
                     </div>
                   </div>

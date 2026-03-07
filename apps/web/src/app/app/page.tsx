@@ -3254,7 +3254,17 @@ function AppShell({
                 />
               </div>
               {((addInput.trim() || addInputFocused) || (addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message)) && (
-                <div className="row" style={{ gap: "var(--space-10)", flex: "0 0 auto" }}>
+                <div className="row" style={{ gap: "var(--space-10)", flex: "0 0 auto", alignItems: "center" }}>
+                  {addInput && (
+                    <button 
+                      type="button" 
+                      onClick={() => setAddInput("")}
+                      style={{ padding: "0 4px", fontSize: "1.2em", border: 0, background: "none", cursor: "pointer", color: "var(--text-muted)" }}
+                      title="Clear"
+                    >
+                      ×
+                    </button>
+                  )}
                   {(addInput.trim() || addInputFocused) && (
                     <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
                       {addState.busy ? "…" : "Go"}
@@ -3282,6 +3292,16 @@ function AppShell({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ minWidth: 0, flex: 1 }}
               />
+              {searchQuery && (
+                <button 
+                  type="button" 
+                  onClick={() => setSearchQuery("")}
+                  style={{ padding: "0 4px", fontSize: "1.2em", border: 0, background: "none", cursor: "pointer", color: "var(--text-muted)" }}
+                  title="Clear"
+                >
+                  ×
+                </button>
+              )}
               {(searchFocused || searchQuery.trim()) && (
                 <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`} className="text-muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>Search others</Link>
               )}
