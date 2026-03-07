@@ -365,10 +365,11 @@ function MetadataRow(props: {
   onVisibilityChange?: (visible: boolean) => void;
   hideToggle?: boolean;
   style?: any;
+  isEmpty?: boolean;
 }) {
-  const { label, children, visible, editMode, onVisibilityChange, hideToggle, style } = props;
+  const { label, children, visible, editMode, onVisibilityChange, hideToggle, style, isEmpty } = props;
 
-  if (!editMode && !visible) return null;
+  if (!editMode && (!visible || isEmpty)) return null;
 
   return (
     <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && !visible ? 0.6 : 1, ...style }}>
@@ -4168,6 +4169,7 @@ export default function BookDetailPage() {
                       label="Label"
                       visible={fieldVisibility.label !== false}
                       editMode={editMode}
+                      isEmpty={!effectiveMusic.label && facetView.publisher.length === 0}
                       onVisibilityChange={(v) => toggleFieldVisibility("label")}
                     >
                       {editMode ? (
@@ -4183,6 +4185,7 @@ export default function BookDetailPage() {
                       label="Release date"
                       visible={fieldVisibility.release_date !== false}
                       editMode={editMode}
+                      isEmpty={!effectiveMusic.release_date}
                       onVisibilityChange={(v) => toggleFieldVisibility("release_date")}
                     >
                       {editMode ? (
@@ -4198,6 +4201,7 @@ export default function BookDetailPage() {
                       label="Orig. release year"
                       visible={fieldVisibility.original_release_year !== false}
                       editMode={editMode}
+                      isEmpty={!effectiveMusic.original_release_year}
                       onVisibilityChange={(v) => toggleFieldVisibility("original_release_year")}
                     >
                       {editMode ? (
@@ -4225,13 +4229,16 @@ export default function BookDetailPage() {
                     ].map(([label, key, inputKind, protectedField]) => {
                       const k = key as string;
                       const pf = protectedField as boolean;
-                      return (editMode || Boolean(String((effectiveMusic as any)[k] ?? "").trim())) ? (
+                      const val = (effectiveMusic as any)[k];
+                      const empty = val === null || val === undefined || String(val).trim() === "";
+                      return (editMode || !empty) ? (
                         <MetadataRow
                           key={k}
                           label={label as string}
                           visible={!!(pf || fieldVisibility[k] !== false)}
                           editMode={editMode}
                           hideToggle={pf}
+                          isEmpty={empty}
                           onVisibilityChange={() => toggleFieldVisibility(k)}
                         >
                           {editMode ? (
@@ -4274,6 +4281,7 @@ export default function BookDetailPage() {
                       label="Disc count"
                       visible={fieldVisibility.disc_count !== false}
                       editMode={editMode}
+                      isEmpty={effectiveMusic.disc_count === null}
                       onVisibilityChange={() => toggleFieldVisibility("disc_count")}
                     >
                       {editMode ? (
@@ -4295,6 +4303,7 @@ export default function BookDetailPage() {
                       label="Limited edition"
                       visible={fieldVisibility.limited_edition !== false}
                       editMode={editMode}
+                      isEmpty={effectiveMusic.limited_edition === null}
                       onVisibilityChange={() => toggleFieldVisibility("limited_edition")}
                     >
                       {editMode ? (
@@ -4323,6 +4332,7 @@ export default function BookDetailPage() {
                       label="Reissue"
                       visible={fieldVisibility.reissue !== false}
                       editMode={editMode}
+                      isEmpty={effectiveMusic.reissue === null}
                       onVisibilityChange={() => toggleFieldVisibility("reissue")}
                     >
                       {editMode ? (
@@ -4351,6 +4361,7 @@ export default function BookDetailPage() {
                       label="Genres"
                       visible={fieldVisibility.genres !== false}
                       editMode={editMode}
+                      isEmpty={musicGenres.length === 0}
                       onVisibilityChange={() => toggleFieldVisibility("genres")}
                     >
                       {editMode ? (
@@ -4379,6 +4390,7 @@ export default function BookDetailPage() {
                       label="Tracklist"
                       visible={fieldVisibility.tracklist !== false}
                       editMode={editMode}
+                      isEmpty={effectiveMusic.tracklist.length === 0}
                       onVisibilityChange={() => toggleFieldVisibility("tracklist")}
                       style={{ alignItems: "flex-start" }}
                     >
@@ -4422,6 +4434,7 @@ export default function BookDetailPage() {
                       visible={true}
                       editMode={editMode}
                       hideToggle={true}
+                      isEmpty={facetView.author.length === 0}
                     >
                       <div className="om-hanging-value">
                         {editMode ? (
@@ -4443,6 +4456,7 @@ export default function BookDetailPage() {
                           label={label as string}
                           visible={names.length === 0 || fieldVisibility[visKey] !== false}
                           editMode={editMode}
+                          isEmpty={(viewItems as any[]).length === 0}
                           onVisibilityChange={(v) => {
                             const next = { ...fieldVisibility };
                             names.forEach(n => next[`${role}:${n}`] = v);
@@ -4470,6 +4484,7 @@ export default function BookDetailPage() {
                           label={label as string}
                           visible={names.length === 0 || fieldVisibility[visKey] !== false}
                           editMode={editMode}
+                          isEmpty={(viewItems as any[]).length === 0}
                           onVisibilityChange={(v) => {
                             const next = { ...fieldVisibility };
                             names.forEach(n => next[`${role}:${n}`] = v);
@@ -4489,6 +4504,7 @@ export default function BookDetailPage() {
                       label="Publisher"
                       visible={fieldVisibility.publisher !== false}
                       editMode={editMode}
+                      isEmpty={!effectivePublisher.trim() && facetView.publisher.length === 0}
                       onVisibilityChange={() => toggleFieldVisibility("publisher")}
                     >
                       {editMode ? (
@@ -4504,6 +4520,7 @@ export default function BookDetailPage() {
                       label="Edition"
                       visible={fieldVisibility.edition !== false}
                       editMode={editMode}
+                      isEmpty={!formEditionOverride.trim()}
                       onVisibilityChange={() => toggleFieldVisibility("edition")}
                     >
                       {editMode ? (
@@ -4517,6 +4534,7 @@ export default function BookDetailPage() {
                       label="Published"
                       visible={fieldVisibility.publish_date !== false}
                       editMode={editMode}
+                      isEmpty={!displayPublishDate || displayPublishDate === "—"}
                       onVisibilityChange={() => toggleFieldVisibility("publish_date")}
                     >
                       {editMode ? (
@@ -4530,6 +4548,7 @@ export default function BookDetailPage() {
                       label="Pages"
                       visible={fieldVisibility.pages !== false}
                       editMode={editMode}
+                      isEmpty={!book?.pages}
                       onVisibilityChange={() => toggleFieldVisibility("pages")}
                     >
                       {editMode ? (
@@ -4541,6 +4560,7 @@ export default function BookDetailPage() {
                       label="Trim size"
                       visible={fieldVisibility.trim_size !== false}
                       editMode={editMode}
+                      isEmpty={!(book as any)?.trim_width || !(book as any)?.trim_height}
                       onVisibilityChange={() => toggleFieldVisibility("trim_size")}
                     >
                       {editMode ? (
@@ -4565,6 +4585,7 @@ export default function BookDetailPage() {
                   label="Object type"
                   visible={fieldVisibility.object_type !== false}
                   editMode={editMode}
+                  isEmpty={!book?.object_type}
                   onVisibilityChange={() => toggleFieldVisibility("object_type")}
                 >
                   {editMode ? (
@@ -4584,6 +4605,7 @@ export default function BookDetailPage() {
                   label="Decade"
                   visible={fieldVisibility.decade !== false}
                   editMode={editMode}
+                  isEmpty={!(book?.decade ?? "").trim()}
                   onVisibilityChange={() => toggleFieldVisibility("decade")}
                 >
                   {editMode ? (
@@ -4608,6 +4630,7 @@ export default function BookDetailPage() {
                     label="Subjects"
                     visible={fieldVisibility.subjects !== false}
                     editMode={editMode}
+                    isEmpty={facetView.subject.length === 0}
                     onVisibilityChange={() => toggleFieldVisibility("subjects")}
                   >
                     {editMode ? (
@@ -4638,6 +4661,7 @@ export default function BookDetailPage() {
                     label="ISBN"
                     visible={fieldVisibility.isbn !== false}
                     editMode={editMode}
+                    isEmpty={!book?.edition?.isbn13 && !book?.edition?.isbn10}
                     onVisibilityChange={() => toggleFieldVisibility("isbn")}
                   >
                     <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10}</div>
@@ -4650,6 +4674,7 @@ export default function BookDetailPage() {
                       label="Description"
                       visible={fieldVisibility.description !== false}
                       editMode={editMode}
+                      isEmpty={!effectiveDescription.trim()}
                       onVisibilityChange={() => toggleFieldVisibility("description")}
                       style={{ display: "block" }}
                     >
@@ -4774,6 +4799,7 @@ export default function BookDetailPage() {
                         label="Categories"
                         visible={fieldVisibility.category !== false}
                         editMode={editMode}
+                        isEmpty={facetView.category.length === 0}
                         onVisibilityChange={() => toggleFieldVisibility("category")}
                       >
                         {editMode ? (
@@ -4795,6 +4821,7 @@ export default function BookDetailPage() {
                         label="Tags"
                         visible={fieldVisibility.tag !== false}
                         editMode={editMode}
+                        isEmpty={facetView.tag.length === 0}
                         onVisibilityChange={() => toggleFieldVisibility("tag")}
                       >
                         {editMode ? (
@@ -4816,6 +4843,7 @@ export default function BookDetailPage() {
                         label="Notes"
                         visible={fieldVisibility.notes !== false}
                         editMode={editMode}
+                        isEmpty={!(formNotes ?? "").trim()}
                         onVisibilityChange={() => toggleFieldVisibility("notes")}
                         style={{ alignItems: "flex-start" }}
                       >
@@ -4939,6 +4967,7 @@ export default function BookDetailPage() {
                         label="Location"
                         visible={fieldVisibility.location !== false}
                         editMode={editMode}
+                        isEmpty={!(formLocation ?? "").trim()}
                         onVisibilityChange={() => toggleFieldVisibility("location")}
                       >
                         {editMode ? (
@@ -4952,6 +4981,7 @@ export default function BookDetailPage() {
                         label="Shelf"
                         visible={fieldVisibility.shelf !== false}
                         editMode={editMode}
+                        isEmpty={!(formShelf ?? "").trim()}
                         onVisibilityChange={() => toggleFieldVisibility("shelf")}
                       >
                         {editMode ? (
