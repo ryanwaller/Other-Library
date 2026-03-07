@@ -871,9 +871,21 @@ function SettingsPageContent() {
       const csvContent = [headers.join(","), ...rows].join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
+      
+      let catalogPart = "catalogs";
+      if (exportSelection.size === 1) {
+        const selectedId = Array.from(exportSelection)[0];
+        const lib = libraries.find(l => l.id === selectedId);
+        if (lib?.name) {
+          catalogPart = lib.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-+|-+$)/g, "");
+        }
+      }
+      const datePart = new Date().toISOString().split('T')[0];
+      const filename = `${profile?.username || "library"}_${catalogPart}_${datePart}.csv`;
+
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `library_export_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
