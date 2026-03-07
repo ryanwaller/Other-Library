@@ -68,6 +68,7 @@ type SearchCandidate = {
   publisher: string | null;
   publish_date: string | null;
   publish_year: number | null;
+  description: string | null;
   subjects: string[];
   isbn10: string | null;
   isbn13: string | null;
@@ -2072,6 +2073,7 @@ function AppShell({
       authors: Array.isArray(preview.authors) ? preview.authors.filter(Boolean) : result.authors,
       publisher: preview.publisher ?? result.publisher ?? null,
       publish_date: preview.publish_date ?? result.publish_date ?? null,
+      description: preview.description ?? result.description ?? null,
       subjects: Array.isArray(preview.subjects) ? preview.subjects.filter(Boolean) : result.subjects,
       cover_url: preview.cover_url ?? result.cover_url ?? null,
       music_metadata: preview.music_metadata ?? result.music_metadata ?? null,
@@ -3096,8 +3098,18 @@ function AppShell({
                       {(result.authors ?? []).filter(Boolean).join(", ") || "—"}
                     </div>
                     <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {[result.publisher ?? "", result.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
+                      {[
+                        result.publisher ?? "",
+                        result.publish_year ? String(result.publish_year) : (result.publish_date ?? ""),
+                        (result.object_type === "music" ? (result.music_metadata as any)?.format : "") ?? "",
+                        (result.object_type === "music" ? (result.music_metadata as any)?.catalog_number : "") ?? ""
+                      ].filter(Boolean).join(" · ") || "—"}
                     </div>
+                    {result.object_type === "music" && (result.subjects ?? []).length > 0 && (
+                      <div className="text-muted" style={{ marginTop: 2, fontSize: "0.9em", opacity: 0.8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {(result.subjects ?? []).slice(0, 5).join(", ")}
+                      </div>
+                    )}
                   </div>
                   <div className="om-lookup-actions">
                     {renderLibraries.length > 1 ? (

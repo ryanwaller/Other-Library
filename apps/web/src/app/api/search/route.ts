@@ -13,6 +13,7 @@ type SearchResult = {
   publisher: string | null;
   publish_date: string | null;
   publish_year: number | null;
+  description: string | null;
   subjects: string[];
   isbn10: string | null;
   isbn13: string | null;
@@ -129,6 +130,7 @@ async function openLibrarySearch(title: string, author: string | null): Promise<
       publisher: typeof publisher === "string" ? publisher : null,
       publish_date,
       publish_year: publishYear,
+      description: null,
       subjects,
       isbn10,
       isbn13,
@@ -191,6 +193,7 @@ async function googleBooksSearch(title: string, author: string | null): Promise<
       publisher: typeof info.publisher === "string" ? info.publisher : null,
       publish_date,
       publish_year,
+      description: null,
       subjects,
       isbn10,
       isbn13,
@@ -262,7 +265,7 @@ async function discogsSearch(params: { title: string | null; author: string | nu
 
   const out: SearchResult[] = [];
   for (const row of results) {
-    const title = String(row?.title ?? "").trim();
+    const rawTitle = String(row?.title ?? "").trim();
     const uri = String(row?.uri ?? "").trim();
     const year = Number.isFinite(Number(row?.year)) ? Number(row.year) : null;
     const thumb = String(row?.cover_image ?? row?.thumb ?? "").trim() || null;
@@ -274,6 +277,15 @@ async function discogsSearch(params: { title: string | null; author: string | nu
     const catno = String(row?.catno ?? "").trim() || null;
     const barcode = params.barcode;
 
+    let displayTitle = rawTitle;
+    let authors = uniqStrings(artistValues);
+
+    if (authors.length === 0 && rawTitle.includes(" - ")) {
+      const [artistPart, ...titleParts] = rawTitle.split(" - ");
+      authors = [artistPart.trim()];
+      displayTitle = titleParts.join(" - ").trim();
+    }
+
     out.push({
       source: "discogs",
       object_type: "music",
@@ -283,17 +295,18 @@ async function discogsSearch(params: { title: string | null; author: string | nu
         discogs_id: row?.id ? String(row.id) : null,
         discogs_master_id: row?.master_id ? String(row.master_id) : null
       },
-      title: title || null,
-      authors: uniqStrings(artistValues),
+      title: displayTitle || null,
+      authors: authors,
       publisher: labelValues[0] ?? null,
       publish_date: year ? `${year}-01-01` : null,
       publish_year: year,
+      description: null,
       subjects: uniqStrings([...genreValues, ...styleValues]),
       isbn10: null,
       isbn13: null,
       cover_url: thumb || null,
       music_metadata: {
-        primary_artist: artistValues[0] ?? null,
+        primary_artist: authors[0] ?? null,
         label: labelValues[0] ?? null,
         release_date: year ? `${year}-01-01` : null,
         original_release_year: year ? String(year) : null,
@@ -317,7 +330,7 @@ async function discogsSearch(params: { title: string | null; author: string | nu
         packaging_type: formatValues.find((value: string) => /gatefold|digipak|box set|sleeve|jewel case/i.test(value)) ?? null,
         track_count: null
       },
-      contributor_entities: artistValues.length > 0 ? { performer: uniqStrings(artistValues) } : null,
+      contributor_entities: authors.length > 0 ? { performer: authors } : null,
       raw: { discogs: row }
     });
   }

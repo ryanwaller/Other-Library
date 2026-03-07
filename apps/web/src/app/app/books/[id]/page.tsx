@@ -115,6 +115,7 @@ type MetadataSearchResult = {
   publisher: string | null;
   publish_date: string | null;
   publish_year: number | null;
+  description: string | null;
   subjects: string[];
   isbn10: string | null;
   isbn13: string | null;
@@ -3592,10 +3593,22 @@ export default function BookDetailPage() {
                                 </div>
                                 <div className="om-lookup-main">
                                   <div>{title}</div>
-                                  <div className="text-muted" style={{ marginTop: 4 }}>
+                                  <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     {authors || "—"}
-                                    {pub ? ` · ${pub}` : ""}
                                   </div>
+                                  <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {[
+                                      r.publisher ?? "",
+                                      r.publish_year ? String(r.publish_year) : (r.publish_date ?? ""),
+                                      (r.object_type === "music" ? (r.music_metadata as any)?.format : "") ?? "",
+                                      (r.object_type === "music" ? (r.music_metadata as any)?.catalog_number : "") ?? ""
+                                    ].filter(Boolean).join(" · ") || "—"}
+                                  </div>
+                                  {r.object_type === "music" && (r.subjects ?? []).length > 0 && (
+                                    <div className="text-muted" style={{ marginTop: 2, fontSize: "0.9em", opacity: 0.8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {(r.subjects ?? []).slice(0, 5).join(", ")}
+                                    </div>
+                                  )}
                                   <div className="text-muted" style={{ marginTop: 4 }}>
                                     {bestIsbn ? `ISBN: ${bestIsbn}` : "No ISBN found"} · {r.source}
                                   </div>

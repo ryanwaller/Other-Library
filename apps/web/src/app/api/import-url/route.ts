@@ -957,7 +957,7 @@ async function fetchDiscogsPreview(url: URL): Promise<ImportMetadata | null> {
     authors: primaryArtist ? [primaryArtist] : [],
     publisher: musicMetadata.label,
     publish_date: musicMetadata.release_date,
-    description: null,
+    description: String(data.notes ?? "").trim() || null,
     subjects: uniqStrings([...(musicMetadata.genres ?? []), ...(musicMetadata.styles ?? [])]),
     cover_url: coverCandidates[0] ?? null,
     cover_candidates: coverCandidates,
