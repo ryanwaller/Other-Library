@@ -2719,29 +2719,34 @@ export default function BookDetailPage() {
 
   async function hydrateDiscogsSearchResult(result: MetadataSearchResult): Promise<MetadataSearchResult> {
     if (result.source_type !== "discogs" || !result.source_url) return result;
-    const res = await fetch("/api/import-url", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url: result.source_url })
-    });
-    const json = await res.json();
-    if (!res.ok || !json?.ok || !json?.preview) return result;
-    const preview = json.preview as any;
-    return {
-      ...result,
-      object_type: preview.object_type === "music" ? "music" : (result.object_type ?? "book"),
-      source_type: preview.source_type ?? result.source_type ?? null,
-      source_url: preview.source_url ?? result.source_url ?? null,
-      external_source_ids: preview.external_source_ids ?? result.external_source_ids ?? null,
-      title: preview.title ?? result.title ?? null,
-      authors: Array.isArray(preview.authors) ? preview.authors.filter(Boolean) : result.authors,
-      publisher: preview.publisher ?? result.publisher ?? null,
-      publish_date: preview.publish_date ?? result.publish_date ?? null,
-      subjects: Array.isArray(preview.subjects) ? preview.subjects.filter(Boolean) : result.subjects,
-      cover_url: preview.cover_url ?? result.cover_url ?? null,
-      music_metadata: preview.music_metadata ?? result.music_metadata ?? null,
-      contributor_entities: preview.contributor_entities ?? result.contributor_entities ?? null
-    };
+    setBusy(true);
+    try {
+      const res = await fetch("/api/import-url", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: result.source_url })
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.ok || !json?.preview) return result;
+      const preview = json.preview as any;
+      return {
+        ...result,
+        object_type: preview.object_type === "music" ? "music" : (result.object_type ?? "book"),
+        source_type: preview.source_type ?? result.source_type ?? null,
+        source_url: preview.source_url ?? result.source_url ?? null,
+        external_source_ids: preview.external_source_ids ?? result.external_source_ids ?? null,
+        title: preview.title ?? result.title ?? null,
+        authors: Array.isArray(preview.authors) ? preview.authors.filter(Boolean) : result.authors,
+        publisher: preview.publisher ?? result.publisher ?? null,
+        publish_date: preview.publish_date ?? result.publish_date ?? null,
+        subjects: Array.isArray(preview.subjects) ? preview.subjects.filter(Boolean) : result.subjects,
+        cover_url: preview.cover_url ?? result.cover_url ?? null,
+        music_metadata: preview.music_metadata ?? result.music_metadata ?? null,
+        contributor_entities: preview.contributor_entities ?? result.contributor_entities ?? null
+      };
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function previewImportFromIsbn(isbn: string): Promise<boolean> {
@@ -3326,14 +3331,16 @@ export default function BookDetailPage() {
                       ) : (
                         <>
                           <button onClick={doneEditMode} disabled={busy || saveState.busy}>
-                            {saveState.busy ? "Saving..." : "Save"}
+                            {saveState.busy ? "Saving..." : (busy ? "Loading..." : "Save")}
                           </button>
                           <button onClick={cancelEditMode} disabled={busy || saveState.busy} className="text-muted">Cancel</button>
                           <button onClick={() => setDeleteConfirm(true)} disabled={busy || saveState.busy} className="text-muted">Delete</button>
                         </>
                       )
                     ) : (
-                      <button onClick={enterEditMode} disabled={busy}>Edit</button>
+                      <button onClick={enterEditMode} disabled={busy}>
+                        {busy ? "Loading..." : "Edit"}
+                      </button>
                     )}
                     {updatesCount > 0 ? (
                       <button
@@ -3402,7 +3409,7 @@ export default function BookDetailPage() {
                   : mergeUndoSnapshot
                     ? <button onClick={() => void undoMerge()} disabled={mergeState.busy} className="text-muted">Undo merge</button>
                     : busy
-                        ? "Loading…"
+                        ? ""
                         : error
                           ? error
                           : ""}
