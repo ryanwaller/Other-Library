@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, Fragment, type KeyboardEvent, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
 import { isValidTrimSize, convertTrimUnit, formatTrimRatio, type TrimUnit } from "../../../../lib/trimSize";
@@ -398,10 +398,15 @@ function FacetLinks(props: { role: FacetRole; items: EntityRef[] }) {
   return (
     <span>
       {items.map((e, idx) => (
-        <span key={e.id}>
-          <Link href={facetHref(role, e.name, e.slug)}>{e.name}</Link>
+        <Fragment key={e.id}>
+          <Link 
+            href={facetHref(role, e.name, e.slug)}
+            style={{ textDecoration: "none" }}
+          >
+            {e.name}
+          </Link>
           {idx < items.length - 1 ? ", " : ""}
-        </span>
+        </Fragment>
       ))}
     </span>
   );
@@ -4189,7 +4194,7 @@ export default function BookDetailPage() {
                       {editMode ? (
                         <input className="om-inline-control" value={formMusic.release_date ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, release_date: e.target.value || null }))} placeholder="Add release date" />
                       ) : (
-                        <Link href={musicValueHref(effectiveMusic.release_date ?? "")}>
+                        <Link href={musicValueHref(effectiveMusic.release_date ?? "")} style={{ textDecoration: "none" }}>
                           {formatDateShort(effectiveMusic.release_date || null)}
                         </Link>
                       )}
@@ -4205,7 +4210,7 @@ export default function BookDetailPage() {
                       {editMode ? (
                         <input className="om-inline-control" value={formMusic.original_release_year ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, original_release_year: e.target.value || null }))} placeholder="Add year" />
                       ) : (
-                        <Link href={musicValueHref(effectiveMusic.original_release_year ?? "")}>
+                        <Link href={musicValueHref(effectiveMusic.original_release_year ?? "")} style={{ textDecoration: "none" }}>
                           {effectiveMusic.original_release_year}
                         </Link>
                       )}
@@ -4267,7 +4272,7 @@ export default function BookDetailPage() {
                               />
                             )
                           ) : (
-                            <Link href={musicValueHref(String((effectiveMusic as any)[k] ?? ""))}>
+                            <Link href={musicValueHref(String((effectiveMusic as any)[k] ?? ""))} style={{ textDecoration: "none" }}>
                               {String((effectiveMusic as any)[k] ?? "")}
                             </Link>
                           )}
@@ -4291,7 +4296,7 @@ export default function BookDetailPage() {
                           onChange={(e) => setFormMusic((s) => ({ ...s, disc_count: e.target.value ? Number(e.target.value) : null }))}
                         />
                       ) : (
-                        <Link href={musicValueHref(String(effectiveMusic.disc_count ?? ""))}>
+                        <Link href={musicValueHref(String(effectiveMusic.disc_count ?? ""))} style={{ textDecoration: "none" }}>
                           {effectiveMusic.disc_count}
                         </Link>
                       )}
@@ -4320,7 +4325,7 @@ export default function BookDetailPage() {
                           <option value="no">no</option>
                         </select>
                       ) : effectiveMusic.limited_edition === null ? null : effectiveMusic.limited_edition ? (
-                        <Link href={musicValueHref("limited")}>yes</Link>
+                        <Link href={musicValueHref("limited")} style={{ textDecoration: "none" }}>yes</Link>
                       ) : (
                         "no"
                       )}
@@ -4349,9 +4354,9 @@ export default function BookDetailPage() {
                           <option value="yes">Yes (reissue)</option>
                         </select>
                       ) : effectiveMusic.reissue === null ? null : effectiveMusic.reissue ? (
-                        <Link href={musicValueHref("reissue")}>Yes (reissue)</Link>
+                        <Link href={musicValueHref("reissue")} style={{ textDecoration: "none" }}>Yes (reissue)</Link>
                       ) : (
-                        <Link href={musicValueHref("original release")}>No (original release)</Link>
+                        <Link href={musicValueHref("original release")} style={{ textDecoration: "none" }}>No (original release)</Link>
                       )}
                     </MetadataRow>
 
@@ -4376,7 +4381,7 @@ export default function BookDetailPage() {
                         <span>
                           {musicGenres.map((value, index, arr) => (
                             <span key={value}>
-                              <Link href={musicValueHref(value, "subject")}>{value}</Link>
+                              <Link href={musicValueHref(value, "subject")} style={{ textDecoration: "none" }}>{value}</Link>
                               {index < arr.length - 1 ? ", " : ""}
                             </span>
                           ))}
@@ -4415,7 +4420,7 @@ export default function BookDetailPage() {
                             <div key={`${track.position ?? ""}-${track.title}-${index}`} className="row om-row-baseline" style={{ gap: "var(--space-sm)" }}>
                               {track.position ? <div className="text-muted" style={{ minWidth: 32 }}>{track.position}</div> : null}
                               <div style={{ flex: "1 1 auto" }}>
-                                <Link href={musicValueHref(track.title)}>{track.title}</Link>
+                                <Link href={musicValueHref(track.title)} style={{ textDecoration: "none" }}>{track.title}</Link>
                               </div>
                               {track.duration ? <div className="text-muted">{track.duration}</div> : null}
                             </div>
@@ -4538,7 +4543,7 @@ export default function BookDetailPage() {
                       {editMode ? (
                         <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="YYYY-MM-DD" />
                       ) : (
-                        <Link href={`/app?q=${encodeURIComponent(displayPublishDate)}`}>{displayPublishDate}</Link>
+                        <Link href={`/app?q=${encodeURIComponent(displayPublishDate)}`} style={{ textDecoration: "none" }}>{displayPublishDate}</Link>
                       )}
                     </MetadataRow>
 
@@ -4617,7 +4622,7 @@ export default function BookDetailPage() {
                       {formDecade && !DECADE_OPTIONS.includes(formDecade) ? <option value={formDecade}>{formDecade}</option> : null}
                     </select>
                   ) : (
-                    <Link href={`/app?decade=${encodeURIComponent((book?.decade ?? "").trim())}`}>
+                    <Link href={`/app?decade=${encodeURIComponent((book?.decade ?? "").trim())}`} style={{ textDecoration: "none" }}>
                       {(book?.decade ?? "").trim()}
                     </Link>
                   )}
