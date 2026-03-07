@@ -52,7 +52,7 @@ export default function RotatingHintInput(props: {
   const showHint = !value && !focused;
 
   return (
-    <div style={{ position: "relative", width: "100%", display: "flex", alignItems: "center" }}>
+    <div style={{ position: "relative", width: "100%" }}>
       <input
         {...props}
         placeholder="" // Hide native placeholder
@@ -70,9 +70,9 @@ export default function RotatingHintInput(props: {
         <div
           style={{
             position: "absolute",
-            left: 13,
-            top: "50%",
-            transform: `translateY(calc(-50% + ${translateY}px))`,
+            left: 0,
+            bottom: 9, // Match input padding-bottom
+            transform: `translateY(${translateY}px)`,
             pointerEvents: "none",
             color: "var(--text-muted)",
             opacity: opacity * 0.6,
@@ -82,7 +82,8 @@ export default function RotatingHintInput(props: {
             textOverflow: "ellipsis",
             maxWidth: "calc(100% - 20px)",
             fontSize: "inherit",
-            fontFamily: "inherit"
+            fontFamily: "inherit",
+            lineHeight: "inherit"
           }}
         >
           {ADD_PROMPTS[index]}
