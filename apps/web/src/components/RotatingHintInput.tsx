@@ -36,7 +36,7 @@ export default function RotatingHintInput(props: {
         // Change text while invisible
         setIndex((prev) => (prev + 1) % ADD_PROMPTS.length);
         // Reset position to slightly below
-        setTranslateY(4);
+        setTranslateY(3);
         
         // Phase 2: Fade in and move to center
         setTimeout(() => {
@@ -71,7 +71,7 @@ export default function RotatingHintInput(props: {
           style={{
             position: "absolute",
             left: 0,
-            bottom: 9, // Match input padding-bottom
+            bottom: 10, // Nudged up from 9 to 10 for better mobile alignment
             transform: `translateY(${translateY}px)`,
             pointerEvents: "none",
             color: "var(--text-muted)",
