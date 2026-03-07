@@ -42,9 +42,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ username: strin
     );
     if (sharedCatalogIds.length === 0) return NextResponse.json({ ok: true, books: [], libraries: [], signed_map: {} });
 
-    const librariesRes = await admin.from("libraries").select("id,name").in("id", sharedCatalogIds);
+    const librariesRes = await admin.from("libraries").select("id,name,sort_order").in("id", sharedCatalogIds);
     const libraries = ((librariesRes.error ? [] : librariesRes.data) ?? [])
-      .map((l: any) => ({ id: Number(l.id), name: String(l.name ?? `Catalog ${l.id}`), member_previews: [] as Array<{ user_id: string; username: string; avatar_url: string | null }> }))
+      .map((l: any) => ({
+        id: Number(l.id),
+        name: String(l.name ?? `Catalog ${l.id}`),
+        sort_order: Number.isFinite(Number(l.sort_order)) ? Number(l.sort_order) : null,
+        member_previews: [] as Array<{ user_id: string; username: string; avatar_url: string | null }>
+      }))
       .filter((l: any) => Number.isFinite(l.id) && l.id > 0);
 
     const membersRes = await admin

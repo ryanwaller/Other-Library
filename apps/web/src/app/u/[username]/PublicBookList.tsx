@@ -206,6 +206,7 @@ export default function PublicBookList({
         ? (((json as any).libraries as any[]).map((l) => ({
             id: Number(l.id),
             name: String(l.name ?? ""),
+            sort_order: Number.isFinite(Number(l.sort_order)) ? Number(l.sort_order) : null,
             memberPreviews: Array.isArray(l.member_previews)
               ? (l.member_previews as any[])
                   .map((m) => ({
@@ -431,7 +432,7 @@ export default function PublicBookList({
       byId.set(id, {
         id,
         name: String(l.name ?? `Catalog ${id}`),
-        sort_order: l.sort_order ?? null,
+        sort_order: l.sort_order ?? existing?.sort_order ?? null,
         memberPreviews: (l as any).memberPreviews ?? existing?.memberPreviews ?? []
       });
     }
