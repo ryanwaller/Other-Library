@@ -766,7 +766,7 @@ function AppShell({
   }
 
   async function handleDrop(e: React.DragEvent, targetKey: string, targetLibId: number) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const finalItems = [...items];
     const sourceKey = draggedItemKey;
     const libId = draggedItemLibId;
