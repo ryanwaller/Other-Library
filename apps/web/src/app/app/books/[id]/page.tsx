@@ -330,25 +330,28 @@ function FieldVisibilityToggle(props: {
   disabled?: boolean;
 }) {
   const { visible, onChange, disabled } = props;
-  if (disabled) return <div style={{ width: 24 }} />;
+  if (disabled) return <div style={{ width: 32 }} />;
   return (
     <button
       type="button"
       onMouseDown={(e) => {
         e.preventDefault();
+        e.stopPropagation();
         onChange(!visible);
       }}
       style={{
         background: "none",
         border: "none",
-        padding: "0 4px",
+        padding: "0",
         cursor: "pointer",
-        fontSize: "1.1em",
-        opacity: visible ? 1 : 0.5,
+        fontSize: "1.2em",
+        opacity: visible ? 1 : 0.4,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        width: 24
+        width: 32,
+        height: 32,
+        borderRadius: "4px"
       }}
       title={visible ? "Visible publicly" : "Hidden from public view"}
     >
@@ -376,11 +379,6 @@ function MetadataRow(props: {
       <div style={{ minWidth: 110 }} className="text-muted">{label}</div>
       <div style={{ flex: "1 1 auto", minWidth: 0 }}>
         {children}
-        {editMode && !visible && (
-          <div className="text-muted" style={{ fontSize: "0.8em", marginTop: 2 }}>
-            Hidden from public view
-          </div>
-        )}
       </div>
       {editMode && (
         <div style={{ marginLeft: "var(--space-sm)" }}>
