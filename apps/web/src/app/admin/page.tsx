@@ -7,7 +7,7 @@ import type { Session } from "@supabase/supabase-js";
 import SignInCard from "../components/SignInCard";
 import { supabase } from "../../lib/supabaseClient";
 import { formatDateShort } from "../../lib/formatDate";
-import AdminFeedbackBoard from "./AdminFeedbackBoard";
+import AdminFeedbackBoard, { type FeedbackMetrics } from "./AdminFeedbackBoard";
 import usePageTitle from "../../hooks/usePageTitle";
 
 type ProfileRow = {
@@ -207,6 +207,8 @@ function AdminPageInner() {
   const [invitesPage, setInvitesPage] = useState(1);
   const [invitesPageSize, setInvitesPageSize] = useState(20);
   const [invitesData, setInvitesData] = useState<InvitesResponse | null>(null);
+  const [feedbackMetrics, setFeedbackMetrics] = useState<FeedbackMetrics>({ new: 0, reviewing: 0, resolved: 0, wont_fix: 0 });
+  const [feedbackRefreshToken, setFeedbackRefreshToken] = useState(0);
 
   usePageTitle(
     tab === "waitlist"
@@ -434,13 +436,21 @@ function AdminPageInner() {
         { label: "Approved", value: waitlistData?.metrics.approved ?? 0 }
       ];
     }
+    if (tab === "feedback") {
+      return [
+        { label: "New", value: feedbackMetrics.new },
+        { label: "Reviewing", value: feedbackMetrics.reviewing },
+        { label: "Resolved", value: feedbackMetrics.resolved },
+        { label: "Won't fix", value: feedbackMetrics.wont_fix }
+      ];
+    }
     return [
       { label: "Total", value: invitesData?.metrics.total ?? 0 },
       { label: "Pending", value: invitesData?.metrics.pending ?? 0 },
       { label: "Used", value: invitesData?.metrics.used ?? 0 },
       { label: "Expired", value: invitesData?.metrics.expired ?? 0 }
     ];
-  }, [tab, usersMetrics, waitlistData?.metrics, invitesData?.metrics]);
+  }, [tab, usersMetrics, waitlistData?.metrics, invitesData?.metrics, feedbackMetrics]);
 
   function resultLabel(page: number, totalPages: number, total: number): string {
     if (totalPages > 1) return `Results ${total} Page ${page} / ${totalPages}`;
@@ -477,6 +487,7 @@ function AdminPageInner() {
                 if (tab === "users") refreshUsers();
                 if (tab === "waitlist") refreshWaitlist();
                 if (tab === "invites") refreshInvites();
+                if (tab === "feedback") setFeedbackRefreshToken((prev) => prev + 1);
               }}
               disabled={busy}
             >
@@ -742,7 +753,13 @@ function AdminPageInner() {
             </div>
           ) : null}
 
-          {tab === "feedback" ? <AdminFeedbackBoard token={token} /> : null}
+          {tab === "feedback" ? (
+            <AdminFeedbackBoard
+              token={token}
+              refreshToken={feedbackRefreshToken}
+              onMetricsChange={setFeedbackMetrics}
+            />
+          ) : null}
 
           {tab !== "feedback" ? (
           <div className="om-list" style={{ marginTop: searchOpen ? 0 : "var(--space-lg)" }}>

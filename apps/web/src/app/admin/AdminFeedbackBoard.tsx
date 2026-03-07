@@ -6,6 +6,7 @@ type FeedbackStatus = "new" | "reviewing" | "resolved" | "wont_fix";
 type FeedbackStatusAction = FeedbackStatus | "delete";
 type FeedbackCategory = "bug" | "feels_wrong" | "feature_idea" | "spacing_issue" | "other";
 type FeedbackDeviceType = "desktop" | "mobile" | "tablet" | "unknown";
+export type FeedbackMetrics = Record<FeedbackStatus, number>;
 
 type FeedbackRow = {
   id: string;
@@ -73,7 +74,25 @@ function deviceLabel(deviceType: FeedbackRow["device_type"]): string {
   return "Unknown";
 }
 
-export default function AdminFeedbackBoard({ token }: { token: string }) {
+function countMetrics(rows: FeedbackRow[]): FeedbackMetrics {
+  return rows.reduce<FeedbackMetrics>(
+    (acc, row) => {
+      acc[row.status] += 1;
+      return acc;
+    },
+    { new: 0, reviewing: 0, resolved: 0, wont_fix: 0 }
+  );
+}
+
+export default function AdminFeedbackBoard({
+  token,
+  refreshToken = 0,
+  onMetricsChange
+}: {
+  token: string;
+  refreshToken?: number;
+  onMetricsChange?: (metrics: FeedbackMetrics) => void;
+}) {
   const [statusFilter, setStatusFilter] = useState<"all" | FeedbackStatus>("all");
   const [categoryFilter, setCategoryFilter] = useState<"all" | FeedbackCategory>("all");
   const [pageFilter, setPageFilter] = useState<string>("all");
@@ -83,6 +102,21 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
   const [rows, setRows] = useState<FeedbackRow[]>([]);
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  async function loadMetrics() {
+    if (!token) return;
+    const params = new URLSearchParams();
+    params.set("status", "all");
+    params.set("category", "all");
+    const res = await fetch(`/api/admin/feedback?${params.toString()}`, {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` }
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(String((json as any)?.error ?? "feedback_metrics_failed"));
+    const data = Array.isArray((json as any)?.feedback) ? ((json as any).feedback as FeedbackRow[]) : [];
+    onMetricsChange?.(countMetrics(data));
+  }
 
   async function load() {
     if (!token) return;
@@ -101,9 +135,11 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
       const data = Array.isArray((json as any)?.feedback) ? ((json as any).feedback as FeedbackRow[]) : [];
       setRows(data);
       setNotesDraft(Object.fromEntries(data.map((r) => [r.id, String(r.admin_notes ?? "")])));
+      await loadMetrics();
     } catch (e: any) {
       setError(e?.message ?? "Failed to load feedback");
       setRows([]);
+      onMetricsChange?.({ new: 0, reviewing: 0, resolved: 0, wont_fix: 0 });
     } finally {
       setBusy(false);
     }
@@ -112,7 +148,7 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, statusFilter, categoryFilter]);
+  }, [token, statusFilter, categoryFilter, refreshToken]);
 
   async function patchRow(id: string, patch: Partial<Pick<FeedbackRow, "status" | "admin_notes">>) {
     const res = await fetch(`/api/admin/feedback/${encodeURIComponent(id)}`, {
@@ -217,14 +253,14 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
         {statusFilter === "all" ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(300px, 1fr))", gap: "var(--space-md)" }}>
               {STATUSES.map((col) => (
-                <div key={col.key} className="card" style={{ minHeight: 220 }}>
+                <div key={col.key} className="card om-feedback-card om-feedback-column" data-status={col.key} style={{ minHeight: 220 }}>
                   <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
                     <div>{col.label}</div>
                     <span className="text-muted">{grouped[col.key].length}</span>
                   </div>
                   <div style={{ marginTop: "var(--space-md)", display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
                     {grouped[col.key].map((row) => (
-                      <div key={row.id} style={{ border: "1px solid var(--border)", padding: "var(--space-sm)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
+                      <div key={row.id} className="om-feedback-card" data-status={row.status} style={{ padding: "var(--space-sm)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
                         <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-8)" }}>
                           <div className="om-avatar-lockup" style={{ minWidth: 0 }}>
                             {row.avatar_url ? (
@@ -251,7 +287,7 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
                             {deviceLabel(row.device_type)}
                           </span>
                         </div>
-                        <div style={{ borderTop: "1px solid var(--border)", marginTop: "var(--space-8)" }} />
+                        <div className="om-feedback-divider" style={{ marginTop: "var(--space-8)" }} />
                         {row.element_context ? <div className="text-muted">{row.element_context}</div> : null}
                         <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{row.message}</div>
                         {row.screenshot_url ? (
@@ -261,11 +297,11 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
                             style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" }}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={row.screenshot_url} alt="" style={{ width: 88, height: 88, objectFit: "cover", border: "1px solid var(--border)" }} />
+                            <img src={row.screenshot_url} alt="" className="om-feedback-thumb" style={{ width: 88, height: 88, objectFit: "cover" }} />
                           </button>
                         ) : null}
 
-                        <div style={{ borderTop: "1px solid var(--border)", marginTop: "var(--space-8)" }} />
+                        <div className="om-feedback-divider" style={{ marginTop: "var(--space-8)" }} />
                         <input
                           value={notesDraft[row.id] ?? ""}
                           onChange={(e) => setNotesDraft((prev) => ({ ...prev, [row.id]: e.target.value }))}
@@ -275,6 +311,7 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
                             setRows((prev) => prev.map((x) => (x.id === row.id ? { ...x, admin_notes: value } : x)));
                             try {
                               await patchRow(row.id, { admin_notes: value });
+                              await loadMetrics();
                             } catch {
                               void load();
                             }
@@ -294,6 +331,7 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
                               setRows((curr) => curr.filter((x) => x.id !== row.id));
                               try {
                                 await deleteRow(row.id);
+                                await loadMetrics();
                               } catch {
                                 setRows(prev);
                                 void load();
@@ -303,6 +341,7 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
                             setRows((prev) => prev.map((x) => (x.id === row.id ? { ...x, status: next } : x)));
                             try {
                               await patchRow(row.id, { status: next });
+                              await loadMetrics();
                             } catch {
                               void load();
                             }
@@ -325,7 +364,7 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
         ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(300px, 1fr))", gap: "var(--space-md)" }}>
             {focusedRows.map((row) => (
-              <div key={row.id} style={{ border: "1px solid var(--border)", padding: "var(--space-sm)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
+              <div key={row.id} className="om-feedback-card" data-status={row.status} style={{ padding: "var(--space-sm)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-8)" }}>
                   <div className="om-avatar-lockup" style={{ minWidth: 0 }}>
                     {row.avatar_url ? (
@@ -352,7 +391,7 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
                     {deviceLabel(row.device_type)}
                   </span>
                 </div>
-                <div style={{ borderTop: "1px solid var(--border)", marginTop: "var(--space-8)" }} />
+                <div className="om-feedback-divider" style={{ marginTop: "var(--space-8)" }} />
                 {row.element_context ? <div className="text-muted">{row.element_context}</div> : null}
                 <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{row.message}</div>
                 {row.screenshot_url ? (
@@ -362,11 +401,11 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
                     style={{ border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" }}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={row.screenshot_url} alt="" style={{ width: 88, height: 88, objectFit: "cover", border: "1px solid var(--border)" }} />
+                    <img src={row.screenshot_url} alt="" className="om-feedback-thumb" style={{ width: 88, height: 88, objectFit: "cover" }} />
                   </button>
                 ) : null}
 
-                <div style={{ borderTop: "1px solid var(--border)", marginTop: "var(--space-8)" }} />
+                <div className="om-feedback-divider" style={{ marginTop: "var(--space-8)" }} />
                 <input
                   value={notesDraft[row.id] ?? ""}
                   onChange={(e) => setNotesDraft((prev) => ({ ...prev, [row.id]: e.target.value }))}
@@ -376,6 +415,7 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
                     setRows((prev) => prev.map((x) => (x.id === row.id ? { ...x, admin_notes: value } : x)));
                     try {
                       await patchRow(row.id, { admin_notes: value });
+                      await loadMetrics();
                     } catch {
                       void load();
                     }
@@ -395,6 +435,7 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
                       setRows((curr) => curr.filter((x) => x.id !== row.id));
                       try {
                         await deleteRow(row.id);
+                        await loadMetrics();
                       } catch {
                         setRows(prev);
                         void load();
@@ -404,6 +445,7 @@ export default function AdminFeedbackBoard({ token }: { token: string }) {
                     setRows((prev) => prev.map((x) => (x.id === row.id ? { ...x, status: next } : x)));
                     try {
                       await patchRow(row.id, { status: next });
+                      await loadMetrics();
                     } catch {
                       void load();
                     }

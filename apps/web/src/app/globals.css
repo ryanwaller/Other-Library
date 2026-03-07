@@ -39,6 +39,9 @@
   --bg-muted: var(--placeholder-bg);
 
   --border-avatar: #e0e0e0;
+  --feedback-status-new: #c14a5f;
+  --feedback-status-reviewing: #3f9b69;
+  --feedback-status-neutral: #a8a8af;
 
   --space-xs: 4px;
   --space-sm: 6px;
@@ -68,6 +71,9 @@
     --bg-muted: var(--placeholder-bg);
 
     --border-avatar: #2a2a2e;
+    --feedback-status-new: #d85b72;
+    --feedback-status-reviewing: #58b47f;
+    --feedback-status-neutral: #62626b;
 
     --space-xs: 4px;
     --space-sm: 6px;
@@ -273,6 +279,50 @@ button.muted:focus-visible {
   display: inline;
   line-height: inherit;
   white-space: normal;
+}
+
+.om-feedback-card {
+  border: 1px solid var(--border);
+  color: var(--fg);
+}
+
+.om-feedback-card[data-status="new"] {
+  border-color: var(--feedback-status-new);
+  color: var(--feedback-status-new);
+}
+
+.om-feedback-card[data-status="reviewing"] {
+  border-color: var(--feedback-status-reviewing);
+  color: var(--feedback-status-reviewing);
+}
+
+.om-feedback-card[data-status="resolved"],
+.om-feedback-card[data-status="wont_fix"] {
+  border-color: var(--feedback-status-neutral);
+  color: var(--feedback-status-neutral);
+}
+
+.om-feedback-card .text-muted {
+  color: currentColor !important;
+  opacity: 0.82;
+}
+
+.om-feedback-card .om-filter-control {
+  color: currentColor;
+  border-color: currentColor !important;
+}
+
+.om-feedback-card .om-filter-control option {
+  color: var(--fg);
+}
+
+.om-feedback-divider {
+  border-top: 1px solid currentColor;
+  opacity: 0.4;
+}
+
+.om-feedback-thumb {
+  border: 1px solid currentColor;
 }
 
 .om-cover-slot {
