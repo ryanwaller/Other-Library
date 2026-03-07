@@ -56,6 +56,98 @@ function looksLikeBarcode(input: string): boolean {
   return /^\d{12,14}$/.test(digits);
 }
 
+const ADD_PROMPTS = [
+  "Add by ISBN",
+  "Add by URL",
+  "Add by title and author",
+  "Add by artist and album",
+  "Add by Discogs link"
+];
+
+function RotatingHintInput(props: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  style?: React.CSSProperties;
+  className?: string;
+  autoFocus?: boolean;
+}) {
+  const { value, onChange, onFocus, onBlur, onKeyDown, style, className, autoFocus } = props;
+  const [index, setIndex] = useState(0);
+  const [focused, setFocused] = useState(false);
+  const [opacity, setOpacity] = useState(1);
+  const [translateY, setTranslateY] = useState(0);
+
+  useEffect(() => {
+    if (focused || value) return;
+    
+    const timer = setInterval(() => {
+      // Phase 1: Fade out and move up slightly
+      setOpacity(0);
+      setTranslateY(-4);
+      
+      setTimeout(() => {
+        // Change text while invisible
+        setIndex((prev) => (prev + 1) % ADD_PROMPTS.length);
+        // Reset position to slightly below
+        setTranslateY(4);
+        
+        // Phase 2: Fade in and move to center
+        setTimeout(() => {
+          setOpacity(1);
+          setTranslateY(0);
+        }, 50);
+      }, 300);
+    }, 3000);
+
+    return () => clearInterval(timer);
+  }, [focused, value]);
+
+  const showHint = !value && !focused;
+
+  return (
+    <div style={{ position: "relative", width: "100%", display: "flex", alignItems: "center" }}>
+      <input
+        {...props}
+        placeholder="" // Hide native placeholder
+        onFocus={(e) => {
+          setFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          onBlur?.(e);
+        }}
+        style={{ ...style, width: "100%" }}
+      />
+      {showHint && (
+        <div
+          style={{
+            position: "absolute",
+            left: 13,
+            top: "50%",
+            transform: `translateY(calc(-50% + ${translateY}px))`,
+            pointerEvents: "none",
+            color: "var(--text-muted)",
+            opacity: opacity * 0.6,
+            transition: "opacity 0.3s ease, transform 0.3s ease",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            maxWidth: "calc(100% - 20px)",
+            fontSize: "inherit",
+            fontFamily: "inherit"
+          }}
+        >
+          {ADD_PROMPTS[index]}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type SearchCandidate = {
   source: "openlibrary" | "googleBooks" | "discogs";
   object_type?: "book" | "music" | null;
@@ -3243,8 +3335,7 @@ function AppShell({
                 </div>
               )}
               <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                <input
-                  placeholder="Add ISBN, URL, or title/author"
+                <RotatingHintInput
                   value={addInput}
                   onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); }}
                   onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
@@ -3317,8 +3408,7 @@ function AppShell({
                 </div>
               )}
               <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                <input
-                  placeholder={showScan ? "enter ISBN…" : "Add by ISBN, URL, or title/author"}
+                <RotatingHintInput
                   value={addInput}
                   onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); }}
                   onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
