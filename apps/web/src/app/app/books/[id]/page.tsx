@@ -10,6 +10,7 @@ import { bookIdSlug } from "../../../../lib/slug";
 import { formatDateShort } from "../../../../lib/formatDate";
 import { DECADE_OPTIONS } from "../../../../lib/decades";
 import { loadBookNavContext, type BookNavContext } from "../../../../lib/bookNav";
+import { detailFilterHref, type DetailFilterKey } from "../../../../lib/detailFilters";
 import {
   emptyMusicMetadata,
   formatMusicTrackLine,
@@ -316,12 +317,8 @@ function musicRoleLabel(role: string): string {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
-function musicValueHref(value: string, kind: "q" | "publisher" | "subject" = "q"): string {
-  const next = value.trim();
-  if (!next) return "/app";
-  if (kind === "publisher") return `/app?publisher=${encodeURIComponent(next)}`;
-  if (kind === "subject") return `/app?subject=${encodeURIComponent(next)}`;
-  return `/app?q=${encodeURIComponent(next)}`;
+function musicValueHref(value: string, key: DetailFilterKey = "q"): string {
+  return detailFilterHref("/app", key, value);
 }
 
 function FieldVisibilityToggle(props: { 
@@ -4159,7 +4156,7 @@ export default function BookDetailPage() {
                           {editMode ? (
                             <input className="om-inline-control" value={formMusic.release_date ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, release_date: e.target.value || null }))} placeholder="Add release date" />
                           ) : (
-                            <Link href={musicValueHref(effectiveMusic.release_date ?? "")} style={{ textDecoration: "none" }}>
+                            <Link href={musicValueHref(effectiveMusic.release_date ?? "", "release_date")} style={{ textDecoration: "none" }}>
                               {formatDateShort(effectiveMusic.release_date || null)}
                             </Link>
                           )}
@@ -4179,7 +4176,7 @@ export default function BookDetailPage() {
                           {editMode ? (
                             <input className="om-inline-control" value={formMusic.original_release_year ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, original_release_year: e.target.value || null }))} placeholder="Add year" />
                           ) : (
-                            <Link href={musicValueHref(effectiveMusic.original_release_year ?? "")} style={{ textDecoration: "none" }}>
+                            <Link href={musicValueHref(effectiveMusic.original_release_year ?? "", "original_release_year")} style={{ textDecoration: "none" }}>
                               {effectiveMusic.original_release_year}
                             </Link>
                           )}
@@ -4193,20 +4190,21 @@ export default function BookDetailPage() {
                     )}
 
                     {[
-                      ["Format", "format", "select", true],
-                      ["Release type", "release_type", "select", false],
-                      ["Pressing", "edition_pressing", "text", false],
-                      ["Catalog #", "catalog_number", "text", false],
-                      ["Barcode", "barcode", "text", false],
-                      ["Country", "country", "text", false],
-                      ["Discogs ID", "discogs_id", "text", false],
-                      ["MusicBrainz ID", "musicbrainz_id", "text", false],
-                      ["Speed", "speed", "select", false],
-                      ["Channels", "channels", "select", false],
-                      ["Color / variant", "color_variant", "text", false],
-                      ["Packaging type", "packaging_type", "text", false]
-                    ].map(([label, key, inputKind, protectedField]) => {
+                      ["Format", "format", "format", "select", true],
+                      ["Release type", "release_type", "release_type", "select", false],
+                      ["Pressing", "edition_pressing", "pressing", "text", false],
+                      ["Catalog #", "catalog_number", "catalog_number", "text", false],
+                      ["Barcode", "barcode", "barcode", "text", false],
+                      ["Country", "country", "country", "text", false],
+                      ["Discogs ID", "discogs_id", "discogs_id", "text", false],
+                      ["MusicBrainz ID", "musicbrainz_id", "musicbrainz_id", "text", false],
+                      ["Speed", "speed", "speed", "select", false],
+                      ["Channels", "channels", "channels", "select", false],
+                      ["Color / variant", "color_variant", "q", "text", false],
+                      ["Packaging type", "packaging_type", "q", "text", false]
+                    ].map(([label, key, filterKey, inputKind, protectedField]) => {
                       const k = key as string;
+                      const fk = filterKey as DetailFilterKey;
                       const pf = protectedField as boolean;
                       const val = (effectiveMusic as any)[k];
                       const empty = val === null || val === undefined || String(val).trim() === "";
@@ -4245,7 +4243,7 @@ export default function BookDetailPage() {
                                 />
                               )
                             ) : (
-                              <Link href={musicValueHref(String((effectiveMusic as any)[k] ?? ""))} style={{ textDecoration: "none" }}>
+                              <Link href={musicValueHref(String((effectiveMusic as any)[k] ?? ""), fk)} style={{ textDecoration: "none" }}>
                                 {String((effectiveMusic as any)[k] ?? "")}
                               </Link>
                             )}
@@ -4272,7 +4270,7 @@ export default function BookDetailPage() {
                               onChange={(e) => setFormMusic((s) => ({ ...s, disc_count: e.target.value ? Number(e.target.value) : null }))}
                             />
                           ) : (
-                            <Link href={musicValueHref(String(effectiveMusic.disc_count ?? ""))} style={{ textDecoration: "none" }}>
+                            <Link href={musicValueHref(String(effectiveMusic.disc_count ?? ""), "disc_count")} style={{ textDecoration: "none" }}>
                               {effectiveMusic.disc_count}
                             </Link>
                           )}
@@ -4305,7 +4303,7 @@ export default function BookDetailPage() {
                               <option value="no">no</option>
                             </select>
                           ) : effectiveMusic.limited_edition ? (
-                            <Link href={musicValueHref("limited")} style={{ textDecoration: "none" }}>yes</Link>
+                            <Link href={musicValueHref("yes", "limited_edition")} style={{ textDecoration: "none" }}>yes</Link>
                           ) : (
                             "no"
                           )}
@@ -4338,9 +4336,9 @@ export default function BookDetailPage() {
                               <option value="yes">Yes (reissue)</option>
                             </select>
                           ) : effectiveMusic.reissue === null ? null : effectiveMusic.reissue ? (
-                            <Link href={musicValueHref("reissue")} style={{ textDecoration: "none" }}>Yes (reissue)</Link>
+                            <Link href={musicValueHref("reissue", "reissue")} style={{ textDecoration: "none" }}>Yes (reissue)</Link>
                           ) : (
-                            <Link href={musicValueHref("original release")} style={{ textDecoration: "none" }}>No (original release)</Link>
+                            <Link href={musicValueHref("original release", "reissue")} style={{ textDecoration: "none" }}>No (original release)</Link>
                           )}
                         </div>
                         {editMode && (
@@ -4559,7 +4557,7 @@ export default function BookDetailPage() {
                           {editMode ? (
                             <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="YYYY-MM-DD" />
                           ) : (
-                            <Link href={`/app?q=${encodeURIComponent(displayPublishDate)}`} style={{ textDecoration: "none" }}>{displayPublishDate}</Link>
+                            <Link href={detailFilterHref("/app", "publish_date", effectivePublishDate)} style={{ textDecoration: "none" }}>{displayPublishDate}</Link>
                           )}
                         </div>
                         {editMode && (

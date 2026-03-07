@@ -16,7 +16,32 @@ export async function generateMetadata({
   searchParams
 }: {
   params: Promise<{ username: string }>;
-  searchParams: Promise<{ author?: string; tag?: string; subject?: string; category?: string; publisher?: string; decade?: string; designer?: string; q?: string }>;
+  searchParams: Promise<{
+    author?: string;
+    tag?: string;
+    subject?: string;
+    category?: string;
+    publisher?: string;
+    decade?: string;
+    designer?: string;
+    q?: string;
+    publish_date?: string;
+    release_date?: string;
+    original_release_year?: string;
+    format?: string;
+    release_type?: string;
+    pressing?: string;
+    catalog_number?: string;
+    barcode?: string;
+    country?: string;
+    discogs_id?: string;
+    musicbrainz_id?: string;
+    speed?: string;
+    channels?: string;
+    disc_count?: string;
+    limited_edition?: string;
+    reissue?: string;
+  }>;
 }): Promise<Metadata> {
   const { username } = await params;
   const usernameNorm = (username ?? "").trim().toLowerCase();
@@ -43,7 +68,12 @@ export default async function PublicProfilePage({
   searchParams
 }: { 
   params: Promise<{ username: string }>,
-  searchParams: Promise<{ author?: string; tag?: string; subject?: string; category?: string; publisher?: string; decade?: string; designer?: string; q?: string }>
+  searchParams: Promise<{
+    author?: string; tag?: string; subject?: string; category?: string; publisher?: string; decade?: string; designer?: string; q?: string;
+    publish_date?: string; release_date?: string; original_release_year?: string; format?: string; release_type?: string; pressing?: string;
+    catalog_number?: string; barcode?: string; country?: string; discogs_id?: string; musicbrainz_id?: string; speed?: string; channels?: string;
+    disc_count?: string; limited_edition?: string; reissue?: string;
+  }>
 }) {
   const { username } = await params;
   const rawParams = await searchParams;
@@ -55,6 +85,22 @@ export default async function PublicProfilePage({
   const filterDecade = rawParams.decade ? decodeURIComponent(rawParams.decade) : undefined;
   const filterDesigner = rawParams.designer ? decodeURIComponent(rawParams.designer) : undefined;
   const filterQuery = rawParams.q ? decodeURIComponent(rawParams.q) : undefined;
+  const filterPublishDate = rawParams.publish_date ? decodeURIComponent(rawParams.publish_date) : undefined;
+  const filterReleaseDate = rawParams.release_date ? decodeURIComponent(rawParams.release_date) : undefined;
+  const filterOriginalReleaseYear = rawParams.original_release_year ? decodeURIComponent(rawParams.original_release_year) : undefined;
+  const filterFormat = rawParams.format ? decodeURIComponent(rawParams.format) : undefined;
+  const filterReleaseType = rawParams.release_type ? decodeURIComponent(rawParams.release_type) : undefined;
+  const filterPressing = rawParams.pressing ? decodeURIComponent(rawParams.pressing) : undefined;
+  const filterCatalogNumber = rawParams.catalog_number ? decodeURIComponent(rawParams.catalog_number) : undefined;
+  const filterBarcode = rawParams.barcode ? decodeURIComponent(rawParams.barcode) : undefined;
+  const filterCountry = rawParams.country ? decodeURIComponent(rawParams.country) : undefined;
+  const filterDiscogsId = rawParams.discogs_id ? decodeURIComponent(rawParams.discogs_id) : undefined;
+  const filterMusicbrainzId = rawParams.musicbrainz_id ? decodeURIComponent(rawParams.musicbrainz_id) : undefined;
+  const filterSpeed = rawParams.speed ? decodeURIComponent(rawParams.speed) : undefined;
+  const filterChannels = rawParams.channels ? decodeURIComponent(rawParams.channels) : undefined;
+  const filterDiscCount = rawParams.disc_count ? decodeURIComponent(rawParams.disc_count) : undefined;
+  const filterLimitedEdition = rawParams.limited_edition ? decodeURIComponent(rawParams.limited_edition) : undefined;
+  const filterReissue = rawParams.reissue ? decodeURIComponent(rawParams.reissue) : undefined;
 
   const usernameNorm = (username ?? "").trim().toLowerCase();
   const supabase = getServerSupabase();
@@ -193,11 +239,35 @@ export default async function PublicProfilePage({
             allBooks={visibleBooks}
             username={profile.username}
             profileId={profile.id}
-            signedMap={signedMap}
-            showLibraryBlocks={showLibraryBlocks}
-            initialSearch={filterQuery}
-            initialFilters={{ author: filterAuthor, subject: filterSubject, tag: filterTag, category: filterCategory, publisher: filterPublisher, decade: filterDecade, designer: filterDesigner }}
-          />
+          signedMap={signedMap}
+          showLibraryBlocks={showLibraryBlocks}
+          initialSearch={filterQuery}
+          initialFilters={{
+            author: filterAuthor,
+            subject: filterSubject,
+            tag: filterTag,
+            category: filterCategory,
+            publisher: filterPublisher,
+            decade: filterDecade,
+            designer: filterDesigner,
+            publish_date: filterPublishDate,
+            release_date: filterReleaseDate,
+            original_release_year: filterOriginalReleaseYear,
+            format: filterFormat,
+            release_type: filterReleaseType,
+            pressing: filterPressing,
+            catalog_number: filterCatalogNumber,
+            barcode: filterBarcode,
+            country: filterCountry,
+            discogs_id: filterDiscogsId,
+            musicbrainz_id: filterMusicbrainzId,
+            speed: filterSpeed,
+            channels: filterChannels,
+            disc_count: filterDiscCount,
+            limited_edition: filterLimitedEdition,
+            reissue: filterReissue
+          }}
+        />
         </AddToLibraryProvider>
       </div>
     </main>

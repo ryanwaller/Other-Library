@@ -11,6 +11,7 @@ import type { PublicBook, CatalogGroup } from "../../../lib/types";
 import { supabase } from "../../../lib/supabaseClient";
 import { DECADE_OPTIONS } from "../../../lib/decades";
 import { parseMusicMetadata } from "../../../lib/music";
+import { detailFilterLabel, type DetailFilterKey } from "../../../lib/detailFilters";
 import { 
   effectiveTitleFor, 
   effectiveAuthorsFor, 
@@ -27,11 +28,32 @@ type Props = {
   signedMap: Record<string, string>;
   showLibraryBlocks: boolean;
   initialSearch?: string;
-  initialFilters: { author?: string; tag?: string; category?: string; publisher?: string; decade?: string; subject?: string; designer?: string };
+  initialFilters: Partial<Record<Exclude<DetailFilterKey, "q">, string>>;
 };
 
 type MemberPreview = { userId: string; username: string; avatarUrl: string | null };
 type PublicLibrary = { id: number; name: string; sort_order?: number | null; memberPreviews?: MemberPreview[] };
+const EXTRA_DETAIL_FILTER_KEYS: Exclude<
+  DetailFilterKey,
+  "q" | "author" | "tag" | "category" | "publisher" | "subject" | "designer" | "editor" | "material" | "group" | "decade"
+>[] = [
+  "publish_date",
+  "release_date",
+  "original_release_year",
+  "format",
+  "release_type",
+  "pressing",
+  "catalog_number",
+  "barcode",
+  "country",
+  "discogs_id",
+  "musicbrainz_id",
+  "speed",
+  "channels",
+  "disc_count",
+  "limited_edition",
+  "reissue"
+];
 
 export default function PublicBookList({
   libraries,
@@ -46,6 +68,7 @@ export default function PublicBookList({
   const PUBLIC_GRID_COLS_KEY = "om_public_gridCols";
   const PUBLIC_SORT_MODE_KEY = "om_public_sortMode";
   const [searchQuery, setSearchQuery] = useState(initialSearch ?? "");
+  const [queryFilter, setQueryFilter] = useState(initialSearch ?? "");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [gridCols, setGridCols] = useState<1 | 2 | 4 | 8>(4);
   const autoReducedGridColsRef = useRef<4 | 8 | null>(null);
@@ -121,6 +144,7 @@ export default function PublicBookList({
 
   useEffect(() => {
     setSearchQuery(initialSearch ?? "");
+    setQueryFilter(initialSearch ?? "");
   }, [initialSearch]);
 
   function namesForRole(b: PublicBook, role: "tag" | "category" | "subject" | "designer"): string[] {
@@ -240,12 +264,12 @@ export default function PublicBookList({
 
   const combinedSignedMap = useMemo(() => ({ ...sharedSignedMap, ...signedMap }), [sharedSignedMap, signedMap]);
 
-  function setFilterAndUrl(key: "author" | "tag" | "category" | "publisher" | "decade" | "subject" | "designer", value?: string) {
-    const next = { ...activeFilters };
+  function setFilterAndUrl(key: Exclude<DetailFilterKey, "q">, value?: string) {
+    const next = { ...activeFilters } as Partial<Record<Exclude<DetailFilterKey, "q">, string>>;
     if (value && value.trim()) {
-      (next as any)[key] = value;
+      next[key] = value;
     } else {
-      delete (next as any)[key];
+      delete next[key];
     }
     setActiveFilters(next);
     const params = new URLSearchParams(window.location.search);
@@ -285,10 +309,61 @@ export default function PublicBookList({
         const tags = namesForRole(b, "tag").map((n) => n.toLowerCase());
         if (!tags.includes(activeFilters.tag.toLowerCase())) return false;
       }
+      const music = parseMusicMetadata((b as any).music_metadata);
+      if (activeFilters.publish_date) {
+        const publishDate = String(b.publish_date_override ?? b.edition?.publish_date ?? "").trim().toLowerCase();
+        if (publishDate !== activeFilters.publish_date.toLowerCase()) return false;
+      }
+      if (activeFilters.release_date) {
+        if (String(music?.release_date ?? "").trim().toLowerCase() !== activeFilters.release_date.toLowerCase()) return false;
+      }
+      if (activeFilters.original_release_year) {
+        if (String(music?.original_release_year ?? "").trim().toLowerCase() !== activeFilters.original_release_year.toLowerCase()) return false;
+      }
+      if (activeFilters.format) {
+        if (String(music?.format ?? "").trim().toLowerCase() !== activeFilters.format.toLowerCase()) return false;
+      }
+      if (activeFilters.release_type) {
+        if (String(music?.release_type ?? "").trim().toLowerCase() !== activeFilters.release_type.toLowerCase()) return false;
+      }
+      if (activeFilters.pressing) {
+        if (String(music?.edition_pressing ?? "").trim().toLowerCase() !== activeFilters.pressing.toLowerCase()) return false;
+      }
+      if (activeFilters.catalog_number) {
+        if (String(music?.catalog_number ?? "").trim().toLowerCase() !== activeFilters.catalog_number.toLowerCase()) return false;
+      }
+      if (activeFilters.barcode) {
+        if (String(music?.barcode ?? "").trim().toLowerCase() !== activeFilters.barcode.toLowerCase()) return false;
+      }
+      if (activeFilters.country) {
+        if (String(music?.country ?? "").trim().toLowerCase() !== activeFilters.country.toLowerCase()) return false;
+      }
+      if (activeFilters.discogs_id) {
+        if (String(music?.discogs_id ?? "").trim().toLowerCase() !== activeFilters.discogs_id.toLowerCase()) return false;
+      }
+      if (activeFilters.musicbrainz_id) {
+        if (String(music?.musicbrainz_id ?? "").trim().toLowerCase() !== activeFilters.musicbrainz_id.toLowerCase()) return false;
+      }
+      if (activeFilters.speed) {
+        if (String(music?.speed ?? "").trim().toLowerCase() !== activeFilters.speed.toLowerCase()) return false;
+      }
+      if (activeFilters.channels) {
+        if (String(music?.channels ?? "").trim().toLowerCase() !== activeFilters.channels.toLowerCase()) return false;
+      }
+      if (activeFilters.disc_count) {
+        if (String(music?.disc_count ?? "").trim().toLowerCase() !== activeFilters.disc_count.toLowerCase()) return false;
+      }
+      if (activeFilters.limited_edition) {
+        const limitedEditionValue = music?.limited_edition == null ? "" : music.limited_edition ? "yes" : "no";
+        if (limitedEditionValue !== activeFilters.limited_edition.toLowerCase()) return false;
+      }
+      if (activeFilters.reissue) {
+        const reissueValue = music?.reissue == null ? "" : music.reissue ? "reissue" : "original release";
+        if (reissueValue !== activeFilters.reissue.toLowerCase()) return false;
+      }
       
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const music = parseMusicMetadata((b as any).music_metadata);
         const title = effectiveTitleFor(b).toLowerCase();
         const authors = effectiveAuthorsFor(b).join(" ").toLowerCase();
         const subjects = namesForRole(b, "subject").join(" ").toLowerCase();
@@ -574,6 +649,15 @@ export default function PublicBookList({
             <ActiveFilterDisplay
               pairs={(() => {
                 const pairs: FilterPair[] = [];
+                if (queryFilter.trim()) {
+                  pairs.push({ label: "Search", value: queryFilter.trim(), key: "q", onClear: () => {
+                    const params = new URLSearchParams(window.location.search);
+                    params.delete("q");
+                    window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+                    setQueryFilter("");
+                    setSearchQuery("");
+                  } });
+                }
                 if (activeFilters.category) pairs.push({ label: "Category", value: activeFilters.category, key: "category", onClear: () => setFilterAndUrl("category") });
                 if (activeFilters.tag) pairs.push({ label: "Tag", value: activeFilters.tag, key: "tag", onClear: () => setFilterAndUrl("tag") });
                 if (activeFilters.author) pairs.push({ label: "Author", value: activeFilters.author, key: "author", onClear: () => setFilterAndUrl("author") });
@@ -581,10 +665,19 @@ export default function PublicBookList({
                 if (activeFilters.designer) pairs.push({ label: "Designer", value: activeFilters.designer, key: "designer", onClear: () => setFilterAndUrl("designer") });
                 if (activeFilters.publisher) pairs.push({ label: "Publisher", value: activeFilters.publisher, key: "publisher", onClear: () => setFilterAndUrl("publisher") });
                 if (activeFilters.decade) pairs.push({ label: "Decade", value: activeFilters.decade, key: "decade", onClear: () => setFilterAndUrl("decade") });
+                for (const key of EXTRA_DETAIL_FILTER_KEYS) {
+                  const value = activeFilters[key];
+                  if (!value) continue;
+                  const label = detailFilterLabel(key);
+                  if (!label) continue;
+                  pairs.push({ label, value, key, onClear: () => setFilterAndUrl(key) });
+                }
                 return pairs;
               })()}
               onClearAll={() => {
                 setActiveFilters({});
+                setQueryFilter("");
+                setSearchQuery("");
                 window.history.replaceState({}, "", `/u/${username}`);
               }}
             />

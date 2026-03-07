@@ -32,8 +32,9 @@ import {
 } from "../../lib/isbn";
 import { DECADE_OPTIONS } from "../../lib/decades";
 import { saveBookNavContext } from "../../lib/bookNav";
-import type { MusicMetadata, MusicContributorRole } from "../../lib/music";
+import { parseMusicMetadata, type MusicMetadata, type MusicContributorRole } from "../../lib/music";
 import { contextFromFilterParams } from "../../lib/pageTitle";
+import { DETAIL_FILTER_KEYS, detailFilterLabel, type DetailFilterKey } from "../../lib/detailFilters";
 
 const BookScannerModal = dynamic(() => import("../../components/BookScannerModal"), { ssr: false });
 
@@ -2108,22 +2109,13 @@ function AppShell({
     return inserted.data.id as number;
   }
 
-  function setUrlFilters(next: { tag?: string | null; category?: string | null; decade?: string | null }) {
-    const params = new URLSearchParams();
-    const nextTag = typeof next.tag === "string" ? next.tag : next.tag === null ? "" : (filterTag ?? "");
-    const nextCategory = typeof next.category === "string" ? next.category : next.category === null ? "" : (filterCategory ?? "");
-    const nextDecade = typeof next.decade === "string" ? next.decade : next.decade === null ? "" : (filterDecade ?? "");
-
-    const tagVal = nextTag.trim();
-    const catVal = nextCategory.trim();
-    const decadeVal = nextDecade.trim();
-    if (tagVal && tagVal !== "all") params.set("tag", tagVal);
-    if (catVal && catVal !== "all") params.set("category", catVal);
-    if (decadeVal) params.set("decade", decadeVal);
-    if (filterAuthor) params.set("author", filterAuthor);
-    if (filterSubject) params.set("subject", filterSubject);
-    if (filterPublisher) params.set("publisher", filterPublisher);
-
+  function setUrlFilters(next: Partial<Record<DetailFilterKey, string | null>>) {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, rawValue] of Object.entries(next)) {
+      const value = typeof rawValue === "string" ? rawValue.trim() : "";
+      if (!value || value === "all") params.delete(key);
+      else params.set(key, value);
+    }
     const url = params.toString() ? `/app?${params.toString()}` : "/app";
     router.push(url);
   }
@@ -2582,6 +2574,22 @@ function AppShell({
     const activeCategoryMode = (filterCategory ?? categoryMode) || "all";
     const categoryTag = (activeCategoryMode === "all" ? "" : String(activeCategoryMode)).trim().toLowerCase();
     const q = searchQuery.trim().toLowerCase();
+    const publishDate = (searchParams.get("publish_date") ?? "").trim().toLowerCase();
+    const releaseDate = (searchParams.get("release_date") ?? "").trim().toLowerCase();
+    const originalReleaseYear = (searchParams.get("original_release_year") ?? "").trim().toLowerCase();
+    const formatVal = (searchParams.get("format") ?? "").trim().toLowerCase();
+    const releaseType = (searchParams.get("release_type") ?? "").trim().toLowerCase();
+    const pressing = (searchParams.get("pressing") ?? "").trim().toLowerCase();
+    const catalogNumber = (searchParams.get("catalog_number") ?? "").trim().toLowerCase();
+    const barcode = (searchParams.get("barcode") ?? "").trim().toLowerCase();
+    const country = (searchParams.get("country") ?? "").trim().toLowerCase();
+    const discogsId = (searchParams.get("discogs_id") ?? "").trim().toLowerCase();
+    const musicbrainzId = (searchParams.get("musicbrainz_id") ?? "").trim().toLowerCase();
+    const speed = (searchParams.get("speed") ?? "").trim().toLowerCase();
+    const channels = (searchParams.get("channels") ?? "").trim().toLowerCase();
+    const discCount = (searchParams.get("disc_count") ?? "").trim().toLowerCase();
+    const limitedEdition = (searchParams.get("limited_edition") ?? "").trim().toLowerCase();
+    const reissue = (searchParams.get("reissue") ?? "").trim().toLowerCase();
 
     const byKey = new Map<string, CatalogItem[]>();
     for (const it of filteredItems) {
@@ -2669,6 +2677,30 @@ function AppShell({
     if (groupVal) groups = groups.filter((g) => g.filterGroups.some((v) => v.toLowerCase() === groupVal));
     if (decadeVal) groups = groups.filter((g) => g.filterDecades.some((v) => v.toLowerCase() === decadeVal));
     if (categoryTag) groups = groups.filter((g) => g.categoryNames.some((t) => t.toLowerCase() === categoryTag));
+    if (publishDate) groups = groups.filter((g) => g.copies.some((c) => String(c.publish_date_override ?? c.edition?.publish_date ?? "").trim().toLowerCase() === publishDate));
+    if (releaseDate) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.release_date ?? "").trim().toLowerCase() === releaseDate));
+    if (originalReleaseYear) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.original_release_year ?? "").trim().toLowerCase() === originalReleaseYear));
+    if (formatVal) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.format ?? "").trim().toLowerCase() === formatVal));
+    if (releaseType) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.release_type ?? "").trim().toLowerCase() === releaseType));
+    if (pressing) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.edition_pressing ?? "").trim().toLowerCase() === pressing));
+    if (catalogNumber) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.catalog_number ?? "").trim().toLowerCase() === catalogNumber));
+    if (barcode) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.barcode ?? "").trim().toLowerCase() === barcode));
+    if (country) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.country ?? "").trim().toLowerCase() === country));
+    if (discogsId) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.discogs_id ?? "").trim().toLowerCase() === discogsId));
+    if (musicbrainzId) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.musicbrainz_id ?? "").trim().toLowerCase() === musicbrainzId));
+    if (speed) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.speed ?? "").trim().toLowerCase() === speed));
+    if (channels) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.channels ?? "").trim().toLowerCase() === channels));
+    if (discCount) groups = groups.filter((g) => g.copies.some((c) => String(parseMusicMetadata(c.music_metadata)?.disc_count ?? "").trim().toLowerCase() === discCount));
+    if (limitedEdition) groups = groups.filter((g) => g.copies.some((c) => {
+      const value = parseMusicMetadata(c.music_metadata)?.limited_edition;
+      const normalized = value == null ? "" : value ? "yes" : "no";
+      return normalized === limitedEdition;
+    }));
+    if (reissue) groups = groups.filter((g) => g.copies.some((c) => {
+      const value = parseMusicMetadata(c.music_metadata)?.reissue;
+      const normalized = value == null ? "" : value ? "reissue" : "original release";
+      return normalized === reissue;
+    }));
     if (visibilityMode !== "all") {
       groups = groups.filter((g) => {
         const eff = g.effectiveVisibility;
@@ -2751,7 +2783,7 @@ function AppShell({
     });
 
     return groups;
-  }, [filteredItems, filterTag, tagMode, filterAuthor, filterSubject, filterPublisher, filterDesigner, filterGroup, filterDecade, filterCategory, categoryMode, visibilityMode, sortMode, searchQuery, profile?.visibility]);
+  }, [filteredItems, filterTag, tagMode, filterAuthor, filterSubject, filterPublisher, filterDesigner, filterGroup, filterDecade, filterCategory, categoryMode, visibilityMode, sortMode, searchQuery, profile?.visibility, searchParams]);
 
   const bulkSelectedGroups = useMemo(() => displayGroups.filter((g) => bulkSelectedKeys[g.key]), [displayGroups, bulkSelectedKeys]);
 
@@ -2882,9 +2914,11 @@ function AppShell({
                 const pairs: FilterPair[] = [];
                 const activeCategory = (filterCategory ?? categoryMode) !== "all" ? String(filterCategory ?? categoryMode) : null;
                 const activeTag = (filterTag ?? tagMode) !== "all" ? String(filterTag ?? tagMode) : null;
+                const queryValue = (searchParams.get("q") ?? "").trim();
                 
                 if (activeCategory) pairs.push({ label: "Category", value: activeCategory, key: "category", onClear: () => { setCategoryMode("all"); clearFilter("category"); } });
                 if (activeTag) pairs.push({ label: "Tag", value: activeTag, key: "tag", onClear: () => { setTagMode("all"); clearFilter("tag"); } });
+                if (queryValue) pairs.push({ label: "Search", value: queryValue, key: "q", onClear: () => { setSearchQuery(""); clearFilter("q"); } });
                 if (filterAuthor) pairs.push({ label: "Author", value: filterAuthor, key: "author", onClear: () => clearFilter("author") });
                 if (filterEditor) pairs.push({ label: "Editor", value: filterEditor, key: "editor", onClear: () => clearFilter("editor") });
                 if (filterDesigner) pairs.push({ label: "Designer", value: filterDesigner, key: "designer", onClear: () => clearFilter("designer") });
@@ -2893,6 +2927,12 @@ function AppShell({
                 if (filterMaterial) pairs.push({ label: "Material", value: filterMaterial, key: "material", onClear: () => clearFilter("material") });
                 if (filterGroup) pairs.push({ label: "Group", value: filterGroup, key: "group", onClear: () => clearFilter("group") });
                 if (filterDecade) pairs.push({ label: "Decade", value: filterDecade, key: "decade", onClear: () => clearFilter("decade") });
+                for (const key of DETAIL_FILTER_KEYS.filter((entry) => !["q", "author", "tag", "category", "publisher", "subject", "designer", "editor", "material", "group", "decade"].includes(entry))) {
+                  const value = (searchParams.get(key) ?? "").trim();
+                  const label = detailFilterLabel(key);
+                  if (!value || !label) continue;
+                  pairs.push({ label, value, key, onClear: () => clearFilter(key) });
+                }
                 return pairs;
               })()}
               onClearAll={clearAllFilters}

@@ -5,6 +5,7 @@ import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
 import { formatDateShort } from "../../../../../lib/formatDate";
 import { formatMusicTrackLine, musicDisplayGenres, MUSIC_CONTRIBUTOR_ROLES, parseMusicMetadata, type MusicMetadata } from "../../../../../lib/music";
+import { detailFilterHref, type DetailFilterKey } from "../../../../../lib/detailFilters";
 import AddToLibraryButton from "../../AddToLibraryButton";
 import AddToLibraryProvider from "../../AddToLibraryProvider";
 import BorrowRequestWidget from "../../BorrowRequestWidget";
@@ -24,12 +25,8 @@ function musicRoleLabel(role: string): string {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
-function publicMusicFilterHref(username: string, value: string, kind: "q" | "publisher" | "subject" = "q"): string {
-  const next = value.trim();
-  if (!next) return `/u/${username}`;
-  if (kind === "publisher") return `/u/${username}?publisher=${encodeURIComponent(next)}`;
-  if (kind === "subject") return `/u/${username}?subject=${encodeURIComponent(next)}`;
-  return `/u/${username}?q=${encodeURIComponent(next)}`;
+function publicMusicFilterHref(username: string, value: string, key: DetailFilterKey = "q"): string {
+  return detailFilterHref(`/u/${username}`, key, value);
 }
 
 type PublicBookDetail = {
@@ -417,7 +414,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   {effectiveAuthors.length > 0 ? (
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                       <div style={{ minWidth: 110 }} className="text-muted">Primary artist</div>
-                      <div><Link href={publicMusicFilterHref(profile.username, effectiveAuthors[0] ?? "")}>{effectiveAuthors[0]}</Link></div>
+                      <div><Link href={publicMusicFilterHref(profile.username, effectiveAuthors[0] ?? "", "author")}>{effectiveAuthors[0]}</Link></div>
                     </div>
                   ) : null}
                   {MUSIC_CONTRIBUTOR_ROLES.map((role) =>
@@ -444,35 +441,35 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   {effectivePublishDate ? (
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                       <div style={{ minWidth: 110 }} className="text-muted">Release date</div>
-                      <div><Link href={publicMusicFilterHref(profile.username, effectivePublishDate)}>{displayPublishDate}</Link></div>
+                      <div><Link href={publicMusicFilterHref(profile.username, effectivePublishDate, "release_date")}>{displayPublishDate}</Link></div>
                     </div>
                   ) : null}
                   {(music?.original_release_year ?? "").trim() ? (
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                       <div style={{ minWidth: 110 }} className="text-muted">Orig. release year</div>
-                      <div><Link href={publicMusicFilterHref(profile.username, music?.original_release_year ?? "")}>{music?.original_release_year}</Link></div>
+                      <div><Link href={publicMusicFilterHref(profile.username, music?.original_release_year ?? "", "original_release_year")}>{music?.original_release_year}</Link></div>
                     </div>
                   ) : null}
                   {[
-                    ["Format", music?.format],
-                    ["Release type", music?.release_type],
-                    ["Pressing", music?.edition_pressing],
-                    ["Catlog #", music?.catalog_number],
-                    ["Barcode", music?.barcode],
-                    ["Country", music?.country],
-                    ["Discogs ID", music?.discogs_id],
-                    ["MusicBrainz ID", music?.musicbrainz_id],
-                    ["Speed", music?.speed],
-                    ["Channels", music?.channels],
-                    ["Disc count", music?.disc_count != null ? String(music.disc_count) : null],
-                    ["Color / variant", music?.color_variant],
-                    ["Limited edition", music?.limited_edition === null ? null : music?.limited_edition ? "yes" : "no"],
-                    ["Packaging type", music?.packaging_type]
-                  ].map(([label, value]) =>
+                    ["Format", music?.format, "format"],
+                    ["Release type", music?.release_type, "release_type"],
+                    ["Pressing", music?.edition_pressing, "pressing"],
+                    ["Catlog #", music?.catalog_number, "catalog_number"],
+                    ["Barcode", music?.barcode, "barcode"],
+                    ["Country", music?.country, "country"],
+                    ["Discogs ID", music?.discogs_id, "discogs_id"],
+                    ["MusicBrainz ID", music?.musicbrainz_id, "musicbrainz_id"],
+                    ["Speed", music?.speed, "speed"],
+                    ["Channels", music?.channels, "channels"],
+                    ["Disc count", music?.disc_count != null ? String(music.disc_count) : null, "disc_count"],
+                    ["Color / variant", music?.color_variant, "q"],
+                    ["Limited edition", music?.limited_edition === null ? null : music?.limited_edition ? "yes" : "no", "limited_edition"],
+                    ["Packaging type", music?.packaging_type, "q"]
+                  ].map(([label, value, key]) =>
                     value ? (
                       <div key={label} className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                         <div style={{ minWidth: 110 }} className="text-muted">{label}</div>
-                        <div><Link href={publicMusicFilterHref(profile.username, String(value))}>{value}</Link></div>
+                        <div><Link href={publicMusicFilterHref(profile.username, String(value), key as DetailFilterKey)}>{value}</Link></div>
                       </div>
                     ) : null
                   )}
@@ -480,7 +477,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                       <div style={{ minWidth: 110 }} className="text-muted">Reissue</div>
                       <div>
-                        <Link href={publicMusicFilterHref(profile.username, music?.reissue ? "reissue" : "original release")}>
+                        <Link href={publicMusicFilterHref(profile.username, music?.reissue ? "reissue" : "original release", "reissue")}>
                           {music?.reissue ? "Yes (reissue)" : "No (original release)"}
                         </Link>
                       </div>

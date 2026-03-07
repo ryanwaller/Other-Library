@@ -1,3 +1,5 @@
+import { DETAIL_FILTER_KEYS, detailFilterLabel } from "./detailFilters";
+
 export const SITE_TITLE = "Other Library";
 const TITLE_SEPARATOR = " – ";
 
@@ -68,32 +70,25 @@ export function facetLabelForRole(role: string): string {
 }
 
 export function contextFromFilterParams(input: QueryInput, fallbackContext: string): string {
-  const filterKeys: Array<[string, string]> = [
-    ["category", "Category"],
-    ["tag", "Tag"],
-    ["subject", "Subject"],
-    ["author", "Author"],
-    ["editor", "Editor"],
-    ["designer", "Designer"],
-    ["publisher", "Publisher"],
-    ["material", "Material"],
-    ["printer", "Printer"],
-    ["performer", "Performer"],
-    ["composer", "Composer"],
-    ["producer", "Producer"],
-    ["engineer", "Engineer"],
-    ["mastering", "Mastering"],
-    ["arranger", "Arranger"],
-    ["conductor", "Conductor"],
-    ["orchestra", "Orchestra"],
-    ["artwork", "Artwork"],
-    ["design", "Design"],
-    ["photography", "Photography"],
-    ["decade", "Decade"]
-  ];
+  const exactFilterKeys = [
+    ...DETAIL_FILTER_KEYS.filter((key) => key !== "q"),
+    "printer",
+    "performer",
+    "composer",
+    "producer",
+    "engineer",
+    "mastering",
+    "arranger",
+    "conductor",
+    "orchestra",
+    "artwork",
+    "design",
+    "photography"
+  ] as const;
 
-  for (const [key, label] of filterKeys) {
+  for (const key of exactFilterKeys) {
     const value = decodeQueryValue(readQueryValue(input, key));
+    const label = detailFilterLabel(key) ?? facetLabelForRole(key);
     if (value) return `${label}: ${value}`;
   }
 
