@@ -6,7 +6,7 @@ import type { CoverCrop } from "../../../../components/CoverImage";
 
 export const dynamic = "force-dynamic";
 
-const FACET_ROLES = ["author", "editor", "designer", "subject", "tag", "category", "material", "printer", "publisher"] as const;
+const FACET_ROLES = ["author", "editor", "designer", "subject", "tag", "category", "material", "printer", "publisher", "performer", "composer", "producer", "engineer", "mastering", "featured artist", "arranger", "conductor", "orchestra", "artwork", "design", "photography"] as const;
 type FacetRole = (typeof FACET_ROLES)[number];
 
 type FacetEntity = { id: string; name: string; slug: string };
@@ -48,6 +48,18 @@ function labelForRole(role: FacetRole): string {
   if (role === "category") return "Category";
   if (role === "material") return "Material";
   if (role === "printer") return "Printer";
+  if (role === "performer") return "Performer";
+  if (role === "composer") return "Composer";
+  if (role === "producer") return "Producer";
+  if (role === "engineer") return "Engineer";
+  if (role === "mastering") return "Mastering";
+  if (role === "featured artist") return "Featured artist";
+  if (role === "arranger") return "Arranger";
+  if (role === "conductor") return "Conductor";
+  if (role === "orchestra") return "Orchestra";
+  if (role === "artwork") return "Artwork";
+  if (role === "design") return "Design";
+  if (role === "photography") return "Photography";
   return "Publisher";
 }
 

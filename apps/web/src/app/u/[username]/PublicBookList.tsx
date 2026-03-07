@@ -10,6 +10,7 @@ import PagedBookList from "../../app/components/PagedBookList";
 import type { PublicBook, CatalogGroup } from "../../../lib/types";
 import { supabase } from "../../../lib/supabaseClient";
 import { DECADE_OPTIONS } from "../../../lib/decades";
+import { parseMusicMetadata } from "../../../lib/music";
 import { 
   effectiveTitleFor, 
   effectiveAuthorsFor, 
@@ -25,6 +26,7 @@ type Props = {
   profileId: string;
   signedMap: Record<string, string>;
   showLibraryBlocks: boolean;
+  initialSearch?: string;
   initialFilters: { author?: string; tag?: string; category?: string; publisher?: string; decade?: string; subject?: string; designer?: string };
 };
 
@@ -37,12 +39,13 @@ export default function PublicBookList({
   username,
   signedMap,
   showLibraryBlocks: _showLibraryBlocks,
+  initialSearch,
   initialFilters
 }: Props) {
   const PUBLIC_VIEW_MODE_KEY = "om_public_viewMode";
   const PUBLIC_GRID_COLS_KEY = "om_public_gridCols";
   const PUBLIC_SORT_MODE_KEY = "om_public_sortMode";
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearch ?? "");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [gridCols, setGridCols] = useState<1 | 2 | 4 | 8>(4);
   const autoReducedGridColsRef = useRef<4 | 8 | null>(null);
@@ -115,6 +118,10 @@ export default function PublicBookList({
   useEffect(() => {
     setActiveFilters(initialFilters);
   }, [initialFilters]);
+
+  useEffect(() => {
+    setSearchQuery(initialSearch ?? "");
+  }, [initialSearch]);
 
   function namesForRole(b: PublicBook, role: "tag" | "category" | "subject" | "designer"): string[] {
     if (role === "tag" || role === "category") {
@@ -280,6 +287,7 @@ export default function PublicBookList({
       
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
+        const music = parseMusicMetadata((b as any).music_metadata);
         const title = effectiveTitleFor(b).toLowerCase();
         const authors = effectiveAuthorsFor(b).join(" ").toLowerCase();
         const subjects = namesForRole(b, "subject").join(" ").toLowerCase();
@@ -288,7 +296,26 @@ export default function PublicBookList({
         const categories = namesForRole(b, "category").join(" ").toLowerCase();
         const designers = namesForRole(b, "designer").join(" ").toLowerCase();
         const decades = String(b.decade ?? "").toLowerCase();
-        if (!title.includes(q) && !authors.includes(q) && !subjects.includes(q) && !pub.includes(q) && !tags.includes(q) && !categories.includes(q) && !designers.includes(q) && !decades.includes(q)) return false;
+        const contributors = (b.book_entities ?? []).map((row) => String(row?.entity?.name ?? "")).join(" ").toLowerCase();
+        const musicParts = [
+          music?.label,
+          music?.format,
+          music?.edition_pressing,
+          music?.catalog_number,
+          music?.barcode,
+          music?.country,
+          music?.discogs_id,
+          music?.musicbrainz_id,
+          music?.speed,
+          music?.color_variant,
+          music?.release_lineage,
+          music?.audio_configuration,
+          music?.packaging_type,
+          ...(music?.genres ?? []),
+          ...(music?.styles ?? []),
+          ...(music?.tracklist ?? []).map((track) => `${track.position ?? ""} ${track.title} ${track.duration ?? ""}`.trim())
+        ].filter(Boolean).join(" ").toLowerCase();
+        if (!title.includes(q) && !authors.includes(q) && !subjects.includes(q) && !pub.includes(q) && !tags.includes(q) && !categories.includes(q) && !designers.includes(q) && !decades.includes(q) && !contributors.includes(q) && !musicParts.includes(q)) return false;
       }
       return true;
     });

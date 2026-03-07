@@ -3,6 +3,7 @@ import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
 import { formatDateShort } from "../../../../../lib/formatDate";
+import { formatMusicTrackLine, musicDisplayGenres, MUSIC_CONTRIBUTOR_ROLES, parseMusicMetadata, type MusicMetadata } from "../../../../../lib/music";
 import AddToLibraryButton from "../../AddToLibraryButton";
 import AddToLibraryProvider from "../../AddToLibraryProvider";
 import BorrowRequestWidget from "../../BorrowRequestWidget";
@@ -15,6 +16,19 @@ import PublicImageGrid from "./PublicImageGrid";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
 
 export const dynamic = "force-dynamic";
+
+function musicRoleLabel(role: string): string {
+  if (role === "featured artist") return "Featured artist";
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+function publicMusicFilterHref(username: string, value: string, kind: "q" | "publisher" | "subject" = "q"): string {
+  const next = value.trim();
+  if (!next) return `/u/${username}`;
+  if (kind === "publisher") return `/u/${username}?publisher=${encodeURIComponent(next)}`;
+  if (kind === "subject") return `/u/${username}?subject=${encodeURIComponent(next)}`;
+  return `/u/${username}?q=${encodeURIComponent(next)}`;
+}
 
 type PublicBookDetail = {
   id: number;
@@ -34,6 +48,10 @@ type PublicBookDetail = {
   pages: number | null;
   group_label: string | null;
   object_type: string | null;
+  source_type?: string | null;
+  source_url?: string | null;
+  external_source_ids?: Record<string, string | null> | null;
+  music_metadata?: MusicMetadata | null;
   decade: string | null;
   description_override: string | null;
   subjects_override: string[] | null;
@@ -218,12 +236,17 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   }
 
   const effectiveTitle = (book.title_override ?? "").trim() || book.edition?.title || "(untitled)";
+  const isMusicObject = (book.object_type ?? "").trim() === "music";
+  const music = parseMusicMetadata(book.music_metadata);
+  const musicGenres = musicDisplayGenres(music);
   const canonical = bookIdSlug(book.id, effectiveTitle);
   if (idSlug !== canonical) {
     permanentRedirect(`/u/${profile.username}/b/${canonical}`);
   }
 
-  const effectiveAuthors = (
+  const effectiveAuthors = isMusicObject
+    ? ((music?.primary_artist ?? "").trim() ? [String(music?.primary_artist ?? "").trim()] : [])
+    : (
     (book.authors_override ?? []).filter(Boolean).length > 0
       ? (book.authors_override ?? []).filter(Boolean)
       : (book.edition?.authors ?? []).filter(Boolean)
@@ -235,8 +258,8 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const effectiveMaterials = (book.materials_override ?? "").trim();
   const effectiveEdition = (book.edition_override ?? "").trim();
 
-  const effectivePublisher = (book.publisher_override ?? "").trim() || book.edition?.publisher || "";
-  const effectivePublishDate = (book.publish_date_override ?? "").trim() || book.edition?.publish_date || "";
+  const effectivePublisher = isMusicObject ? (music?.label ?? "").trim() : (book.publisher_override ?? "").trim() || book.edition?.publisher || "";
+  const effectivePublishDate = isMusicObject ? (music?.release_date ?? "").trim() : (book.publish_date_override ?? "").trim() || book.edition?.publish_date || "";
   const displayPublishDate = formatDateShort(effectivePublishDate || null);
   const effectiveDescription = (book.description_override ?? "").trim() || book.edition?.description || "";
   const effectiveSubjects = (
@@ -259,6 +282,18 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   }
   const categories = Array.from(categorySet.values());
   const tags = allTags.filter((t) => t.kind === "tag").map((t) => String(t.name ?? "").trim()).filter(Boolean);
+  const contributorMap = Object.fromEntries(
+    MUSIC_CONTRIBUTOR_ROLES.map((role) => [
+      role,
+      (book.book_entities ?? [])
+        .filter((row) => String(row?.role ?? "").trim() === role)
+        .map((row) => ({
+          name: String(row?.entity?.name ?? "").trim(),
+          slug: String(row?.entity?.slug ?? "").trim()
+        }))
+        .filter((row) => row.name && row.slug)
+    ])
+  ) as Record<(typeof MUSIC_CONTRIBUTOR_ROLES)[number], Array<{ name: string; slug: string }>>;
 
   const paths = Array.from(new Set([
     ...(book.media ?? []).map((m) => m.storage_path).filter(Boolean),
@@ -354,7 +389,103 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   compact
                 />
               </div>
-              {effectiveAuthors.length > 0 ? (
+              {isMusicObject ? (
+                <>
+                  {effectiveAuthors.length > 0 ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Primary artist</div>
+                      <div><Link href={publicMusicFilterHref(profile.username, effectiveAuthors[0] ?? "")}>{effectiveAuthors[0]}</Link></div>
+                    </div>
+                  ) : null}
+                  {MUSIC_CONTRIBUTOR_ROLES.map((role) =>
+                    contributorMap[role].length > 0 ? (
+                      <div key={role} className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">{musicRoleLabel(role)}</div>
+                        <div className="om-hanging-value">
+                          {contributorMap[role].map((row, idx) => (
+                            <span key={`${role}-${row.slug}`}>
+                              <Link href={publicMusicFilterHref(profile.username, row.name)}>{row.name}</Link>
+                              {idx < contributorMap[role].length - 1 ? <span>, </span> : null}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null
+                  )}
+                  {effectivePublisher ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Label</div>
+                      <div><Link href={publicMusicFilterHref(profile.username, effectivePublisher, "publisher")}>{effectivePublisher}</Link></div>
+                    </div>
+                  ) : null}
+                  {effectivePublishDate ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Release date</div>
+                      <div><Link href={publicMusicFilterHref(profile.username, effectivePublishDate)}>{displayPublishDate}</Link></div>
+                    </div>
+                  ) : null}
+                  {(music?.original_release_year ?? "").trim() ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Original release year</div>
+                      <div><Link href={publicMusicFilterHref(profile.username, music?.original_release_year ?? "")}>{music?.original_release_year}</Link></div>
+                    </div>
+                  ) : null}
+                  {[
+                    ["Format", music?.format],
+                    ["Pressing", music?.edition_pressing],
+                    ["Catlog #", music?.catalog_number],
+                    ["Barcode", music?.barcode],
+                    ["Country", music?.country],
+                    ["Discogs ID", music?.discogs_id],
+                    ["MusicBrainz ID", music?.musicbrainz_id],
+                    ["Speed", music?.speed],
+                    ["Disc count", music?.disc_count != null ? String(music.disc_count) : null],
+                    ["Color / variant", music?.color_variant],
+                    ["Limited edition", music?.limited_edition === null ? null : music?.limited_edition ? "yes" : "no"],
+                    ["Reissue / original", music?.release_lineage],
+                    ["Mono / stereo", music?.audio_configuration],
+                    ["Packaging type", music?.packaging_type]
+                  ].map(([label, value]) =>
+                    value ? (
+                      <div key={label} className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">{label}</div>
+                        <div><Link href={publicMusicFilterHref(profile.username, String(value))}>{value}</Link></div>
+                      </div>
+                    ) : null
+                  )}
+                  {musicGenres.length > 0 ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Genres</div>
+                      <div className="om-hanging-value">
+                        {musicGenres.map((value, idx, arr) => (
+                          <span key={value}>
+                            <Link href={publicMusicFilterHref(profile.username, value, "subject")}>{value}</Link>
+                            {idx < arr.length - 1 ? <span>, </span> : null}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {(music?.tracklist ?? []).length > 0 ? (
+                    <div className="row" style={{ marginTop: "var(--space-md)", alignItems: "flex-start" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Tracklist</div>
+                      <div style={{ display: "grid", gap: "var(--space-4)", flex: "1 1 auto" }}>
+                        {(music?.tracklist ?? []).map((track, index) => (
+                          <div key={`${track.position ?? ""}-${track.title}-${index}`} className="row om-row-baseline" style={{ gap: "var(--space-sm)" }}>
+                            {track.position ? <div className="text-muted" style={{ minWidth: 32 }}>{track.position}</div> : null}
+                            <div style={{ flex: "1 1 auto" }}>
+                              <Link href={publicMusicFilterHref(profile.username, track.title)} title={formatMusicTrackLine(track)}>{track.title}</Link>
+                            </div>
+                            {track.duration ? <div className="text-muted">{track.duration}</div> : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
+              {!isMusicObject && effectiveAuthors.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Authors
@@ -370,7 +501,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {effectiveEditors.length > 0 ? (
+              {!isMusicObject && effectiveEditors.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Editors
@@ -379,7 +510,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {effectiveDesigners.length > 0 ? (
+              {!isMusicObject && effectiveDesigners.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Designers
@@ -395,7 +526,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {effectivePrinter ? (
+              {!isMusicObject && effectivePrinter ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Printer
@@ -404,7 +535,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {effectiveMaterials ? (
+              {!isMusicObject && effectiveMaterials ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Materials
@@ -413,7 +544,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {effectiveEdition ? (
+              {!isMusicObject && effectiveEdition ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Edition
@@ -422,7 +553,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {effectivePublisher ? (
+              {!isMusicObject && effectivePublisher ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Publisher
@@ -433,7 +564,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {effectivePublishDate ? (
+              {!isMusicObject && effectivePublishDate ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Publish date
@@ -442,7 +573,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {book.pages ? (
+              {!isMusicObject && book.pages ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Pages
@@ -480,7 +611,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {subjects.length > 0 ? (
+              {!isMusicObject && subjects.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-md)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Subjects
@@ -491,7 +622,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {book.edition?.isbn13 || book.edition?.isbn10 ? (
+              {!isMusicObject && (book.edition?.isbn13 || book.edition?.isbn10) ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     ISBN

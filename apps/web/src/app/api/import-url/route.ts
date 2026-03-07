@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import sizeOf from "image-size";
 import { fetchWithSafeRedirects, isSafeHttpUrl } from "../../../lib/networkSafety";
+import { emptyMusicMetadata, type MusicContributorRole, type MusicMetadata, type MusicTrack } from "../../../lib/music";
 
 export const runtime = "nodejs";
 
@@ -23,8 +24,34 @@ type ImportMetadata = {
   trim_width: number | null;
   trim_height: number | null;
   trim_unit: TrimUnit | null;
+  object_type?: "book" | "music" | null;
+  source_type?: string | null;
+  source_url?: string | null;
+  external_source_ids?: Record<string, string | null> | null;
+  music_metadata?: MusicMetadata | null;
+  contributor_entities?: Partial<Record<MusicContributorRole, string[]>> | null;
   sources: string[];
   raw: Record<string, unknown>;
+};
+
+type DiscogsReleaseLike = {
+  id?: number;
+  title?: string;
+  artists_sort?: string;
+  artists?: Array<{ name?: string | null }>;
+  extraartists?: Array<{ name?: string | null; role?: string | null }>;
+  labels?: Array<{ name?: string | null; catno?: string | null }>;
+  released?: string | null;
+  year?: number | null;
+  country?: string | null;
+  genres?: string[] | null;
+  styles?: string[] | null;
+  tracklist?: Array<{ position?: string | null; title?: string | null; duration?: string | null; type_?: string | null }>;
+  formats?: Array<{ name?: string | null; qty?: string | null; descriptions?: string[] | null; text?: string | null }>;
+  identifiers?: Array<{ type?: string | null; value?: string | null }>;
+  images?: Array<{ uri?: string | null; uri150?: string | null }>;
+  notes?: string | null;
+  main_release?: number | null;
 };
 
 const USER_AGENT = "Other-Library/0.1 (https://other-library.com; contact: hello@other-library.com)";
@@ -684,7 +711,220 @@ function detectDomainKind(hostname: string): string {
   if (h === "books.google.com") return "googlebooks";
   if (h === "printedmatter.org" || h.endsWith(".printedmatter.org")) return "printedmatter";
   if (h === "abebooks.com" || h.endsWith(".abebooks.com")) return "abebooks";
+  if (h === "discogs.com" || h.endsWith(".discogs.com")) return "discogs";
   return "generic";
+}
+
+function parseDiscogsTarget(url: URL): { kind: "release" | "master"; id: string } | null {
+  const match = url.pathname.match(/\/(release|master)\/(\d+)/i);
+  if (!match?.[1] || !match?.[2]) return null;
+  const kind = match[1].toLowerCase();
+  if (kind !== "release" && kind !== "master") return null;
+  return { kind, id: match[2] };
+}
+
+function roleFromDiscogs(input: string): MusicContributorRole | null {
+  const value = input.trim().toLowerCase();
+  if (!value) return null;
+  if (value.includes("featuring") || value.includes("featured")) return "featured artist";
+  if (value.includes("mastered")) return "mastering";
+  if (value.includes("engineer")) return "engineer";
+  if (value.includes("producer")) return "producer";
+  if (value.includes("composed") || value.includes("composer")) return "composer";
+  if (value.includes("arranged") || value.includes("arranger")) return "arranger";
+  if (value.includes("conducted") || value.includes("conductor")) return "conductor";
+  if (value.includes("orchestra")) return "orchestra";
+  if (value.includes("artwork")) return "artwork";
+  if (value.includes("design")) return "design";
+  if (value.includes("photo")) return "photography";
+  if (value.includes("perform") || value.includes("vocals") || value.includes("guitar") || value.includes("drums") || value.includes("bass")) return "performer";
+  return null;
+}
+
+function parseDiscogsReleaseDate(input: string | null | undefined): string | null {
+  const raw = String(input ?? "").trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  if (/^\d{4}-\d{2}$/.test(raw)) return `${raw}-01`;
+  if (/^\d{4}$/.test(raw)) return `${raw}-01-01`;
+  return parseDateToIso(raw);
+}
+
+function collectDiscogsContributorEntities(data: DiscogsReleaseLike): Partial<Record<MusicContributorRole, string[]>> {
+  const next: Partial<Record<MusicContributorRole, string[]>> = {};
+  for (const row of data.extraartists ?? []) {
+    const name = String(row?.name ?? "").replace(/\s+\(\d+\)$/, "").trim();
+    const role = roleFromDiscogs(String(row?.role ?? ""));
+    if (!name || !role) continue;
+    const existing = next[role] ?? [];
+    if (!existing.some((entry) => entry.toLowerCase() === name.toLowerCase())) {
+      next[role] = [...existing, name];
+    }
+  }
+  return next;
+}
+
+function normalizeDiscogsParts(values: Array<string | null | undefined>): string[] {
+  return uniqStrings(values.map((value) => String(value ?? "").trim()).filter(Boolean));
+}
+
+function pickDiscogsMatch(values: string[], pattern: RegExp): string | null {
+  return values.find((value) => pattern.test(value)) ?? null;
+}
+
+function deriveDiscogsFormat(source: DiscogsReleaseLike): string | null {
+  const formatNames = normalizeDiscogsParts((source.formats ?? []).map((format) => format?.name));
+  const formatDescriptions = normalizeDiscogsParts((source.formats ?? []).flatMap((format) => format?.descriptions ?? []));
+  const sizeAndEditionBits = formatDescriptions.filter((value) =>
+    /lp|12"|10"|7"|album|mini-album|ep|single|maxi-single|compilation|sampler|promo/i.test(value)
+  );
+  const out = uniqStrings([...formatNames, ...sizeAndEditionBits]);
+  return out.join(", ") || null;
+}
+
+function deriveDiscogsPressing(source: DiscogsReleaseLike): string | null {
+  const formatDescriptions = normalizeDiscogsParts((source.formats ?? []).flatMap((format) => format?.descriptions ?? []));
+  const formatTexts = normalizeDiscogsParts((source.formats ?? []).map((format) => format?.text));
+  const notes = String(source.notes ?? "").trim();
+  const detailBits = uniqStrings([
+    ...formatTexts,
+    ...formatDescriptions.filter((value) =>
+      /test pressing|promo|white label|numbered|special edition|club edition|limited edition|reissue|repress|remaster|unofficial|mispress|first pressing|second pressing/i.test(value)
+    )
+  ]);
+  if (detailBits.length > 0) return detailBits.join(", ");
+  return notes || null;
+}
+
+function buildDiscogsMusicMetadata(source: DiscogsReleaseLike, primaryArtist: string): MusicMetadata {
+  const base = emptyMusicMetadata();
+  const label = String(source.labels?.[0]?.name ?? "").trim() || null;
+  const catalogNumber = String(source.labels?.[0]?.catno ?? "").trim() || null;
+  const releaseDate = parseDiscogsReleaseDate(source.released ?? (source.year ? String(source.year) : null));
+  const year = source.year ? String(source.year) : null;
+  const formatDescriptions = normalizeDiscogsParts((source.formats ?? []).flatMap((format) => format?.descriptions ?? []));
+  const formatTexts = normalizeDiscogsParts((source.formats ?? []).map((format) => format?.text));
+  const formatText = deriveDiscogsFormat(source);
+  const packagingType =
+    pickDiscogsMatch([...formatDescriptions, ...formatTexts], /gatefold|digipak|sleeve|box set|jewel case|keep case|wallet|gatefold sleeve/i);
+  const speed = pickDiscogsMatch([...formatDescriptions, ...formatTexts], /\d{2}(?:\s?1\/3)?\s?rpm/i);
+  const barcode =
+    (source.identifiers ?? [])
+      .find((identifier) => /barcode|ean|upc/i.test(String(identifier?.type ?? "")))
+      ?.value?.replace(/\s+/g, " ").trim() ?? null;
+  const musicbrainzId =
+    (source.identifiers ?? [])
+      .find((identifier) => /musicbrainz/i.test(String(identifier?.type ?? "")))
+      ?.value?.trim() ?? null;
+  const tracklist: MusicTrack[] = (source.tracklist ?? [])
+    .map((track) => {
+      const title = String(track?.title ?? "").trim();
+      if (!title) return null;
+      return {
+        position: String(track?.position ?? "").trim() || null,
+        title,
+        duration: String(track?.duration ?? "").trim() || null,
+        type: String(track?.type_ ?? "").trim() || null
+      };
+    })
+    .filter(Boolean) as MusicTrack[];
+  const discCount = (source.formats ?? [])
+    .map((format) => Number(format?.qty ?? ""))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .reduce((sum, value) => sum + value, 0);
+  const releaseHints = [...formatDescriptions, ...formatTexts, String(source.notes ?? "").trim()].filter(Boolean);
+  return {
+    ...base,
+    primary_artist: primaryArtist || null,
+    label,
+    release_date: releaseDate,
+    original_release_year: year,
+    format: formatText,
+    edition_pressing: deriveDiscogsPressing(source),
+    catalog_number: catalogNumber,
+    barcode,
+    country: String(source.country ?? "").trim() || null,
+    genres: uniqStrings(source.genres ?? []),
+    styles: uniqStrings(source.styles ?? []),
+    tracklist,
+    discogs_id: source.id ? String(source.id) : null,
+    musicbrainz_id: musicbrainzId,
+    speed,
+    disc_count: discCount > 0 ? discCount : null,
+    color_variant: pickDiscogsMatch(releaseHints, /color|colou?r|clear|opaque|marbled|splatter|translucent|smoke|swirl/i),
+    limited_edition: releaseHints.some((value) => /limited|numbered/i.test(value)) ? true : null,
+    release_lineage: releaseHints.some((value) => /reissue|repress|remaster/i.test(value))
+      ? "reissue"
+      : releaseHints.some((value) => /original/i.test(value))
+        ? "original"
+        : null,
+    audio_configuration: pickDiscogsMatch(releaseHints, /mono|stereo/i),
+    packaging_type: packagingType,
+    track_count: tracklist.length || null
+  };
+}
+
+async function fetchDiscogsPreview(url: URL): Promise<ImportMetadata | null> {
+  const target = parseDiscogsTarget(url);
+  if (!target) return null;
+
+  const endpoint = `https://api.discogs.com/${target.kind === "release" ? "releases" : "masters"}/${target.id}`;
+  const baseRes = await fetch(endpoint, { headers: { "User-Agent": USER_AGENT } });
+  if (!baseRes.ok) {
+    throw new Error(`Discogs lookup failed (${baseRes.status})`);
+  }
+  let data = (await baseRes.json()) as DiscogsReleaseLike;
+
+  if (target.kind === "master" && Number(data.main_release)) {
+    const releaseRes = await fetch(`https://api.discogs.com/releases/${data.main_release}`, { headers: { "User-Agent": USER_AGENT } });
+    if (releaseRes.ok) {
+      const release = (await releaseRes.json()) as DiscogsReleaseLike;
+      data = {
+        ...data,
+        ...release,
+        year: data.year ?? release.year ?? null
+      };
+    }
+  }
+
+  const artists = uniqStrings([
+    String(data.artists_sort ?? "").trim(),
+    ...((data.artists ?? []).map((artist) => String(artist?.name ?? "").replace(/\s+\(\d+\)$/, "").trim()))
+  ]);
+  const primaryArtist = artists[0] ?? "";
+  const musicMetadata = buildDiscogsMusicMetadata(data, primaryArtist);
+  const contributorEntities = collectDiscogsContributorEntities(data);
+  if (primaryArtist) {
+    contributorEntities.performer = uniqStrings([primaryArtist, ...(contributorEntities.performer ?? [])]);
+  }
+  const coverCandidates = uniqStrings(
+    (data.images ?? []).flatMap((image) => [normalizeHttpsUrl(image?.uri), normalizeHttpsUrl(image?.uri150)]).filter(Boolean) as string[]
+  );
+
+  return {
+    ...makeEmpty(),
+    object_type: "music",
+    source_type: "discogs",
+    source_url: url.toString(),
+    external_source_ids: {
+      discogs_id: musicMetadata.discogs_id,
+      discogs_kind: target.kind
+    },
+    title: String(data.title ?? "").trim() || null,
+    authors: primaryArtist ? [primaryArtist] : [],
+    publisher: musicMetadata.label,
+    publish_date: musicMetadata.release_date,
+    description: null,
+    subjects: uniqStrings([...(musicMetadata.genres ?? []), ...(musicMetadata.styles ?? [])]),
+    cover_url: coverCandidates[0] ?? null,
+    cover_candidates: coverCandidates,
+    music_metadata: musicMetadata,
+    contributor_entities: contributorEntities,
+    sources: ["discogs"],
+    raw: {
+      discogs: data
+    }
+  };
 }
 
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
@@ -799,6 +1039,12 @@ function makeEmpty(): ImportMetadata {
     trim_width: null,
     trim_height: null,
     trim_unit: null,
+    object_type: "book",
+    source_type: null,
+    source_url: null,
+    external_source_ids: null,
+    music_metadata: null,
+    contributor_entities: null,
     sources: [],
     raw: {}
   };
@@ -859,6 +1105,28 @@ export async function POST(req: NextRequest) {
   }
 
   const domainKind = detectDomainKind(parsed.hostname);
+
+  if (domainKind === "discogs") {
+    try {
+      const preview = await fetchDiscogsPreview(parsed);
+      if (!preview) {
+        return NextResponse.json({ ok: false, error: "Unsupported Discogs URL." }, { status: 400 });
+      }
+      const validCandidates = (await Promise.all(preview.cover_candidates.map((url) => validateCoverUrl(url)))).filter(Boolean) as string[];
+      preview.cover_candidates = validCandidates;
+      preview.cover_url = validCandidates[0] ?? null;
+      return NextResponse.json({
+        ok: true,
+        domain: parsed.hostname,
+        domain_kind: domainKind,
+        final_url: parsed.toString(),
+        scraped: preview,
+        preview
+      });
+    } catch (e: any) {
+      return NextResponse.json({ ok: false, error: e?.message ?? "Discogs import failed" }, { status: 400 });
+    }
+  }
 
   // AbeBooks: try ISBN from URL before fetching (fetch often fails due to bot protection)
   if (domainKind === "abebooks") {

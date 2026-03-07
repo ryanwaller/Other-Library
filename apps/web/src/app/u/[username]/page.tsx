@@ -14,7 +14,7 @@ export default async function PublicProfilePage({
   searchParams
 }: { 
   params: Promise<{ username: string }>,
-  searchParams: Promise<{ author?: string; tag?: string; subject?: string; category?: string; publisher?: string; decade?: string; designer?: string }>
+  searchParams: Promise<{ author?: string; tag?: string; subject?: string; category?: string; publisher?: string; decade?: string; designer?: string; q?: string }>
 }) {
   const { username } = await params;
   const rawParams = await searchParams;
@@ -25,6 +25,7 @@ export default async function PublicProfilePage({
   const filterPublisher = rawParams.publisher ? decodeURIComponent(rawParams.publisher) : undefined;
   const filterDecade = rawParams.decade ? decodeURIComponent(rawParams.decade) : undefined;
   const filterDesigner = rawParams.designer ? decodeURIComponent(rawParams.designer) : undefined;
+  const filterQuery = rawParams.q ? decodeURIComponent(rawParams.q) : undefined;
 
   const usernameNorm = (username ?? "").trim().toLowerCase();
   const supabase = getServerSupabase();
@@ -165,6 +166,7 @@ export default async function PublicProfilePage({
             profileId={profile.id}
             signedMap={signedMap}
             showLibraryBlocks={showLibraryBlocks}
+            initialSearch={filterQuery}
             initialFilters={{ author: filterAuthor, subject: filterSubject, tag: filterTag, category: filterCategory, publisher: filterPublisher, decade: filterDecade, designer: filterDesigner }}
           />
         </AddToLibraryProvider>

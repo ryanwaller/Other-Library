@@ -10,6 +10,15 @@ import { bookIdSlug } from "../../../../lib/slug";
 import { formatDateShort } from "../../../../lib/formatDate";
 import { DECADE_OPTIONS } from "../../../../lib/decades";
 import { loadBookNavContext, type BookNavContext } from "../../../../lib/bookNav";
+import {
+  emptyMusicMetadata,
+  formatMusicTrackLine,
+  musicDisplayGenres,
+  MUSIC_CONTRIBUTOR_ROLES,
+  parseMusicMetadata,
+  type MusicContributorRole,
+  type MusicMetadata
+} from "../../../../lib/music";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
 import SignInCard from "../../../components/SignInCard";
 import EntityTokenField from "../../components/EntityTokenField";
@@ -30,7 +39,8 @@ type FacetRole =
   | "category"
   | "material"
   | "printer"
-  | "publisher";
+  | "publisher"
+  | MusicContributorRole;
 
 type EntityRef = { id: string; name: string; slug: string };
 
@@ -44,6 +54,10 @@ type UserBookDetail = {
   borrow_request_scope_override: string | null;
   group_label: string | null;
   object_type: string | null;
+  source_type?: string | null;
+  source_url?: string | null;
+  external_source_ids?: Record<string, string | null> | null;
+  music_metadata?: MusicMetadata | null;
   decade: string | null;
   pages: number | null;
   title_override: string | null;
@@ -110,6 +124,12 @@ type ImportPreview = {
   isbn13: string | null;
   cover_url: string | null;
   cover_candidates: string[];
+  object_type?: "book" | "music" | null;
+  source_type?: string | null;
+  source_url?: string | null;
+  external_source_ids?: Record<string, string | null> | null;
+  music_metadata?: MusicMetadata | null;
+  contributor_entities?: Partial<Record<MusicContributorRole, string[]>> | null;
   trim_width: number | null;
   trim_height: number | null;
   trim_unit: TrimUnit | null;
@@ -254,7 +274,7 @@ function normalizePublishDateForStorage(input: string): string | null {
   return trimmed;
 }
 
-function facetHref(role: string, name: string): string {
+function facetHref(role: string, name: string, slug?: string): string {
   const mapping: Record<string, string> = {
     author: "author",
     subject: "subject",
@@ -265,7 +285,23 @@ function facetHref(role: string, name: string): string {
     tag: "tag"
   };
   const param = mapping[role] || role;
+  if (!(role in mapping) && slug) {
+    return `/facet/${encodeURIComponent(role)}/${encodeURIComponent(slug)}`;
+  }
   return `/app?${param}=${encodeURIComponent(name)}`;
+}
+
+function musicRoleLabel(role: string): string {
+  if (role === "featured artist") return "Featured artist";
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+function musicValueHref(value: string, kind: "q" | "publisher" | "subject" = "q"): string {
+  const next = value.trim();
+  if (!next) return "/app";
+  if (kind === "publisher") return `/app?publisher=${encodeURIComponent(next)}`;
+  if (kind === "subject") return `/app?subject=${encodeURIComponent(next)}`;
+  return `/app?q=${encodeURIComponent(next)}`;
 }
 
 function FacetLinks(props: { role: FacetRole; items: EntityRef[] }) {
@@ -274,7 +310,7 @@ function FacetLinks(props: { role: FacetRole; items: EntityRef[] }) {
     <span>
       {items.map((e, idx) => (
         <span key={e.id}>
-          <Link href={facetHref(role, e.name)}>{e.name}</Link>
+          <Link href={facetHref(role, e.name, e.slug)}>{e.name}</Link>
           {idx < items.length - 1 ? ", " : ""}
         </span>
       ))}
@@ -364,6 +400,7 @@ export default function BookDetailPage() {
     formBorrowable: "inherit" | "yes" | "no";
     formLibraryId: number | null;
     facetDraft: Record<FacetRole, string[]>;
+    formMusic: MusicMetadata;
     formTrimWidth: string;
     formTrimHeight: string;
     formTrimUnit: TrimUnit;
@@ -441,6 +478,7 @@ export default function BookDetailPage() {
   const [formTrimWidth, setFormTrimWidth] = useState<string>("");
   const [formTrimHeight, setFormTrimHeight] = useState<string>("");
   const [formTrimUnit, setFormTrimUnit] = useState<TrimUnit>("in");
+  const [formMusic, setFormMusic] = useState<MusicMetadata>(emptyMusicMetadata());
   // Crop-editor-local trim state; syncs to form only when cropTrimUnit is set.
   const [cropTrimWidth, setCropTrimWidth] = useState<string>("");
   const [cropTrimHeight, setCropTrimHeight] = useState<string>("");
@@ -466,7 +504,19 @@ export default function BookDetailPage() {
     category: [],
     material: [],
     printer: [],
-    publisher: []
+    publisher: [],
+    performer: [],
+    composer: [],
+    producer: [],
+    engineer: [],
+    mastering: [],
+    "featured artist": [],
+    arranger: [],
+    conductor: [],
+    orchestra: [],
+    artwork: [],
+    design: [],
+    photography: []
   });
 
   const { scannerOpen, openScanner, closeScanner } = useBookScanner();
@@ -822,9 +872,9 @@ export default function BookDetailPage() {
     setCopiesCountState({ busy: false, error: null });
     try {
       const baseNew =
-        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,source_type,source_url,external_source_ids,music_metadata,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
       const baseOld =
-        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,object_type,source_type,source_url,external_source_ids,music_metadata,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
 
       const entitiesSelect = ",book_entities:book_entities(role,position,entity:entities(id,name,slug))";
       const selectNew = baseNew + entitiesSelect;
@@ -882,7 +932,19 @@ export default function BookDetailPage() {
         category: [],
         material: [],
         printer: [],
-        publisher: []
+        publisher: [],
+        performer: [],
+        composer: [],
+        producer: [],
+        engineer: [],
+        mastering: [],
+        "featured artist": [],
+        arranger: [],
+        conductor: [],
+        orchestra: [],
+        artwork: [],
+        design: [],
+        photography: []
       };
 
       const entityRows = ((row as any).book_entities as Array<{ role: FacetRole; position: number | null; entity: EntityRef | null }> | null) ?? [];
@@ -936,6 +998,7 @@ export default function BookDetailPage() {
       setFormDescription(row.description_override ?? row.edition?.description ?? "");
       setFormGroupLabel(((row as any).group_label ?? "") as any);
       setFormObjectType(String((row as any).object_type ?? "").trim());
+      setFormMusic(parseMusicMetadata((row as any).music_metadata) ?? emptyMusicMetadata());
       setFormDecade(String((row as any).decade ?? "").trim());
       setFormPages((row as any).pages ? String((row as any).pages) : "");
       setFormLocation(row.location ?? "");
@@ -1146,16 +1209,28 @@ export default function BookDetailPage() {
   const effectiveTitle = useMemo(() => {
     return formTitle.trim() ? formTitle.trim() : book?.edition?.title ?? "(untitled)";
   }, [formTitle, book]);
+  const isMusicObject = (formObjectType.trim() || String(book?.object_type ?? "").trim()) === "music";
+  const effectiveMusic = useMemo(() => ({
+    ...emptyMusicMetadata(),
+    ...(parseMusicMetadata(book?.music_metadata) ?? emptyMusicMetadata()),
+    ...formMusic,
+    track_count: formMusic.track_count ?? parseMusicMetadata(book?.music_metadata)?.track_count ?? null
+  }), [book?.music_metadata, formMusic]);
+  const musicGenres = useMemo(() => musicDisplayGenres(effectiveMusic), [effectiveMusic]);
 
   const effectivePublisher = useMemo(() => {
+    if (isMusicObject) {
+      return (effectiveMusic.label ?? "").trim();
+    }
     const fromFacet = (facetDraft.publisher?.[0] ?? "").trim();
     if (fromFacet) return fromFacet;
     return formPublisher.trim() ? formPublisher.trim() : book?.edition?.publisher ?? "";
-  }, [facetDraft.publisher, formPublisher, book]);
+  }, [effectiveMusic.label, facetDraft.publisher, formPublisher, book, isMusicObject]);
 
   const effectivePublishDate = useMemo(() => {
+    if (isMusicObject) return (effectiveMusic.release_date ?? "").trim();
     return formPublishDate.trim() ? formPublishDate.trim() : book?.edition?.publish_date ?? "";
-  }, [formPublishDate, book]);
+  }, [effectiveMusic.release_date, formPublishDate, book, isMusicObject]);
   const displayPublishDate = useMemo(() => formatDateShort(effectivePublishDate || null), [effectivePublishDate]);
 
   const effectiveDescription = useMemo(() => {
@@ -1163,6 +1238,10 @@ export default function BookDetailPage() {
   }, [formDescription, book]);
 
   const effectiveAuthors = useMemo(() => {
+    if (isMusicObject) {
+      const primaryArtist = (effectiveMusic.primary_artist ?? "").trim();
+      return primaryArtist ? [primaryArtist] : [];
+    }
     if (book?.authors_override !== null && book?.authors_override !== undefined) {
       return uniqStrings(facetDraft.author ?? []);
     }
@@ -1170,7 +1249,7 @@ export default function BookDetailPage() {
     const override = parseAuthorsInput(formAuthors);
     if (override.length > 0) return override;
     return (book?.edition?.authors ?? []).filter(Boolean);
-  }, [facetDraft.author, formAuthors, book]);
+  }, [effectiveMusic.primary_artist, facetDraft.author, formAuthors, book, isMusicObject]);
 
   const effectiveEditors = useMemo(() => {
     if ((facetDraft.editor ?? []).length > 0) return uniqStrings(facetDraft.editor);
@@ -1396,7 +1475,19 @@ export default function BookDetailPage() {
       category: [],
       material: [],
       printer: [],
-      publisher: []
+      publisher: [],
+      performer: [],
+      composer: [],
+      producer: [],
+      engineer: [],
+      mastering: [],
+      "featured artist": [],
+      arranger: [],
+      conductor: [],
+      orchestra: [],
+      artwork: [],
+      design: [],
+      photography: []
     };
 
     const rows = ((book?.book_entities ?? []) as Array<{ role: FacetRole; position: number | null; entity: EntityRef | null }> | null) ?? [];
@@ -1443,6 +1534,10 @@ export default function BookDetailPage() {
     const materialName = (facetDraft.material?.[0] ?? formMaterials).trim();
     if (materialName) supplement("material", [materialName]);
 
+    for (const role of MUSIC_CONTRIBUTOR_ROLES) {
+      supplement(role, facetDraft[role] ?? []);
+    }
+
     return out;
   }, [
     book?.book_entities,
@@ -1452,6 +1547,7 @@ export default function BookDetailPage() {
     effectiveEditors,
     effectivePublisher,
     effectiveSubjects,
+    facetDraft,
     facetDraft.material,
     facetDraft.printer,
     formMaterials,
@@ -1724,6 +1820,7 @@ export default function BookDetailPage() {
       formBorrowable,
       formLibraryId,
       facetDraft: JSON.parse(JSON.stringify(facetDraft)),
+      formMusic: JSON.parse(JSON.stringify(formMusic)),
       formTrimWidth,
       formTrimHeight,
       formTrimUnit,
@@ -1762,6 +1859,7 @@ export default function BookDetailPage() {
       setFormBorrowable(snap.formBorrowable);
       setFormLibraryId(snap.formLibraryId);
       if (snap.facetDraft) setFacetDraft(snap.facetDraft);
+      setFormMusic(snap.formMusic ?? emptyMusicMetadata());
       setFormTrimWidth(snap.formTrimWidth);
       setFormTrimHeight(snap.formTrimHeight);
       setFormTrimUnit(snap.formTrimUnit);
@@ -1827,8 +1925,20 @@ export default function BookDetailPage() {
       notes: formNotes.trim() ? formNotes.trim() : null,
       visibility: formVisibility,
       status: formStatus,
-      borrowable_override: formBorrowable === "inherit" ? null : formBorrowable === "yes"
+      borrowable_override: formBorrowable === "inherit" ? null : formBorrowable === "yes",
+      music_metadata: isMusicObject ? formMusic : null
     };
+    if (isMusicObject) {
+      payload.authors_override = null;
+      payload.editors_override = null;
+      payload.designers_override = null;
+      payload.publisher_override = null;
+      payload.printer_override = null;
+      payload.materials_override = null;
+      payload.edition_override = null;
+      payload.publish_date_override = null;
+      payload.pages = null;
+    }
     let res = await supabase.from("user_books").update(payload).eq("id", book.id);
     if (res.error) {
       const msg = (res.error.message ?? "").toLowerCase();
@@ -1868,6 +1978,22 @@ export default function BookDetailPage() {
         ["tag", facetDraft.tag ?? tags.map((t) => t.name)],
         ["category", facetDraft.category ?? categories.map((t) => t.name)]
       ];
+      if (isMusicObject) {
+        const primaryArtist = String(formMusic.primary_artist ?? "").trim();
+        const performerNames = uniqStrings([primaryArtist, ...(facetDraft.performer ?? [])]);
+        const labelNames = String(formMusic.label ?? "").trim() ? [String(formMusic.label ?? "").trim()] : [];
+        roles.splice(0, roles.length,
+          ["subject", facetDraft.subject ?? effectiveSubjects],
+          ["tag", facetDraft.tag ?? tags.map((t) => t.name)],
+          ["category", facetDraft.category ?? categories.map((t) => t.name)],
+          ["publisher", labelNames],
+          ["performer", performerNames]
+        );
+        for (const role of MUSIC_CONTRIBUTOR_ROLES) {
+          if (role === "performer") continue;
+          roles.push([role, facetDraft[role] ?? []]);
+        }
+      }
       for (const [role, names] of roles) {
         const rpc = await supabase.rpc("set_book_entities", { p_user_book_id: book.id, p_role: role, p_names: names ?? [] });
         if (rpc.error) {
@@ -2445,6 +2571,12 @@ export default function BookDetailPage() {
             isbn13: rawPreview.isbn13 ?? null,
             cover_url: finalCoverUrl,
             cover_candidates: Array.isArray(rawPreview.cover_candidates) ? rawPreview.cover_candidates : [],
+            object_type: rawPreview.object_type === "music" ? "music" : "book",
+            source_type: typeof rawPreview.source_type === "string" ? rawPreview.source_type : null,
+            source_url: typeof rawPreview.source_url === "string" ? rawPreview.source_url : null,
+            external_source_ids: rawPreview.external_source_ids ?? null,
+            music_metadata: rawPreview.music_metadata ?? null,
+            contributor_entities: rawPreview.contributor_entities ?? null,
             trim_width: typeof rawPreview.trim_width === "number" ? rawPreview.trim_width : null,
             trim_height: typeof rawPreview.trim_height === "number" ? rawPreview.trim_height : null,
             trim_unit: rawPreview.trim_unit ?? null,
@@ -2554,6 +2686,9 @@ export default function BookDetailPage() {
     description?: string | null;
     subjects?: string[] | null;
     cover_url?: string | null;
+    object_type?: "book" | "music" | null;
+    music_metadata?: MusicMetadata | null;
+    contributor_entities?: Partial<Record<MusicContributorRole, string[]>> | null;
     trim_width?: number | null;
     trim_height?: number | null;
     trim_unit?: TrimUnit | null;
@@ -2565,11 +2700,66 @@ export default function BookDetailPage() {
     const nextCover = String(input.cover_url ?? "").trim();
     const nextAuthors = (input.authors ?? []).map((a) => String(a ?? "").trim()).filter(Boolean);
     const nextSubjects = (input.subjects ?? []).map((s) => String(s ?? "").trim()).filter(Boolean);
-
+    const nextMusic = input.music_metadata ?? null;
     const currentEffectiveTitle = (formTitle.trim() || String(book?.edition?.title ?? "").trim()).trim();
     const currentEffectivePublisher = (formPublisher.trim() || String(book?.edition?.publisher ?? "").trim()).trim();
     const currentEffectivePublishDate = (formPublishDate.trim() || String(book?.edition?.publish_date ?? "").trim()).trim();
     const currentEffectiveDescription = (formDescription.trim() || String(book?.edition?.description ?? "").trim()).trim();
+
+    if (input.object_type === "music") {
+      setFormObjectType("music");
+      if (nextTitle && !currentEffectiveTitle) setFormTitle(nextTitle);
+      if (nextDescription && !currentEffectiveDescription) setFormDescription(nextDescription);
+      if (nextSubjects.length > 0) {
+        const mergedSubjects = uniqStrings([...(effectiveSubjects ?? []), ...nextSubjects]);
+        setFacetDraft((s) => ({ ...s, subject: mergedSubjects }));
+      }
+      if (nextCover) setSuggestedCoverUrl(nextCover);
+      if (nextMusic) {
+        setFormMusic((current) => ({
+          ...current,
+          ...nextMusic,
+          primary_artist: current.primary_artist || nextMusic.primary_artist,
+          label: current.label || nextMusic.label,
+          release_date: current.release_date || nextMusic.release_date,
+          original_release_year: current.original_release_year || nextMusic.original_release_year,
+          format: current.format || nextMusic.format,
+          edition_pressing: current.edition_pressing || nextMusic.edition_pressing,
+          catalog_number: current.catalog_number || nextMusic.catalog_number,
+          barcode: current.barcode || nextMusic.barcode,
+          country: current.country || nextMusic.country,
+          genres: current.genres.length > 0 ? current.genres : nextMusic.genres,
+          styles: current.styles.length > 0 ? current.styles : nextMusic.styles,
+          tracklist: current.tracklist.length > 0 ? current.tracklist : nextMusic.tracklist,
+          discogs_id: current.discogs_id || nextMusic.discogs_id,
+          musicbrainz_id: current.musicbrainz_id || nextMusic.musicbrainz_id,
+          speed: current.speed || nextMusic.speed,
+          disc_count: current.disc_count ?? nextMusic.disc_count,
+          color_variant: current.color_variant || nextMusic.color_variant,
+          limited_edition: current.limited_edition ?? nextMusic.limited_edition,
+          release_lineage: current.release_lineage || nextMusic.release_lineage,
+          audio_configuration: current.audio_configuration || nextMusic.audio_configuration,
+          packaging_type: current.packaging_type || nextMusic.packaging_type,
+          track_count: current.track_count ?? nextMusic.track_count
+        }));
+      }
+      const primaryArtist = String(nextMusic?.primary_artist ?? nextAuthors[0] ?? "").trim();
+      if (primaryArtist) {
+        setFacetDraft((state) => ({ ...state, performer: uniqStrings([...(state.performer ?? []), primaryArtist]) }));
+      }
+      const label = String(nextMusic?.label ?? nextPublisher ?? "").trim();
+      if (label) {
+        setFacetDraft((state) => ({ ...state, publisher: [label] }));
+      }
+      for (const role of MUSIC_CONTRIBUTOR_ROLES) {
+        const nextNames = input.contributor_entities?.[role] ?? [];
+        if (nextNames.length === 0) continue;
+        setFacetDraft((state) => ({ ...state, [role]: uniqStrings([...(state[role] ?? []), ...nextNames]) }));
+      }
+      setSearchState((s) => ({ ...s, message: "Filled missing fields (not saved)" }));
+      setImportState((s) => ({ ...s, message: "Filled missing fields (not saved)" }));
+      return;
+    }
     const hasCurrentCover = Boolean((book?.media ?? []).some((m) => m.kind === "cover"));
 
     if (!currentEffectiveTitle && nextTitle) setFormTitle(nextTitle);
@@ -3685,262 +3875,378 @@ export default function BookDetailPage() {
               </div>
 
               <div style={{ marginTop: "var(--space-14)" }}>
-                {editMode || facetView.author.length > 0 ? <hr className="divider" /> : null}
-                {editMode || facetView.author.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Authors
-                    </div>
-                    <div className="om-hanging-value">
-                      {editMode ? (
-                        <EntityTokenField
-                          role="author"
-                          value={facetDraft.author}
-                          onChange={(next) => {
-                            setFacetDraft((s) => ({ ...s, author: next }));
-                            setFormAuthors(next.join(", "));
-                          }}
-                          placeholder="Add an author"
-                          disabled={!isOwner || busy || saveState.busy}
-                        />
-                      ) : (
-                        <FacetLinks role="author" items={facetView.author} />
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {editMode || facetView.editor.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Editors
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <EntityTokenField
-                          role="editor"
-                          value={facetDraft.editor}
-                          onChange={(next) => {
-                            setFacetDraft((s) => ({ ...s, editor: next }));
-                            setFormEditors(next.join(", "));
-                          }}
-                          placeholder="Add an editor"
-                          disabled={!isOwner || busy || saveState.busy}
-                        />
-                      ) : (
-                        <FacetLinks role="editor" items={facetView.editor} />
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {editMode || facetView.designer.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Designers
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <EntityTokenField
-                          role="designer"
-                          value={facetDraft.designer}
-                          onChange={(next) => {
-                            setFacetDraft((s) => ({ ...s, designer: next }));
-                            setFormDesigners(next.join(", "));
-                          }}
-                          placeholder="Add a designer"
-                          disabled={!isOwner || busy || saveState.busy}
-                        />
-                      ) : (
-                        <FacetLinks role="designer" items={facetView.designer} />
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {editMode || facetView.printer.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Printer
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <EntityTokenField
-                          role="printer"
-                          value={facetDraft.printer}
-                          onChange={(next) => {
-                            const only = next.slice(0, 1);
-                            setFacetDraft((s) => ({ ...s, printer: only }));
-                            setFormPrinter(only[0] ?? "");
-                          }}
-                          placeholder="Add a printer"
-                          disabled={!isOwner || busy || saveState.busy}
-                        />
-                      ) : (
-                        <FacetLinks role="printer" items={facetView.printer} />
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {editMode || facetView.material.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Materials
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <EntityTokenField
-                          role="material"
-                          value={facetDraft.material}
-                          onChange={(next) => {
-                            const only = next.slice(0, 1);
-                            setFacetDraft((s) => ({ ...s, material: only }));
-                            setFormMaterials(only[0] ?? "");
-                          }}
-                          placeholder="Add materials"
-                          disabled={!isOwner || busy || saveState.busy}
-                        />
-                      ) : (
-                        <FacetLinks role="material" items={facetView.material} />
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {editMode || Boolean((formEditionOverride ?? "").trim()) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Edition
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <input
-                          className="om-inline-control"
-                          value={formEditionOverride}
-                          onChange={(e) => setFormEditionOverride(e.target.value)}
-                          onKeyDown={(e) => onEnter(e, () => void saveEdits())}
-                          placeholder="Add edition"
-                        />
-                      ) : (
-                        (formEditionOverride ?? "").trim()
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {editMode || facetView.publisher.length > 0 ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Publisher
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <EntityTokenField
-                          role="publisher"
-                          value={facetDraft.publisher}
-                          onChange={(next) => {
-                            const only = next.slice(0, 1);
-                            setFacetDraft((s) => ({ ...s, publisher: only }));
-                            setFormPublisher(only[0] ?? "");
-                          }}
-                          placeholder="Add a publisher"
-                          disabled={!isOwner || busy || saveState.busy}
-                        />
-                      ) : (
-                        <FacetLinks role="publisher" items={facetView.publisher} />
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {editMode || Boolean(effectivePublishDate) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Publish date
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <input
-                          className="om-inline-control"
-                          value={formPublishDate}
-                          onChange={(e) => setFormPublishDate(e.target.value)}
-                          onKeyDown={(e) => onEnter(e, () => void saveEdits())}
-                          placeholder="Add date"
-                        />
-                      ) : (
-                        displayPublishDate
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {editMode || Boolean(book?.pages) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Pages
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <input
-                          className="om-inline-control"
-                          value={formPages}
-                          onChange={(e) => setFormPages(e.target.value)}
-                          onKeyDown={(e) => onEnter(e, () => void saveEdits())}
-                          placeholder="Add page count"
-                        />
-                      ) : book?.pages ? (
-                        String(book.pages)
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-
-                {editMode || Boolean((book as any)?.trim_width) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Trim size
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <div className="row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
-                          <input
-                            className="om-inline-control"
-                            type="number"
-                            min={0.01}
-                            step={0.01}
-                            value={formTrimWidth}
-                            onChange={(e) => setFormTrimWidth(e.target.value)}
-                            placeholder="W"
-                            style={{ width: 72 }}
-                          />
-                          <span className="text-muted">×</span>
-                          <input
-                            className="om-inline-control"
-                            type="number"
-                            min={0.01}
-                            step={0.01}
-                            value={formTrimHeight}
-                            onChange={(e) => setFormTrimHeight(e.target.value)}
-                            placeholder="H"
-                            style={{ width: 72 }}
-                          />
-                          <select
-                            className="om-inline-control"
-                            value={formTrimUnit}
-                            onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)}
-                            style={{ width: "auto", minWidth: 0 }}
-                          >
-                            <option value="in">in</option>
-                            <option value="mm">mm</option>
-                          </select>
+                {isMusicObject ? (
+                  <>
+                    {editMode || effectiveAuthors.length > 0 ? <hr className="divider" /> : null}
+                    {editMode || effectiveAuthors.length > 0 ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Primary artist</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input
+                              className="om-inline-control"
+                              value={formMusic.primary_artist ?? ""}
+                              onChange={(e) => setFormMusic((s) => ({ ...s, primary_artist: e.target.value || null }))}
+                              placeholder="Add primary artist"
+                            />
+                          ) : facetView.performer[0] ? (
+                            <FacetLinks role="performer" items={[facetView.performer[0]]} />
+                          ) : (
+                            effectiveAuthors[0] ?? null
+                          )}
                         </div>
-                      ) : (book as any)?.trim_width && (book as any)?.trim_height ? (
-                        `${(book as any).trim_width} × ${(book as any).trim_height} ${(book as any).trim_unit ?? "in"}`
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
+                      </div>
+                    ) : null}
+
+                    {MUSIC_CONTRIBUTOR_ROLES.map((role) =>
+                      editMode || facetView[role].length > 0 ? (
+                        <div key={role} className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                          <div style={{ minWidth: 110 }} className="text-muted">
+                            {musicRoleLabel(role)}
+                          </div>
+                          <div style={{ flex: "1 1 auto" }}>
+                            {editMode ? (
+                              <EntityTokenField
+                                role={role}
+                                value={facetDraft[role]}
+                                onChange={(next) => setFacetDraft((s) => ({ ...s, [role]: next }))}
+                                placeholder={`Add ${role}`}
+                                disabled={!isOwner || busy || saveState.busy}
+                              />
+                            ) : (
+                              <FacetLinks role={role} items={facetView[role]} />
+                            )}
+                          </div>
+                        </div>
+                      ) : null
+                    )}
+
+                    {editMode || Boolean((effectiveMusic.label ?? "").trim()) ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Label</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formMusic.label ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, label: e.target.value || null }))} placeholder="Add label" />
+                          ) : facetView.publisher.length > 0 ? (
+                            <FacetLinks role="publisher" items={facetView.publisher} />
+                          ) : (
+                            effectiveMusic.label
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {editMode || Boolean((effectiveMusic.release_date ?? "").trim()) ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Release date</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formMusic.release_date ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, release_date: e.target.value || null }))} placeholder="Add release date" />
+                          ) : (
+                            <Link href={musicValueHref(effectiveMusic.release_date ?? "")}>
+                              {formatDateShort(effectiveMusic.release_date || null)}
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {editMode || Boolean((effectiveMusic.original_release_year ?? "").trim()) ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Original release year</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formMusic.original_release_year ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, original_release_year: e.target.value || null }))} placeholder="Add year" />
+                          ) : (
+                            <Link href={musicValueHref(effectiveMusic.original_release_year ?? "")}>
+                              {effectiveMusic.original_release_year}
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {[
+                      ["Format", "format"],
+                      ["Pressing", "edition_pressing"],
+                      ["Catlog #", "catalog_number"],
+                      ["Barcode", "barcode"],
+                      ["Country", "country"],
+                      ["Discogs ID", "discogs_id"],
+                      ["MusicBrainz ID", "musicbrainz_id"],
+                      ["Speed", "speed"],
+                      ["Color / variant", "color_variant"],
+                      ["Reissue / original", "release_lineage"],
+                      ["Mono / stereo", "audio_configuration"],
+                      ["Packaging type", "packaging_type"]
+                    ].map(([label, key]) =>
+                      editMode || Boolean(String((effectiveMusic as any)[key] ?? "").trim()) ? (
+                        <div key={key} className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                          <div style={{ minWidth: 110 }} className="text-muted">{label}</div>
+                          <div style={{ flex: "1 1 auto" }}>
+                            {editMode ? (
+                              <input
+                                className="om-inline-control"
+                                value={String((formMusic as any)[key] ?? "")}
+                                onChange={(e) => setFormMusic((s) => ({ ...s, [key]: e.target.value || null }))}
+                                placeholder={`Add ${label.toLowerCase()}`}
+                              />
+                            ) : (
+                              <Link href={musicValueHref(String((effectiveMusic as any)[key] ?? ""))}>
+                                {String((effectiveMusic as any)[key] ?? "")}
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      ) : null
+                    )}
+
+                    {editMode || effectiveMusic.disc_count != null ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Disc count</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input
+                              className="om-inline-control"
+                              type="number"
+                              min={1}
+                              value={effectiveMusic.disc_count ?? ""}
+                              onChange={(e) => setFormMusic((s) => ({ ...s, disc_count: e.target.value ? Number(e.target.value) : null }))}
+                            />
+                          ) : (
+                            <Link href={musicValueHref(String(effectiveMusic.disc_count ?? ""))}>
+                              {effectiveMusic.disc_count}
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {editMode || effectiveMusic.limited_edition !== null ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Limited edition</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <select
+                              className="om-inline-control"
+                              value={effectiveMusic.limited_edition === null ? "" : effectiveMusic.limited_edition ? "yes" : "no"}
+                              onChange={(e) =>
+                                setFormMusic((s) => ({
+                                  ...s,
+                                  limited_edition: e.target.value === "" ? null : e.target.value === "yes"
+                                }))
+                              }
+                            >
+                              <option value="">Choose</option>
+                              <option value="yes">yes</option>
+                              <option value="no">no</option>
+                            </select>
+                          ) : effectiveMusic.limited_edition === null ? null : effectiveMusic.limited_edition ? (
+                            <Link href={musicValueHref("limited")}>yes</Link>
+                          ) : (
+                            "no"
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {editMode || musicGenres.length > 0 ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Genres</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input
+                              className="om-inline-control"
+                              value={[...effectiveMusic.genres, ...effectiveMusic.styles].join(", ")}
+                              onChange={(e) => {
+                                const next = e.target.value.split(",").map((value) => value.trim()).filter(Boolean);
+                                setFormMusic((s) => ({ ...s, genres: next, styles: [] }));
+                              }}
+                              placeholder="Add genres or styles"
+                            />
+                          ) : (
+                            <span>
+                              {musicGenres.map((value, index, arr) => (
+                                <span key={value}>
+                                  <Link href={musicValueHref(value, "subject")}>{value}</Link>
+                                  {index < arr.length - 1 ? ", " : ""}
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {editMode || effectiveMusic.tracklist.length > 0 ? (
+                      <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "flex-start" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Tracklist</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <textarea
+                              className="om-inline-control"
+                              value={effectiveMusic.tracklist.map((track) => formatMusicTrackLine(track)).join("\n")}
+                              onChange={(e) =>
+                                setFormMusic((s) => ({
+                                  ...s,
+                                  tracklist: e.target.value
+                                    .split("\n")
+                                    .map((line) => line.trim())
+                                    .filter(Boolean)
+                                    .map((line) => ({ position: null, title: line, duration: null, type: null })),
+                                  track_count: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean).length || null
+                                }))
+                              }
+                              rows={Math.max(3, effectiveMusic.tracklist.length || 3)}
+                            />
+                          ) : (
+                            <div style={{ display: "grid", gap: "var(--space-4)" }}>
+                              {effectiveMusic.tracklist.map((track, index) => (
+                                <div key={`${track.position ?? ""}-${track.title}-${index}`} className="row om-row-baseline" style={{ gap: "var(--space-sm)" }}>
+                                  {track.position ? <div className="text-muted" style={{ minWidth: 32 }}>{track.position}</div> : null}
+                                  <div style={{ flex: "1 1 auto" }}>
+                                    <Link href={musicValueHref(track.title)}>{track.title}</Link>
+                                  </div>
+                                  {track.duration ? <div className="text-muted">{track.duration}</div> : null}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    {editMode || facetView.author.length > 0 ? <hr className="divider" /> : null}
+                    {editMode || facetView.author.length > 0 ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Authors</div>
+                        <div className="om-hanging-value">
+                          {editMode ? (
+                            <EntityTokenField role="author" value={facetDraft.author} onChange={(next) => { setFacetDraft((s) => ({ ...s, author: next })); setFormAuthors(next.join(", ")); }} placeholder="Add an author" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="author" items={facetView.author} />
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                    {editMode || facetView.editor.length > 0 ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Editors</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="editor" value={facetDraft.editor} onChange={(next) => { setFacetDraft((s) => ({ ...s, editor: next })); setFormEditors(next.join(", ")); }} placeholder="Add an editor" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="editor" items={facetView.editor} />
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                    {editMode || facetView.designer.length > 0 ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Designers</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="designer" value={facetDraft.designer} onChange={(next) => { setFacetDraft((s) => ({ ...s, designer: next })); setFormDesigners(next.join(", ")); }} placeholder="Add a designer" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="designer" items={facetView.designer} />
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                    {editMode || facetView.printer.length > 0 ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Printer</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="printer" value={facetDraft.printer} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, printer: only })); setFormPrinter(only[0] ?? ""); }} placeholder="Add a printer" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="printer" items={facetView.printer} />
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                    {editMode || facetView.material.length > 0 ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Materials</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="material" value={facetDraft.material} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, material: only })); setFormMaterials(only[0] ?? ""); }} placeholder="Add materials" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="material" items={facetView.material} />
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                    {editMode || Boolean((formEditionOverride ?? "").trim()) ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Edition</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formEditionOverride} onChange={(e) => setFormEditionOverride(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add edition" />
+                          ) : (
+                            (formEditionOverride ?? "").trim()
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                    {editMode || facetView.publisher.length > 0 ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Publisher</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="publisher" value={facetDraft.publisher} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, publisher: only })); setFormPublisher(only[0] ?? ""); }} placeholder="Add a publisher" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="publisher" items={facetView.publisher} />
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                    {editMode || Boolean(effectivePublishDate) ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Publish date</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add date" />
+                          ) : (
+                            displayPublishDate
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                    {editMode || Boolean(book?.pages) ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Pages</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formPages} onChange={(e) => setFormPages(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add page count" />
+                          ) : book?.pages ? String(book.pages) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                    {editMode || Boolean((book as any)?.trim_width) ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Trim size</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <div className="row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
+                              <input className="om-inline-control" type="number" min={0.01} step={0.01} value={formTrimWidth} onChange={(e) => setFormTrimWidth(e.target.value)} placeholder="W" style={{ width: 72 }} />
+                              <span className="text-muted">×</span>
+                              <input className="om-inline-control" type="number" min={0.01} step={0.01} value={formTrimHeight} onChange={(e) => setFormTrimHeight(e.target.value)} placeholder="H" style={{ width: 72 }} />
+                              <select className="om-inline-control" value={formTrimUnit} onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)} style={{ width: "auto", minWidth: 0 }}>
+                                <option value="in">in</option>
+                                <option value="mm">mm</option>
+                              </select>
+                            </div>
+                          ) : (book as any)?.trim_width && (book as any)?.trim_height ? (
+                            `${(book as any).trim_width} × ${(book as any).trim_height} ${(book as any).trim_unit ?? "in"}`
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                )}
 
 
                 {editMode || Boolean((book?.object_type ?? "").trim()) ? (
@@ -3989,7 +4295,7 @@ export default function BookDetailPage() {
                   </div>
                 ) : null}
 
-                {editMode || facetView.subject.length > 0 ? (
+                {!isMusicObject && (editMode || facetView.subject.length > 0) ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="text-muted">
                       Subjects
@@ -4019,7 +4325,7 @@ export default function BookDetailPage() {
                   </div>
                 ) : null}
 
-                {editMode || Boolean(book?.edition?.isbn13 ?? book?.edition?.isbn10) ? (
+                {!isMusicObject && (editMode || Boolean(book?.edition?.isbn13 ?? book?.edition?.isbn10)) ? (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                     <div style={{ minWidth: 110 }} className="text-muted">
                       ISBN

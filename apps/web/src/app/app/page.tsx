@@ -31,6 +31,7 @@ import {
 } from "../../lib/isbn";
 import { DECADE_OPTIONS } from "../../lib/decades";
 import { saveBookNavContext } from "../../lib/bookNav";
+import type { MusicMetadata, MusicContributorRole } from "../../lib/music";
 
 const BookScannerModal = dynamic(() => import("../../components/BookScannerModal"), { ssr: false });
 
@@ -404,6 +405,12 @@ function AppShell({
     isbn10: string | null;
     isbn13: string | null;
     cover_url: string | null;
+    object_type?: "book" | "music" | null;
+    source_type?: string | null;
+    source_url?: string | null;
+    external_source_ids?: Record<string, string | null> | null;
+    music_metadata?: MusicMetadata | null;
+    contributor_entities?: Partial<Record<MusicContributorRole, string[]>> | null;
     sources: string[];
   } | null>(null);
   const [addPreviewCoverFailed, setAddPreviewCoverFailed] = useState(false);
@@ -721,16 +728,18 @@ function AppShell({
       const vm = window.localStorage.getItem("om_viewMode");
       const gc = window.localStorage.getItem("om_gridCols");
       const sm = window.localStorage.getItem("om_sortMode");
+      const q = (searchParams.get("q") ?? "").trim();
       window.localStorage.removeItem("om_categoryMode");
       window.localStorage.removeItem("om_tagMode");
       window.localStorage.removeItem("om_visibilityMode");
       if (vm === "grid" || vm === "list") setViewMode(vm);
       if (gc === "1" || gc === "2" || gc === "4" || gc === "8") setGridCols(Number(gc) as any);
       if (sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
+      setSearchQuery(q);
     } catch {
       // ignore
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     try {
@@ -895,9 +904,9 @@ function AppShell({
     if (ids.length === 0) return { ok: false, reason: "no_library_ids" };
 
     const fallbackSelects = [
-      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))",
-      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))",
-      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))",
+      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))",
+      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))",
+      "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))",
       "*"
     ];
 
@@ -984,7 +993,7 @@ function AppShell({
         const ownerFallback = await supabase
           .from("user_books")
           .select(
-            "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,decade,cover_original_url,cover_crop,notes,edition_id,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date,description,subjects),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))"
+            "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,cover_original_url,cover_crop,notes,edition_id,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date,description,subjects),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))"
           )
           .eq("owner_id", userId)
           .order("created_at", { ascending: false })
@@ -1877,10 +1886,71 @@ function AppShell({
     description?: string | null;
     subjects?: string[];
     cover_url?: string | null;
+    object_type?: "book" | "music" | null;
+    source_type?: string | null;
+    source_url?: string | null;
+    external_source_ids?: Record<string, string | null> | null;
+    music_metadata?: MusicMetadata | null;
+    contributor_entities?: Partial<Record<MusicContributorRole, string[]>> | null;
   }, targetLibraryId?: number | null): Promise<number> {
     if (!supabase) throw new Error("Supabase is not configured");
     const selectedLibraryId = Number(targetLibraryId ?? addLibraryId ?? 0);
     if (!selectedLibraryId) throw new Error("Choose a catalog first");
+    const objectType = (data.object_type ?? "book") === "music" ? "music" : "book";
+    if (objectType === "music") {
+      const musicMetadata = data.music_metadata ?? null;
+      const insertPayload: Record<string, unknown> = {
+        owner_id: userId,
+        library_id: selectedLibraryId,
+        edition_id: null,
+        object_type: "music",
+        title_override: data.title ?? null,
+        description_override: data.description ?? null,
+        subjects_override: (data.subjects ?? []).length > 0 ? data.subjects : [],
+        source_type: data.source_type ?? null,
+        source_url: data.source_url ?? null,
+        external_source_ids: data.external_source_ids ?? null,
+        music_metadata: musicMetadata,
+        decade:
+          String(musicMetadata?.original_release_year ?? "").trim()
+            ? `${String(musicMetadata?.original_release_year).trim().slice(0, 3)}0s`
+            : null
+      };
+      const created = await supabase.from("user_books").insert(insertPayload).select("id").single();
+      if (created.error) throw new Error(created.error.message);
+      const createdId = created.data.id as number;
+      const contributorEntities = data.contributor_entities ?? {};
+      const primaryArtist = String(musicMetadata?.primary_artist ?? "").trim();
+      if (primaryArtist) {
+        contributorEntities.performer = Array.from(new Set([primaryArtist, ...(contributorEntities.performer ?? [])]));
+      }
+      const label = String(musicMetadata?.label ?? "").trim();
+      if (label) {
+        await supabase.rpc("set_book_entities", {
+          p_user_book_id: createdId,
+          p_role: "publisher",
+          p_names: [label]
+        });
+      }
+      for (const [role, names] of Object.entries(contributorEntities)) {
+        if (!Array.isArray(names) || names.length === 0) continue;
+        await supabase.rpc("set_book_entities", {
+          p_user_book_id: createdId,
+          p_role: role,
+          p_names: names
+        });
+      }
+      const coverUrl = (data.cover_url ?? "").trim();
+      if (coverUrl) {
+        try {
+          await importCoverForBook(createdId, coverUrl);
+        } catch {
+          // ignore cover import failures for music objects
+        }
+      }
+      await refreshAllBooks();
+      return createdId;
+    }
     const isbn13 = (data.isbn13 ?? "").trim();
     let editionId: number | undefined;
     if (isbn13) {
@@ -2558,6 +2628,7 @@ function AppShell({
         haystackParts.push((g.filterGroups ?? []).join(" "));
         haystackParts.push((g.filterDecades ?? []).join(" "));
         for (const c of g.copies ?? []) {
+          const music = (c as any)?.music_metadata && typeof (c as any).music_metadata === "object" ? (c as any).music_metadata : null;
           haystackParts.push(String(c.edition?.isbn13 ?? ""));
           haystackParts.push(String(c.edition?.isbn10 ?? ""));
           haystackParts.push(String(c.publisher_override ?? ""));
@@ -2576,6 +2647,28 @@ function AppShell({
           haystackParts.push((c.editors_override ?? []).join(" "));
           haystackParts.push((c.designers_override ?? []).join(" "));
           haystackParts.push((c.subjects_override ?? c.edition?.subjects ?? []).join(" "));
+          haystackParts.push((c.book_entities ?? []).map((row: any) => String(row?.entity?.name ?? "")).join(" "));
+          if (music) {
+            haystackParts.push(String(music.primary_artist ?? ""));
+            haystackParts.push(String(music.label ?? ""));
+            haystackParts.push(String(music.release_date ?? ""));
+            haystackParts.push(String(music.original_release_year ?? ""));
+            haystackParts.push(String(music.format ?? ""));
+            haystackParts.push(String(music.edition_pressing ?? ""));
+            haystackParts.push(String(music.catalog_number ?? ""));
+            haystackParts.push(String(music.barcode ?? ""));
+            haystackParts.push(String(music.country ?? ""));
+            haystackParts.push(String(music.discogs_id ?? ""));
+            haystackParts.push(String(music.musicbrainz_id ?? ""));
+            haystackParts.push(String(music.speed ?? ""));
+            haystackParts.push(String(music.color_variant ?? ""));
+            haystackParts.push(String(music.release_lineage ?? ""));
+            haystackParts.push(String(music.audio_configuration ?? ""));
+            haystackParts.push(String(music.packaging_type ?? ""));
+            haystackParts.push(((music.genres ?? []) as string[]).join(" "));
+            haystackParts.push(((music.styles ?? []) as string[]).join(" "));
+            haystackParts.push((((music.tracklist ?? []) as Array<{ position?: string | null; title?: string | null; duration?: string | null }>).map((track) => `${track.position ?? ""} ${track.title ?? ""} ${track.duration ?? ""}`.trim())).join(" "));
+          }
           haystackParts.push(
             (c.book_tags ?? [])
               .map((bt) => bt?.tag)

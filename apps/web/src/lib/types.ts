@@ -1,4 +1,5 @@
 import type { CoverCrop } from "../components/CoverImage";
+import type { MusicMetadata } from "./music";
 
 export type PublicBook = {
   id: number;
@@ -14,6 +15,10 @@ export type PublicBook = {
   group_label?: string | null;
   object_type?: string | null;
   decade?: string | null;
+  source_type?: string | null;
+  source_url?: string | null;
+  external_source_ids?: Record<string, string | null> | null;
+  music_metadata?: MusicMetadata | null;
   publish_date_override?: string | null;
   description_override?: string | null;
   location?: string | null;

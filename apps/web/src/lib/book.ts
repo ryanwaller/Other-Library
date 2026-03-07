@@ -1,4 +1,5 @@
 import type { PublicBook } from "./types";
+import { parseMusicMetadata } from "./music";
 
 export function normalizeKeyPart(input: string): string {
   return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -10,6 +11,11 @@ export function effectiveTitleFor(b: PublicBook): string {
 }
 
 export function effectiveAuthorsFor(b: PublicBook): string[] {
+  if ((b.object_type ?? "").trim() === "music") {
+    const music = parseMusicMetadata(b.music_metadata);
+    const primaryArtist = (music?.primary_artist ?? "").trim();
+    if (primaryArtist) return [primaryArtist];
+  }
   const editors = (b.editors_override ?? []).filter(Boolean);
   if (b.authors_override !== null && b.authors_override !== undefined) {
     const override = (b.authors_override ?? []).filter(Boolean);
