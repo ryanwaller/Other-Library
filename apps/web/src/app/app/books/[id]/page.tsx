@@ -82,6 +82,7 @@ type UserBookDetail = {
   trim_width: number | null;
   trim_height: number | null;
   trim_unit: string | null;
+  field_visibility?: Record<string, boolean> | null;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
   edition: {
@@ -99,7 +100,7 @@ type UserBookDetail = {
   } | null;
   media: Array<{ id: number; kind: "cover" | "image"; storage_path: string; caption: string | null; created_at: string }>;
   book_tags: Array<{ tag: { id: number; name: string; kind: "tag" | "category" } | null }>;
-  book_entities?: Array<{ role: FacetRole; position: number | null; entity: EntityRef | null }> | null;
+  book_entities?: Array<{ role: FacetRole; position: number | null; entity: EntityRef | null; visibility?: boolean }> | null;
 };
 
 type MetadataSearchResult = {
@@ -323,6 +324,73 @@ function musicValueHref(value: string, kind: "q" | "publisher" | "subject" = "q"
   return `/app?q=${encodeURIComponent(next)}`;
 }
 
+function FieldVisibilityToggle(props: { 
+  visible: boolean; 
+  onChange: (visible: boolean) => void; 
+  disabled?: boolean;
+}) {
+  const { visible, onChange, disabled } = props;
+  if (disabled) return <div style={{ width: 24 }} />;
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!visible)}
+      style={{
+        background: "none",
+        border: "none",
+        padding: "0 4px",
+        cursor: "pointer",
+        fontSize: "1.1em",
+        opacity: visible ? 1 : 0.5,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 24
+      }}
+      title={visible ? "Visible publicly" : "Hidden from public view"}
+    >
+      {visible ? "👁" : "🙈"}
+    </button>
+  );
+}
+
+function MetadataRow(props: {
+  label: string;
+  children: ReactNode;
+  visible: boolean;
+  editMode: boolean;
+  onVisibilityChange?: (visible: boolean) => void;
+  hideToggle?: boolean;
+  style?: any;
+}) {
+  const { label, children, visible, editMode, onVisibilityChange, hideToggle, style } = props;
+
+  if (!editMode && !visible) return null;
+
+  return (
+    <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && !visible ? 0.6 : 1, ...style }}>
+      <div style={{ minWidth: 110 }} className="text-muted">{label}</div>
+      <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+        {children}
+        {editMode && !visible && (
+          <div className="text-muted" style={{ fontSize: "0.8em", marginTop: 2 }}>
+            Hidden from public view
+          </div>
+        )}
+      </div>
+      {editMode && (
+        <div style={{ marginLeft: "var(--space-sm)" }}>
+          <FieldVisibilityToggle 
+            visible={visible} 
+            onChange={onVisibilityChange ?? (() => {})} 
+            disabled={hideToggle}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FacetLinks(props: { role: FacetRole; items: EntityRef[] }) {
   const { role, items } = props;
   return (
@@ -491,6 +559,14 @@ export default function BookDetailPage() {
   const [formLocation, setFormLocation] = useState("");
   const [formShelf, setFormShelf] = useState("");
   const [formNotes, setFormNotes] = useState("");
+  const [fieldVisibility, setFieldVisibility] = useState<Record<string, boolean>>({});
+
+  function toggleFieldVisibility(fieldKey: string) {
+    setFieldVisibility((prev) => ({
+      ...prev,
+      [fieldKey]: !prev[fieldKey]
+    }));
+  }
   const [formVisibility, setFormVisibility] = useState<"inherit" | "followers_only" | "public">("inherit");
   const [formStatus, setFormStatus] = useState<"owned" | "loaned" | "selling" | "trading">("owned");
   const [formBorrowable, setFormBorrowable] = useState<"inherit" | "yes" | "no">("inherit");
@@ -891,11 +967,11 @@ export default function BookDetailPage() {
     setCopiesCountState({ busy: false, error: null });
     try {
       const baseNew =
-        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,source_type,source_url,external_source_ids,music_metadata,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,source_type,source_url,external_source_ids,music_metadata,field_visibility,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
       const baseOld =
-        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,object_type,source_type,source_url,external_source_ids,music_metadata,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,object_type,source_type,source_url,external_source_ids,music_metadata,field_visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
 
-      const entitiesSelect = ",book_entities:book_entities(role,position,entity:entities(id,name,slug))";
+      const entitiesSelect = ",book_entities:book_entities(role,position,visibility,entity:entities(id,name,slug))";
       const selectNew = baseNew + entitiesSelect;
       const selectOld = baseOld + entitiesSelect;
 
@@ -966,7 +1042,7 @@ export default function BookDetailPage() {
         photography: []
       };
 
-      const entityRows = ((row as any).book_entities as Array<{ role: FacetRole; position: number | null; entity: EntityRef | null }> | null) ?? [];
+      const entityRows = ((row as any).book_entities as Array<{ role: FacetRole; position: number | null; entity: EntityRef | null; visibility?: boolean }> | null) ?? [];
       if (entityRows.length > 0) {
         const sorted = entityRows
           .filter((r) => r?.role && r?.entity?.name)
@@ -1002,6 +1078,18 @@ export default function BookDetailPage() {
         nextFacets.tag = tagsFallback.filter((t) => t.kind === "tag").map((t) => String(t.name)).filter(Boolean);
         nextFacets.category = tagsFallback.filter((t) => t.kind === "category").map((t) => String(t.name)).filter(Boolean);
       }
+
+      const nextVisibility: Record<string, boolean> = { ...(row.field_visibility as Record<string, boolean> ?? {}) };
+      for (const r of entityRows) {
+        if (r?.role && r?.entity?.name) {
+          const role = (r.role === ("design" as any) ? "designer" : r.role) as FacetRole;
+          const name = String(r.entity!.name ?? "").trim();
+          if (name && r.visibility === false) {
+            nextVisibility[`${role}:${name}`] = false;
+          }
+        }
+      }
+      setFieldVisibility(nextVisibility);
 
       setFacetDraft(nextFacets);
 
@@ -1580,51 +1668,26 @@ export default function BookDetailPage() {
 
   const facetView = useMemo(() => {
     const out: Record<FacetRole, EntityRef[]> = {
-      author: [],
-      editor: [],
-      designer: [],
-      subject: [],
-      tag: [],
-      category: [],
-      material: [],
-      printer: [],
-      publisher: [],
-      performer: [],
-      composer: [],
-      producer: [],
-      engineer: [],
-      mastering: [],
-      "featured artist": [],
-      arranger: [],
-      conductor: [],
-      orchestra: [],
-      "art direction": [],
-      artwork: [],
-      photography: []
+      author: [], editor: [], designer: [], subject: [], tag: [], category: [], material: [], printer: [], publisher: [],
+      performer: [], composer: [], producer: [], engineer: [], mastering: [], "featured artist": [], arranger: [],
+      conductor: [], orchestra: [], "art direction": [], artwork: [], photography: []
     };
-
-    const rows = ((book?.book_entities ?? []) as Array<{ role: FacetRole; position: number | null; entity: EntityRef | null }> | null) ?? [];
-    const sorted = rows
-      .filter((r) => r?.role && r?.entity?.name && r?.entity?.slug)
-      .slice()
-      .sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999));
-    for (const r of sorted) {
-      const role = r.role;
-      const ent = r.entity!;
-      if (out[role]) {
-        out[role].push({ id: ent.id, name: ent.name, slug: ent.slug });
-      }
+    if (!book) return out;
+    const canSeeHidden = isOwner;
+    const entities = (book.book_entities ?? []);
+    for (const r of entities) {
+      if (!r.role || !r.entity?.name) continue;
+      const role = (r.role === ("design" as any) ? "designer" : r.role) as FacetRole;
+      const isVisible = r.visibility !== false;
+      if (!canSeeHidden && !isVisible) continue;
+      out[role].push(r.entity);
     }
 
-    // Supplement with fallback slugs generated from effective variables for any roles that are missing local overrides.
-    // This ensures that even designers/editors added via CSV (stored in overrides) are clickable.
     const supplement = (role: FacetRole, names: string[]) => {
       for (const name of names) {
         const normalized = name.trim();
         if (!normalized) continue;
-        // If we already have this name in out[role] from DB rows, skip it
         if (out[role].some((existing) => existing.name.toLowerCase() === normalized.toLowerCase())) continue;
-
         const slug = slugifyFallback(normalized) || slugifyFallback(`${role}-${normalized}`);
         out[role].push({ id: `${role}:${slug}`, name: normalized, slug });
       }
@@ -1636,36 +1699,29 @@ export default function BookDetailPage() {
     supplement("subject", effectiveSubjects);
     supplement("tag", tags.map((t) => t.name));
     supplement("category", categories.map((t) => t.name));
-
-    if (effectivePublisher.trim()) {
-      supplement("publisher", [effectivePublisher.trim()]);
-    }
-
+    if (effectivePublisher.trim()) supplement("publisher", [effectivePublisher.trim()]);
     const printerName = (facetDraft.printer?.[0] ?? formPrinter).trim();
     if (printerName) supplement("printer", [printerName]);
-
     const materialName = (facetDraft.material?.[0] ?? formMaterials).trim();
     if (materialName) supplement("material", [materialName]);
-
     for (const role of MUSIC_CONTRIBUTOR_ROLES) {
       supplement(role, facetDraft[role] ?? []);
     }
 
     return out;
   }, [
-    book?.book_entities,
-    categories,
-    effectiveAuthors,
-    effectiveDesigners,
-    effectiveEditors,
-    effectivePublisher,
-    effectiveSubjects,
-    facetDraft,
-    facetDraft.material,
-    facetDraft.printer,
-    formMaterials,
-    formPrinter,
-    tags
+    book, 
+    isOwner, 
+    effectiveAuthors, 
+    effectiveEditors, 
+    effectiveDesigners, 
+    effectiveSubjects, 
+    tags, 
+    categories, 
+    effectivePublisher, 
+    facetDraft, 
+    formPrinter, 
+    formMaterials
   ]);
 
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
@@ -2014,6 +2070,12 @@ export default function BookDetailPage() {
     const trim_width = Number.isFinite(trimWRaw) && trimWRaw > 0 ? trimWRaw : null;
     const trim_height = Number.isFinite(trimHRaw) && trimHRaw > 0 ? trimHRaw : null;
     const trim_unit = trim_width !== null && trim_height !== null ? (formTrimUnit || "in") : null;
+
+    const standardVisibility: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(fieldVisibility)) {
+      if (!k.includes(":")) standardVisibility[k] = v;
+    }
+
     const payload: any = {
       group_label,
       object_type,
@@ -2022,6 +2084,7 @@ export default function BookDetailPage() {
       trim_width,
       trim_height,
       trim_unit,
+      field_visibility: standardVisibility,
       title_override,
       authors_override,
       editors_override: editors_override.length > 0 ? editors_override : null,
@@ -2111,11 +2174,18 @@ export default function BookDetailPage() {
         }
       }
       for (const [role, names] of roles) {
-        const rpc = await supabase.rpc("set_book_entities", { p_user_book_id: book.id, p_role: role, p_names: names ?? [] });
+        const visibilities = names.map((n) => fieldVisibility[`${role}:${n}`] !== false);
+        const rpc = await supabase.rpc("set_book_entities_v2", { 
+          p_user_book_id: book.id, 
+          p_role: role, 
+          p_names: names ?? [],
+          p_visibility: visibilities
+        });
         if (rpc.error) {
           const msg = (rpc.error.message ?? "").toLowerCase();
           if (msg.includes("does not exist") || msg.includes("function") || msg.includes("unknown")) {
-            break;
+            // Fallback to legacy RPC if v2 not available yet
+            await supabase.rpc("set_book_entities", { p_user_book_id: book.id, p_role: role, p_names: names ?? [] });
           }
         }
       }
@@ -4061,93 +4131,103 @@ export default function BookDetailPage() {
                 {isMusicObject ? (
                   <>
                     {editMode || effectiveAuthors.length > 0 ? <hr className="divider" /> : null}
-                    {editMode || effectiveAuthors.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Primary artist</div>
-                        <div style={{ flex: "1 1 auto" }}>
+                    <MetadataRow
+                      label="Primary artist"
+                      visible={true}
+                      editMode={editMode}
+                      hideToggle={true}
+                    >
+                      {editMode ? (
+                        <input
+                          className="om-inline-control"
+                          value={formMusic.primary_artist ?? ""}
+                          onChange={(e) => setFormMusic((s) => ({ ...s, primary_artist: e.target.value || null }))}
+                          placeholder="Add primary artist"
+                        />
+                      ) : facetView.performer[0] ? (
+                        <FacetLinks role="performer" items={[facetView.performer[0]]} />
+                      ) : (
+                        effectiveAuthors[0] ?? null
+                      )}
+                    </MetadataRow>
+
+                    {MUSIC_CONTRIBUTOR_ROLES.map((role) => {
+                      if (role === "performer" && !editMode) return null;
+                      const items = facetView[role];
+                      const names = editMode ? facetDraft[role] : items.map(i => i.name);
+                      const visKey = `${role}:${names[0] ?? ""}`;
+                      
+                      return (editMode || items.length > 0) ? (
+                        <MetadataRow
+                          key={role}
+                          label={musicRoleLabel(role)}
+                          visible={names.length === 0 || fieldVisibility[visKey] !== false}
+                          editMode={editMode}
+                          onVisibilityChange={(v) => {
+                            const next = { ...fieldVisibility };
+                            names.forEach(n => next[`${role}:${n}`] = v);
+                            setFieldVisibility(next);
+                          }}
+                        >
                           {editMode ? (
-                            <input
-                              className="om-inline-control"
-                              value={formMusic.primary_artist ?? ""}
-                              onChange={(e) => setFormMusic((s) => ({ ...s, primary_artist: e.target.value || null }))}
-                              placeholder="Add primary artist"
+                            <EntityTokenField
+                              role={role}
+                              value={facetDraft[role]}
+                              onChange={(next) => setFacetDraft((s) => ({ ...s, [role]: next }))}
+                              placeholder={`Add ${role}`}
+                              disabled={!isOwner || busy || saveState.busy}
                             />
-                          ) : facetView.performer[0] ? (
-                            <FacetLinks role="performer" items={[facetView.performer[0]]} />
                           ) : (
-                            effectiveAuthors[0] ?? null
+                            <FacetLinks role={role} items={items} />
                           )}
-                        </div>
-                      </div>
-                    ) : null}
+                        </MetadataRow>
+                      ) : null;
+                    })}
 
-                    {MUSIC_CONTRIBUTOR_ROLES.map((role) =>
-                      editMode || facetView[role].length > 0 ? (
-                        <div key={role} className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                          <div style={{ minWidth: 110 }} className="text-muted">
-                            {musicRoleLabel(role)}
-                          </div>
-                          <div style={{ flex: "1 1 auto" }}>
-                            {editMode ? (
-                              <EntityTokenField
-                                role={role}
-                                value={facetDraft[role]}
-                                onChange={(next) => setFacetDraft((s) => ({ ...s, [role]: next }))}
-                                placeholder={`Add ${role}`}
-                                disabled={!isOwner || busy || saveState.busy}
-                              />
-                            ) : (
-                              <FacetLinks role={role} items={facetView[role]} />
-                            )}
-                          </div>
-                        </div>
-                      ) : null
-                    )}
+                    <MetadataRow
+                      label="Label"
+                      visible={fieldVisibility.label !== false}
+                      editMode={editMode}
+                      onVisibilityChange={(v) => toggleFieldVisibility("label")}
+                    >
+                      {editMode ? (
+                        <input className="om-inline-control" value={formMusic.label ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, label: e.target.value || null }))} placeholder="Add label" />
+                      ) : facetView.publisher.length > 0 ? (
+                        <FacetLinks role="publisher" items={facetView.publisher} />
+                      ) : (
+                        effectiveMusic.label
+                      )}
+                    </MetadataRow>
 
-                    {editMode || Boolean((effectiveMusic.label ?? "").trim()) ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Label</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <input className="om-inline-control" value={formMusic.label ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, label: e.target.value || null }))} placeholder="Add label" />
-                          ) : facetView.publisher.length > 0 ? (
-                            <FacetLinks role="publisher" items={facetView.publisher} />
-                          ) : (
-                            effectiveMusic.label
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
+                    <MetadataRow
+                      label="Release date"
+                      visible={fieldVisibility.release_date !== false}
+                      editMode={editMode}
+                      onVisibilityChange={(v) => toggleFieldVisibility("release_date")}
+                    >
+                      {editMode ? (
+                        <input className="om-inline-control" value={formMusic.release_date ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, release_date: e.target.value || null }))} placeholder="Add release date" />
+                      ) : (
+                        <Link href={musicValueHref(effectiveMusic.release_date ?? "")}>
+                          {formatDateShort(effectiveMusic.release_date || null)}
+                        </Link>
+                      )}
+                    </MetadataRow>
 
-                    {editMode || Boolean((effectiveMusic.release_date ?? "").trim()) ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Release date</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <input className="om-inline-control" value={formMusic.release_date ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, release_date: e.target.value || null }))} placeholder="Add release date" />
-                          ) : (
-                            <Link href={musicValueHref(effectiveMusic.release_date ?? "")}>
-                              {formatDateShort(effectiveMusic.release_date || null)}
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {editMode || Boolean((effectiveMusic.original_release_year ?? "").trim()) ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Orig. release year</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <input className="om-inline-control" value={formMusic.original_release_year ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, original_release_year: e.target.value || null }))} placeholder="Add year" />
-                          ) : (
-                            <Link href={musicValueHref(effectiveMusic.original_release_year ?? "")}>
-                              {effectiveMusic.original_release_year}
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
+                    <MetadataRow
+                      label="Orig. release year"
+                      visible={fieldVisibility.original_release_year !== false}
+                      editMode={editMode}
+                      onVisibilityChange={(v) => toggleFieldVisibility("original_release_year")}
+                    >
+                      {editMode ? (
+                        <input className="om-inline-control" value={formMusic.original_release_year ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, original_release_year: e.target.value || null }))} placeholder="Add year" />
+                      ) : (
+                        <Link href={musicValueHref(effectiveMusic.original_release_year ?? "")}>
+                          {effectiveMusic.original_release_year}
+                        </Link>
+                      )}
+                    </MetadataRow>
 
                     {[
                       ["Format", "format", "select"],
@@ -4350,248 +4430,267 @@ export default function BookDetailPage() {
                 ) : (
                   <>
                     {editMode || facetView.author.length > 0 ? <hr className="divider" /> : null}
-                    {editMode || facetView.author.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Authors</div>
-                        <div className="om-hanging-value">
+                    <MetadataRow
+                      label="Authors"
+                      visible={true}
+                      editMode={editMode}
+                      hideToggle={true}
+                    >
+                      <div className="om-hanging-value">
+                        {editMode ? (
+                          <EntityTokenField role="author" value={facetDraft.author} onChange={(next) => { setFacetDraft((s) => ({ ...s, author: next })); setFormAuthors(next.join(", ")); }} placeholder="Add an author" disabled={!isOwner || busy || saveState.busy} />
+                        ) : (
+                          <FacetLinks role="author" items={facetView.author} />
+                        )}
+                      </div>
+                    </MetadataRow>
+                    {[
+                      ["Editors", "editor", facetView.editor, facetDraft.editor, setFormEditors],
+                      ["Designers", "designer", facetView.designer, facetDraft.designer, setFormDesigners]
+                    ].map(([label, role, viewItems, draftItems, setForm]) => {
+                      const names = editMode ? (draftItems as string[]) : (viewItems as EntityRef[]).map(i => i.name);
+                      const visKey = `${role}:${names[0] ?? ""}`;
+                      return (editMode || (viewItems as any[]).length > 0) ? (
+                        <MetadataRow
+                          key={role as string}
+                          label={label as string}
+                          visible={names.length === 0 || fieldVisibility[visKey] !== false}
+                          editMode={editMode}
+                          onVisibilityChange={(v) => {
+                            const next = { ...fieldVisibility };
+                            names.forEach(n => next[`${role}:${n}`] = v);
+                            setFieldVisibility(next);
+                          }}
+                        >
                           {editMode ? (
-                            <EntityTokenField role="author" value={facetDraft.author} onChange={(next) => { setFacetDraft((s) => ({ ...s, author: next })); setFormAuthors(next.join(", ")); }} placeholder="Add an author" disabled={!isOwner || busy || saveState.busy} />
+                            <EntityTokenField role={role as FacetRole} value={draftItems as string[]} onChange={(next) => { setFacetDraft((s) => ({ ...s, [role as string]: next })); (setForm as any)(next.join(", ")); }} placeholder={`Add ${String(label).toLowerCase().replace(/s$/, "")}`} disabled={!isOwner || busy || saveState.busy} />
                           ) : (
-                            <FacetLinks role="author" items={facetView.author} />
+                            <FacetLinks role={role as FacetRole} items={viewItems as EntityRef[]} />
                           )}
-                        </div>
-                      </div>
-                    ) : null}
-                    {editMode || facetView.editor.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Editors</div>
-                        <div style={{ flex: "1 1 auto" }}>
+                        </MetadataRow>
+                      ) : null;
+                    })}
+
+                    {[
+                      ["Printer", "printer", facetView.printer, facetDraft.printer, setFormPrinter, "Add a printer"],
+                      ["Material", "material", facetView.material, facetDraft.material, setFormMaterials, "Add materials"]
+                    ].map(([label, role, viewItems, draftItems, setForm, placeholder]) => {
+                      const names = editMode ? (draftItems as string[]) : (viewItems as EntityRef[]).map(i => i.name);
+                      const visKey = `${role}:${names[0] ?? ""}`;
+                      return (editMode || (viewItems as any[]).length > 0) ? (
+                        <MetadataRow
+                          key={role as string}
+                          label={label as string}
+                          visible={names.length === 0 || fieldVisibility[visKey] !== false}
+                          editMode={editMode}
+                          onVisibilityChange={(v) => {
+                            const next = { ...fieldVisibility };
+                            names.forEach(n => next[`${role}:${n}`] = v);
+                            setFieldVisibility(next);
+                          }}
+                        >
                           {editMode ? (
-                            <EntityTokenField role="editor" value={facetDraft.editor} onChange={(next) => { setFacetDraft((s) => ({ ...s, editor: next })); setFormEditors(next.join(", ")); }} placeholder="Add an editor" disabled={!isOwner || busy || saveState.busy} />
+                            <EntityTokenField role={role as FacetRole} value={draftItems as string[]} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, [role as string]: only })); (setForm as any)(only[0] ?? ""); }} placeholder={placeholder as string} disabled={!isOwner || busy || saveState.busy} />
                           ) : (
-                            <FacetLinks role="editor" items={facetView.editor} />
+                            <FacetLinks role={role as FacetRole} items={viewItems as EntityRef[]} />
                           )}
+                        </MetadataRow>
+                      ) : null;
+                    })}
+
+                    <MetadataRow
+                      label="Publisher"
+                      visible={fieldVisibility.publisher !== false}
+                      editMode={editMode}
+                      onVisibilityChange={() => toggleFieldVisibility("publisher")}
+                    >
+                      {editMode ? (
+                        <EntityTokenField role="publisher" value={facetDraft.publisher} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, publisher: only })); setFormPublisher(only[0] ?? ""); }} placeholder="Add a publisher" disabled={!isOwner || busy || saveState.busy} />
+                      ) : facetView.publisher.length > 0 ? (
+                        <FacetLinks role="publisher" items={facetView.publisher} />
+                      ) : (
+                        effectivePublisher
+                      )}
+                    </MetadataRow>
+
+                    <MetadataRow
+                      label="Edition"
+                      visible={fieldVisibility.edition !== false}
+                      editMode={editMode}
+                      onVisibilityChange={() => toggleFieldVisibility("edition")}
+                    >
+                      {editMode ? (
+                        <input className="om-inline-control" value={formEditionOverride} onChange={(e) => setFormEditionOverride(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add edition" />
+                      ) : (
+                        (formEditionOverride ?? "").trim()
+                      )}
+                    </MetadataRow>
+
+                    <MetadataRow
+                      label="Published"
+                      visible={fieldVisibility.publish_date !== false}
+                      editMode={editMode}
+                      onVisibilityChange={() => toggleFieldVisibility("publish_date")}
+                    >
+                      {editMode ? (
+                        <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="YYYY-MM-DD" />
+                      ) : (
+                        <Link href={`/app?q=${encodeURIComponent(displayPublishDate)}`}>{displayPublishDate}</Link>
+                      )}
+                    </MetadataRow>
+
+                    <MetadataRow
+                      label="Pages"
+                      visible={fieldVisibility.pages !== false}
+                      editMode={editMode}
+                      onVisibilityChange={() => toggleFieldVisibility("pages")}
+                    >
+                      {editMode ? (
+                        <input className="om-inline-control" value={formPages} onChange={(e) => setFormPages(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add page count" />
+                      ) : book?.pages ? String(book.pages) : null}
+                    </MetadataRow>
+
+                    <MetadataRow
+                      label="Trim size"
+                      visible={fieldVisibility.trim_size !== false}
+                      editMode={editMode}
+                      onVisibilityChange={() => toggleFieldVisibility("trim_size")}
+                    >
+                      {editMode ? (
+                        <div className="row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
+                          <input className="om-inline-control" type="number" min={0.01} step={0.01} value={formTrimWidth} onChange={(e) => setFormTrimWidth(e.target.value)} placeholder="W" style={{ width: 72 }} />
+                          <span className="text-muted">×</span>
+                          <input className="om-inline-control" type="number" min={0.01} step={0.01} value={formTrimHeight} onChange={(e) => setFormTrimHeight(e.target.value)} placeholder="H" style={{ width: 72 }} />
+                          <select className="om-inline-control" value={formTrimUnit} onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)} style={{ width: "auto", minWidth: 0 }}>
+                            <option value="in">in</option>
+                            <option value="mm">mm</option>
+                          </select>
                         </div>
-                      </div>
-                    ) : null}
-                    {editMode || facetView.designer.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Designers</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <EntityTokenField role="designer" value={facetDraft.designer} onChange={(next) => { setFacetDraft((s) => ({ ...s, designer: next })); setFormDesigners(next.join(", ")); }} placeholder="Add a designer" disabled={!isOwner || busy || saveState.busy} />
-                          ) : (
-                            <FacetLinks role="designer" items={facetView.designer} />
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                    {editMode || facetView.printer.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Printer</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <EntityTokenField role="printer" value={facetDraft.printer} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, printer: only })); setFormPrinter(only[0] ?? ""); }} placeholder="Add a printer" disabled={!isOwner || busy || saveState.busy} />
-                          ) : (
-                            <FacetLinks role="printer" items={facetView.printer} />
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                    {editMode || facetView.material.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Materials</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <EntityTokenField role="material" value={facetDraft.material} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, material: only })); setFormMaterials(only[0] ?? ""); }} placeholder="Add materials" disabled={!isOwner || busy || saveState.busy} />
-                          ) : (
-                            <FacetLinks role="material" items={facetView.material} />
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                    {editMode || Boolean((formEditionOverride ?? "").trim()) ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Edition</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <input className="om-inline-control" value={formEditionOverride} onChange={(e) => setFormEditionOverride(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add edition" />
-                          ) : (
-                            (formEditionOverride ?? "").trim()
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                    {editMode || facetView.publisher.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Publisher</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <EntityTokenField role="publisher" value={facetDraft.publisher} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, publisher: only })); setFormPublisher(only[0] ?? ""); }} placeholder="Add a publisher" disabled={!isOwner || busy || saveState.busy} />
-                          ) : (
-                            <FacetLinks role="publisher" items={facetView.publisher} />
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                    {editMode || Boolean(effectivePublishDate) ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Publish date</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add date" />
-                          ) : (
-                            displayPublishDate
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-                    {editMode || Boolean(book?.pages) ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Pages</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <input className="om-inline-control" value={formPages} onChange={(e) => setFormPages(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add page count" />
-                          ) : book?.pages ? String(book.pages) : null}
-                        </div>
-                      </div>
-                    ) : null}
-                    {editMode || Boolean((book as any)?.trim_width) ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Trim size</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <div className="row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
-                              <input className="om-inline-control" type="number" min={0.01} step={0.01} value={formTrimWidth} onChange={(e) => setFormTrimWidth(e.target.value)} placeholder="W" style={{ width: 72 }} />
-                              <span className="text-muted">×</span>
-                              <input className="om-inline-control" type="number" min={0.01} step={0.01} value={formTrimHeight} onChange={(e) => setFormTrimHeight(e.target.value)} placeholder="H" style={{ width: 72 }} />
-                              <select className="om-inline-control" value={formTrimUnit} onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)} style={{ width: "auto", minWidth: 0 }}>
-                                <option value="in">in</option>
-                                <option value="mm">mm</option>
-                              </select>
-                            </div>
-                          ) : (book as any)?.trim_width && (book as any)?.trim_height ? (
-                            `${(book as any).trim_width} × ${(book as any).trim_height} ${(book as any).trim_unit ?? "in"}`
-                          ) : null}
-                        </div>
-                      </div>
-                    ) : null}
+                      ) : (book as any)?.trim_width && (book as any)?.trim_height ? (
+                        `${(book as any).trim_width} × ${(book as any).trim_height} ${(book as any).trim_unit ?? "in"}`
+                      ) : null}
+                    </MetadataRow>
                   </>
                 )}
 
 
-                {editMode || Boolean((book?.object_type ?? "").trim()) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Object type
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <select className="om-inline-control" value={formObjectType || "book"} onChange={(e) => handleObjectTypeChange(e.target.value)}>
-                          <option value="book">book</option>
-                          <option value="magazine">magazine</option>
-                          <option value="ephemera">ephemera</option>
-                          <option value="video">video</option>
-                          <option value="music">music</option>
-                        </select>
-                      ) : (
-                        (book?.object_type ?? "").trim()
-                      )}
-                    </div>
-                  </div>
-                ) : null}
+                <MetadataRow
+                  label="Object type"
+                  visible={fieldVisibility.object_type !== false}
+                  editMode={editMode}
+                  onVisibilityChange={() => toggleFieldVisibility("object_type")}
+                >
+                  {editMode ? (
+                    <select className="om-inline-control" value={formObjectType || "book"} onChange={(e) => handleObjectTypeChange(e.target.value)}>
+                      <option value="book">book</option>
+                      <option value="magazine">magazine</option>
+                      <option value="ephemera">ephemera</option>
+                      <option value="video">video</option>
+                      <option value="music">music</option>
+                    </select>
+                  ) : (
+                    (book?.object_type ?? "").trim()
+                  )}
+                </MetadataRow>
 
-                {editMode || Boolean((book?.decade ?? "").trim()) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Decade
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <select className="om-inline-control" value={formDecade || ""} onChange={(e) => setFormDecade(e.target.value)}>
-                          <option value="">Choose a decade</option>
-                          {DECADE_OPTIONS.map((decade) => (
-                            <option key={decade} value={decade}>
-                              {decade}
-                            </option>
-                          ))}
-                          {formDecade && !DECADE_OPTIONS.includes(formDecade) ? <option value={formDecade}>{formDecade}</option> : null}
-                        </select>
-                      ) : (
-                        <Link href={`/app?decade=${encodeURIComponent((book?.decade ?? "").trim())}`}>
-                          {(book?.decade ?? "").trim()}
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
+                <MetadataRow
+                  label="Decade"
+                  visible={fieldVisibility.decade !== false}
+                  editMode={editMode}
+                  onVisibilityChange={() => toggleFieldVisibility("decade")}
+                >
+                  {editMode ? (
+                    <select className="om-inline-control" value={formDecade || ""} onChange={(e) => setFormDecade(e.target.value)}>
+                      <option value="">Choose a decade</option>
+                      {DECADE_OPTIONS.map((decade) => (
+                        <option key={decade} value={decade}>
+                          {decade}
+                        </option>
+                      ))}
+                      {formDecade && !DECADE_OPTIONS.includes(formDecade) ? <option value={formDecade}>{formDecade}</option> : null}
+                    </select>
+                  ) : (
+                    <Link href={`/app?decade=${encodeURIComponent((book?.decade ?? "").trim())}`}>
+                      {(book?.decade ?? "").trim()}
+                    </Link>
+                  )}
+                </MetadataRow>
 
-                {!isMusicObject && (editMode || facetView.subject.length > 0) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      Subjects
-                    </div>
-                    <div style={{ flex: "1 1 auto" }}>
-                      {editMode ? (
-                        <EntityTokenField
-                          role="subject"
-                          value={facetDraft.subject}
-                          onChange={(next) => setFacetDraft((s) => ({ ...s, subject: next }))}
-                          placeholder="Add a subject"
-                          disabled={!isOwner || busy || saveState.busy}
-                        />
-                      ) : (
-                        <ExpandableContent
-                          items={facetView.subject}
-                          limit={15}
-                          renderVisible={(visible, isExpanded) => (
-                            <>
-                              <FacetLinks role="subject" items={visible} />
-                              {!isExpanded && facetView.subject.length > 15 ? " …" : ""}
-                            </>
-                          )}
-                        />
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {!isMusicObject && (editMode || Boolean(book?.edition?.isbn13 ?? book?.edition?.isbn10)) ? (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                    <div style={{ minWidth: 110 }} className="text-muted">
-                      ISBN
-                    </div>
-                    <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10}</div>
-                  </div>
-                ) : null}
-
-                {editMode || Boolean(effectiveDescription.trim()) ? (
-                  <div style={{ marginTop: "var(--space-8)" }}>
-                    <div className="text-muted">Description</div>
+                {!isMusicObject && (editMode || facetView.subject.length > 0) && (
+                  <MetadataRow
+                    label="Subjects"
+                    visible={fieldVisibility.subjects !== false}
+                    editMode={editMode}
+                    onVisibilityChange={() => toggleFieldVisibility("subjects")}
+                  >
                     {editMode ? (
-                      <textarea
-                        ref={descriptionTextareaRef}
-                        className="om-inline-control"
-                        value={formDescription}
-                        onChange={(e) => setFormDescription(e.target.value)}
-                        rows={1}
-                        style={{ overflow: "hidden", resize: "none", marginTop: "var(--space-sm)" }}
+                      <EntityTokenField
+                        role="subject"
+                        value={facetDraft.subject}
+                        onChange={(next) => setFacetDraft((s) => ({ ...s, subject: next }))}
+                        placeholder="Add a subject"
+                        disabled={!isOwner || busy || saveState.busy}
                       />
                     ) : (
-                      <div style={{ marginTop: "var(--space-sm)" }}>
-                        <ExpandableContent
-                          items={effectiveDescription.trim().split(/\s+/)}
-                          limit={100}
-                          renderVisible={(visible, isExpanded) => (
-                            <div style={{ whiteSpace: "pre-wrap" }}>
-                              {isExpanded ? effectiveDescription : visible.join(" ") + (effectiveDescription.trim().split(/\s+/).length > 100 ? "…" : "")}
-                            </div>
-                          )}
-                        />
-                      </div>
+                      <ExpandableContent
+                        items={facetView.subject}
+                        limit={15}
+                        renderVisible={(visibleItems, isExpanded) => (
+                          <>
+                            <FacetLinks role="subject" items={visibleItems} />
+                            {!isExpanded && facetView.subject.length > 15 ? " …" : ""}
+                          </>
+                        )}
+                      />
                     )}
+                  </MetadataRow>
+                )}
+
+                {!isMusicObject && (editMode || Boolean(book?.edition?.isbn13 ?? book?.edition?.isbn10)) && (
+                  <MetadataRow
+                    label="ISBN"
+                    visible={fieldVisibility.isbn !== false}
+                    editMode={editMode}
+                    onVisibilityChange={() => toggleFieldVisibility("isbn")}
+                  >
+                    <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10}</div>
+                  </MetadataRow>
+                )}
+
+                {(editMode || Boolean(effectiveDescription.trim())) && (
+                  <div style={{ marginTop: "var(--space-8)" }}>
+                    <MetadataRow
+                      label="Description"
+                      visible={fieldVisibility.description !== false}
+                      editMode={editMode}
+                      onVisibilityChange={() => toggleFieldVisibility("description")}
+                      style={{ display: "block" }}
+                    >
+                      {editMode ? (
+                        <textarea
+                          ref={descriptionTextareaRef}
+                          className="om-inline-control"
+                          value={formDescription}
+                          onChange={(e) => setFormDescription(e.target.value)}
+                          rows={1}
+                          style={{ overflow: "hidden", resize: "none", marginTop: "var(--space-sm)" }}
+                        />
+                      ) : (
+                        <div style={{ marginTop: "var(--space-sm)" }}>
+                          <ExpandableContent
+                            items={effectiveDescription.trim().split(/\s+/)}
+                            limit={100}
+                            renderVisible={(visibleItems, isExpanded) => (
+                              <div style={{ whiteSpace: "pre-wrap" }}>
+                                {isExpanded ? effectiveDescription : visibleItems.join(" ") + (effectiveDescription.trim().split(/\s+/).length > 100 ? "…" : "")}
+                              </div>
+                            )}
+                          />
+                        </div>
+                      )}
+                    </MetadataRow>
                   </div>
-                ) : null}
+                )}
 
               </div>
 
@@ -4683,71 +4782,72 @@ export default function BookDetailPage() {
                         <div>{copiesCountState.busy ? "…" : copiesCount !== null ? String(copiesCount) : "—"}</div>
                       )}
                     </div>
-                    {editMode || facetView.category.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">
-                          Categories
-                        </div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <EntityTokenField
-                              role="category"
-                              value={facetDraft.category}
-                              onChange={(next) => setFacetDraft((s) => ({ ...s, category: next }))}
-                              placeholder="Add a category"
-                              disabled={!isOwner || busy || saveState.busy}
-                            />
-                          ) : (
-                            <FacetLinks role="category" items={facetView.category} />
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
+                    {(editMode || facetView.category.length > 0) && (
+                      <MetadataRow
+                        label="Categories"
+                        visible={fieldVisibility.category !== false}
+                        editMode={editMode}
+                        onVisibilityChange={() => toggleFieldVisibility("category")}
+                      >
+                        {editMode ? (
+                          <EntityTokenField
+                            role="category"
+                            value={facetDraft.category}
+                            onChange={(next) => setFacetDraft((s) => ({ ...s, category: next }))}
+                            placeholder="Add a category"
+                            disabled={!isOwner || busy || saveState.busy}
+                          />
+                        ) : (
+                          <FacetLinks role="category" items={facetView.category} />
+                        )}
+                      </MetadataRow>
+                    )}
 
-                    {editMode || facetView.tag.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">
-                          Tags
-                        </div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <EntityTokenField
-                              role="tag"
-                              value={facetDraft.tag}
-                              onChange={(next) => setFacetDraft((s) => ({ ...s, tag: next }))}
-                              placeholder="Add a tag"
-                              disabled={!isOwner || busy || saveState.busy}
-                            />
-                          ) : (
-                            <FacetLinks role="tag" items={facetView.tag} />
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
+                    {(editMode || facetView.tag.length > 0) && (
+                      <MetadataRow
+                        label="Tags"
+                        visible={fieldVisibility.tag !== false}
+                        editMode={editMode}
+                        onVisibilityChange={() => toggleFieldVisibility("tag")}
+                      >
+                        {editMode ? (
+                          <EntityTokenField
+                            role="tag"
+                            value={facetDraft.tag}
+                            onChange={(next) => setFacetDraft((s) => ({ ...s, tag: next }))}
+                            placeholder="Add a tag"
+                            disabled={!isOwner || busy || saveState.busy}
+                          />
+                        ) : (
+                          <FacetLinks role="tag" items={facetView.tag} />
+                        )}
+                      </MetadataRow>
+                    )}
 
-                    {showNotesSection ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">
-                          Notes
-                        </div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <textarea
-                              className="om-inline-control"
-                              value={formNotes}
-                              onChange={(e) => setFormNotes(e.target.value)}
-                              rows={1}
-                              style={{ width: "100%", resize: "none" }}
-                              placeholder="Add notes"
-                            />
-                          ) : (
-                            <div style={{ whiteSpace: "pre-wrap" }}>
-                              {(formNotes ?? "").trim()}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
+                    {showNotesSection && (
+                      <MetadataRow
+                        label="Notes"
+                        visible={fieldVisibility.notes !== false}
+                        editMode={editMode}
+                        onVisibilityChange={() => toggleFieldVisibility("notes")}
+                        style={{ alignItems: "flex-start" }}
+                      >
+                        {editMode ? (
+                          <textarea
+                            className="om-inline-control"
+                            value={formNotes}
+                            onChange={(e) => setFormNotes(e.target.value)}
+                            rows={1}
+                            style={{ width: "100%", resize: "none" }}
+                            placeholder="Add notes"
+                          />
+                        ) : (
+                          <div style={{ whiteSpace: "pre-wrap" }}>
+                            {(formNotes ?? "").trim()}
+                          </div>
+                        )}
+                      </MetadataRow>
+                    )}
                   </div>
 
                   <hr className="divider" />
@@ -4848,46 +4948,32 @@ export default function BookDetailPage() {
                   {showLocationBlock ? (
                     <>
                     <div className="meta-list" style={{ gap: 0 }}>
-                      {showLocationSection ? (
-                        <div className="row om-row-baseline">
-                          <div style={{ minWidth: 110 }} className="text-muted">
-                            Location
-                          </div>
-                            <div style={{ flex: "1 1 auto" }}>
-                              {editMode ? (
-                                <input
-                                  className="om-inline-control"
-                                  value={formLocation}
-                                  onChange={(e) => setFormLocation(e.target.value)}
-                                  placeholder="Home, Studio…"
-                                />
-                              ) : (
-                                (formLocation ?? "").trim()
-                              )}
-                            </div>
-                          </div>
-                        ) : null}
+                      <MetadataRow
+                        label="Location"
+                        visible={fieldVisibility.location !== false}
+                        editMode={editMode}
+                        onVisibilityChange={() => toggleFieldVisibility("location")}
+                      >
+                        {editMode ? (
+                          <input className="om-inline-control" value={formLocation} onChange={(e) => setFormLocation(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Home, Studio…" />
+                        ) : (
+                          (formLocation ?? "").trim()
+                        )}
+                      </MetadataRow>
 
-                        {showShelfSection ? (
-                          <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                            <div style={{ minWidth: 110 }} className="text-muted">
-                              Shelf
-                            </div>
-                            <div style={{ flex: "1 1 auto" }}>
-                              {editMode ? (
-                                <input
-                                  className="om-inline-control"
-                                  value={formShelf}
-                                  onChange={(e) => setFormShelf(e.target.value)}
-                                  placeholder="Shelf #"
-                                />
-                              ) : (
-                                (formShelf ?? "").trim()
-                              )}
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
+                      <MetadataRow
+                        label="Shelf"
+                        visible={fieldVisibility.shelf !== false}
+                        editMode={editMode}
+                        onVisibilityChange={() => toggleFieldVisibility("shelf")}
+                      >
+                        {editMode ? (
+                          <input className="om-inline-control" value={formShelf} onChange={(e) => setFormShelf(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Shelf #" />
+                        ) : (
+                          (formShelf ?? "").trim()
+                        )}
+                      </MetadataRow>
+                    </div>
                     </>
                   ) : null}
 
