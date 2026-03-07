@@ -978,33 +978,22 @@ export default function BookDetailPage() {
       let res = await supabase.from("user_books").select(selectNew).eq("id", bookId).maybeSingle();
       if (res.error) {
         const msg = (res.error.message ?? "").toLowerCase();
-        if (msg.includes("trim_width") && msg.includes("does not exist")) {
-          // trim_width (and possibly cover_original_url/cover_crop) not yet added; strip them and retry.
-          const noTrim = (s: string) => s.replace(",trim_width,trim_height,trim_unit,cover_original_url,cover_crop", "").replace(",cover_crop", "");
-          res = await supabase.from("user_books").select(noTrim(selectNew)).eq("id", bookId).maybeSingle();
-          if (res.error) {
-            const msg2 = (res.error.message ?? "").toLowerCase();
-            if ((msg2.includes("book_entities") || msg2.includes("entities")) && msg2.includes("does not exist")) {
-              res = await supabase.from("user_books").select(noTrim(baseNew)).eq("id", bookId).maybeSingle();
-            }
-          }
-        } else if (msg.includes("cover_crop") && msg.includes("does not exist")) {
-          // cover_crop column not yet added; strip it and retry.
-          const noCrop = (s: string) => s.replace(",cover_crop", "");
-          res = await supabase.from("user_books").select(noCrop(selectNew)).eq("id", bookId).maybeSingle();
-        } else if (msg.includes("cover_original_url") && msg.includes("does not exist")) {
-          // cover_original_url column not yet added; strip it and retry.
-          const noCoverOrig = (s: string) => s.replace(",cover_original_url", "").replace(",cover_crop", "");
-          res = await supabase.from("user_books").select(noCoverOrig(selectNew)).eq("id", bookId).maybeSingle();
-        } else if ((msg.includes("book_entities") || msg.includes("entities")) && (res.error.message ?? "").toLowerCase().includes("does not exist")) {
-          res = await supabase.from("user_books").select(baseNew).eq("id", bookId).maybeSingle();
-        } else if (msg.includes("group_label") && msg.includes("does not exist")) {
-          res = await supabase.from("user_books").select(selectOld).eq("id", bookId).maybeSingle();
-          if (res.error) {
-            const msg2 = (res.error.message ?? "").toLowerCase();
-            if ((msg2.includes("book_entities") || msg2.includes("entities")) && msg2.includes("does not exist")) {
-              res = await supabase.from("user_books").select(baseOld).eq("id", bookId).maybeSingle();
-            }
+        if (msg.includes("does not exist")) {
+          // If any column is missing, try a conservative fallback that strips all newer columns.
+          // This ensures the app functions during schema transitions.
+          const fallbackSelect = selectNew
+            .replace(",field_visibility", "")
+            .replace(",trim_width,trim_height,trim_unit", "")
+            .replace(",cover_original_url", "")
+            .replace(",cover_crop", "")
+            .replace(",book_entities:book_entities(role,position,visibility,entity:entities(id,name,slug))", "")
+            .replace(",book_entities:book_entities(role,position,entity:entities(id,name,slug))", "");
+          
+          res = await supabase.from("user_books").select(fallbackSelect).eq("id", bookId).maybeSingle();
+          
+          if (res.error && (res.error.message ?? "").toLowerCase().includes("does not exist")) {
+            // Last resort: strip group_label too
+            res = await supabase.from("user_books").select(baseOld.replace(",field_visibility", "").replace(",group_label", "")).eq("id", bookId).maybeSingle();
           }
         }
       }
