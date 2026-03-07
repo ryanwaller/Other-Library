@@ -2110,17 +2110,12 @@ export default function BookDetailPage() {
     let res = await supabase.from("user_books").update(payload).eq("id", book.id);
     if (res.error) {
       const msg = (res.error.message ?? "").toLowerCase();
-      if (msg.includes("trim_width") && msg.includes("does not exist")) {
-        // Migration 0025 not yet applied; save without trim fields.
+      if (msg.includes("does not exist")) {
+        // If any column is missing, strip all new fields and retry.
+        delete payload.field_visibility;
         delete payload.trim_width;
         delete payload.trim_height;
         delete payload.trim_unit;
-        res = await supabase.from("user_books").update(payload).eq("id", book.id);
-      }
-    }
-    if (res.error) {
-      const msg = (res.error.message ?? "").toLowerCase();
-      if (msg.includes("group_label") && msg.includes("does not exist")) {
         delete payload.group_label;
         delete payload.object_type;
         delete payload.decade;
@@ -4219,202 +4214,209 @@ export default function BookDetailPage() {
                     </MetadataRow>
 
                     {[
-                      ["Format", "format", "select"],
-                      ["Release type", "release_type", "select"],
-                      ["Pressing", "edition_pressing", "text"],
-                      ["Catlog #", "catalog_number", "text"],
-                      ["Barcode", "barcode", "text"],
-                      ["Country", "country", "text"],
-                      ["Discogs ID", "discogs_id", "text"],
-                      ["MusicBrainz ID", "musicbrainz_id", "text"],
-                      ["Speed", "speed", "select"],
-                      ["Channels", "channels", "select"],
-                      ["Color / variant", "color_variant", "text"],
-                      ["Packaging type", "packaging_type", "text"]
-                    ].map(([label, key, inputKind]) =>
-                      editMode || Boolean(String((effectiveMusic as any)[key] ?? "").trim()) ? (
-                        <div key={key} className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                          <div style={{ minWidth: 110 }} className="text-muted">{label}</div>
-                          <div style={{ flex: "1 1 auto" }}>
-                            {editMode ? (
-                              inputKind === "select" ? (
-                                <select
-                                  className="om-inline-control"
-                                  value={String((formMusic as any)[key] ?? "")}
-                                  onChange={(e) => setFormMusic((s) => ({ ...s, [key]: e.target.value || null }))}
-                                >
-                                  <option value="">Choose</option>
-                                  {(key === "format"
-                                    ? MUSIC_FORMAT_OPTIONS
-                                    : key === "release_type"
-                                      ? MUSIC_RELEASE_TYPE_OPTIONS
-                                      : key === "speed"
-                                        ? MUSIC_SPEED_OPTIONS
-                                        : MUSIC_CHANNEL_OPTIONS
-                                  ).map((option) => (
-                                    <option key={option} value={option}>{option}</option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <input
-                                  className="om-inline-control"
-                                  value={String((formMusic as any)[key] ?? "")}
-                                  onChange={(e) => setFormMusic((s) => ({ ...s, [key]: e.target.value || null }))}
-                                  placeholder={`Add ${label.toLowerCase()}`}
-                                />
-                              )
-                            ) : (
-                              <Link href={musicValueHref(String((effectiveMusic as any)[key] ?? ""))}>
-                                {String((effectiveMusic as any)[key] ?? "")}
-                              </Link>
-                            )}
-                          </div>
-                        </div>
-                      ) : null
-                    )}
-
-                    {editMode || effectiveMusic.disc_count != null ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Disc count</div>
-                        <div style={{ flex: "1 1 auto" }}>
+                      ["Format", "format", "select", true],
+                      ["Release type", "release_type", "select", false],
+                      ["Pressing", "edition_pressing", "text", false],
+                      ["Catalog #", "catalog_number", "text", false],
+                      ["Barcode", "barcode", "text", false],
+                      ["Country", "country", "text", false],
+                      ["Discogs ID", "discogs_id", "text", false],
+                      ["MusicBrainz ID", "musicbrainz_id", "text", false],
+                      ["Speed", "speed", "select", false],
+                      ["Channels", "channels", "select", false],
+                      ["Color / variant", "color_variant", "text", false],
+                      ["Packaging type", "packaging_type", "text", false]
+                    ].map(([label, key, inputKind, protectedField]) => {
+                      const k = key as string;
+                      const pf = protectedField as boolean;
+                      return (editMode || Boolean(String((effectiveMusic as any)[k] ?? "").trim())) ? (
+                        <MetadataRow
+                          key={k}
+                          label={label as string}
+                          visible={!!(pf || fieldVisibility[k] !== false)}
+                          editMode={editMode}
+                          hideToggle={pf}
+                          onVisibilityChange={() => toggleFieldVisibility(k)}
+                        >
                           {editMode ? (
-                            <input
-                              className="om-inline-control"
-                              type="number"
-                              min={1}
-                              value={effectiveMusic.disc_count ?? ""}
-                              onChange={(e) => setFormMusic((s) => ({ ...s, disc_count: e.target.value ? Number(e.target.value) : null }))}
-                            />
+                            inputKind === "select" ? (
+                              <select
+                                className="om-inline-control"
+                                value={String((formMusic as any)[k] ?? "")}
+                                onChange={(e) => setFormMusic((s) => ({ ...s, [k]: e.target.value || null }))}
+                              >
+                                <option value="">Choose</option>
+                                {(k === "format"
+                                  ? MUSIC_FORMAT_OPTIONS
+                                  : k === "release_type"
+                                    ? MUSIC_RELEASE_TYPE_OPTIONS
+                                    : k === "speed"
+                                      ? MUSIC_SPEED_OPTIONS
+                                      : MUSIC_CHANNEL_OPTIONS
+                                ).map((option) => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                className="om-inline-control"
+                                value={String((formMusic as any)[k] ?? "")}
+                                onChange={(e) => setFormMusic((s) => ({ ...s, [k]: e.target.value || null }))}
+                                placeholder={`Add ${String(label).toLowerCase()}`}
+                              />
+                            )
                           ) : (
-                            <Link href={musicValueHref(String(effectiveMusic.disc_count ?? ""))}>
-                              {effectiveMusic.disc_count}
+                            <Link href={musicValueHref(String((effectiveMusic as any)[k] ?? ""))}>
+                              {String((effectiveMusic as any)[k] ?? "")}
                             </Link>
                           )}
-                        </div>
-                      </div>
-                    ) : null}
+                        </MetadataRow>
+                      ) : null;
+                    })}
 
-                    {editMode || effectiveMusic.limited_edition !== null ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Limited edition</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <select
-                              className="om-inline-control"
-                              value={effectiveMusic.limited_edition === null ? "" : effectiveMusic.limited_edition ? "yes" : "no"}
-                              onChange={(e) =>
-                                setFormMusic((s) => ({
-                                  ...s,
-                                  limited_edition: e.target.value === "" ? null : e.target.value === "yes"
-                                }))
-                              }
-                            >
-                              <option value="">Choose</option>
-                              <option value="yes">yes</option>
-                              <option value="no">no</option>
-                            </select>
-                          ) : effectiveMusic.limited_edition === null ? null : effectiveMusic.limited_edition ? (
-                            <Link href={musicValueHref("limited")}>yes</Link>
-                          ) : (
-                            "no"
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
+                    <MetadataRow
+                      label="Disc count"
+                      visible={fieldVisibility.disc_count !== false}
+                      editMode={editMode}
+                      onVisibilityChange={() => toggleFieldVisibility("disc_count")}
+                    >
+                      {editMode ? (
+                        <input
+                          className="om-inline-control"
+                          type="number"
+                          min={1}
+                          value={effectiveMusic.disc_count ?? ""}
+                          onChange={(e) => setFormMusic((s) => ({ ...s, disc_count: e.target.value ? Number(e.target.value) : null }))}
+                        />
+                      ) : (
+                        <Link href={musicValueHref(String(effectiveMusic.disc_count ?? ""))}>
+                          {effectiveMusic.disc_count}
+                        </Link>
+                      )}
+                    </MetadataRow>
 
-                    {editMode || effectiveMusic.reissue !== null ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Reissue</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <select
-                              className="om-inline-control"
-                              value={effectiveMusic.reissue === null ? "" : effectiveMusic.reissue ? "yes" : "no"}
-                              onChange={(e) =>
-                                setFormMusic((s) => ({
-                                  ...s,
-                                  reissue: e.target.value === "" ? null : e.target.value === "yes"
-                                }))
-                              }
-                            >
-                              <option value="">Choose</option>
-                              <option value="no">No (original release)</option>
-                              <option value="yes">Yes (reissue)</option>
-                            </select>
-                          ) : effectiveMusic.reissue === null ? null : effectiveMusic.reissue ? (
-                            <Link href={musicValueHref("reissue")}>Yes (reissue)</Link>
-                          ) : (
-                            <Link href={musicValueHref("original release")}>No (original release)</Link>
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
+                    <MetadataRow
+                      label="Limited edition"
+                      visible={fieldVisibility.limited_edition !== false}
+                      editMode={editMode}
+                      onVisibilityChange={() => toggleFieldVisibility("limited_edition")}
+                    >
+                      {editMode ? (
+                        <select
+                          className="om-inline-control"
+                          value={effectiveMusic.limited_edition === null ? "" : effectiveMusic.limited_edition ? "yes" : "no"}
+                          onChange={(e) =>
+                            setFormMusic((s) => ({
+                              ...s,
+                              limited_edition: e.target.value === "" ? null : e.target.value === "yes"
+                            }))
+                          }
+                        >
+                          <option value="">Choose</option>
+                          <option value="yes">yes</option>
+                          <option value="no">no</option>
+                        </select>
+                      ) : effectiveMusic.limited_edition === null ? null : effectiveMusic.limited_edition ? (
+                        <Link href={musicValueHref("limited")}>yes</Link>
+                      ) : (
+                        "no"
+                      )}
+                    </MetadataRow>
 
-                    {editMode || musicGenres.length > 0 ? (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Genres</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <input
-                              className="om-inline-control"
-                              value={[...effectiveMusic.genres, ...effectiveMusic.styles].join(", ")}
-                              onChange={(e) => {
-                                const next = e.target.value.split(",").map((value) => value.trim()).filter(Boolean);
-                                setFormMusic((s) => ({ ...s, genres: next, styles: [] }));
-                              }}
-                              placeholder="Add genres or styles"
-                            />
-                          ) : (
-                            <span>
-                              {musicGenres.map((value, index, arr) => (
-                                <span key={value}>
-                                  <Link href={musicValueHref(value, "subject")}>{value}</Link>
-                                  {index < arr.length - 1 ? ", " : ""}
-                                </span>
-                              ))}
+                    <MetadataRow
+                      label="Reissue"
+                      visible={fieldVisibility.reissue !== false}
+                      editMode={editMode}
+                      onVisibilityChange={() => toggleFieldVisibility("reissue")}
+                    >
+                      {editMode ? (
+                        <select
+                          className="om-inline-control"
+                          value={effectiveMusic.reissue === null ? "" : effectiveMusic.reissue ? "yes" : "no"}
+                          onChange={(e) =>
+                            setFormMusic((s) => ({
+                              ...s,
+                              reissue: e.target.value === "" ? null : e.target.value === "yes"
+                            }))
+                          }
+                        >
+                          <option value="">Choose</option>
+                          <option value="no">No (original release)</option>
+                          <option value="yes">Yes (reissue)</option>
+                        </select>
+                      ) : effectiveMusic.reissue === null ? null : effectiveMusic.reissue ? (
+                        <Link href={musicValueHref("reissue")}>Yes (reissue)</Link>
+                      ) : (
+                        <Link href={musicValueHref("original release")}>No (original release)</Link>
+                      )}
+                    </MetadataRow>
+
+                    <MetadataRow
+                      label="Genres"
+                      visible={fieldVisibility.genres !== false}
+                      editMode={editMode}
+                      onVisibilityChange={() => toggleFieldVisibility("genres")}
+                    >
+                      {editMode ? (
+                        <input
+                          className="om-inline-control"
+                          value={[...effectiveMusic.genres, ...effectiveMusic.styles].join(", ")}
+                          onChange={(e) => {
+                            const next = e.target.value.split(",").map((value) => value.trim()).filter(Boolean);
+                            setFormMusic((s) => ({ ...s, genres: next, styles: [] }));
+                          }}
+                          placeholder="Add genres or styles"
+                        />
+                      ) : (
+                        <span>
+                          {musicGenres.map((value, index, arr) => (
+                            <span key={value}>
+                              <Link href={musicValueHref(value, "subject")}>{value}</Link>
+                              {index < arr.length - 1 ? ", " : ""}
                             </span>
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
+                          ))}
+                        </span>
+                      )}
+                    </MetadataRow>
 
-                    {editMode || effectiveMusic.tracklist.length > 0 ? (
-                      <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "flex-start" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Tracklist</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <textarea
-                              className="om-inline-control"
-                              value={effectiveMusic.tracklist.map((track) => formatMusicTrackLine(track)).join("\n")}
-                              onChange={(e) =>
-                                setFormMusic((s) => ({
-                                  ...s,
-                                  tracklist: e.target.value
-                                    .split("\n")
-                                    .map((line) => line.trim())
-                                    .filter(Boolean)
-                                    .map((line) => ({ position: null, title: line, duration: null, type: null })),
-                                  track_count: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean).length || null
-                                }))
-                              }
-                              rows={Math.max(3, effectiveMusic.tracklist.length || 3)}
-                            />
-                          ) : (
-                            <div style={{ display: "grid", gap: "var(--space-4)" }}>
-                              {effectiveMusic.tracklist.map((track, index) => (
-                                <div key={`${track.position ?? ""}-${track.title}-${index}`} className="row om-row-baseline" style={{ gap: "var(--space-sm)" }}>
-                                  {track.position ? <div className="text-muted" style={{ minWidth: 32 }}>{track.position}</div> : null}
-                                  <div style={{ flex: "1 1 auto" }}>
-                                    <Link href={musicValueHref(track.title)}>{track.title}</Link>
-                                  </div>
-                                  {track.duration ? <div className="text-muted">{track.duration}</div> : null}
-                                </div>
-                              ))}
+                    <MetadataRow
+                      label="Tracklist"
+                      visible={fieldVisibility.tracklist !== false}
+                      editMode={editMode}
+                      onVisibilityChange={() => toggleFieldVisibility("tracklist")}
+                      style={{ alignItems: "flex-start" }}
+                    >
+                      {editMode ? (
+                        <textarea
+                          className="om-inline-control"
+                          value={effectiveMusic.tracklist.map((track) => formatMusicTrackLine(track)).join("\n")}
+                          onChange={(e) =>
+                            setFormMusic((s) => ({
+                              ...s,
+                              tracklist: e.target.value
+                                .split("\n")
+                                .map((line) => line.trim())
+                                .filter(Boolean)
+                                .map((line) => ({ position: null, title: line, duration: null, type: null })),
+                              track_count: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean).length || null
+                            }))
+                          }
+                          rows={Math.max(3, effectiveMusic.tracklist.length || 3)}
+                        />
+                      ) : (
+                        <div style={{ display: "grid", gap: "var(--space-4)" }}>
+                          {effectiveMusic.tracklist.map((track, index) => (
+                            <div key={`${track.position ?? ""}-${track.title}-${index}`} className="row om-row-baseline" style={{ gap: "var(--space-sm)" }}>
+                              {track.position ? <div className="text-muted" style={{ minWidth: 32 }}>{track.position}</div> : null}
+                              <div style={{ flex: "1 1 auto" }}>
+                                <Link href={musicValueHref(track.title)}>{track.title}</Link>
+                              </div>
+                              {track.duration ? <div className="text-muted">{track.duration}</div> : null}
                             </div>
-                          )}
+                          ))}
                         </div>
-                      </div>
-                    ) : null}
+                      )}
+                    </MetadataRow>
                   </>
                 ) : (
                   <>
