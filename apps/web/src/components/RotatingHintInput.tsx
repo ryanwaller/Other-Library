@@ -72,7 +72,7 @@ export default function RotatingHintInput(props: {
           style={{
             position: "absolute",
             left: 0,
-            bottom: isMobile ? 12 : 10, // Higher on mobile to match baseline
+            bottom: isMobile ? 11 : 10, // Nudged down from 12 to 11 for perfect mobile alignment
             transform: `translateY(${translateY}px)`,
             pointerEvents: "none",
             color: "var(--text-muted)",
