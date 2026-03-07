@@ -1,7 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import sizeOf from "image-size";
 import { fetchWithSafeRedirects, isSafeHttpUrl } from "../../../lib/networkSafety";
-import { emptyMusicMetadata, type MusicContributorRole, type MusicMetadata, type MusicTrack } from "../../../lib/music";
+import {
+  emptyMusicMetadata,
+  normalizeMusicChannels,
+  normalizeMusicFormat,
+  normalizeMusicReleaseType,
+  normalizeMusicSpeed,
+  type MusicContributorRole,
+  type MusicMetadata,
+  type MusicTrack
+} from "../../../lib/music";
 
 export const runtime = "nodejs";
 
@@ -34,6 +43,14 @@ type ImportMetadata = {
   raw: Record<string, unknown>;
 };
 
+type DiscogsTrackLike = {
+  position?: string | null;
+  title?: string | null;
+  duration?: string | null;
+  type_?: string | null;
+  sub_tracks?: DiscogsTrackLike[] | null;
+};
+
 type DiscogsReleaseLike = {
   id?: number;
   title?: string;
@@ -46,7 +63,7 @@ type DiscogsReleaseLike = {
   country?: string | null;
   genres?: string[] | null;
   styles?: string[] | null;
-  tracklist?: Array<{ position?: string | null; title?: string | null; duration?: string | null; type_?: string | null }>;
+  tracklist?: DiscogsTrackLike[];
   formats?: Array<{ name?: string | null; qty?: string | null; descriptions?: string[] | null; text?: string | null }>;
   identifiers?: Array<{ type?: string | null; value?: string | null }>;
   images?: Array<{ uri?: string | null; uri150?: string | null }>;
@@ -726,6 +743,9 @@ function parseDiscogsTarget(url: URL): { kind: "release" | "master"; id: string 
 function roleFromDiscogs(input: string): MusicContributorRole | null {
   const value = input.trim().toLowerCase();
   if (!value) return null;
+  if (value.includes("art direction")) return "art direction";
+  if (value === "artist" || value.includes("artwork")) return "artwork";
+  if (value.includes("designer") || value.includes("designed by") || value.includes("design by") || value === "design") return "designer";
   if (value.includes("featuring") || value.includes("featured")) return "featured artist";
   if (value.includes("mastered")) return "mastering";
   if (value.includes("engineer")) return "engineer";
@@ -734,11 +754,27 @@ function roleFromDiscogs(input: string): MusicContributorRole | null {
   if (value.includes("arranged") || value.includes("arranger")) return "arranger";
   if (value.includes("conducted") || value.includes("conductor")) return "conductor";
   if (value.includes("orchestra")) return "orchestra";
-  if (value.includes("artwork")) return "artwork";
-  if (value.includes("design")) return "design";
   if (value.includes("photo")) return "photography";
   if (value.includes("perform") || value.includes("vocals") || value.includes("guitar") || value.includes("drums") || value.includes("bass")) return "performer";
   return null;
+}
+
+function flattenDiscogsTracklist(rows: DiscogsTrackLike[] | null | undefined): MusicTrack[] {
+  const out: MusicTrack[] = [];
+  const walk = (track: DiscogsTrackLike | null | undefined) => {
+    if (!track) return;
+    const type = String(track.type_ ?? "").trim() || null;
+    const title = String(track.title ?? "").trim();
+    const position = String(track.position ?? "").trim() || null;
+    const duration = String(track.duration ?? "").trim() || null;
+    const subTracks = Array.isArray(track.sub_tracks) ? track.sub_tracks : [];
+    if (title && type !== "heading" && type !== "index") {
+      out.push({ position, title, duration, type });
+    }
+    for (const subTrack of subTracks) walk(subTrack);
+  };
+  for (const row of rows ?? []) walk(row);
+  return out;
 }
 
 function parseDiscogsReleaseDate(input: string | null | undefined): string | null {
@@ -773,13 +809,16 @@ function pickDiscogsMatch(values: string[], pattern: RegExp): string | null {
 }
 
 function deriveDiscogsFormat(source: DiscogsReleaseLike): string | null {
-  const formatNames = normalizeDiscogsParts((source.formats ?? []).map((format) => format?.name));
-  const formatDescriptions = normalizeDiscogsParts((source.formats ?? []).flatMap((format) => format?.descriptions ?? []));
-  const sizeAndEditionBits = formatDescriptions.filter((value) =>
-    /lp|12"|10"|7"|album|mini-album|ep|single|maxi-single|compilation|sampler|promo/i.test(value)
-  );
-  const out = uniqStrings([...formatNames, ...sizeAndEditionBits]);
-  return out.join(", ") || null;
+  const candidates = normalizeDiscogsParts([
+    ...(source.formats ?? []).map((format) => format?.name),
+    ...(source.formats ?? []).flatMap((format) => format?.descriptions ?? []),
+    ...(source.formats ?? []).map((format) => format?.text)
+  ]);
+  for (const value of candidates) {
+    const normalized = normalizeMusicFormat(value);
+    if (normalized) return normalized;
+  }
+  return null;
 }
 
 function deriveDiscogsPressing(source: DiscogsReleaseLike): string | null {
@@ -794,6 +833,19 @@ function deriveDiscogsPressing(source: DiscogsReleaseLike): string | null {
   ]);
   if (detailBits.length > 0) return detailBits.join(", ");
   return notes || null;
+}
+
+function deriveDiscogsReleaseType(source: DiscogsReleaseLike): string | null {
+  const candidates = normalizeDiscogsParts([
+    ...(source.formats ?? []).flatMap((format) => format?.descriptions ?? []),
+    ...(source.formats ?? []).map((format) => format?.text),
+    String(source.title ?? "")
+  ]);
+  for (const value of candidates) {
+    const normalized = normalizeMusicReleaseType(value);
+    if (normalized) return normalized;
+  }
+  return null;
 }
 
 function buildDiscogsMusicMetadata(source: DiscogsReleaseLike, primaryArtist: string): MusicMetadata {
@@ -816,18 +868,7 @@ function buildDiscogsMusicMetadata(source: DiscogsReleaseLike, primaryArtist: st
     (source.identifiers ?? [])
       .find((identifier) => /musicbrainz/i.test(String(identifier?.type ?? "")))
       ?.value?.trim() ?? null;
-  const tracklist: MusicTrack[] = (source.tracklist ?? [])
-    .map((track) => {
-      const title = String(track?.title ?? "").trim();
-      if (!title) return null;
-      return {
-        position: String(track?.position ?? "").trim() || null,
-        title,
-        duration: String(track?.duration ?? "").trim() || null,
-        type: String(track?.type_ ?? "").trim() || null
-      };
-    })
-    .filter(Boolean) as MusicTrack[];
+  const tracklist = flattenDiscogsTracklist(source.tracklist);
   const discCount = (source.formats ?? [])
     .map((format) => Number(format?.qty ?? ""))
     .filter((value) => Number.isFinite(value) && value > 0)
@@ -840,6 +881,7 @@ function buildDiscogsMusicMetadata(source: DiscogsReleaseLike, primaryArtist: st
     release_date: releaseDate,
     original_release_year: year,
     format: formatText,
+    release_type: deriveDiscogsReleaseType(source),
     edition_pressing: deriveDiscogsPressing(source),
     catalog_number: catalogNumber,
     barcode,
@@ -849,16 +891,16 @@ function buildDiscogsMusicMetadata(source: DiscogsReleaseLike, primaryArtist: st
     tracklist,
     discogs_id: source.id ? String(source.id) : null,
     musicbrainz_id: musicbrainzId,
-    speed,
+    speed: normalizeMusicSpeed(speed),
     disc_count: discCount > 0 ? discCount : null,
     color_variant: pickDiscogsMatch(releaseHints, /color|colou?r|clear|opaque|marbled|splatter|translucent|smoke|swirl/i),
     limited_edition: releaseHints.some((value) => /limited|numbered/i.test(value)) ? true : null,
-    release_lineage: releaseHints.some((value) => /reissue|repress|remaster/i.test(value))
-      ? "reissue"
+    reissue: releaseHints.some((value) => /reissue|repress|remaster/i.test(value))
+      ? true
       : releaseHints.some((value) => /original/i.test(value))
-        ? "original"
+        ? false
         : null,
-    audio_configuration: pickDiscogsMatch(releaseHints, /mono|stereo/i),
+    channels: normalizeMusicChannels(pickDiscogsMatch(releaseHints, /mono|stereo|both/i)),
     packaging_type: packagingType,
     track_count: tracklist.length || null
   };
@@ -882,6 +924,7 @@ async function fetchDiscogsPreview(url: URL): Promise<ImportMetadata | null> {
       data = {
         ...data,
         ...release,
+        tracklist: Array.isArray(release.tracklist) && release.tracklist.length > 0 ? release.tracklist : data.tracklist,
         year: data.year ?? release.year ?? null
       };
     }

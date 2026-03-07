@@ -48,6 +48,30 @@ type EditionMetadata = {
   raw?: Record<string, unknown>;
 };
 
+function looksLikeBarcode(input: string): boolean {
+  const digits = input.trim().replace(/\D/g, "");
+  return /^\d{12,14}$/.test(digits);
+}
+
+type SearchCandidate = {
+  source: "openlibrary" | "googleBooks" | "discogs";
+  object_type?: "book" | "music" | null;
+  source_type?: string | null;
+  source_url?: string | null;
+  external_source_ids?: Record<string, string | null> | null;
+  music_metadata?: MusicMetadata | null;
+  contributor_entities?: Partial<Record<MusicContributorRole, string[]>> | null;
+  title: string | null;
+  authors: string[];
+  publisher: string | null;
+  publish_date: string | null;
+  publish_year: number | null;
+  subjects: string[];
+  isbn10: string | null;
+  isbn13: string | null;
+  cover_url: string | null;
+};
+
 type LibrarySummary = {
   id: number;
   name: string;
@@ -290,6 +314,7 @@ function parseStructuredNotes(notes: string | null): {
     subjects: "subjects_override",
     decade: "decade",
     design: "designers_override",
+    "art direction": "designers_override",
     designer: "designers_override",
     designers: "designers_override",
     production: "materials_override",
@@ -420,18 +445,7 @@ function AppShell({
     domain_kind: null
   });
   const [addSearchResults, setAddSearchResults] = useState<
-    Array<{
-      source: "openlibrary" | "googleBooks";
-      title: string | null;
-      authors: string[];
-      publisher: string | null;
-      publish_date: string | null;
-      publish_year: number | null;
-      subjects: string[];
-      isbn10: string | null;
-      isbn13: string | null;
-      cover_url: string | null;
-    }>
+    SearchCandidate[]
   >([]);
   const [addSearchState, setAddSearchState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
@@ -1792,7 +1806,7 @@ function AppShell({
     }
   }
 
-  async function previewIsbn(isbn: string) {
+  async function previewIsbn(isbn: string): Promise<boolean> {
     setAddState({ busy: true, error: null, message: "Looking up ISBN…" });
     setAddUrlPreview(null);
     setAddPreviewCoverFailed(false);
@@ -1823,19 +1837,25 @@ function AppShell({
         sources: Array.from(new Set(["isbn", ...((edition.sources ?? []) as any[]).map((s: any) => String(s))])).filter(Boolean)
       });
       setAddState({ busy: false, error: null, message: null });
+      return true;
     } catch (e: any) {
       setAddState({ busy: false, error: e?.message ?? "ISBN lookup failed", message: "ISBN lookup failed" });
+      return false;
     }
   }
 
-  async function searchAddResults(title: string, author: string | null) {
+  async function searchAddResults(title: string, author: string | null, barcode?: string | null) {
     setAddSearchState({ busy: true, error: null, message: "Searching…" });
     setAddSearchResults([]);
     try {
-      const res = await fetch(`/api/search?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author ?? "")}`);
+      const params = new URLSearchParams();
+      if (title) params.set("title", title);
+      if (author) params.set("author", author);
+      if (barcode) params.set("barcode", barcode);
+      const res = await fetch(`/api/search?${params.toString()}`);
       const json = await res.json();
       if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Search failed");
-      setAddSearchResults((json.results ?? []) as any[]);
+      setAddSearchResults((json.results ?? []) as SearchCandidate[]);
       setAddSearchState({ busy: false, error: null, message: null });
     } catch (e: any) {
       setAddSearchState({ busy: false, error: e?.message ?? "Search failed", message: "Search failed" });
@@ -1852,7 +1872,16 @@ function AppShell({
     setAddSearchState({ busy: false, error: null, message: null });
 
     if (looksLikeIsbn(value)) {
-      await previewIsbn(value);
+      const ok = await previewIsbn(value);
+      if (ok) return;
+      if (looksLikeBarcode(value)) {
+        await searchAddResults("", null, value);
+      }
+      return;
+    }
+
+    if (looksLikeBarcode(value)) {
+      await searchAddResults("", null, value);
       return;
     }
 
@@ -2021,10 +2050,38 @@ function AppShell({
     }
   }
 
+  async function hydrateDiscogsSearchCandidate(result: SearchCandidate): Promise<SearchCandidate> {
+    if (result.source_type !== "discogs" || !result.source_url) return result;
+    const res = await fetch("/api/import-url", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: result.source_url })
+    });
+    const json = await res.json();
+    if (!res.ok || !json?.ok || !json?.preview) return result;
+    const preview = json.preview as any;
+    return {
+      ...result,
+      object_type: preview.object_type === "music" ? "music" : (result.object_type ?? "book"),
+      source_type: preview.source_type ?? result.source_type ?? null,
+      source_url: preview.source_url ?? result.source_url ?? null,
+      external_source_ids: preview.external_source_ids ?? result.external_source_ids ?? null,
+      title: preview.title ?? result.title ?? null,
+      authors: Array.isArray(preview.authors) ? preview.authors.filter(Boolean) : result.authors,
+      publisher: preview.publisher ?? result.publisher ?? null,
+      publish_date: preview.publish_date ?? result.publish_date ?? null,
+      subjects: Array.isArray(preview.subjects) ? preview.subjects.filter(Boolean) : result.subjects,
+      cover_url: preview.cover_url ?? result.cover_url ?? null,
+      music_metadata: preview.music_metadata ?? result.music_metadata ?? null,
+      contributor_entities: preview.contributor_entities ?? result.contributor_entities ?? null
+    };
+  }
+
   async function addFromSearchResultItem(result: typeof addSearchResults[number], targetLibraryId?: number | null) {
     setAddState({ busy: true, error: null, message: "Adding…" });
     try {
-      await addEditionData(result, targetLibraryId);
+      const hydrated = await hydrateDiscogsSearchCandidate(result);
+      await addEditionData(hydrated, targetLibraryId);
       setAddInput("");
       cancelAddPreview();
       setAddState({ busy: false, error: null, message: "Added" });
@@ -2654,6 +2711,7 @@ function AppShell({
             haystackParts.push(String(music.release_date ?? ""));
             haystackParts.push(String(music.original_release_year ?? ""));
             haystackParts.push(String(music.format ?? ""));
+            haystackParts.push(String(music.release_type ?? ""));
             haystackParts.push(String(music.edition_pressing ?? ""));
             haystackParts.push(String(music.catalog_number ?? ""));
             haystackParts.push(String(music.barcode ?? ""));
@@ -2661,9 +2719,9 @@ function AppShell({
             haystackParts.push(String(music.discogs_id ?? ""));
             haystackParts.push(String(music.musicbrainz_id ?? ""));
             haystackParts.push(String(music.speed ?? ""));
+            haystackParts.push(String(music.channels ?? ""));
             haystackParts.push(String(music.color_variant ?? ""));
-            haystackParts.push(String(music.release_lineage ?? ""));
-            haystackParts.push(String(music.audio_configuration ?? ""));
+            haystackParts.push(String(music.reissue == null ? "" : music.reissue ? "reissue" : "original release"));
             haystackParts.push(String(music.packaging_type ?? ""));
             haystackParts.push(((music.genres ?? []) as string[]).join(" "));
             haystackParts.push(((music.styles ?? []) as string[]).join(" "));
@@ -2794,7 +2852,7 @@ function AppShell({
               <span>{displayLibraries.length}</span>
             </span>
             <span className="om-stat-pair">
-              <span className="text-muted">Books</span>
+              <span className="text-muted">Items</span>
               <span>{displayGroups.length}</span>
             </span>
             {bulkMode && (

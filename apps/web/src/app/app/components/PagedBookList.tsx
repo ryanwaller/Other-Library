@@ -10,7 +10,7 @@ export default function PagedBookList<T>({
   searchQuery = "",
   renderItem,
   containerStyle,
-  noItemsMessage = "No books yet."
+  noItemsMessage = "No items yet."
 }: {
   items: T[];
   viewMode: "grid" | "list";

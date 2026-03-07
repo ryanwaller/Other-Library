@@ -44,6 +44,7 @@ alter table public.book_entities
       'arranger',
       'conductor',
       'orchestra',
+      'art direction',
       'artwork',
       'design',
       'photography'
@@ -117,6 +118,7 @@ begin
     'arranger',
     'conductor',
     'orchestra',
+    'art direction',
     'artwork',
     'design',
     'photography'

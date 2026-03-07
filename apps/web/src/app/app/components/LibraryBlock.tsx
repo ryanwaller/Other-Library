@@ -215,7 +215,7 @@ export default function LibraryBlock({
               </div>
               {!manageMode ? (
                 <span className="text-muted" style={{ marginLeft: "var(--space-md)", whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
-                  {bookCount}&nbsp;&nbsp;book{bookCount === 1 ? "" : "s"}
+                  {bookCount}&nbsp;&nbsp;item{bookCount === 1 ? "" : "s"}
                 </span>
               ) : null}
             </div>

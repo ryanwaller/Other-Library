@@ -6,7 +6,7 @@ import type { CoverCrop } from "../../../../components/CoverImage";
 
 export const dynamic = "force-dynamic";
 
-const FACET_ROLES = ["author", "editor", "designer", "subject", "tag", "category", "material", "printer", "publisher", "performer", "composer", "producer", "engineer", "mastering", "featured artist", "arranger", "conductor", "orchestra", "artwork", "design", "photography"] as const;
+const FACET_ROLES = ["author", "editor", "designer", "subject", "tag", "category", "material", "printer", "publisher", "performer", "composer", "producer", "engineer", "mastering", "featured artist", "arranger", "conductor", "orchestra", "art direction", "artwork", "design", "photography"] as const;
 type FacetRole = (typeof FACET_ROLES)[number];
 
 type FacetEntity = { id: string; name: string; slug: string };
@@ -57,6 +57,7 @@ function labelForRole(role: FacetRole): string {
   if (role === "arranger") return "Arranger";
   if (role === "conductor") return "Conductor";
   if (role === "orchestra") return "Orchestra";
+  if (role === "art direction") return "Art direction";
   if (role === "artwork") return "Artwork";
   if (role === "design") return "Design";
   if (role === "photography") return "Photography";
@@ -216,7 +217,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
             <span>{catalogsCount}</span>
           </span>
           <span className="om-stat-pair">
-            <span className="text-muted">Books</span>
+            <span className="text-muted">Items</span>
             <span>{booksCount}</span>
           </span>
         </div>
@@ -228,7 +229,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
       <hr className="om-hr" style={{ marginTop: "var(--space-10)" }} />
 
       {groups.length === 0 ? (
-        <div className="card muted">No books in this facet yet.</div>
+        <div className="card muted">No items in this facet yet.</div>
       ) : (
         groups.map((group, index) => (
           <div key={group.libraryId} style={{ marginTop: index === 0 ? 0 : 12 }}>
@@ -236,7 +237,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
             <div className="row" style={{ gap: "var(--space-10)", marginTop: "var(--space-8)", marginBottom: "var(--space-10)" }}>
               <span>{group.name}</span>
               <span className="text-muted">
-                {group.rows.length} book{group.rows.length === 1 ? "" : "s"}
+                {group.rows.length} item{group.rows.length === 1 ? "" : "s"}
               </span>
             </div>
 

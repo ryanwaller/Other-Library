@@ -14,7 +14,11 @@ import {
   emptyMusicMetadata,
   formatMusicTrackLine,
   musicDisplayGenres,
+  MUSIC_CHANNEL_OPTIONS,
   MUSIC_CONTRIBUTOR_ROLES,
+  MUSIC_FORMAT_OPTIONS,
+  MUSIC_RELEASE_TYPE_OPTIONS,
+  MUSIC_SPEED_OPTIONS,
   parseMusicMetadata,
   type MusicContributorRole,
   type MusicMetadata
@@ -98,7 +102,13 @@ type UserBookDetail = {
 };
 
 type MetadataSearchResult = {
-  source: "openlibrary" | "googleBooks";
+  source: "openlibrary" | "googleBooks" | "discogs";
+  object_type?: "book" | "music" | null;
+  source_type?: string | null;
+  source_url?: string | null;
+  external_source_ids?: Record<string, string | null> | null;
+  music_metadata?: MusicMetadata | null;
+  contributor_entities?: Partial<Record<MusicContributorRole, string[]>> | null;
   title: string | null;
   authors: string[];
   publisher: string | null;
@@ -109,6 +119,11 @@ type MetadataSearchResult = {
   isbn13: string | null;
   cover_url: string | null;
 };
+
+function looksLikeBarcode(input: string): boolean {
+  const digits = input.trim().replace(/\D/g, "");
+  return /^\d{12,14}$/.test(digits);
+}
 
 type ImportPreview = {
   title: string | null;
@@ -293,6 +308,7 @@ function facetHref(role: string, name: string, slug?: string): string {
 
 function musicRoleLabel(role: string): string {
   if (role === "featured artist") return "Featured artist";
+  if (role === "art direction") return "Art direction";
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
@@ -514,8 +530,8 @@ export default function BookDetailPage() {
     arranger: [],
     conductor: [],
     orchestra: [],
+    "art direction": [],
     artwork: [],
-    design: [],
     photography: []
   });
 
@@ -942,8 +958,8 @@ export default function BookDetailPage() {
         arranger: [],
         conductor: [],
         orchestra: [],
+        "art direction": [],
         artwork: [],
-        design: [],
         photography: []
       };
 
@@ -954,7 +970,7 @@ export default function BookDetailPage() {
           .slice()
           .sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999));
         for (const r of sorted) {
-          const role = r.role;
+          const role = (r.role === ("design" as any) ? "designer" : r.role) as FacetRole;
           const name = String(r.entity!.name ?? "").trim();
           if (!name) continue;
           const existing = nextFacets[role] ?? [];
@@ -1279,6 +1295,99 @@ export default function BookDetailPage() {
     return (book?.edition?.subjects ?? []).filter(Boolean);
   }, [facetDraft.subject, book]);
 
+  function handleObjectTypeChange(nextType: string) {
+    const normalizedNext = nextType.trim() || "book";
+    const currentType = (formObjectType.trim() || String(book?.object_type ?? "").trim() || "book");
+    if (normalizedNext === currentType) {
+      setFormObjectType(normalizedNext);
+      return;
+    }
+
+    if (normalizedNext === "music") {
+      const mappedPrimaryArtist = uniqStrings([
+        ...(facetDraft.author ?? parseAuthorsInput(formAuthors)),
+        ...effectiveAuthors
+      ])[0] ?? null;
+      const mappedLabel = String((facetDraft.publisher?.[0] ?? formPublisher ?? effectivePublisher) || "").trim() || null;
+      const mappedReleaseDate = String(formPublishDate || effectivePublishDate || "").trim() || null;
+      const mappedDesigners = uniqStrings([...(facetDraft.designer ?? parseAuthorsInput(formDesigners))]);
+      const nextMusic = {
+        ...emptyMusicMetadata(),
+        ...formMusic,
+        primary_artist: (formMusic.primary_artist ?? "").trim() || mappedPrimaryArtist,
+        label: (formMusic.label ?? "").trim() || mappedLabel,
+        release_date: (formMusic.release_date ?? "").trim() || mappedReleaseDate
+      } satisfies MusicMetadata;
+
+      setFormObjectType("music");
+      setFormMusic(nextMusic);
+      setFormAuthors("");
+      setFormEditors("");
+      setFormDesigners("");
+      setFormPublisher("");
+      setFormPrinter("");
+      setFormMaterials("");
+      setFormEditionOverride("");
+      setFormPublishDate("");
+      setFormPages("");
+      setFormTrimWidth("");
+      setFormTrimHeight("");
+      setCropTrimWidth("");
+      setCropTrimHeight("");
+      setCropTrimUnit("ratio");
+      setFacetDraft((state) => ({
+        ...state,
+        author: [],
+        editor: [],
+        printer: [],
+        material: [],
+        performer: mappedPrimaryArtist ? uniqStrings([...(state.performer ?? []), mappedPrimaryArtist]) : state.performer,
+        publisher: mappedLabel ? [mappedLabel] : [],
+        "art direction": state["art direction"] ?? [],
+        designer: mappedDesigners
+      }));
+      return;
+    }
+
+    if (normalizedNext === "book" && currentType === "music") {
+      const mappedAuthor = String(formMusic.primary_artist ?? "").trim();
+      const mappedPublisher = String(formMusic.label ?? "").trim();
+      const mappedPublishDate = String(formMusic.release_date ?? "").trim();
+
+      setFormObjectType("book");
+      if (mappedAuthor) {
+        setFormAuthors(mappedAuthor);
+      }
+      if (mappedPublisher) {
+        setFormPublisher(mappedPublisher);
+      }
+      if (mappedPublishDate) {
+        setFormPublishDate(mappedPublishDate);
+      }
+      setFacetDraft((state) => ({
+        ...state,
+        author: mappedAuthor ? [mappedAuthor] : [],
+        publisher: mappedPublisher ? [mappedPublisher] : state.publisher,
+        performer: [],
+        composer: [],
+        producer: [],
+        engineer: [],
+        mastering: [],
+        "featured artist": [],
+        arranger: [],
+        conductor: [],
+        orchestra: [],
+        "art direction": [],
+        artwork: [],
+        photography: []
+      }));
+      setFormMusic(emptyMusicMetadata());
+      return;
+    }
+
+    setFormObjectType(normalizedNext);
+  }
+
   const tags = useMemo(() => {
     const all = ((book?.book_tags ?? []).map((bt) => bt.tag).filter(Boolean) as any[]).filter((t) => t?.id && t?.name);
     return all
@@ -1485,8 +1594,8 @@ export default function BookDetailPage() {
       arranger: [],
       conductor: [],
       orchestra: [],
+      "art direction": [],
       artwork: [],
-      design: [],
       photography: []
     };
 
@@ -1938,6 +2047,9 @@ export default function BookDetailPage() {
       payload.edition_override = null;
       payload.publish_date_override = null;
       payload.pages = null;
+      payload.trim_width = null;
+      payload.trim_height = null;
+      payload.trim_unit = null;
     }
     let res = await supabase.from("user_books").update(payload).eq("id", book.id);
     if (res.error) {
@@ -2506,14 +2618,19 @@ export default function BookDetailPage() {
     });
   }
 
-  async function searchMetadata(titleInput: string, authorInput?: string) {
+  async function searchMetadata(titleInput: string, authorInput?: string, barcodeInput?: string | null) {
     const title = titleInput.trim();
     const author = (authorInput ?? "").trim();
-    if (!title) return;
+    const barcode = String(barcodeInput ?? "").trim();
+    if (!title && !barcode) return;
     setSearchState({ busy: true, error: null, message: "Searching…" });
     setSearchResults([]);
     try {
-      const res = await fetch(`/api/search?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}`);
+      const params = new URLSearchParams();
+      if (title) params.set("title", title);
+      if (author) params.set("author", author);
+      if (barcode) params.set("barcode", barcode);
+      const res = await fetch(`/api/search?${params.toString()}`);
       const json = await res.json();
       if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Search failed");
       
@@ -2596,9 +2713,36 @@ export default function BookDetailPage() {
     }
   }
 
-  async function previewImportFromIsbn(isbn: string) {
+  async function hydrateDiscogsSearchResult(result: MetadataSearchResult): Promise<MetadataSearchResult> {
+    if (result.source_type !== "discogs" || !result.source_url) return result;
+    const res = await fetch("/api/import-url", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: result.source_url })
+    });
+    const json = await res.json();
+    if (!res.ok || !json?.ok || !json?.preview) return result;
+    const preview = json.preview as any;
+    return {
+      ...result,
+      object_type: preview.object_type === "music" ? "music" : (result.object_type ?? "book"),
+      source_type: preview.source_type ?? result.source_type ?? null,
+      source_url: preview.source_url ?? result.source_url ?? null,
+      external_source_ids: preview.external_source_ids ?? result.external_source_ids ?? null,
+      title: preview.title ?? result.title ?? null,
+      authors: Array.isArray(preview.authors) ? preview.authors.filter(Boolean) : result.authors,
+      publisher: preview.publisher ?? result.publisher ?? null,
+      publish_date: preview.publish_date ?? result.publish_date ?? null,
+      subjects: Array.isArray(preview.subjects) ? preview.subjects.filter(Boolean) : result.subjects,
+      cover_url: preview.cover_url ?? result.cover_url ?? null,
+      music_metadata: preview.music_metadata ?? result.music_metadata ?? null,
+      contributor_entities: preview.contributor_entities ?? result.contributor_entities ?? null
+    };
+  }
+
+  async function previewImportFromIsbn(isbn: string): Promise<boolean> {
     const value = isbn.trim();
-    if (!value) return;
+    if (!value) return false;
     setImportState({ busy: true, error: null, message: "Looking up ISBN…" });
     setImportPreview(null);
     setImportMeta({ final_url: null, domain: null, domain_kind: "isbn", scraped_sources: [] });
@@ -2642,8 +2786,10 @@ export default function BookDetailPage() {
         scraped_sources: Array.isArray(edition.sources) ? (edition.sources as any[]).map((s) => String(s)) : []
       });
       setImportState({ busy: false, error: null, message: "Preview ready" });
+      return true;
     } catch (e: any) {
       setImportState({ busy: false, error: e?.message ?? "ISBN lookup failed", message: "ISBN lookup failed" });
+      return false;
     }
   }
 
@@ -2659,7 +2805,16 @@ export default function BookDetailPage() {
     setLinkState({ busy: false, error: null, message: null });
 
     if (looksLikeIsbn(value)) {
-      await previewImportFromIsbn(value);
+      const ok = await previewImportFromIsbn(value);
+      if (ok) return;
+      if (looksLikeBarcode(value)) {
+        await searchMetadata("", "", value);
+      }
+      return;
+    }
+
+    if (looksLikeBarcode(value)) {
+      await searchMetadata("", "", value);
       return;
     }
 
@@ -2724,6 +2879,7 @@ export default function BookDetailPage() {
           release_date: current.release_date || nextMusic.release_date,
           original_release_year: current.original_release_year || nextMusic.original_release_year,
           format: current.format || nextMusic.format,
+          release_type: current.release_type || nextMusic.release_type,
           edition_pressing: current.edition_pressing || nextMusic.edition_pressing,
           catalog_number: current.catalog_number || nextMusic.catalog_number,
           barcode: current.barcode || nextMusic.barcode,
@@ -2737,8 +2893,8 @@ export default function BookDetailPage() {
           disc_count: current.disc_count ?? nextMusic.disc_count,
           color_variant: current.color_variant || nextMusic.color_variant,
           limited_edition: current.limited_edition ?? nextMusic.limited_edition,
-          release_lineage: current.release_lineage || nextMusic.release_lineage,
-          audio_configuration: current.audio_configuration || nextMusic.audio_configuration,
+          reissue: current.reissue ?? nextMusic.reissue,
+          channels: current.channels || nextMusic.channels,
           packaging_type: current.packaging_type || nextMusic.packaging_type,
           track_count: current.track_count ?? nextMusic.track_count
         }));
@@ -3456,15 +3612,19 @@ export default function BookDetailPage() {
                                       </button>
                                     ) : (
                                       <button
-                                        onClick={() => {
+                                        onClick={async () => {
                                           enterEditMode();
+                                          const hydrated = await hydrateDiscogsSearchResult(r);
                                           fillFieldsAdditive({
-                                            title: r.title,
-                                            authors: r.authors,
-                                            publisher: r.publisher,
-                                            publish_date: r.publish_date,
-                                            subjects: r.subjects,
-                                            cover_url: r.cover_url
+                                            title: hydrated.title,
+                                            authors: hydrated.authors,
+                                            publisher: hydrated.publisher,
+                                            publish_date: hydrated.publish_date,
+                                            subjects: hydrated.subjects,
+                                            cover_url: hydrated.cover_url,
+                                            object_type: hydrated.object_type ?? "book",
+                                            music_metadata: hydrated.music_metadata ?? null,
+                                            contributor_entities: hydrated.contributor_entities ?? null
                                           });
                                         }}
                                         disabled={!r.title && (!r.authors || r.authors.length === 0) && !r.publisher && !r.publish_date}
@@ -3532,7 +3692,7 @@ export default function BookDetailPage() {
                                   ) : null}
                                   {(preview.designers ?? []).length > 0 ? (
                                     <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                      design: {preview.designers!.join(", ")}
+                                      designer: {preview.designers!.join(", ")}
                                     </div>
                                   ) : null}
                                   {(preview.printers ?? []).length > 0 ? (
@@ -3953,7 +4113,7 @@ export default function BookDetailPage() {
 
                     {editMode || Boolean((effectiveMusic.original_release_year ?? "").trim()) ? (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Original release year</div>
+                        <div style={{ minWidth: 110 }} className="text-muted">Orig. release year</div>
                         <div style={{ flex: "1 1 auto" }}>
                           {editMode ? (
                             <input className="om-inline-control" value={formMusic.original_release_year ?? ""} onChange={(e) => setFormMusic((s) => ({ ...s, original_release_year: e.target.value || null }))} placeholder="Add year" />
@@ -3967,30 +4127,50 @@ export default function BookDetailPage() {
                     ) : null}
 
                     {[
-                      ["Format", "format"],
-                      ["Pressing", "edition_pressing"],
-                      ["Catlog #", "catalog_number"],
-                      ["Barcode", "barcode"],
-                      ["Country", "country"],
-                      ["Discogs ID", "discogs_id"],
-                      ["MusicBrainz ID", "musicbrainz_id"],
-                      ["Speed", "speed"],
-                      ["Color / variant", "color_variant"],
-                      ["Reissue / original", "release_lineage"],
-                      ["Mono / stereo", "audio_configuration"],
-                      ["Packaging type", "packaging_type"]
-                    ].map(([label, key]) =>
+                      ["Format", "format", "select"],
+                      ["Release type", "release_type", "select"],
+                      ["Pressing", "edition_pressing", "text"],
+                      ["Catlog #", "catalog_number", "text"],
+                      ["Barcode", "barcode", "text"],
+                      ["Country", "country", "text"],
+                      ["Discogs ID", "discogs_id", "text"],
+                      ["MusicBrainz ID", "musicbrainz_id", "text"],
+                      ["Speed", "speed", "select"],
+                      ["Channels", "channels", "select"],
+                      ["Color / variant", "color_variant", "text"],
+                      ["Packaging type", "packaging_type", "text"]
+                    ].map(([label, key, inputKind]) =>
                       editMode || Boolean(String((effectiveMusic as any)[key] ?? "").trim()) ? (
                         <div key={key} className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                           <div style={{ minWidth: 110 }} className="text-muted">{label}</div>
                           <div style={{ flex: "1 1 auto" }}>
                             {editMode ? (
-                              <input
-                                className="om-inline-control"
-                                value={String((formMusic as any)[key] ?? "")}
-                                onChange={(e) => setFormMusic((s) => ({ ...s, [key]: e.target.value || null }))}
-                                placeholder={`Add ${label.toLowerCase()}`}
-                              />
+                              inputKind === "select" ? (
+                                <select
+                                  className="om-inline-control"
+                                  value={String((formMusic as any)[key] ?? "")}
+                                  onChange={(e) => setFormMusic((s) => ({ ...s, [key]: e.target.value || null }))}
+                                >
+                                  <option value="">Choose</option>
+                                  {(key === "format"
+                                    ? MUSIC_FORMAT_OPTIONS
+                                    : key === "release_type"
+                                      ? MUSIC_RELEASE_TYPE_OPTIONS
+                                      : key === "speed"
+                                        ? MUSIC_SPEED_OPTIONS
+                                        : MUSIC_CHANNEL_OPTIONS
+                                  ).map((option) => (
+                                    <option key={option} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  className="om-inline-control"
+                                  value={String((formMusic as any)[key] ?? "")}
+                                  onChange={(e) => setFormMusic((s) => ({ ...s, [key]: e.target.value || null }))}
+                                  placeholder={`Add ${label.toLowerCase()}`}
+                                />
+                              )
                             ) : (
                               <Link href={musicValueHref(String((effectiveMusic as any)[key] ?? ""))}>
                                 {String((effectiveMusic as any)[key] ?? "")}
@@ -4045,6 +4225,34 @@ export default function BookDetailPage() {
                             <Link href={musicValueHref("limited")}>yes</Link>
                           ) : (
                             "no"
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {editMode || effectiveMusic.reissue !== null ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Reissue</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <select
+                              className="om-inline-control"
+                              value={effectiveMusic.reissue === null ? "" : effectiveMusic.reissue ? "yes" : "no"}
+                              onChange={(e) =>
+                                setFormMusic((s) => ({
+                                  ...s,
+                                  reissue: e.target.value === "" ? null : e.target.value === "yes"
+                                }))
+                              }
+                            >
+                              <option value="">Choose</option>
+                              <option value="no">No (original release)</option>
+                              <option value="yes">Yes (reissue)</option>
+                            </select>
+                          ) : effectiveMusic.reissue === null ? null : effectiveMusic.reissue ? (
+                            <Link href={musicValueHref("reissue")}>Yes (reissue)</Link>
+                          ) : (
+                            <Link href={musicValueHref("original release")}>No (original release)</Link>
                           )}
                         </div>
                       </div>
@@ -4256,7 +4464,7 @@ export default function BookDetailPage() {
                     </div>
                     <div style={{ flex: "1 1 auto" }}>
                       {editMode ? (
-                        <select className="om-inline-control" value={formObjectType || "book"} onChange={(e) => setFormObjectType(e.target.value)}>
+                        <select className="om-inline-control" value={formObjectType || "book"} onChange={(e) => handleObjectTypeChange(e.target.value)}>
                           <option value="book">book</option>
                           <option value="magazine">magazine</option>
                           <option value="ephemera">ephemera</option>

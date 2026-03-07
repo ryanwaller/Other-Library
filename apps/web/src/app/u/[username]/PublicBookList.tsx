@@ -300,6 +300,7 @@ export default function PublicBookList({
         const musicParts = [
           music?.label,
           music?.format,
+          music?.release_type,
           music?.edition_pressing,
           music?.catalog_number,
           music?.barcode,
@@ -307,9 +308,9 @@ export default function PublicBookList({
           music?.discogs_id,
           music?.musicbrainz_id,
           music?.speed,
+          music?.channels,
           music?.color_variant,
-          music?.release_lineage,
-          music?.audio_configuration,
+          music?.reissue == null ? null : music?.reissue ? "reissue" : "original release",
           music?.packaging_type,
           ...(music?.genres ?? []),
           ...(music?.styles ?? []),
@@ -561,7 +562,7 @@ export default function PublicBookList({
               <span>{effectiveLibraries.length}</span>
             </span>
             <span className="om-stat-pair">
-              <span className="text-muted">Books</span>
+              <span className="text-muted">Items</span>
               <span>{filteredGroups.length}</span>
             </span>
           </div>
@@ -713,7 +714,7 @@ export default function PublicBookList({
                         ) : null}
                       </div>
                       <span className="text-muted" style={{ marginLeft: "var(--space-md)", whiteSpace: "nowrap", paddingBottom: 9, borderBottom: "1px solid transparent" }}>
-                        {libGroups.length}&nbsp;&nbsp;book{libGroups.length === 1 ? "" : "s"}
+                        {libGroups.length}&nbsp;&nbsp;item{libGroups.length === 1 ? "" : "s"}
                       </span>
                     </div>
                   </div>

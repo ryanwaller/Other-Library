@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 function musicRoleLabel(role: string): string {
   if (role === "featured artist") return "Featured artist";
+  if (role === "art direction") return "Art direction";
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
@@ -426,12 +427,13 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   ) : null}
                   {(music?.original_release_year ?? "").trim() ? (
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                      <div style={{ minWidth: 110 }} className="text-muted">Original release year</div>
+                      <div style={{ minWidth: 110 }} className="text-muted">Orig. release year</div>
                       <div><Link href={publicMusicFilterHref(profile.username, music?.original_release_year ?? "")}>{music?.original_release_year}</Link></div>
                     </div>
                   ) : null}
                   {[
                     ["Format", music?.format],
+                    ["Release type", music?.release_type],
                     ["Pressing", music?.edition_pressing],
                     ["Catlog #", music?.catalog_number],
                     ["Barcode", music?.barcode],
@@ -439,11 +441,10 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     ["Discogs ID", music?.discogs_id],
                     ["MusicBrainz ID", music?.musicbrainz_id],
                     ["Speed", music?.speed],
+                    ["Channels", music?.channels],
                     ["Disc count", music?.disc_count != null ? String(music.disc_count) : null],
                     ["Color / variant", music?.color_variant],
                     ["Limited edition", music?.limited_edition === null ? null : music?.limited_edition ? "yes" : "no"],
-                    ["Reissue / original", music?.release_lineage],
-                    ["Mono / stereo", music?.audio_configuration],
                     ["Packaging type", music?.packaging_type]
                   ].map(([label, value]) =>
                     value ? (
@@ -453,6 +454,16 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                       </div>
                     ) : null
                   )}
+                  {music?.reissue !== null ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Reissue</div>
+                      <div>
+                        <Link href={publicMusicFilterHref(profile.username, music?.reissue ? "reissue" : "original release")}>
+                          {music?.reissue ? "Yes (reissue)" : "No (original release)"}
+                        </Link>
+                      </div>
+                    </div>
+                  ) : null}
                   {musicGenres.length > 0 ? (
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                       <div style={{ minWidth: 110 }} className="text-muted">Genres</div>

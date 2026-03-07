@@ -3,16 +3,22 @@ import { NextResponse, type NextRequest } from "next/server";
 export const runtime = "nodejs";
 
 type SearchResult = {
-  source: "openlibrary" | "googleBooks";
+  source: "openlibrary" | "googleBooks" | "discogs";
+  object_type: "book" | "music";
+  source_type: string | null;
+  source_url: string | null;
+  external_source_ids: Record<string, string | null> | null;
   title: string | null;
   authors: string[];
   publisher: string | null;
-  publish_date: string | null; // ISO YYYY-MM-DD when confidently parsed, else null
+  publish_date: string | null;
   publish_year: number | null;
   subjects: string[];
   isbn10: string | null;
   isbn13: string | null;
   cover_url: string | null;
+  music_metadata?: Record<string, unknown> | null;
+  contributor_entities?: Record<string, string[]> | null;
   raw: Record<string, unknown>;
 };
 
@@ -36,11 +42,9 @@ function parseDateToIso(dateLike: unknown): string | null {
   if (typeof dateLike !== "string") return null;
   const s = dateLike.trim();
   if (!s) return null;
-
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   if (/^\d{4}-\d{2}$/.test(s)) return `${s}-01`;
   if (/^\d{4}$/.test(s)) return null;
-
   const ms = Date.parse(s);
   if (Number.isNaN(ms)) return null;
   const d = new Date(ms);
@@ -51,10 +55,11 @@ function parseDateToIso(dateLike: unknown): string | null {
 }
 
 function normalizeIsbn(input: string): string {
-  return input
-    .trim()
-    .toUpperCase()
-    .replace(/[^0-9X]/g, "");
+  return input.trim().toUpperCase().replace(/[^0-9X]/g, "");
+}
+
+function normalizeBarcode(input: string): string {
+  return input.trim().replace(/\D/g, "");
 }
 
 function isValidIsbn13(isbn13: string): boolean {
@@ -87,9 +92,7 @@ async function openLibrarySearch(title: string, author: string | null): Promise<
   qs.set("title", title);
   if (author) qs.set("author", author);
   qs.set("limit", "10");
-
-  const url = `https://openlibrary.org/search.json?${qs.toString()}`;
-  const json = await fetchJson(url);
+  const json = await fetchJson(`https://openlibrary.org/search.json?${qs.toString()}`);
   const docs = (json as any)?.docs;
   if (!Array.isArray(docs)) return [];
 
@@ -103,7 +106,6 @@ async function openLibrarySearch(title: string, author: string | null): Promise<
       Array.isArray(doc.publish_date) && doc.publish_date.length > 0 ? String(doc.publish_date[0] ?? "").trim() : null;
     const publish_date = parseDateToIso(publishDateCandidate);
     const subjects = Array.isArray(doc.subject) ? doc.subject.filter((x: any) => typeof x === "string").slice(0, 25) : [];
-
     const isbns = Array.isArray(doc.isbn) ? doc.isbn.filter((x: any) => typeof x === "string") : [];
     const isbn13 = pickIsbn13(isbns);
     const isbn10 = (() => {
@@ -113,12 +115,15 @@ async function openLibrarySearch(title: string, author: string | null): Promise<
       }
       return null;
     })();
-
     const cover_i = typeof doc.cover_i === "number" ? doc.cover_i : null;
     const cover_url = cover_i ? `https://covers.openlibrary.org/b/id/${cover_i}-L.jpg` : null;
 
     out.push({
       source: "openlibrary",
+      object_type: "book",
+      source_type: "openlibrary",
+      source_url: null,
+      external_source_ids: null,
       title: typeof doc.title === "string" ? doc.title : null,
       authors,
       publisher: typeof publisher === "string" ? publisher : null,
@@ -137,10 +142,7 @@ async function openLibrarySearch(title: string, author: string | null): Promise<
 async function googleBooksSearch(title: string, author: string | null): Promise<SearchResult[]> {
   const qParts = [`intitle:${title}`];
   if (author) qParts.push(`inauthor:${author}`);
-  const q = qParts.join("+");
-
-  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=10&printType=books`;
-  const json = await fetchJson(url);
+  const json = await fetchJson(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(qParts.join("+"))}&maxResults=10&printType=books`);
   const items = (json as any)?.items;
   if (!Array.isArray(items)) return [];
 
@@ -148,7 +150,6 @@ async function googleBooksSearch(title: string, author: string | null): Promise<
   for (const it of items) {
     const info = it?.volumeInfo;
     if (!info || typeof info !== "object") continue;
-
     const identifiers = Array.isArray(info.industryIdentifiers) ? info.industryIdentifiers : [];
     const isbn13 =
       pickIsbn13(identifiers.map((x: any) => (x?.type === "ISBN_13" ? String(x?.identifier ?? "") : ""))) ??
@@ -165,14 +166,12 @@ async function googleBooksSearch(title: string, author: string | null): Promise<
       }
       return null;
     })();
-
     const publish_date = parseDateToIso(info.publishedDate);
     const publish_year = (() => {
       const s = typeof info.publishedDate === "string" ? info.publishedDate.trim() : "";
       if (/^\d{4}/.test(s)) return Number(s.slice(0, 4));
       return null;
     })();
-
     const subjects = Array.isArray(info.categories) ? info.categories.filter((x: any) => typeof x === "string") : [];
     const cover_url =
       typeof info.imageLinks?.thumbnail === "string"
@@ -183,6 +182,10 @@ async function googleBooksSearch(title: string, author: string | null): Promise<
 
     out.push({
       source: "googleBooks",
+      object_type: "book",
+      source_type: "googleBooks",
+      source_url: null,
+      external_source_ids: null,
       title: typeof info.title === "string" ? info.title : null,
       authors: Array.isArray(info.authors) ? info.authors.filter((x: any) => typeof x === "string") : [],
       publisher: typeof info.publisher === "string" ? info.publisher : null,
@@ -198,18 +201,147 @@ async function googleBooksSearch(title: string, author: string | null): Promise<
   return out;
 }
 
-function score(r: SearchResult, title: string, author: string | null): number {
-  const titleLc = title.toLowerCase();
-  const t = (r.title ?? "").toLowerCase();
-  const a = (author ?? "").toLowerCase();
+function mapDiscogsFormat(values: string[]): string | null {
+  const joined = values.join(" ").toLowerCase();
+  if (joined.includes("box set")) return "Box set";
+  if (joined.includes("flexi")) return "Flexi disc";
+  if (joined.includes("cassette")) return "Cassette";
+  if (joined.includes("cd")) return "CD";
+  if (joined.includes('12"')) return '12"';
+  if (joined.includes('10"')) return '10"';
+  if (joined.includes('7"')) return '7"';
+  if (joined.includes("lp") || joined.includes("vinyl")) return "LP";
+  return null;
+}
+
+function mapDiscogsReleaseType(values: string[]): string | null {
+  const joined = values.join(" ").toLowerCase();
+  if (joined.includes("box set")) return "Box set";
+  if (joined.includes("soundtrack")) return "Soundtrack";
+  if (joined.includes("compilation")) return "Compilation";
+  if (joined.includes("live")) return "Live";
+  if (/\bep\b/.test(joined)) return "EP";
+  if (joined.includes("single")) return "Single";
+  if (joined.includes("album")) return "Album";
+  return null;
+}
+
+function mapDiscogsSpeed(values: string[]): string | null {
+  const joined = values.join(" ").toLowerCase();
+  if (joined.includes("33")) return "33⅓ RPM";
+  if (joined.includes("45")) return "45 RPM";
+  if (joined.includes("78")) return "78 RPM";
+  return null;
+}
+
+function mapDiscogsChannels(values: string[]): string | null {
+  const joined = values.join(" ").toLowerCase();
+  if (joined.includes("stereo") && joined.includes("mono")) return "Both";
+  if (joined.includes("stereo")) return "Stereo";
+  if (joined.includes("mono")) return "Mono";
+  return null;
+}
+
+async function discogsSearch(params: { title: string | null; author: string | null; barcode: string | null }): Promise<SearchResult[]> {
+  const qs = new URLSearchParams();
+  qs.set("type", "release");
+  if (params.barcode) {
+    qs.set("barcode", params.barcode);
+  } else if (params.title && params.author) {
+    qs.set("release_title", params.title);
+    qs.set("artist", params.author);
+  } else if (params.title) {
+    qs.set("q", params.title);
+  } else {
+    return [];
+  }
+  qs.set("per_page", "12");
+  const json = await fetchJson(`https://api.discogs.com/database/search?${qs.toString()}`);
+  const results = (json as any)?.results;
+  if (!Array.isArray(results)) return [];
+
+  const out: SearchResult[] = [];
+  for (const row of results) {
+    const title = String(row?.title ?? "").trim();
+    const uri = String(row?.uri ?? "").trim();
+    const year = Number.isFinite(Number(row?.year)) ? Number(row.year) : null;
+    const thumb = String(row?.cover_image ?? row?.thumb ?? "").trim() || null;
+    const styleValues = Array.isArray(row?.style) ? row.style.filter((x: any) => typeof x === "string") : [];
+    const genreValues = Array.isArray(row?.genre) ? row.genre.filter((x: any) => typeof x === "string") : [];
+    const formatValues = Array.isArray(row?.format) ? row.format.filter((x: any) => typeof x === "string") : [];
+    const labelValues = Array.isArray(row?.label) ? row.label.filter((x: any) => typeof x === "string") : [];
+    const artistValues = Array.isArray(row?.artist) ? row.artist.filter((x: any) => typeof x === "string") : [];
+    const catno = String(row?.catno ?? "").trim() || null;
+    const barcode = params.barcode;
+
+    out.push({
+      source: "discogs",
+      object_type: "music",
+      source_type: "discogs",
+      source_url: uri ? `https://www.discogs.com${uri}` : null,
+      external_source_ids: {
+        discogs_id: row?.id ? String(row.id) : null,
+        discogs_master_id: row?.master_id ? String(row.master_id) : null
+      },
+      title: title || null,
+      authors: uniqStrings(artistValues),
+      publisher: labelValues[0] ?? null,
+      publish_date: year ? `${year}-01-01` : null,
+      publish_year: year,
+      subjects: uniqStrings([...genreValues, ...styleValues]),
+      isbn10: null,
+      isbn13: null,
+      cover_url: thumb || null,
+      music_metadata: {
+        primary_artist: artistValues[0] ?? null,
+        label: labelValues[0] ?? null,
+        release_date: year ? `${year}-01-01` : null,
+        original_release_year: year ? String(year) : null,
+        format: mapDiscogsFormat(formatValues),
+        release_type: mapDiscogsReleaseType(formatValues),
+        edition_pressing: null,
+        catalog_number: catno,
+        barcode,
+        country: null,
+        genres: uniqStrings(genreValues),
+        styles: uniqStrings(styleValues),
+        tracklist: [],
+        discogs_id: row?.id ? String(row.id) : null,
+        musicbrainz_id: null,
+        speed: mapDiscogsSpeed(formatValues),
+        disc_count: null,
+        color_variant: null,
+        limited_edition: null,
+        reissue: null,
+        channels: mapDiscogsChannels(formatValues),
+        packaging_type: formatValues.find((value: string) => /gatefold|digipak|box set|sleeve|jewel case/i.test(value)) ?? null,
+        track_count: null
+      },
+      contributor_entities: artistValues.length > 0 ? { performer: uniqStrings(artistValues) } : null,
+      raw: { discogs: row }
+    });
+  }
+  return out;
+}
+
+function score(r: SearchResult, title: string | null, author: string | null, barcode: string | null): number {
   let s = 0;
-  if (t && titleLc === t) s += 8;
-  if (t && (titleLc.includes(t) || t.includes(titleLc))) s += 4;
+  const t = (r.title ?? "").toLowerCase();
+  const titleLc = (title ?? "").toLowerCase();
+  const a = (author ?? "").toLowerCase();
+  if (barcode) {
+    const resultBarcode = normalizeBarcode(String((r.music_metadata as any)?.barcode ?? ""));
+    if (resultBarcode && resultBarcode === normalizeBarcode(barcode)) s += 20;
+    if (r.object_type === "music") s += 8;
+  }
+  if (t && titleLc && titleLc === t) s += 8;
+  if (t && titleLc && (titleLc.includes(t) || t.includes(titleLc))) s += 4;
   if (a) {
     const authors = (r.authors ?? []).map((x) => x.toLowerCase());
     if (authors.some((x) => x === a)) s += 5;
     if (authors.some((x) => x.includes(a) || a.includes(x))) s += 2;
   }
+  if (r.object_type === "music") s += 2;
   if (r.isbn13) s += 3;
   if (r.cover_url) s += 1;
   if (r.publisher) s += 1;
@@ -228,7 +360,7 @@ function dedupe(results: SearchResult[]): SearchResult[] {
       out.push(r);
       continue;
     }
-    const key = `${(r.title ?? "").toLowerCase()}|${(r.authors ?? []).join(",").toLowerCase()}`;
+    const key = `${r.object_type}|${(r.title ?? "").toLowerCase()}|${(r.authors ?? []).join(",").toLowerCase()}|${String((r.external_source_ids ?? {}).discogs_id ?? "")}`;
     if (seenKey.has(key)) continue;
     seenKey.add(key);
     out.push(r);
@@ -240,27 +372,33 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const title = (searchParams.get("title") ?? "").trim();
   const author = (searchParams.get("author") ?? "").trim();
+  const barcode = normalizeBarcode(searchParams.get("barcode") ?? "");
 
-  if (!title) {
-    return NextResponse.json({ ok: false, error: "Provide a title." }, { status: 400 });
+  if (!title && !barcode) {
+    return NextResponse.json({ ok: false, error: "Provide a title or barcode." }, { status: 400 });
   }
 
   const authorValue = author || null;
+  const titleValue = title || null;
+  const barcodeValue = barcode.length >= 12 ? barcode : null;
 
-  const [ol, gb] = await Promise.allSettled([openLibrarySearch(title, authorValue), googleBooksSearch(title, authorValue)]);
+  const tasks: Array<Promise<SearchResult[]>> = [];
+  if (titleValue) {
+    tasks.push(openLibrarySearch(titleValue, authorValue));
+    tasks.push(googleBooksSearch(titleValue, authorValue));
+    tasks.push(discogsSearch({ title: titleValue, author: authorValue, barcode: null }));
+  } else if (barcodeValue) {
+    tasks.push(discogsSearch({ title: null, author: null, barcode: barcodeValue }));
+  }
 
-  const combined = [
-    ...(ol.status === "fulfilled" ? ol.value : []),
-    ...(gb.status === "fulfilled" ? gb.value : [])
-  ];
-
+  const settled = await Promise.allSettled(tasks);
+  const combined = settled.flatMap((entry) => (entry.status === "fulfilled" ? entry.value : []));
   const ranked = dedupe(combined)
-    .map((r) => ({ r, s: score(r, title, authorValue) }))
+    .map((r) => ({ r, s: score(r, titleValue, authorValue, barcodeValue) }))
     .sort((a, b) => b.s - a.s)
     .map((x) => x.r)
     .slice(0, 12);
 
-  // Ensure arrays are present.
   for (const r of ranked) {
     r.authors = uniqStrings(r.authors ?? []);
     r.subjects = uniqStrings(r.subjects ?? []);
