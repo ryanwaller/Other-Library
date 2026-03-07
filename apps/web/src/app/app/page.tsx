@@ -380,6 +380,20 @@ function AppShell({
   filterDesigner,
   filterEditor,
   filterMaterial,
+  filterPrinter,
+  filterPerformer,
+  filterComposer,
+  filterProducer,
+  filterEngineer,
+  filterMastering,
+  filterFeaturedArtist,
+  filterArranger,
+  filterConductor,
+  filterOrchestra,
+  filterArtDirection,
+  filterArtwork,
+  filterDesign,
+  filterPhotography,
   filterGroup,
   filterDecade,
   filterCategory,
@@ -394,6 +408,20 @@ function AppShell({
   filterDesigner: string | null;
   filterEditor: string | null;
   filterMaterial: string | null;
+  filterPrinter: string | null;
+  filterPerformer: string | null;
+  filterComposer: string | null;
+  filterProducer: string | null;
+  filterEngineer: string | null;
+  filterMastering: string | null;
+  filterFeaturedArtist: string | null;
+  filterArranger: string | null;
+  filterConductor: string | null;
+  filterOrchestra: string | null;
+  filterArtDirection: string | null;
+  filterArtwork: string | null;
+  filterDesign: string | null;
+  filterPhotography: string | null;
   filterGroup: string | null;
   filterDecade: string | null;
   filterCategory: string | null;
@@ -2590,6 +2618,22 @@ function AppShell({
     const discCount = (searchParams.get("disc_count") ?? "").trim().toLowerCase();
     const limitedEdition = (searchParams.get("limited_edition") ?? "").trim().toLowerCase();
     const reissue = (searchParams.get("reissue") ?? "").trim().toLowerCase();
+    const entityRoleFilters = [
+      ["performer", "performer"],
+      ["composer", "composer"],
+      ["producer", "producer"],
+      ["engineer", "engineer"],
+      ["mastering", "mastering"],
+      ["featured_artist", "featured artist"],
+      ["arranger", "arranger"],
+      ["conductor", "conductor"],
+      ["orchestra", "orchestra"],
+      ["art_direction", "art direction"],
+      ["artwork", "artwork"],
+      ["design", "design"],
+      ["photography", "photography"],
+      ["printer", "printer"]
+    ] as const;
 
     const byKey = new Map<string, CatalogItem[]>();
     for (const it of filteredItems) {
@@ -2701,6 +2745,23 @@ function AppShell({
       const normalized = value == null ? "" : value ? "reissue" : "original release";
       return normalized === reissue;
     }));
+    for (const [queryKey, role] of entityRoleFilters) {
+      const value = (searchParams.get(queryKey) ?? "").trim().toLowerCase();
+      if (!value) continue;
+      groups = groups.filter((g) =>
+        g.copies.some((c) => {
+          if (role === "printer") {
+            const printerOverride = String((c as any).printer_override ?? "").trim().toLowerCase();
+            if (printerOverride === value) return true;
+          }
+          return (c.book_entities ?? []).some((row: any) => {
+            const rowRole = String(row?.role ?? "").trim().toLowerCase();
+            const rowName = String(row?.entity?.name ?? "").trim().toLowerCase();
+            return rowRole === role && rowName === value;
+          });
+        })
+      );
+    }
     if (visibilityMode !== "all") {
       groups = groups.filter((g) => {
         const eff = g.effectiveVisibility;
@@ -2925,9 +2986,23 @@ function AppShell({
                 if (filterSubject) pairs.push({ label: "Subject", value: filterSubject, key: "subject", onClear: () => clearFilter("subject") });
                 if (filterPublisher) pairs.push({ label: "Publisher", value: filterPublisher, key: "publisher", onClear: () => clearFilter("publisher") });
                 if (filterMaterial) pairs.push({ label: "Material", value: filterMaterial, key: "material", onClear: () => clearFilter("material") });
+                if (filterPrinter) pairs.push({ label: "Printer", value: filterPrinter, key: "printer", onClear: () => clearFilter("printer") });
+                if (filterPerformer) pairs.push({ label: "Performer", value: filterPerformer, key: "performer", onClear: () => clearFilter("performer") });
+                if (filterComposer) pairs.push({ label: "Composer", value: filterComposer, key: "composer", onClear: () => clearFilter("composer") });
+                if (filterProducer) pairs.push({ label: "Producer", value: filterProducer, key: "producer", onClear: () => clearFilter("producer") });
+                if (filterEngineer) pairs.push({ label: "Engineer", value: filterEngineer, key: "engineer", onClear: () => clearFilter("engineer") });
+                if (filterMastering) pairs.push({ label: "Mastering", value: filterMastering, key: "mastering", onClear: () => clearFilter("mastering") });
+                if (filterFeaturedArtist) pairs.push({ label: "Featured artist", value: filterFeaturedArtist, key: "featured_artist", onClear: () => clearFilter("featured_artist") });
+                if (filterArranger) pairs.push({ label: "Arranger", value: filterArranger, key: "arranger", onClear: () => clearFilter("arranger") });
+                if (filterConductor) pairs.push({ label: "Conductor", value: filterConductor, key: "conductor", onClear: () => clearFilter("conductor") });
+                if (filterOrchestra) pairs.push({ label: "Orchestra", value: filterOrchestra, key: "orchestra", onClear: () => clearFilter("orchestra") });
+                if (filterArtDirection) pairs.push({ label: "Art direction", value: filterArtDirection, key: "art_direction", onClear: () => clearFilter("art_direction") });
+                if (filterArtwork) pairs.push({ label: "Artwork", value: filterArtwork, key: "artwork", onClear: () => clearFilter("artwork") });
+                if (filterDesign) pairs.push({ label: "Design", value: filterDesign, key: "design", onClear: () => clearFilter("design") });
+                if (filterPhotography) pairs.push({ label: "Photography", value: filterPhotography, key: "photography", onClear: () => clearFilter("photography") });
                 if (filterGroup) pairs.push({ label: "Group", value: filterGroup, key: "group", onClear: () => clearFilter("group") });
                 if (filterDecade) pairs.push({ label: "Decade", value: filterDecade, key: "decade", onClear: () => clearFilter("decade") });
-                for (const key of DETAIL_FILTER_KEYS.filter((entry) => !["q", "author", "tag", "category", "publisher", "subject", "designer", "editor", "material", "group", "decade"].includes(entry))) {
+                for (const key of DETAIL_FILTER_KEYS.filter((entry) => !["q", "author", "tag", "category", "publisher", "subject", "designer", "editor", "material", "printer", "performer", "composer", "producer", "engineer", "mastering", "featured_artist", "arranger", "conductor", "orchestra", "art_direction", "artwork", "design", "photography", "group", "decade"].includes(entry))) {
                   const value = (searchParams.get(key) ?? "").trim();
                   const label = detailFilterLabel(key);
                   if (!value || !label) continue;
@@ -3530,6 +3605,20 @@ function AppWithFilters({ session }: { session: Session }) {
   const filterDesigner = searchParams.get("designer");
   const filterEditor = searchParams.get("editor");
   const filterMaterial = searchParams.get("material");
+  const filterPrinter = searchParams.get("printer");
+  const filterPerformer = searchParams.get("performer");
+  const filterComposer = searchParams.get("composer");
+  const filterProducer = searchParams.get("producer");
+  const filterEngineer = searchParams.get("engineer");
+  const filterMastering = searchParams.get("mastering");
+  const filterFeaturedArtist = searchParams.get("featured_artist");
+  const filterArranger = searchParams.get("arranger");
+  const filterConductor = searchParams.get("conductor");
+  const filterOrchestra = searchParams.get("orchestra");
+  const filterArtDirection = searchParams.get("art_direction");
+  const filterArtwork = searchParams.get("artwork");
+  const filterDesign = searchParams.get("design");
+  const filterPhotography = searchParams.get("photography");
   const filterGroup = searchParams.get("group");
   const filterDecade = searchParams.get("decade");
   const filterCategory = searchParams.get("category");
@@ -3545,6 +3634,20 @@ function AppWithFilters({ session }: { session: Session }) {
       filterDesigner={filterDesigner}
       filterEditor={filterEditor}
       filterMaterial={filterMaterial}
+      filterPrinter={filterPrinter}
+      filterPerformer={filterPerformer}
+      filterComposer={filterComposer}
+      filterProducer={filterProducer}
+      filterEngineer={filterEngineer}
+      filterMastering={filterMastering}
+      filterFeaturedArtist={filterFeaturedArtist}
+      filterArranger={filterArranger}
+      filterConductor={filterConductor}
+      filterOrchestra={filterOrchestra}
+      filterArtDirection={filterArtDirection}
+      filterArtwork={filterArtwork}
+      filterDesign={filterDesign}
+      filterPhotography={filterPhotography}
       filterGroup={filterGroup}
       filterDecade={filterDecade}
       filterCategory={filterCategory}

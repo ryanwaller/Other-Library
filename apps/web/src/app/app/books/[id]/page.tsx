@@ -10,7 +10,7 @@ import { bookIdSlug } from "../../../../lib/slug";
 import { formatDateShort } from "../../../../lib/formatDate";
 import { DECADE_OPTIONS } from "../../../../lib/decades";
 import { loadBookNavContext, type BookNavContext } from "../../../../lib/bookNav";
-import { detailFilterHref, type DetailFilterKey } from "../../../../lib/detailFilters";
+import { detailFilterHref, roleToDetailFilterKey, type DetailFilterKey } from "../../../../lib/detailFilters";
 import {
   emptyMusicMetadata,
   formatMusicTrackLine,
@@ -295,20 +295,14 @@ function normalizePublishDateForStorage(input: string): string | null {
 }
 
 function facetHref(role: string, name: string, slug?: string): string {
-  const mapping: Record<string, string> = {
-    author: "author",
-    subject: "subject",
-    publisher: "publisher",
-    designer: "designer",
-    material: "material",
-    category: "category",
-    tag: "tag"
-  };
-  const param = mapping[role] || role;
-  if (!(role in mapping) && slug) {
+  const filterKey = roleToDetailFilterKey(role);
+  if (!filterKey && slug) {
     return `/facet/${encodeURIComponent(role)}/${encodeURIComponent(slug)}`;
   }
-  return `/app?${param}=${encodeURIComponent(name)}`;
+  if (!filterKey) {
+    return `/app?q=${encodeURIComponent(name)}`;
+  }
+  return detailFilterHref("/app", filterKey, name);
 }
 
 function musicRoleLabel(role: string): string {
