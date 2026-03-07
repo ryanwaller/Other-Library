@@ -15,6 +15,7 @@ export type PublicBook = {
   group_label?: string | null;
   object_type?: string | null;
   decade?: string | null;
+  sort_order?: number | null;
   source_type?: string | null;
   source_url?: string | null;
   external_source_ids?: Record<string, string | null> | null;

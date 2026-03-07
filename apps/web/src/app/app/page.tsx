@@ -584,23 +584,29 @@ function AppShell({
   const [draggedItemKey, setDraggedItemKey] = useState<string | null>(null);
   const [draggedItemLibId, setDraggedItemLibId] = useState<number | null>(null);
   const [dragOverItemKey, setDragOverItemKey] = useState<string | null>(null);
+  const [backupItems, setBackupItems] = useState<CatalogItem[] | null>(null);
   const scrollIntervalRef = useRef<any>(null);
 
   function handleDragStart(e: React.DragEvent, key: string, libraryId: number) {
     setDraggedItemKey(key);
     setDraggedItemLibId(libraryId);
+    setBackupItems([...items]);
     e.dataTransfer.effectAllowed = "move";
-    // Create a ghost image or just let default happen
+    
+    // Create a ghost image that is slightly larger
+    const target = e.currentTarget as HTMLElement;
+    if (target) {
+      target.style.opacity = "0.99"; // force a layer
+    }
   }
 
   function handleDragOver(e: React.DragEvent, key: string) {
     e.preventDefault();
-    if (draggedItemKey === key) return;
-    setDragOverItemKey(key);
+    e.dataTransfer.dropEffect = "move";
 
     // Auto-scroll logic
     const threshold = 100;
-    const speed = 10;
+    const speed = 15;
     if (e.clientY < threshold) {
       if (!scrollIntervalRef.current) {
         scrollIntervalRef.current = setInterval(() => window.scrollBy(0, -speed), 16);
@@ -617,6 +623,48 @@ function AppShell({
     }
   }
 
+  function handleDragEnter(e: React.DragEvent, targetKey: string, targetLibId: number) {
+    e.preventDefault();
+    if (!draggedItemKey || draggedItemKey === targetKey || targetLibId !== draggedItemLibId) return;
+    setDragOverItemKey(targetKey);
+
+    // Live reorder logic (Optimistic)
+    const libId = targetLibId;
+    const groups = displayGroupsByLibraryId[libId] ?? [];
+    const sourceIdx = groups.findIndex(g => g.key === draggedItemKey);
+    const targetIdx = groups.findIndex(g => g.key === targetKey);
+    
+    if (sourceIdx === -1 || targetIdx === -1) return;
+
+    // Calculate new temporary sort_order for the source group items
+    let newOrder: number;
+    if (targetIdx === 0) {
+      newOrder = (groups[0].sortOrder ?? 0) - 1000;
+    } else if (targetIdx === groups.length - 1 && sourceIdx < targetIdx) {
+      newOrder = (groups[groups.length - 1].sortOrder ?? 0) + 1000;
+    } else {
+      // If moving "down", we want to insert AFTER the target. 
+      // If moving "up", we want to insert BEFORE.
+      if (targetIdx > sourceIdx) {
+        // Moving down: insert after target
+        const afterTarget = groups[targetIdx + 1];
+        newOrder = ((groups[targetIdx].sortOrder ?? 0) + (afterTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) + 2000)) / 2;
+      } else {
+        // Moving up: insert before target
+        const beforeTarget = groups[targetIdx - 1];
+        newOrder = ((beforeTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) - 2000) + (groups[targetIdx].sortOrder ?? 0)) / 2;
+      }
+    }
+
+    const sourceGroup = groups[sourceIdx];
+    setItems(prev => prev.map(item => {
+      if (sourceGroup.copies.some(c => c.id === item.id)) {
+        return { ...item, sort_order: newOrder };
+      }
+      return item;
+    }));
+  }
+
   function handleDragEnd() {
     setDraggedItemKey(null);
     setDraggedItemLibId(null);
@@ -629,67 +677,33 @@ function AppShell({
 
   async function handleDrop(e: React.DragEvent, targetKey: string, targetLibId: number) {
     e.preventDefault();
-    if (scrollIntervalRef.current) {
-      clearInterval(scrollIntervalRef.current);
-      scrollIntervalRef.current = null;
-    }
+    const finalItems = [...items];
     const sourceKey = draggedItemKey;
-    if (!sourceKey || sourceKey === targetKey || targetLibId !== draggedItemLibId) {
-      handleDragEnd();
-      return;
-    }
-
-    const libId = targetLibId;
-    const groups = (displayGroupsByLibraryId[libId] ?? []).filter(g => !searchQuery || true); // use current view list
-    const sourceIdx = groups.findIndex(g => g.key === sourceKey);
-    const targetIdx = groups.findIndex(g => g.key === targetKey);
-    if (sourceIdx === -1 || targetIdx === -1) {
-      handleDragEnd();
-      return;
-    }
-
-    // Gap-based sort_order calculation
-    let newOrder: number;
-    if (targetIdx === 0) {
-      newOrder = (groups[0]?.sortOrder ?? 0) - 1000;
-    } else if (targetIdx === groups.length - 1 && sourceIdx < targetIdx) {
-      newOrder = (groups[groups.length - 1]?.sortOrder ?? 0) + 1000;
-    } else {
-      const prevIdx = targetIdx > sourceIdx ? targetIdx : targetIdx - 1;
-      const nextIdx = targetIdx > sourceIdx ? targetIdx + 1 : targetIdx;
-      
-      const prevOrder = groups[prevIdx]?.sortOrder ?? 0;
-      const nextOrder = groups[nextIdx]?.sortOrder ?? (prevOrder + 2000);
-      newOrder = (prevOrder + nextOrder) / 2;
-    }
-
-    // Optimization: if we are dropping directly on an item, we need to decide if it's "before" or "after"
-    // For simplicity, let's just always insert BEFORE the target.
-    const beforeTarget = groups[targetIdx];
-    const afterTarget = targetIdx + 1 < groups.length ? groups[targetIdx + 1] : null;
-    
-    if (targetIdx === 0) {
-      newOrder = (beforeTarget.sortOrder ?? 0) - 1000;
-    } else {
-      const prev = groups[targetIdx - 1];
-      newOrder = ((prev.sortOrder ?? 0) + (beforeTarget.sortOrder ?? 0)) / 2;
-    }
-
-    // Update locally first for snappy UI
-    const sourceGroup = groups[sourceIdx];
-    const updatedItems = items.map(item => {
-      if (sourceGroup.copies.some(c => c.id === item.id)) {
-        return { ...item, sort_order: newOrder };
-      }
-      return item;
-    });
-    setItems(updatedItems);
+    const libId = draggedItemLibId;
     handleDragEnd();
 
-    // Persist to DB
-    if (supabase) {
-      const ids = sourceGroup.copies.map(c => c.id);
-      await supabase.from("user_books").update({ sort_order: newOrder }).in("id", ids);
+    if (!sourceKey || !libId || !supabase) return;
+
+    // Persist the final state of the dragged items
+    const sourceGroupItems = finalItems.filter(item => 
+      item.library_id === libId && 
+      displayGroups.find(g => g.key === sourceKey)?.copies.some(c => c.id === item.id)
+    );
+    
+    if (sourceGroupItems.length === 0) return;
+    
+    const finalSortOrder = sourceGroupItems[0].sort_order;
+    const ids = sourceGroupItems.map(it => it.id);
+
+    try {
+      const { error } = await supabase.from("user_books").update({ sort_order: finalSortOrder }).in("id", ids);
+      if (error) throw error;
+    } catch (err: any) {
+      console.error("Failed to persist new order", err);
+      if (backupItems) setItems(backupItems);
+      window.alert("Failed to save new order. Reverting.");
+    } finally {
+      setBackupItems(null);
     }
   }
   const [libraryNameDraft, setLibraryNameDraft] = useState("");
@@ -3484,13 +3498,6 @@ function AppShell({
 
       <div style={{ height: "var(--catalog-top-gap)" }} />
 
-      {rearrangingLibraryId !== null && (
-        <div className="row" style={{ marginBottom: "var(--space-md)", justifyContent: "space-between", alignItems: "center", background: "var(--bg-muted)", padding: "8px 12px", borderRadius: "4px" }}>
-          <span className="text-muted">Rearranging catalog order</span>
-          <button onClick={() => setRearrangingLibraryId(null)} style={{ textDecoration: "underline" }}>Done</button>
-        </div>
-      )}
-
       {displayLibraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];
         const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
@@ -3682,15 +3689,16 @@ function AppShell({
                         draggable={isRearrangingThis}
                         onDragStart={(e) => handleDragStart(e, g.key, lib.id)}
                         onDragOver={(e) => handleDragOver(e, g.key)}
+                        onDragEnter={(e) => handleDragEnter(e, g.key, lib.id)}
                         onDragEnd={handleDragEnd}
                         onDrop={(e) => handleDrop(e, g.key, lib.id)}
                         style={{
-                          opacity: isDragged ? 0.4 : 1,
+                          opacity: isDragged ? 0.3 : 1,
                           cursor: isRearrangingThis ? "grab" : "default",
-                          transition: "transform 0.15s ease",
-                          transform: isDragOver ? "scale(1.02)" : "none",
-                          borderLeft: isDragOver ? "2px solid var(--fg)" : "none",
-                          paddingLeft: isDragOver ? 8 : 0,
+                          transition: "all 0.3s cubic-bezier(0.2, 0, 0, 1)",
+                          transform: isDragged ? "scale(1.05)" : "none",
+                          zIndex: isDragged ? 1000 : 1,
+                          boxShadow: isDragged ? "0 8px 24px rgba(0,0,0,0.2)" : "none",
                           position: "relative"
                         }}
                       >
@@ -3705,7 +3713,8 @@ function AppShell({
                           tags={g.tagNames}
                           copiesCount={g.copiesCount}
                           href={isRearrangingThis ? "" : `/app/books/${g.primary.id}`}
-                          coverUrl={resolvedCoverUrl}                          originalSrc={resolvedCoverUrl}
+                          coverUrl={resolvedCoverUrl}
+                          originalSrc={resolvedCoverUrl}
                           onOpen={() => storeBookNavContext(lib.id, orderedBookIds)}
                           cropData={g.primary.cover_crop}
                           onDeleteCopy={() => deleteEntry(g.primary.id)}
