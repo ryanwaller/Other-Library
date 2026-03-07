@@ -225,6 +225,13 @@ function SettingsPageContent() {
       }>;
     }>
   >([]);
+  const [libraries, setLibraries] = useState<Array<{ id: number; name: string; sort_order: number | null }>>([]);
+  const [exportSelection, setExportSelection] = useState<Set<number>>(new Set());
+  const [exportState, setExportState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
   usePageTitle("Settings");
   const accountEmail = (profile?.email ?? sessionEmail ?? null);
 
@@ -348,6 +355,20 @@ function SettingsPageContent() {
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!supabase || !userId) return;
+      const res = await supabase.from("libraries").select("id,name,sort_order").eq("owner_id", userId).order("sort_order", { ascending: true });
+      if (!alive) return;
+      if (res.error) return;
+      setLibraries((res.data as any) ?? []);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (tab !== "shared") return;
@@ -753,6 +774,117 @@ function SettingsPageContent() {
     window.setTimeout(() => setPasswordState({ busy: false, error: null, message: null }), 900);
   }
 
+  async function handleExport() {
+    if (!supabase || !userId || exportSelection.size === 0) return;
+    setExportState({ busy: true, error: null, message: "Fetching data…" });
+    try {
+      const { data, error } = await supabase
+        .from("user_books")
+        .select(`
+          id,
+          library_id,
+          object_type,
+          title_override,
+          authors_override,
+          publisher_override,
+          publish_date_override,
+          description_override,
+          subjects_override,
+          notes,
+          location,
+          shelf,
+          decade,
+          pages,
+          trim_width,
+          trim_height,
+          trim_unit,
+          music_metadata,
+          edition:editions(id, isbn10, isbn13, title, authors, publisher, publish_date, description, subjects),
+          book_entities:book_entities(role, entity:entities(name))
+        `)
+        .in("library_id", Array.from(exportSelection));
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        setExportState({ busy: false, error: "No items found in selected catalogs.", message: null });
+        return;
+      }
+
+      setExportState({ busy: true, error: null, message: "Generating CSV…" });
+
+      const headers = [
+        "ID", "Catalog ID", "Type", "Title", "Authors", "Publisher", "Published", "ISBN10", "ISBN13", 
+        "Description", "Subjects", "Location", "Shelf", "Notes", "Decade", "Pages", 
+        "Trim Width", "Trim Height", "Trim Unit",
+        "Music Artist", "Music Label", "Music Format", "Music Release Type", "Music Track Count"
+      ];
+
+      const rows = data.map(item => {
+        const edition = item.edition as any;
+        const music = item.music_metadata as any;
+        const entities = (item.book_entities as any[]) ?? [];
+        
+        const getFacet = (role: string) => {
+          const fromEntities = entities.filter(e => e.role === role).map(e => e.entity?.name).filter(Boolean);
+          if (fromEntities.length > 0) return fromEntities.join("; ");
+          if (role === "author") return (item.authors_override ?? edition?.authors ?? []).join("; ");
+          if (role === "subject") return (item.subjects_override ?? edition?.subjects ?? []).join("; ");
+          if (role === "publisher") return item.publisher_override ?? edition?.publisher ?? "";
+          return "";
+        };
+
+        const authors = getFacet("author");
+        const subjects = getFacet("subject");
+        const publisher = getFacet("publisher");
+
+        return [
+          item.id,
+          item.library_id,
+          item.object_type ?? "book",
+          item.title_override ?? edition?.title ?? "",
+          authors,
+          publisher,
+          item.publish_date_override ?? edition?.publish_date ?? "",
+          edition?.isbn10 ?? "",
+          edition?.isbn13 ?? "",
+          item.description_override ?? edition?.description ?? "",
+          subjects,
+          item.location ?? "",
+          item.shelf ?? "",
+          item.notes ?? "",
+          item.decade ?? "",
+          item.pages ?? "",
+          item.trim_width ?? "",
+          item.trim_height ?? "",
+          item.trim_unit ?? "",
+          music?.primary_artist ?? "",
+          music?.label ?? "",
+          music?.format ?? "",
+          music?.release_type ?? "",
+          music?.track_count ?? ""
+        ].map(val => {
+          const str = String(val ?? "").replace(/"/g, '""');
+          return `"${str}"`;
+        }).join(",");
+      });
+
+      const csvContent = [headers.join(","), ...rows].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `library_export_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setExportState({ busy: false, error: null, message: `Exported ${data.length} items.` });
+      window.setTimeout(() => setExportState(s => ({ ...s, message: null })), 3000);
+    } catch (e: any) {
+      setExportState({ busy: false, error: e?.message ?? "Export failed", message: null });
+    }
+  }
+
   async function deleteAccount() {
     if (!supabase) return;
     if (deleteConfirm.trim() !== "DELETE") {
@@ -799,7 +931,7 @@ function SettingsPageContent() {
               <button type="button" onClick={() => setTab("profile")} aria-current={tab === "profile" ? "page" : undefined}>Profile</button>
               <button type="button" onClick={() => setTab("follows")} aria-current={tab === "follows" ? "page" : undefined}>Follows</button>
               <button type="button" onClick={() => setTab("loans")} aria-current={tab === "loans" ? "page" : undefined}>Loans</button>
-              <button type="button" onClick={() => setTab("catalog")} aria-current={tab === "catalog" ? "page" : undefined}>Catalog Import</button>
+              <button type="button" onClick={() => setTab("catalog")} aria-current={tab === "catalog" ? "page" : undefined}>Import/export</button>
               <button type="button" onClick={() => setTab("shared")} aria-current={tab === "shared" ? "page" : undefined}>Shared catalogs</button>
               <button type="button" onClick={() => setTab("account")} aria-current={tab === "account" ? "page" : undefined}>Account</button>
             </div>
@@ -1122,6 +1254,45 @@ function SettingsPageContent() {
                   >
                     Upload CSV file
                   </button>
+                </div>
+              </div>
+
+              <hr className="om-hr" />
+
+              <div className="row om-settings-row" style={{ alignItems: "flex-start" }}>
+                <div style={{ width: 120 }} className="text-muted">Export</div>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <div className="text-muted" style={{ marginBottom: "var(--space-md)" }}>
+                    Select catalogs to export as CSV:
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
+                    {libraries.map(lib => (
+                      <label key={lib.id} className="row no-wrap" style={{ gap: "var(--space-sm)", cursor: "pointer", alignItems: "center" }}>
+                        <input 
+                          type="checkbox" 
+                          checked={exportSelection.has(lib.id)}
+                          onChange={(e) => {
+                            const next = new Set(exportSelection);
+                            if (e.target.checked) next.add(lib.id);
+                            else next.delete(lib.id);
+                            setExportSelection(next);
+                          }}
+                        />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lib.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  
+                  <div className="row" style={{ gap: "var(--space-md)", alignItems: "center" }}>
+                    <button 
+                      onClick={handleExport} 
+                      disabled={exportState.busy || exportSelection.size === 0}
+                    >
+                      {exportState.busy ? "Exporting…" : "Download CSV"}
+                    </button>
+                    {exportState.message && <span className="text-muted">{exportState.message}</span>}
+                    {exportState.error && <span style={{ color: "var(--text-error)" }}>{exportState.error}</span>}
+                  </div>
                 </div>
               </div>
             </div>
