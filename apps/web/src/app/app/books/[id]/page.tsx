@@ -3572,7 +3572,7 @@ export default function BookDetailPage() {
                                   {r.cover_url ? (
                                     <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
                                       <img
-                                        src={r.cover_url}
+                                        src={toProxyImageUrl(r.cover_url)}
                                         alt=""
                                         width={60}
                                         style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}

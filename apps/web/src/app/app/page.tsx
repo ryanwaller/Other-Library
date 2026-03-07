@@ -112,10 +112,9 @@ function isStoragePath(value: string): boolean {
 function proxyExternalImageUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
+  if (trimmed.startsWith("blob:")) return trimmed;
   if (!/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (/^https:\/\//i.test(trimmed)) return trimmed;
-  if (/^http:\/\//i.test(trimmed)) return `/api/image-proxy?url=${encodeURIComponent(trimmed)}`;
-  return trimmed;
+  return `/api/image-proxy?url=${encodeURIComponent(trimmed)}`;
 }
 
 function toStoragePathCandidate(value: string | null | undefined): string | null {
@@ -3086,7 +3085,7 @@ function AppShell({
                   <div style={{ width: 62, flex: "0 0 auto" }}>
                     {result.cover_url ? (
                       <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
-                        <img src={result.cover_url} alt="" width={60} style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }} />
+                        <img src={proxyExternalImageUrl(result.cover_url)} alt="" width={60} style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }} />
                       </div>
                     ) : (
                       <div className="om-cover-slot" style={{ width: 60, height: "auto" }}><div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} /></div>
