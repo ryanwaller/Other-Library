@@ -29,6 +29,7 @@ import SignInCard from "../../../components/SignInCard";
 import EntityTokenField from "../../components/EntityTokenField";
 import CoverImage, { type CoverCrop } from "../../../../components/CoverImage";
 import ExpandableContent from "../../../../components/ExpandableContent";
+import RotatingHintInput from "../../../../components/RotatingHintInput";
 import CustomSlider from "../../../../components/CustomSlider";
 import CoverEditor, { type EditorState } from "./components/CoverEditor";
 import { useBookScanner } from "../../../../hooks/useBookScanner";
@@ -204,94 +205,6 @@ function uniqStrings(values: Array<string | null | undefined>): string[] {
 
 function safeFileName(name: string): string {
   return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
-}
-
-const ADD_PROMPTS = [
-  "Add by ISBN",
-  "Add by URL",
-  "Add by title and author",
-  "Add by artist and album",
-  "Add by Discogs link"
-];
-
-function RotatingHintInput(props: {
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
-  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
-  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-  style?: React.CSSProperties;
-  className?: string;
-  autoFocus?: boolean;
-}) {
-  const { value, onChange, onFocus, onBlur, onKeyDown, style, className, autoFocus } = props;
-  const [index, setIndex] = useState(0);
-  const [focused, setFocused] = useState(false);
-  const [opacity, setOpacity] = useState(1);
-  const [translateY, setTranslateY] = useState(0);
-
-  useEffect(() => {
-    if (focused || value) return;
-    
-    const timer = setInterval(() => {
-      setOpacity(0);
-      setTranslateY(-4);
-      
-      setTimeout(() => {
-        setIndex((prev) => (prev + 1) % ADD_PROMPTS.length);
-        setTranslateY(4);
-        
-        setTimeout(() => {
-          setOpacity(1);
-          setTranslateY(0);
-        }, 50);
-      }, 300);
-    }, 3000);
-
-    return () => clearInterval(timer);
-  }, [focused, value]);
-
-  const showHint = !value && !focused;
-
-  return (
-    <div style={{ position: "relative", width: "100%", display: "flex", alignItems: "center" }}>
-      <input
-        {...props}
-        placeholder=""
-        onFocus={(e) => {
-          setFocused(true);
-          onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          onBlur?.(e);
-        }}
-        style={{ ...style, width: "100%" }}
-      />
-      {showHint && (
-        <div
-          style={{
-            position: "absolute",
-            left: 13,
-            top: "50%",
-            transform: `translateY(calc(-50% + ${translateY}px))`,
-            pointerEvents: "none",
-            color: "var(--text-muted)",
-            opacity: opacity * 0.6,
-            transition: "opacity 0.3s ease, transform 0.3s ease",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            maxWidth: "calc(100% - 20px)",
-            fontSize: "inherit",
-            fontFamily: "inherit"
-          }}
-        >
-          {ADD_PROMPTS[index]}
-        </div>
-      )}
-    </div>
-  );
 }
 
 function toProxyImageUrl(url: string): string {
