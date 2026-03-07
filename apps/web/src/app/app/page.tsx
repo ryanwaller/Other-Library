@@ -686,47 +686,57 @@ function AppShell({
   function handleTouchMove(e: React.TouchEvent) {
     if (!draggedItemKey || !draggedItemLibId) return;
     const touch = e.touches[0];
-    const target = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (!target) return;
+    
+    // Find all items in the current rearranging library
+    const itemsEls = document.querySelectorAll(`[data-reorder-lib-id="${draggedItemLibId}"]`);
+    let nearestKey = null;
+    let minDistance = Infinity;
 
-    // Find the parent item container
-    const itemEl = target.closest("[data-reorder-key]") as HTMLElement;
-    if (itemEl) {
-      const targetKey = itemEl.getAttribute("data-reorder-key");
-      const targetLibId = Number(itemEl.getAttribute("data-reorder-lib-id"));
-      if (targetKey && targetKey !== draggedItemKey && targetLibId === draggedItemLibId) {
-        // Trigger the same reorder logic as handleDragEnter
-        setDragOverItemKey(targetKey);
+    for (let i = 0; i < itemsEls.length; i++) {
+      const el = itemsEls[i] as HTMLElement;
+      const rect = el.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const distance = Math.sqrt(Math.pow(touch.clientX - centerX, 2) + Math.pow(touch.clientY - centerY, 2));
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestKey = el.getAttribute("data-reorder-key");
+      }
+    }
+
+    if (nearestKey && nearestKey !== draggedItemKey) {
+      // Trigger reorder logic
+      const libId = draggedItemLibId;
+      const groups = displayGroupsByLibraryId[libId] ?? [];
+      const sourceIdx = groups.findIndex(g => g.key === draggedItemKey);
+      const targetIdx = groups.findIndex(g => g.key === nearestKey);
+      
+      if (sourceIdx !== -1 && targetIdx !== -1) {
+        setDragOverItemKey(nearestKey);
         
-        const libId = targetLibId;
-        const groups = displayGroupsByLibraryId[libId] ?? [];
-        const sourceIdx = groups.findIndex(g => g.key === draggedItemKey);
-        const targetIdx = groups.findIndex(g => g.key === targetKey);
-        
-        if (sourceIdx !== -1 && targetIdx !== -1) {
-          let newOrder: number;
-          if (targetIdx === 0) {
-            newOrder = (groups[0].sortOrder ?? 0) - 1000;
-          } else if (targetIdx === groups.length - 1 && sourceIdx < targetIdx) {
-            newOrder = (groups[groups.length - 1].sortOrder ?? 0) + 1000;
+        let newOrder: number;
+        if (targetIdx === 0) {
+          newOrder = (groups[0].sortOrder ?? 0) - 1000;
+        } else if (targetIdx === groups.length - 1 && sourceIdx < targetIdx) {
+          newOrder = (groups[groups.length - 1].sortOrder ?? 0) + 1000;
+        } else {
+          if (targetIdx > sourceIdx) {
+            const afterTarget = groups[targetIdx + 1];
+            newOrder = ((groups[targetIdx].sortOrder ?? 0) + (afterTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) + 2000)) / 2;
           } else {
-            if (targetIdx > sourceIdx) {
-              const afterTarget = groups[targetIdx + 1];
-              newOrder = ((groups[targetIdx].sortOrder ?? 0) + (afterTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) + 2000)) / 2;
-            } else {
-              const beforeTarget = groups[targetIdx - 1];
-              newOrder = ((beforeTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) - 2000) + (groups[targetIdx].sortOrder ?? 0)) / 2;
-            }
+            const beforeTarget = groups[targetIdx - 1];
+            newOrder = ((beforeTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) - 2000) + (groups[targetIdx].sortOrder ?? 0)) / 2;
           }
-
-          const sourceGroup = groups[sourceIdx];
-          setItems(prev => prev.map(item => {
-            if (sourceGroup.copies.some(c => c.id === item.id)) {
-              return { ...item, sort_order: newOrder };
-            }
-            return item;
-          }));
         }
+
+        const sourceGroup = groups[sourceIdx];
+        setItems(prev => prev.map(item => {
+          if (sourceGroup.copies.some(c => c.id === item.id)) {
+            return { ...item, sort_order: newOrder };
+          }
+          return item;
+        }));
       }
     }
 

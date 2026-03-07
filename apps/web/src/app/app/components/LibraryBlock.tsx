@@ -72,7 +72,7 @@ export default function LibraryBlock({
   const hasNameChanges = nameDraft.trim() !== libraryName.trim();
 
   const isRearrangingThis = rearrangingLibraryId === libraryId;
-  const effectiveViewMode = (isMobile && isRearrangingThis) ? "list" : viewMode;
+  const effectiveViewMode = viewMode;
 
   const { limit, loadMore, seeLess, canSeeLess } = usePagination(effectiveViewMode, gridCols, searchQuery);
 
