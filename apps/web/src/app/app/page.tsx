@@ -3525,7 +3525,13 @@ function AppShell({
             </select>
           )}
 
-          <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as any)}>
+          <select className="om-filter-control" value={sortMode} onChange={(e) => {
+            const val = e.target.value as any;
+            setSortMode(val);
+            if (val === "custom" && rearrangingLibraryId === null && displayLibraries.length > 0) {
+              setRearrangingLibraryId(displayLibraries[0].id);
+            }
+          }}>
             <option value="custom">custom order</option>
             <option value="latest">latest</option>
             <option value="earliest">earliest</option>
@@ -3780,14 +3786,14 @@ function AppShell({
                         data-reorder-key={g.key}
                         data-reorder-lib-id={lib.id}
                         draggable={isRearrangingThis}
-                        onDragStart={(e) => handleDragStart(e, g.key, lib.id)}
-                        onDragOver={(e) => handleDragOver(e, g.key)}
-                        onDragEnter={(e) => handleDragEnter(e, g.key, lib.id)}
-                        onDragEnd={handleDragEnd}
-                        onDrop={(e) => handleDrop(e, g.key, lib.id)}
-                        onTouchStart={(e) => handleTouchStart(e, g.key, lib.id)}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
+                        onDragStart={isRearrangingThis ? (e) => handleDragStart(e, g.key, lib.id) : undefined}
+                        onDragOver={isRearrangingThis ? (e) => handleDragOver(e, g.key) : undefined}
+                        onDragEnter={isRearrangingThis ? (e) => handleDragEnter(e, g.key, lib.id) : undefined}
+                        onDragEnd={isRearrangingThis ? handleDragEnd : undefined}
+                        onDrop={isRearrangingThis ? (e) => handleDrop(e, g.key, lib.id) : undefined}
+                        onTouchStart={isRearrangingThis ? (e) => handleTouchStart(e, g.key, lib.id) : undefined}
+                        onTouchMove={isRearrangingThis ? handleTouchMove : undefined}
+                        onTouchEnd={isRearrangingThis ? handleTouchEnd : undefined}
                         style={{
                           opacity: isDragged ? 0.3 : 1,
                           cursor: isRearrangingThis ? "grab" : "default",
