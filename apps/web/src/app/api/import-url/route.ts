@@ -906,6 +906,24 @@ function buildDiscogsMusicMetadata(source: DiscogsReleaseLike, primaryArtist: st
   };
 }
 
+async function fetchITunesCover(artist: string, title: string): Promise<string | null> {
+  try {
+    const term = `${artist} ${title}`;
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=album&limit=1`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const result = json.results?.[0];
+    if (!result) return null;
+    const artwork = result.artworkUrl100 || result.artworkUrl60;
+    if (!artwork) return null;
+    // iTunes artwork URLs can be modified for higher resolution
+    return artwork.replace("100x100bb.jpg", "600x600bb.jpg").replace("60x60bb.jpg", "600x600bb.jpg");
+  } catch {
+    return null;
+  }
+}
+
 async function fetchDiscogsPreview(url: URL): Promise<ImportMetadata | null> {
   const target = parseDiscogsTarget(url);
   if (!target) return null;
@@ -943,6 +961,13 @@ async function fetchDiscogsPreview(url: URL): Promise<ImportMetadata | null> {
   const coverCandidates = uniqStrings(
     (data.images ?? []).flatMap((image) => [normalizeHttpsUrl(image?.uri), normalizeHttpsUrl(image?.uri150)]).filter(Boolean) as string[]
   );
+
+  if (primaryArtist && data.title) {
+    const iTunesCover = await fetchITunesCover(primaryArtist, data.title);
+    if (iTunesCover) {
+      coverCandidates.push(iTunesCover);
+    }
+  }
 
   return {
     ...makeEmpty(),

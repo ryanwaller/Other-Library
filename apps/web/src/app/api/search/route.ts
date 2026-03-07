@@ -248,6 +248,23 @@ function mapDiscogsChannels(values: string[]): string | null {
   return null;
 }
 
+async function fetchITunesCover(artist: string, title: string): Promise<string | null> {
+  try {
+    const term = `${artist} ${title}`;
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=album&limit=1`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const result = (json as any).results?.[0];
+    if (!result) return null;
+    const artwork = result.artworkUrl100 || result.artworkUrl60;
+    if (!artwork) return null;
+    return artwork.replace("100x100bb.jpg", "600x600bb.jpg").replace("60x60bb.jpg", "600x600bb.jpg");
+  } catch {
+    return null;
+  }
+}
+
 async function discogsSearch(params: { title: string | null; author: string | null; barcode: string | null }): Promise<SearchResult[]> {
   const qs = new URLSearchParams();
   qs.set("type", "release");
@@ -266,8 +283,7 @@ async function discogsSearch(params: { title: string | null; author: string | nu
   const results = (json as any)?.results;
   if (!Array.isArray(results)) return [];
 
-  const out: SearchResult[] = [];
-  for (const row of results) {
+  const out: SearchResult[] = await Promise.all(results.map(async (row) => {
     const rawTitle = String(row?.title ?? "").trim();
     const uri = String(row?.uri ?? "").trim();
     const year = Number.isFinite(Number(row?.year)) ? Number(row.year) : null;
@@ -289,7 +305,11 @@ async function discogsSearch(params: { title: string | null; author: string | nu
       displayTitle = titleParts.join(" - ").trim();
     }
 
-    out.push({
+    const primaryArtist = authors[0] ?? null;
+    const itunesCover = (primaryArtist && displayTitle) ? await fetchITunesCover(primaryArtist, displayTitle) : null;
+    const coverCandidates = [row?.cover_image, row?.thumb, itunesCover].filter(Boolean) as string[];
+
+    return {
       source: "discogs",
       object_type: "music",
       source_type: "discogs",
@@ -307,10 +327,10 @@ async function discogsSearch(params: { title: string | null; author: string | nu
       subjects: uniqStrings([...genreValues, ...styleValues]),
       isbn10: null,
       isbn13: null,
-      cover_url: row?.cover_image || row?.thumb || null,
-      cover_candidates: [row?.cover_image, row?.thumb].filter(Boolean),
+      cover_url: coverCandidates[0] ?? null,
+      cover_candidates: coverCandidates,
       music_metadata: {
-        primary_artist: authors[0] ?? null,
+        primary_artist: primaryArtist,
         label: labelValues[0] ?? null,
         release_date: year ? `${year}-01-01` : null,
         original_release_year: year ? String(year) : null,
@@ -336,8 +356,9 @@ async function discogsSearch(params: { title: string | null; author: string | nu
       },
       contributor_entities: authors.length > 0 ? { performer: authors } : null,
       raw: { discogs: row }
-    });
-  }
+    } satisfies SearchResult;
+  }));
+
   return out;
 }
 
