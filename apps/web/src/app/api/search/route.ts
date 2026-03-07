@@ -18,6 +18,7 @@ type SearchResult = {
   isbn10: string | null;
   isbn13: string | null;
   cover_url: string | null;
+  cover_candidates?: string[];
   music_metadata?: Record<string, unknown> | null;
   contributor_entities?: Record<string, string[]> | null;
   raw: Record<string, unknown>;
@@ -135,6 +136,7 @@ async function openLibrarySearch(title: string, author: string | null): Promise<
       isbn10,
       isbn13,
       cover_url,
+      cover_candidates: [],
       raw: { openlibrary: doc }
     });
   }
@@ -198,6 +200,7 @@ async function googleBooksSearch(title: string, author: string | null): Promise<
       isbn10,
       isbn13,
       cover_url,
+      cover_candidates: [],
       raw: { googleBooks: it }
     });
   }
@@ -304,7 +307,8 @@ async function discogsSearch(params: { title: string | null; author: string | nu
       subjects: uniqStrings([...genreValues, ...styleValues]),
       isbn10: null,
       isbn13: null,
-      cover_url: thumb || null,
+      cover_url: row?.cover_image || row?.thumb || null,
+      cover_candidates: [row?.cover_image, row?.thumb].filter(Boolean),
       music_metadata: {
         primary_artist: authors[0] ?? null,
         label: labelValues[0] ?? null,

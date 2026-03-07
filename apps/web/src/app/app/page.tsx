@@ -73,6 +73,7 @@ type SearchCandidate = {
   isbn10: string | null;
   isbn13: string | null;
   cover_url: string | null;
+  cover_candidates?: string[];
 };
 
 type LibrarySummary = {
@@ -3085,7 +3086,22 @@ function AppShell({
                   <div style={{ width: 62, flex: "0 0 auto" }}>
                     {result.cover_url ? (
                       <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
-                        <img src={proxyExternalImageUrl(result.cover_url)} alt="" width={60} style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }} />
+                        <img 
+                          src={proxyExternalImageUrl(result.cover_url)} 
+                          alt="" 
+                          width={60} 
+                          style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }} 
+                          onError={(e) => {
+                            const candidates = result.cover_candidates || [];
+                            const currentSrc = e.currentTarget.src;
+                            const nextCandidate = candidates.find(c => proxyExternalImageUrl(c) !== currentSrc);
+                            if (nextCandidate) {
+                              e.currentTarget.src = proxyExternalImageUrl(nextCandidate);
+                            } else {
+                              e.currentTarget.style.display = "none";
+                            }
+                          }}
+                        />
                       </div>
                     ) : (
                       <div className="om-cover-slot" style={{ width: 60, height: "auto" }}><div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} /></div>

@@ -120,6 +120,7 @@ type MetadataSearchResult = {
   isbn10: string | null;
   isbn13: string | null;
   cover_url: string | null;
+  cover_candidates?: string[];
 };
 
 function looksLikeBarcode(input: string): boolean {
@@ -3578,12 +3579,19 @@ export default function BookDetailPage() {
                                         style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
 
                                         onLoad={(e) => {
-                                          if (e.currentTarget.naturalWidth < 100 || e.currentTarget.naturalHeight < 100) {
-                                            e.currentTarget.style.display = "none";
+                                          if (e.currentTarget.naturalWidth < 10 && e.currentTarget.naturalHeight < 10) {
+                                            e.currentTarget.dispatchEvent(new Event("error"));
                                           }
                                         }}
                                         onError={(e) => {
-                                          e.currentTarget.style.display = "none";
+                                          const candidates = r.cover_candidates || [];
+                                          const currentSrc = e.currentTarget.src;
+                                          const nextCandidate = candidates.find(c => toProxyImageUrl(c) !== currentSrc);
+                                          if (nextCandidate) {
+                                            e.currentTarget.src = toProxyImageUrl(nextCandidate);
+                                          } else {
+                                            e.currentTarget.style.display = "none";
+                                          }
                                         }}
                                       />
                                     </div>

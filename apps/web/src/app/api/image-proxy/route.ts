@@ -29,7 +29,8 @@ export async function GET(req: NextRequest) {
       {
         headers: {
           "User-Agent": USER_AGENT,
-          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
+          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+          Referer: parsed.hostname.endsWith("discogs.com") ? "https://www.discogs.com/" : parsed.toString()
         },
         signal: controller.signal
       },
