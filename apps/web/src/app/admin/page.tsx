@@ -180,6 +180,16 @@ function AdminPageInner() {
   const [copiedLinkForId, setCopiedLinkForId] = useState<number | string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [avatarUrlsByPath, setAvatarUrlsByPath] = useState<Record<string, string>>({});
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 720px)");
+    const sync = () => setIsMobileViewport(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   const [userTab, setUserTab] = useState<"all" | "active" | "disabled" | "admins">("all");
   const [userSearchDraft, setUserSearchDraft] = useState("");
@@ -497,8 +507,8 @@ function AdminPageInner() {
 
           <hr className="om-hr" />
 
-          <div className="row admin-tabbar-row" style={{ justifyContent: "flex-start", gap: "var(--space-10)", width: "100%", flexWrap: "nowrap" }}>
-            <div className="admin-tabbar" style={{ flexWrap: "nowrap", flex: "0 0 auto" }}>
+          <div className="row admin-tabbar-row" style={{ justifyContent: "flex-start", gap: "var(--space-10)", width: "100%", flexWrap: isMobileViewport ? "wrap" : "nowrap" }}>
+            <div className="admin-tabbar" style={{ flexWrap: "nowrap", flex: isMobileViewport ? "1 1 100%" : "0 0 auto", width: isMobileViewport ? "100%" : "auto" }}>
               <button type="button" onClick={() => setTabAndRoute("users")} aria-current={tab === "users" ? "page" : undefined}>
                 Users
               </button>
@@ -508,12 +518,17 @@ function AdminPageInner() {
               <button type="button" onClick={() => setTabAndRoute("invites")} aria-current={tab === "invites" ? "page" : undefined}>
                 Invites
               </button>
-              <button type="button" onClick={() => setTabAndRoute("feedback")} aria-current={tab === "feedback" ? "page" : undefined}>
+              <button 
+                type="button" 
+                onClick={() => setTabAndRoute("feedback")} 
+                aria-current={tab === "feedback" ? "page" : undefined}
+                style={{ marginLeft: isMobileViewport ? "auto" : 0 }}
+              >
                 Feedback
               </button>
             </div>
             {tab !== "feedback" ? (
-            <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0, flex: "1 1 auto", marginLeft: "var(--space-16)", flexWrap: "nowrap", alignItems: "baseline" }}>
+            <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0, flex: "1 1 auto", marginLeft: isMobileViewport ? 0 : "var(--space-16)", marginTop: isMobileViewport ? "var(--space-sm)" : 0, flexWrap: "nowrap", alignItems: "baseline" }}>
               <input
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
