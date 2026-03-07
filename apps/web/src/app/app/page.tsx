@@ -3251,11 +3251,12 @@ function AppShell({
                   onChange={(e) => setAddInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); smartAddOrSearch(); } }}
                   style={{ width: "100%" }}
+                  isMobile={isMobile}
                 />
               </div>
               {((addInput.trim() || addInputFocused) || (addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message)) && (
                 <div className="row" style={{ gap: "var(--space-10)", flex: "0 0 auto", alignItems: "center" }}>
-                  {addInput && (
+                  {isMobile && addInput && (
                     <button 
                       type="button" 
                       onClick={() => setAddInput("")}
@@ -3292,7 +3293,7 @@ function AppShell({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ minWidth: 0, flex: 1 }}
               />
-              {searchQuery && (
+              {isMobile && searchQuery && (
                 <button 
                   type="button" 
                   onClick={() => setSearchQuery("")}

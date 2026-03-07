@@ -17,8 +17,9 @@ export default function RotatingHintInput(props: {
   style?: React.CSSProperties;
   className?: string;
   autoFocus?: boolean;
+  isMobile?: boolean;
 }) {
-  const { value, onChange, onFocus, onBlur, onKeyDown, style, className, autoFocus } = props;
+  const { value, onChange, onFocus, onBlur, onKeyDown, style, className, autoFocus, isMobile } = props;
   const [index, setIndex] = useState(0);
   const [focused, setFocused] = useState(false);
   const [opacity, setOpacity] = useState(1);
@@ -71,7 +72,7 @@ export default function RotatingHintInput(props: {
           style={{
             position: "absolute",
             left: 0,
-            bottom: 10, // Nudged up from 9 to 10 for better mobile alignment
+            bottom: isMobile ? 12 : 10, // Higher on mobile to match baseline
             transform: `translateY(${translateY}px)`,
             pointerEvents: "none",
             color: "var(--text-muted)",

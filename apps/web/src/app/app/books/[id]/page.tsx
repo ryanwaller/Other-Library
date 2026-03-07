@@ -406,6 +406,16 @@ export default function BookDetailPage() {
   const idParam = (params as any)?.id;
   const bookId = Number(Array.isArray(idParam) ? idParam[0] : idParam);
   const [isNarrow, setIsNarrow] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 720px)");
+    const sync = () => setIsMobileViewport(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
@@ -3538,11 +3548,12 @@ export default function BookDetailPage() {
                           onChange={(e) => setLookupInput(e.target.value)}
                           onKeyDown={(e) => onEnter(e, smartLookup)}
                           style={{ width: "100%", maxWidth: "100%", minWidth: 0 }}
+                          isMobile={isMobileViewport}
                         />
                       </div>
                       {(lookupInput.trim() || lookupInputFocused) ? (
                         <div className="row" style={{ gap: "var(--space-md)", alignItems: "center" }}>
-                          {lookupInput && (
+                          {isMobileViewport && lookupInput && (
                             <button 
                               type="button" 
                               onClick={() => setLookupInput("")}
