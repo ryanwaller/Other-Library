@@ -334,7 +334,10 @@ function FieldVisibilityToggle(props: {
   return (
     <button
       type="button"
-      onClick={() => onChange(!visible)}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        onChange(!visible);
+      }}
       style={{
         background: "none",
         border: "none",
@@ -2035,83 +2038,83 @@ export default function BookDetailPage() {
 
   async function saveEdits(): Promise<boolean> {
     if (!supabase || !book || !userId) return false;
-    if (!isOwner) return false;
     setSaveState({ busy: true, error: null, message: "Saving…" });
-    const title_override = formTitle.trim() ? formTitle.trim() : null;
-    const authors_override = uniqStrings(facetDraft.author ?? parseAuthorsInput(formAuthors));
-    const editors_override = uniqStrings(facetDraft.editor ?? parseAuthorsInput(formEditors));
-    const designers_override = uniqStrings(facetDraft.designer ?? parseAuthorsInput(formDesigners));
-    const publisher_override = (facetDraft.publisher?.[0] ?? formPublisher).trim();
-    const printer_override = (facetDraft.printer?.[0] ?? formPrinter).trim();
-    const materials_override = (facetDraft.material?.[0] ?? formMaterials).trim();
-    const subjects_override = uniqStrings(facetDraft.subject ?? effectiveSubjects);
-    const group_label = formGroupLabel.trim() ? formGroupLabel.trim() : null;
-    const object_type = formObjectType.trim() ? formObjectType.trim() : null;
-    const decade = formDecade.trim() ? formDecade.trim() : null;
-    const pagesRaw = formPages.trim();
-    const pages = pagesRaw ? Number(pagesRaw) : null;
-    if (pages !== null && !Number.isFinite(pages)) {
-      setSaveState({ busy: false, error: "Pages must be a number.", message: "Save failed" });
-      return false;
-    }
-    const trimWRaw = parseFloat(formTrimWidth);
-    const trimHRaw = parseFloat(formTrimHeight);
-    const trim_width = Number.isFinite(trimWRaw) && trimWRaw > 0 ? trimWRaw : null;
-    const trim_height = Number.isFinite(trimHRaw) && trimHRaw > 0 ? trimHRaw : null;
-    const trim_unit = trim_width !== null && trim_height !== null ? (formTrimUnit || "in") : null;
 
-    const standardVisibility: Record<string, boolean> = {};
-    for (const [k, v] of Object.entries(fieldVisibility)) {
-      if (!k.includes(":")) standardVisibility[k] = v;
-    }
+    try {
+      const title_override = formTitle.trim() ? formTitle.trim() : null;
+      const authors_override = uniqStrings(facetDraft.author ?? parseAuthorsInput(formAuthors));
+      const editors_override = uniqStrings(facetDraft.editor ?? parseAuthorsInput(formEditors));
+      const designers_override = uniqStrings(facetDraft.designer ?? parseAuthorsInput(formDesigners));
+      const publisher_override = (facetDraft.publisher?.[0] ?? formPublisher).trim();
+      const printer_override = (facetDraft.printer?.[0] ?? formPrinter).trim();
+      const materials_override = (facetDraft.material?.[0] ?? formMaterials).trim();
+      const subjects_override = uniqStrings(facetDraft.subject ?? effectiveSubjects);
+      const group_label = formGroupLabel.trim() ? formGroupLabel.trim() : null;
+      const object_type = formObjectType.trim() ? formObjectType.trim() : null;
+      const decade = formDecade.trim() ? formDecade.trim() : null;
+      const pagesRaw = formPages.trim();
+      const pages = pagesRaw ? Number(pagesRaw) : null;
+      if (pages !== null && !Number.isFinite(pages)) {
+        setSaveState({ busy: false, error: "Pages must be a number.", message: "Save failed" });
+        return false;
+      }
+      const trimWRaw = parseFloat(formTrimWidth);
+      const trimHRaw = parseFloat(formTrimHeight);
+      const trim_width = Number.isFinite(trimWRaw) && trimWRaw > 0 ? trimWRaw : null;
+      const trim_height = Number.isFinite(trimHRaw) && trimHRaw > 0 ? trimHRaw : null;
+      const trim_unit = trim_width !== null && trim_height !== null ? (formTrimUnit || "in") : null;
 
-    const payload: any = {
-      group_label,
-      object_type,
-      decade,
-      pages: pages === null ? null : Math.max(1, Math.floor(pages)),
-      trim_width,
-      trim_height,
-      trim_unit,
-      field_visibility: standardVisibility,
-      title_override,
-      authors_override,
-      editors_override: editors_override.length > 0 ? editors_override : null,
-      designers_override: designers_override.length > 0 ? designers_override : null,
-      publisher_override: publisher_override || null,
-      printer_override: printer_override || null,
-      materials_override: materials_override || null,
-      edition_override: formEditionOverride.trim() ? formEditionOverride.trim() : null,
-      publish_date_override: normalizePublishDateForStorage(formPublishDate),
-      description_override: formDescription.trim() ? formDescription.trim() : null,
-      subjects_override: subjects_override.length > 0 ? subjects_override : [],
-      location: formLocation.trim() ? formLocation.trim() : null,
-      shelf: formShelf.trim() ? formShelf.trim() : null,
-      notes: formNotes.trim() ? formNotes.trim() : null,
-      visibility: formVisibility,
-      status: formStatus,
-      borrowable_override: formBorrowable === "inherit" ? null : formBorrowable === "yes",
-      music_metadata: isMusicObject ? formMusic : null
-    };
-    if (isMusicObject) {
-      payload.authors_override = null;
-      payload.editors_override = null;
-      payload.designers_override = null;
-      payload.publisher_override = null;
-      payload.printer_override = null;
-      payload.materials_override = null;
-      payload.edition_override = null;
-      payload.publish_date_override = null;
-      payload.pages = null;
-      payload.trim_width = null;
-      payload.trim_height = null;
-      payload.trim_unit = null;
-    }
-    let res = await supabase.from("user_books").update(payload).eq("id", book.id);
-    if (res.error) {
-      const msg = (res.error.message ?? "").toLowerCase();
-      if (msg.includes("does not exist")) {
-        // If any column is missing, strip all new fields and retry.
+      const standardVisibility: Record<string, boolean> = {};
+      for (const [k, v] of Object.entries(fieldVisibility)) {
+        if (!k.includes(":")) standardVisibility[k] = v;
+      }
+
+      const payload: any = {
+        group_label,
+        object_type,
+        decade,
+        pages: pages === null ? null : Math.max(1, Math.floor(pages)),
+        trim_width,
+        trim_height,
+        trim_unit,
+        field_visibility: standardVisibility,
+        title_override,
+        authors_override,
+        editors_override: editors_override.length > 0 ? editors_override : null,
+        designers_override: designers_override.length > 0 ? designers_override : null,
+        publisher_override: publisher_override || null,
+        printer_override: printer_override || null,
+        materials_override: materials_override || null,
+        edition_override: formEditionOverride.trim() ? formEditionOverride.trim() : null,
+        publish_date_override: normalizePublishDateForStorage(formPublishDate),
+        description_override: formDescription.trim() ? formDescription.trim() : null,
+        subjects_override: subjects_override.length > 0 ? subjects_override : [],
+        location: formLocation.trim() ? formLocation.trim() : null,
+        shelf: formShelf.trim() ? formShelf.trim() : null,
+        notes: formNotes.trim() ? formNotes.trim() : null,
+        visibility: formVisibility,
+        status: formStatus,
+        borrowable_override: formBorrowable === "inherit" ? null : formBorrowable === "yes",
+        music_metadata: isMusicObject ? formMusic : null
+      };
+      if (isMusicObject) {
+        payload.authors_override = null;
+        payload.editors_override = null;
+        payload.designers_override = null;
+        payload.publisher_override = null;
+        payload.printer_override = null;
+        payload.materials_override = null;
+        payload.edition_override = null;
+        payload.publish_date_override = null;
+        payload.pages = null;
+        payload.trim_width = null;
+        payload.trim_height = null;
+        payload.trim_unit = null;
+      }
+      
+      let res = await supabase.from("user_books").update(payload).eq("id", book.id);
+      if (res.error) {
+        // Strip columns added in migrations if they don't exist
         delete payload.field_visibility;
         delete payload.trim_width;
         delete payload.trim_height;
@@ -2122,70 +2125,63 @@ export default function BookDetailPage() {
         delete payload.pages;
         res = await supabase.from("user_books").update(payload).eq("id", book.id);
       }
-    }
-    if (res.error) {
-      setSaveState({ busy: false, error: res.error.message, message: "Save failed" });
-      return false;
-    }
+      if (res.error) throw new Error(res.error.message);
 
-    // Sync entity facets (best-effort; won't block save if DB migration hasn't been applied yet).
-    try {
-      const roles: Array<[FacetRole, string[]]> = [
-        ["author", facetDraft.author ?? effectiveAuthors],
-        ["editor", facetDraft.editor ?? effectiveEditors],
-        ["designer", facetDraft.designer ?? effectiveDesigners],
-        ["subject", facetDraft.subject ?? effectiveSubjects],
-        ["publisher", facetDraft.publisher ?? (effectivePublisher.trim() ? [effectivePublisher.trim()] : [])],
-        ["printer", facetDraft.printer ?? (formPrinter.trim() ? [formPrinter.trim()] : [])],
-        ["material", facetDraft.material ?? (formMaterials.trim() ? [formMaterials.trim()] : [])],
-        ["tag", facetDraft.tag ?? tags.map((t) => t.name)],
-        ["category", facetDraft.category ?? categories.map((t) => t.name)]
-      ];
-      if (isMusicObject) {
-        const primaryArtist = String(formMusic.primary_artist ?? "").trim();
-        const performerNames = uniqStrings([primaryArtist, ...(facetDraft.performer ?? [])]);
-        const labelNames = String(formMusic.label ?? "").trim() ? [String(formMusic.label ?? "").trim()] : [];
-        roles.splice(0, roles.length,
+      try {
+        const roles: Array<[FacetRole, string[]]> = [
+          ["author", facetDraft.author ?? effectiveAuthors],
+          ["editor", facetDraft.editor ?? effectiveEditors],
+          ["designer", facetDraft.designer ?? effectiveDesigners],
           ["subject", facetDraft.subject ?? effectiveSubjects],
+          ["publisher", facetDraft.publisher ?? (effectivePublisher.trim() ? [effectivePublisher.trim()] : [])],
+          ["printer", facetDraft.printer ?? (formPrinter.trim() ? [formPrinter.trim()] : [])],
+          ["material", facetDraft.material ?? (formMaterials.trim() ? [formMaterials.trim()] : [])],
           ["tag", facetDraft.tag ?? tags.map((t) => t.name)],
-          ["category", facetDraft.category ?? categories.map((t) => t.name)],
-          ["publisher", labelNames],
-          ["performer", performerNames]
-        );
-        for (const role of MUSIC_CONTRIBUTOR_ROLES) {
-          if (role === "performer") continue;
-          roles.push([role, facetDraft[role] ?? []]);
+          ["category", facetDraft.category ?? categories.map((t) => t.name)]
+        ];
+        if (isMusicObject) {
+          const primaryArtist = String(formMusic.primary_artist ?? "").trim();
+          const performerNames = uniqStrings([primaryArtist, ...(facetDraft.performer ?? [])]);
+          const labelNames = String(formMusic.label ?? "").trim() ? [String(formMusic.label ?? "").trim()] : [];
+          roles.splice(0, roles.length,
+            ["subject", facetDraft.subject ?? effectiveSubjects],
+            ["tag", facetDraft.tag ?? tags.map((t) => t.name)],
+            ["category", facetDraft.category ?? categories.map((t) => t.name)],
+            ["publisher", labelNames],
+            ["performer", performerNames]
+          );
+          for (const role of MUSIC_CONTRIBUTOR_ROLES) {
+            if (role === "performer") continue;
+            roles.push([role, facetDraft[role] ?? []]);
+          }
         }
-      }
-      for (const [role, names] of roles) {
-        const visibilities = names.map((n) => fieldVisibility[`${role}:${n}`] !== false);
-        const rpc = await supabase.rpc("set_book_entities_v2", { 
-          p_user_book_id: book.id, 
-          p_role: role, 
-          p_names: names ?? [],
-          p_visibility: visibilities
-        });
-        if (rpc.error) {
-          const msg = (rpc.error.message ?? "").toLowerCase();
-          if (msg.includes("does not exist") || msg.includes("function") || msg.includes("unknown")) {
-            // Fallback to legacy RPC if v2 not available yet
+        for (const [role, names] of roles) {
+          const visibilities = names.map((n) => fieldVisibility[`${role}:${n}`] !== false);
+          const rpc = await supabase.rpc("set_book_entities_v2", { 
+            p_user_book_id: book.id, 
+            p_role: role, 
+            p_names: names ?? [],
+            p_visibility: visibilities
+          });
+          if (rpc.error) {
             await supabase.rpc("set_book_entities", { p_user_book_id: book.id, p_role: role, p_names: names ?? [] });
           }
         }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
-    }
 
-    // If a cover URL was staged via Find more info / Fill fields but never uploaded, import it now.
-    // importCoverFromUrl uploads to storage, creates user_book_media, and calls refresh() internally.
-    if (suggestedCoverUrl) {
-      await importCoverFromUrl(suggestedCoverUrl);
-    }
+      if (suggestedCoverUrl) {
+        await importCoverFromUrl(suggestedCoverUrl);
+      }
 
-    await refresh();
-    setSaveState({ busy: false, error: null, message: "Saved" });
-    return true;
+      await refresh();
+      setSaveState({ busy: false, error: null, message: "Saved" });
+      return true;
+    } catch (e: any) {
+      setSaveState({ busy: false, error: e?.message ?? "Save failed", message: "Save failed" });
+      return false;
+    }
   }
 
   async function deleteBook() {
