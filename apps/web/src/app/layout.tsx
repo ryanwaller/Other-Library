@@ -2,18 +2,22 @@ import "./globals.css";
 import type { Metadata } from "next";
 import GlobalNav from "./GlobalNav";
 import FeedbackWidget from "./components/FeedbackWidget";
+import { SITE_TITLE } from "../lib/pageTitle";
 
 export const metadata: Metadata = {
-  title: "Other Library",
+  title: {
+    default: SITE_TITLE,
+    template: `${SITE_TITLE} – %s`
+  },
   description: "You like the books?!",
   openGraph: {
-    title: "Other Library",
+    title: SITE_TITLE,
     description: "You like the books?!",
     siteName: "other-library.com"
   },
   twitter: {
     card: "summary",
-    title: "Other Library",
+    title: SITE_TITLE,
     description: "You like the books?!"
   }
 };

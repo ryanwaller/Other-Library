@@ -6,6 +6,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
 import IdentityRow from "../../components/IdentityRow";
+import usePageTitle from "../../../hooks/usePageTitle";
 
 type BorrowRequestRow = {
   id: number;
@@ -31,6 +32,7 @@ type BookLite = {
 type MsgLite = { id: number; borrow_request_id: number; sender_id: string; message: string; created_at: string };
 
 export default function MessagesPage() {
+  usePageTitle("Messages");
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
 

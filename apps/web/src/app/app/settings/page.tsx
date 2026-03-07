@@ -10,6 +10,7 @@ import CustomSlider from "../../../components/CustomSlider";
 import SignInCard from "../../components/SignInCard";
 import FollowsPanel from "../follows/FollowsPanel";
 import BorrowRequestsPanel from "../borrow-requests/BorrowRequestsPanel";
+import usePageTitle from "../../../hooks/usePageTitle";
 
 const SETTINGS_TAB_STORAGE_KEY = "om_settings_tab";
 
@@ -224,6 +225,7 @@ function SettingsPageContent() {
       }>;
     }>
   >([]);
+  usePageTitle("Settings");
   const accountEmail = (profile?.email ?? sessionEmail ?? null);
 
   useEffect(() => {

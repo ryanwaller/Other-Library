@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../lib/supabaseServer";
 import Link from "next/link";
@@ -6,8 +7,36 @@ import AddToLibraryProvider from "./AddToLibraryProvider";
 import PublicBookList from "./PublicBookList";
 import PublicProfileHeader from "../../components/PublicProfileHeader";
 import type { PublicBook } from "../../../lib/types";
+import { contextFromFilterParams } from "../../../lib/pageTitle";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+  searchParams
+}: {
+  params: Promise<{ username: string }>;
+  searchParams: Promise<{ author?: string; tag?: string; subject?: string; category?: string; publisher?: string; decade?: string; designer?: string; q?: string }>;
+}): Promise<Metadata> {
+  const { username } = await params;
+  const usernameNorm = (username ?? "").trim().toLowerCase();
+  const rawParams = await searchParams;
+  const supabase = getServerSupabase();
+
+  if (!supabase || !usernameNorm) {
+    return { title: contextFromFilterParams(rawParams, username || "Profile") };
+  }
+
+  const profileRes = await supabase
+    .from("profiles")
+    .select("username,display_name")
+    .eq("username", usernameNorm)
+    .maybeSingle();
+
+  const profile = profileRes.data as { username?: string | null; display_name?: string | null } | null;
+  const baseContext = String(profile?.display_name ?? "").trim() || String(profile?.username ?? "").trim() || username;
+  return { title: contextFromFilterParams(rawParams, baseContext) };
+}
 
 export default async function PublicProfilePage({ 
   params,

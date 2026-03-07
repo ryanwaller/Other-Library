@@ -11,6 +11,7 @@ import LibraryBlock from "./components/LibraryBlock";
 import BookCard from "./components/BookCard";
 import HomepageSkeleton from "./components/HomepageSkeleton";
 import { useBookScanner } from "../../hooks/useBookScanner";
+import usePageTitle from "../../hooks/usePageTitle";
 import dynamic from "next/dynamic";
 import ActiveFilterDisplay, { type FilterPair } from "../../components/ActiveFilterDisplay";
 import type { CatalogItem, CatalogGroup } from "../../lib/types";
@@ -32,6 +33,7 @@ import {
 import { DECADE_OPTIONS } from "../../lib/decades";
 import { saveBookNavContext } from "../../lib/bookNav";
 import type { MusicMetadata, MusicContributorRole } from "../../lib/music";
+import { contextFromFilterParams } from "../../lib/pageTitle";
 
 const BookScannerModal = dynamic(() => import("../../components/BookScannerModal"), { ssr: false });
 
@@ -3453,6 +3455,7 @@ function AppShell({
 
 function AppWithFilters({ session }: { session: Session }) {
   const searchParams = useSearchParams();
+  usePageTitle(useMemo(() => contextFromFilterParams(searchParams, "Home"), [searchParams]));
   const filterTag = searchParams.get("tag");
   const filterAuthor = searchParams.get("author");
   const filterSubject = searchParams.get("subject");
@@ -3485,6 +3488,7 @@ function AppWithFilters({ session }: { session: Session }) {
 }
 
 export default function AppPage() {
+  usePageTitle("Home");
   const [session, setSession] = useState<Session | null>(null);
   const [authState, setAuthState] = useState<"loading" | "authed" | "guest">("loading");
 

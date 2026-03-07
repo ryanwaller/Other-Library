@@ -8,6 +8,7 @@ import SignInCard from "../components/SignInCard";
 import { supabase } from "../../lib/supabaseClient";
 import { formatDateShort } from "../../lib/formatDate";
 import AdminFeedbackBoard from "./AdminFeedbackBoard";
+import usePageTitle from "../../hooks/usePageTitle";
 
 type ProfileRow = {
   id: string;
@@ -206,6 +207,16 @@ function AdminPageInner() {
   const [invitesPage, setInvitesPage] = useState(1);
   const [invitesPageSize, setInvitesPageSize] = useState(20);
   const [invitesData, setInvitesData] = useState<InvitesResponse | null>(null);
+
+  usePageTitle(
+    tab === "waitlist"
+      ? "Waitlist"
+      : tab === "invites"
+        ? "Invites"
+        : tab === "feedback"
+          ? "Feedback"
+          : "Admin"
+  );
 
   useEffect(() => {
     if (!supabase) return;

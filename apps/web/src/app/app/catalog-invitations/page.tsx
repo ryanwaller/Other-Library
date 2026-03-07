@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../../lib/supabaseClient";
 import SignInCard from "../../components/SignInCard";
+import usePageTitle from "../../../hooks/usePageTitle";
 
 type PendingInvite = {
   id: string;
@@ -15,6 +16,7 @@ type PendingInvite = {
 };
 
 export default function CatalogInvitationsPage() {
+  usePageTitle("Catalog Invitations");
   const [sessionReady, setSessionReady] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

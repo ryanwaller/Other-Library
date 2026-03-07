@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { getPublicEnvOptional } from "../../lib/env";
+
+export const metadata: Metadata = {
+  title: "Setup"
+};
 
 export default function SetupPage() {
   const env = getPublicEnvOptional();
@@ -39,4 +44,3 @@ export default function SetupPage() {
     </main>
   );
 }
-

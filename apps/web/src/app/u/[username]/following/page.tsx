@@ -1,8 +1,25 @@
+import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../lib/supabaseServer";
 import PublicFollowListClient from "../PublicFollowListClient";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ username: string }>;
+}): Promise<Metadata> {
+  const { username } = await params;
+  const usernameNorm = (username ?? "").trim().toLowerCase();
+  const supabase = getServerSupabase();
+  if (!supabase || !usernameNorm) return { title: "Following" };
+
+  const profileRes = await supabase.from("profiles").select("username,display_name").eq("username", usernameNorm).maybeSingle();
+  const profile = profileRes.data as { username?: string | null; display_name?: string | null } | null;
+  const context = String(profile?.display_name ?? "").trim() || String(profile?.username ?? "").trim() || username;
+  return { title: `${context} Following` };
+}
 
 export default async function PublicFollowingPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;

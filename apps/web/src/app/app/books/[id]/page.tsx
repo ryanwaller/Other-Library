@@ -31,6 +31,7 @@ import ExpandableContent from "../../../../components/ExpandableContent";
 import CustomSlider from "../../../../components/CustomSlider";
 import CoverEditor, { type EditorState } from "./components/CoverEditor";
 import { useBookScanner } from "../../../../hooks/useBookScanner";
+import usePageTitle from "../../../../hooks/usePageTitle";
 import dynamic from "next/dynamic";
 const BookScannerModal = dynamic(() => import("../../../../components/BookScannerModal"), { ssr: false });
 
@@ -1225,6 +1226,7 @@ export default function BookDetailPage() {
   const effectiveTitle = useMemo(() => {
     return formTitle.trim() ? formTitle.trim() : book?.edition?.title ?? "(untitled)";
   }, [formTitle, book]);
+  usePageTitle(initialLoadDone ? effectiveTitle : "Item");
   const isMusicObject = (formObjectType.trim() || String(book?.object_type ?? "").trim()) === "music";
   const effectiveMusic = useMemo(() => ({
     ...emptyMusicMetadata(),

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
@@ -85,6 +86,27 @@ function parseBookId(idSlug: string): number | null {
   if (!m) return null;
   const id = Number(m[1]);
   return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ username: string; idSlug: string }>;
+}): Promise<Metadata> {
+  const { idSlug } = await params;
+  const bookId = parseBookId(idSlug);
+  const supabase = getServerSupabase();
+  if (!supabase || !bookId) return { title: "Item" };
+
+  const bookRes = await supabase
+    .from("user_books")
+    .select("title_override,edition:editions(title)")
+    .eq("id", bookId)
+    .maybeSingle();
+
+  const book = (bookRes.data ?? null) as { title_override?: string | null; edition?: { title?: string | null } | null } | null;
+  const context = String(book?.title_override ?? "").trim() || String(book?.edition?.title ?? "").trim() || "Item";
+  return { title: context };
 }
 
 export default async function PublicBookPage({ params }: { params: Promise<{ username: string; idSlug: string }> }) {

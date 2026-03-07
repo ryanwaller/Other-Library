@@ -7,6 +7,7 @@ import { supabase } from "../../../../lib/supabaseClient";
 import SignInCard from "../../../components/SignInCard";
 import Link from "next/link";
 import IdentityRow from "../../../components/IdentityRow";
+import usePageTitle from "../../../../hooks/usePageTitle";
 
 function notifyBorrowRequestsChanged() {
   window.dispatchEvent(new Event("om:borrow-requests-changed"));
@@ -66,6 +67,8 @@ export default function MessageThreadPage() {
   const [profilesById, setProfilesById] = useState<Record<string, ProfileLite>>({});
   const [avatarUrlByUserId, setAvatarUrlByUserId] = useState<Record<string, string>>({});
   const [book, setBook] = useState<BookLite | null>(null);
+  const pageTitle = ((book?.title_override ?? "").trim() || book?.edition?.title || "Messages") as string;
+  usePageTitle(pageTitle);
 
   const [thread, setThread] = useState<Msg[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);

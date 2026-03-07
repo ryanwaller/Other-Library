@@ -1,7 +1,11 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import DiscoverClient from "./DiscoverClient";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Search"
+};
 
 export default function DiscoverPage() {
   return (
@@ -18,4 +22,3 @@ export default function DiscoverPage() {
     </Suspense>
   );
 }
-

@@ -236,6 +236,32 @@ export async function GET(req: Request) {
         }
       }
 
+      const avatarByPath: Record<string, string> = {};
+      const avatarPaths = Array.from(
+        new Set(
+          Object.values(profileById)
+            .map((p) => (p.avatar_path ?? "").trim())
+            .filter(Boolean)
+        )
+      );
+      const directUrls = avatarPaths.filter((p) => /^https?:\/\//i.test(p));
+      for (const p of directUrls) avatarByPath[p] = p;
+      const storagePaths = avatarPaths.filter((p) => !/^https?:\/\//i.test(p));
+      if (storagePaths.length > 0) {
+        const signed = await admin.storage.from("avatars").createSignedUrls(storagePaths, 60 * 30);
+        if (!signed.error && Array.isArray(signed.data)) {
+          for (const row of signed.data) {
+            if (row.path && row.signedUrl) avatarByPath[row.path] = row.signedUrl;
+          }
+        }
+        for (const path of storagePaths) {
+          if (avatarByPath[path]) continue;
+          const pub = admin.storage.from("avatars").getPublicUrl(path);
+          const fallback = String(pub.data?.publicUrl ?? "").trim();
+          if (fallback) avatarByPath[path] = fallback;
+        }
+      }
+
       const byCatalog: Record<number, Array<{ userId: string; username: string; avatarUrl: string | null; acceptedAt: string }>> = {};
       for (const r of memberRows) {
         const cid = Number(r.catalog_id);
@@ -246,7 +272,7 @@ export async function GET(req: Request) {
         byCatalog[cid].push({
           userId: uid,
           username: p.username,
-          avatarUrl: null,
+          avatarUrl: p.avatar_path ? avatarByPath[p.avatar_path] ?? null : null,
           acceptedAt: String(r.accepted_at ?? "")
         });
       }

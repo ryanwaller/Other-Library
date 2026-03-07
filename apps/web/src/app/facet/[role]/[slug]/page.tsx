@@ -1,8 +1,10 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getServerSupabase } from "../../../../lib/supabaseServer";
 import FacetBookList from "./FacetBookList";
 import ActiveFilterDisplay from "../../../../components/ActiveFilterDisplay";
 import type { CoverCrop } from "../../../../components/CoverImage";
+import { facetLabelForRole } from "../../../../lib/pageTitle";
 
 export const dynamic = "force-dynamic";
 
@@ -40,28 +42,29 @@ function safeDecode(input: string): string {
 }
 
 function labelForRole(role: FacetRole): string {
-  if (role === "author") return "Author";
-  if (role === "editor") return "Editor";
-  if (role === "designer") return "Designer";
-  if (role === "subject") return "Subject";
-  if (role === "tag") return "Tag";
-  if (role === "category") return "Category";
-  if (role === "material") return "Material";
-  if (role === "printer") return "Printer";
-  if (role === "performer") return "Performer";
-  if (role === "composer") return "Composer";
-  if (role === "producer") return "Producer";
-  if (role === "engineer") return "Engineer";
-  if (role === "mastering") return "Mastering";
-  if (role === "featured artist") return "Featured artist";
-  if (role === "arranger") return "Arranger";
-  if (role === "conductor") return "Conductor";
-  if (role === "orchestra") return "Orchestra";
-  if (role === "art direction") return "Art direction";
-  if (role === "artwork") return "Artwork";
-  if (role === "design") return "Design";
-  if (role === "photography") return "Photography";
-  return "Publisher";
+  return facetLabelForRole(role);
+}
+
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ role: string; slug: string }>;
+}): Promise<Metadata> {
+  const { role: roleRaw, slug: slugRaw } = await params;
+  const role = (roleRaw ?? "").trim().toLowerCase();
+  const slug = safeDecode(slugRaw ?? "").trim().toLowerCase();
+
+  if (!isFacetRole(role) || !slug) return { title: "Search" };
+
+  const supabase = getServerSupabase();
+  if (!supabase) {
+    return { title: `${facetLabelForRole(role)}: ${safeDecode(slugRaw ?? "")}` };
+  }
+
+  const entityRes = await supabase.from("entities").select("name").eq("slug", slug).maybeSingle();
+  const entity = (entityRes.data ?? null) as { name?: string | null } | null;
+  const value = String(entity?.name ?? "").trim() || safeDecode(slugRaw ?? "");
+  return { title: `${facetLabelForRole(role)}: ${value}` };
 }
 
 export default async function FacetBrowsePage({ params }: { params: Promise<{ role: string; slug: string }> }) {
