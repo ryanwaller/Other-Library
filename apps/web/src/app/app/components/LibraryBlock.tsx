@@ -33,6 +33,7 @@ export default function LibraryBlock({
   onMoveDown,
   viewMode,
   gridCols,
+  isMobile,
   searchQuery,
   renderBooks
 }: {
@@ -64,12 +65,16 @@ export default function LibraryBlock({
   onMoveDown: (libraryId: number) => void;
   viewMode: "grid" | "list";
   gridCols: number;
+  isMobile?: boolean;
   searchQuery: string;
-  renderBooks: (limit: number) => ReactNode;
+  renderBooks: (limit: number, effectiveViewMode: "grid" | "list") => ReactNode;
 }) {
   const hasNameChanges = nameDraft.trim() !== libraryName.trim();
 
-  const { limit, loadMore, seeLess, canSeeLess } = usePagination(viewMode, gridCols, searchQuery);
+  const isRearrangingThis = rearrangingLibraryId === libraryId;
+  const effectiveViewMode = (isMobile && isRearrangingThis) ? "list" : viewMode;
+
+  const { limit, loadMore, seeLess, canSeeLess } = usePagination(effectiveViewMode, gridCols, searchQuery);
 
   return (
     <div className="card" style={{ marginTop: index === 0 ? 0 : "var(--space-14)" }}>
@@ -270,7 +275,7 @@ export default function LibraryBlock({
       {!collapsed && (
         <>
           {membersPanel}
-          {renderBooks(limit)}
+          {renderBooks(limit, effectiveViewMode)}
           {(bookCount > limit || canSeeLess) && (
             <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: 24, justifyContent: "center" }}>
               {bookCount > limit ? (

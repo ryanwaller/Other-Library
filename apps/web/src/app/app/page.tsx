@@ -675,6 +675,86 @@ function AppShell({
     }
   }
 
+  // Mobile Touch Handlers
+  function handleTouchStart(e: React.TouchEvent, key: string, libraryId: number) {
+    if (rearrangingLibraryId !== libraryId) return;
+    setDraggedItemKey(key);
+    setDraggedItemLibId(libraryId);
+    setBackupItems([...items]);
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    if (!draggedItemKey || !draggedItemLibId) return;
+    const touch = e.touches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!target) return;
+
+    // Find the parent item container
+    const itemEl = target.closest("[data-reorder-key]") as HTMLElement;
+    if (itemEl) {
+      const targetKey = itemEl.getAttribute("data-reorder-key");
+      const targetLibId = Number(itemEl.getAttribute("data-reorder-lib-id"));
+      if (targetKey && targetKey !== draggedItemKey && targetLibId === draggedItemLibId) {
+        // Trigger the same reorder logic as handleDragEnter
+        setDragOverItemKey(targetKey);
+        
+        const libId = targetLibId;
+        const groups = displayGroupsByLibraryId[libId] ?? [];
+        const sourceIdx = groups.findIndex(g => g.key === draggedItemKey);
+        const targetIdx = groups.findIndex(g => g.key === targetKey);
+        
+        if (sourceIdx !== -1 && targetIdx !== -1) {
+          let newOrder: number;
+          if (targetIdx === 0) {
+            newOrder = (groups[0].sortOrder ?? 0) - 1000;
+          } else if (targetIdx === groups.length - 1 && sourceIdx < targetIdx) {
+            newOrder = (groups[groups.length - 1].sortOrder ?? 0) + 1000;
+          } else {
+            if (targetIdx > sourceIdx) {
+              const afterTarget = groups[targetIdx + 1];
+              newOrder = ((groups[targetIdx].sortOrder ?? 0) + (afterTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) + 2000)) / 2;
+            } else {
+              const beforeTarget = groups[targetIdx - 1];
+              newOrder = ((beforeTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) - 2000) + (groups[targetIdx].sortOrder ?? 0)) / 2;
+            }
+          }
+
+          const sourceGroup = groups[sourceIdx];
+          setItems(prev => prev.map(item => {
+            if (sourceGroup.copies.some(c => c.id === item.id)) {
+              return { ...item, sort_order: newOrder };
+            }
+            return item;
+          }));
+        }
+      }
+    }
+
+    // Auto-scroll logic for touch
+    const threshold = 80;
+    const speed = 12;
+    if (touch.clientY < threshold) {
+      if (!scrollIntervalRef.current) {
+        scrollIntervalRef.current = setInterval(() => window.scrollBy(0, -speed), 16);
+      }
+    } else if (touch.clientY > window.innerHeight - threshold) {
+      if (!scrollIntervalRef.current) {
+        scrollIntervalRef.current = setInterval(() => window.scrollBy(0, speed), 16);
+      }
+    } else {
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+    }
+  }
+
+  async function handleTouchEnd(e: React.TouchEvent) {
+    if (!draggedItemKey || !draggedItemLibId) return;
+    // Reuse drop logic
+    await handleDrop(null as any, draggedItemKey, draggedItemLibId);
+  }
+
   async function handleDrop(e: React.DragEvent, targetKey: string, targetLibId: number) {
     e.preventDefault();
     const finalItems = [...items];
@@ -3664,9 +3744,10 @@ function AppShell({
               onMoveDown={(id) => moveLibrary(id, 1)}
               viewMode={viewMode}
               gridCols={effectiveCols}
+              isMobile={isMobile}
               searchQuery={searchQuery}
-              renderBooks={(limit) => (
-                <div style={{ display: viewMode === "grid" ? "grid" : "flex", flexDirection: viewMode === "list" ? "column" : undefined, gridTemplateColumns: viewMode === "grid" ? `repeat(${effectiveCols}, minmax(0, 1fr))` : undefined, gap: "var(--space-md)" }}>
+              renderBooks={(limit, effectiveViewMode) => (
+                <div style={{ display: effectiveViewMode === "grid" ? "grid" : "flex", flexDirection: effectiveViewMode === "list" ? "column" : undefined, gridTemplateColumns: effectiveViewMode === "grid" ? `repeat(${effectiveCols}, minmax(0, 1fr))` : undefined, gap: "var(--space-md)" }}>
                   {showBookSkeleton
                     ? Array.from({ length: Math.min(4, Math.max(1, effectiveCols)) }).map((_, i) => (
                         <div key={`skeleton-${lib.id}-${i}`} className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
@@ -3686,12 +3767,17 @@ function AppShell({
                     return (
                       <div
                         key={g.key}
+                        data-reorder-key={g.key}
+                        data-reorder-lib-id={lib.id}
                         draggable={isRearrangingThis}
                         onDragStart={(e) => handleDragStart(e, g.key, lib.id)}
                         onDragOver={(e) => handleDragOver(e, g.key)}
                         onDragEnter={(e) => handleDragEnter(e, g.key, lib.id)}
                         onDragEnd={handleDragEnd}
                         onDrop={(e) => handleDrop(e, g.key, lib.id)}
+                        onTouchStart={(e) => handleTouchStart(e, g.key, lib.id)}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
                         style={{
                           opacity: isDragged ? 0.3 : 1,
                           cursor: isRearrangingThis ? "grab" : "default",
@@ -3699,7 +3785,8 @@ function AppShell({
                           transform: isDragged ? "scale(1.05)" : "none",
                           zIndex: isDragged ? 1000 : 1,
                           boxShadow: isDragged ? "0 8px 24px rgba(0,0,0,0.2)" : "none",
-                          position: "relative"
+                          position: "relative",
+                          touchAction: isRearrangingThis ? "none" : "auto"
                         }}
                       >
                         <BookCard
