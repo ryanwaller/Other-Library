@@ -102,6 +102,16 @@ export default function AdminFeedbackBoard({
   const [rows, setRows] = useState<FeedbackRow[]>([]);
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 720px)");
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   async function loadMetrics() {
     if (!token) return;
@@ -191,7 +201,7 @@ export default function AdminFeedbackBoard({
   }, [rows]);
 
   return (
-    <div style={{ marginTop: "var(--space-lg)", width: "calc(100vw - 48px)", marginLeft: "calc(50% - 50vw + 24px)" }}>
+    <div style={{ marginTop: "var(--space-lg)", width: isMobile ? "100%" : "calc(100vw - 48px)", marginLeft: isMobile ? 0 : "calc(50% - 50vw + 24px)" }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-8)", flexWrap: "wrap" }}>
         <div className="row" style={{ gap: "var(--space-8)", alignItems: "center", flexWrap: "wrap" }}>
           <select className="om-filter-control" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} style={{ width: 180 }}>
@@ -240,8 +250,8 @@ export default function AdminFeedbackBoard({
         </div>
       ) : null}
 
-      <div style={{ marginTop: "var(--space-lg)", width: "100%", overflowX: "auto" }}>
-        <div style={{ minWidth: 1320, position: "relative", paddingTop: 28 }}>
+      <div style={{ marginTop: "var(--space-lg)", width: "100%", overflowX: isMobile ? "visible" : "auto" }}>
+        <div style={{ minWidth: isMobile ? "100%" : 1320, position: "relative", paddingTop: 28 }}>
           <div className="row" style={{ position: "absolute", top: 0, left: 0, right: 0, height: 24, justifyContent: "space-between", alignItems: "baseline" }}>
             <div style={{ visibility: statusFilter === "all" ? "hidden" : "visible" }}>
               {STATUSES.find((s) => s.key === statusFilter)?.label ?? "Status"}
@@ -251,9 +261,9 @@ export default function AdminFeedbackBoard({
             </span>
           </div>
         {statusFilter === "all" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(300px, 1fr))", gap: "var(--space-md)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4, minmax(300px, 1fr))", gap: "var(--space-md)" }}>
               {STATUSES.map((col) => (
-                <div key={col.key} className="card om-feedback-card om-feedback-column" data-status={col.key} style={{ minHeight: 220 }}>
+                <div key={col.key} className="card om-feedback-card om-feedback-column" data-status={col.key} style={{ minHeight: isMobile ? "auto" : 220 }}>
                   <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
                     <div>{col.label}</div>
                     <span className="text-muted">{grouped[col.key].length}</span>
@@ -362,7 +372,7 @@ export default function AdminFeedbackBoard({
               ))}
             </div>
         ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(300px, 1fr))", gap: "var(--space-md)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4, minmax(300px, 1fr))", gap: "var(--space-md)" }}>
             {focusedRows.map((row) => (
               <div key={row.id} className="om-feedback-card" data-status={row.status} style={{ padding: "var(--space-sm)", background: "var(--bg)", display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-8)" }}>
