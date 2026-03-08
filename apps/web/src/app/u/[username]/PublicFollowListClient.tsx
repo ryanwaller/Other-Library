@@ -144,6 +144,7 @@ export default function PublicFollowListClient({ username, mode }: { username: s
           {heading}
           <div className="text-muted">{rows.length}</div>
         </div>
+        <hr className="divider" />
       </div>
 
       <div style={{ marginTop: "var(--space-md)" }}>
