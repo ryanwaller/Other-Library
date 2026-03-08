@@ -536,6 +536,7 @@ export default function BookDetailPage() {
   const [formDesigners, setFormDesigners] = useState("");
   const [formPublisher, setFormPublisher] = useState("");
   const [formIsbn, setFormIsbn] = useState("");
+  const [isbnFormatError, setIsbnFormatError] = useState(false);
   const [formPrinter, setFormPrinter] = useState("");
   const [formMaterials, setFormMaterials] = useState("");
   const [formEditionOverride, setFormEditionOverride] = useState("");
@@ -1077,6 +1078,7 @@ export default function BookDetailPage() {
       setFormDesigners((nextFacets.designer ?? []).join(", "));
       setFormPublisher(joinTokenValues(nextFacets.publisher ?? parseAuthorsInput(String(row.publisher_override ?? row.edition?.publisher ?? "").trim())));
       setFormIsbn(String(row.edition?.isbn13 ?? row.edition?.isbn10 ?? "").trim());
+      setIsbnFormatError(false);
       setFormPrinter(joinTokenValues(nextFacets.printer ?? parseAuthorsInput(String(row.printer_override ?? "").trim())));
       setFormMaterials(joinTokenValues(nextFacets.material ?? parseAuthorsInput(String(row.materials_override ?? "").trim())));
       setFormEditionOverride(row.edition_override ?? "");
@@ -1995,6 +1997,7 @@ export default function BookDetailPage() {
       setFormDesigners(snap.formDesigners);
       setFormPublisher(snap.formPublisher);
       setFormIsbn(snap.formIsbn);
+      setIsbnFormatError(false);
       setFormPrinter(snap.formPrinter);
       setFormMaterials(snap.formMaterials);
       setFormEditionOverride(snap.formEditionOverride);
@@ -2048,9 +2051,11 @@ export default function BookDetailPage() {
       const object_type = formObjectType.trim() ? formObjectType.trim() : null;
       const manualIsbn = isMusicObject ? "" : normalizeIsbnInput(formIsbn);
       if (!isMusicObject && manualIsbn && !/^\d{9}[\dX]$/.test(manualIsbn) && !/^\d{13}$/.test(manualIsbn)) {
-        setSaveState({ busy: false, error: "ISBN must be 10 or 13 characters.", message: "Save failed" });
+        setIsbnFormatError(true);
+        setSaveState({ busy: false, error: null, message: null });
         return false;
       }
+      setIsbnFormatError(false);
       const decade = formDecade.trim() ? formDecade.trim() : null;
       const pagesRaw = formPages.trim();
       const pages = pagesRaw ? Number(pagesRaw) : null;
@@ -2177,11 +2182,7 @@ export default function BookDetailPage() {
 
       const currentStoredIsbn = normalizeIsbnInput(String(book.edition?.isbn13 ?? book.edition?.isbn10 ?? ""));
       if (!isMusicObject && manualIsbn && manualIsbn !== currentStoredIsbn) {
-        const linked = await linkEditionByIsbn(manualIsbn);
-        if (!linked) {
-          setSaveState({ busy: false, error: "Could not save ISBN.", message: "Save failed" });
-          return false;
-        }
+        await linkEditionByIsbn(manualIsbn);
       }
 
       await refresh();
@@ -4822,7 +4823,10 @@ export default function BookDetailPage() {
                         <input
                           className="om-inline-control"
                           value={formIsbn}
-                          onChange={(e) => setFormIsbn(e.target.value)}
+                          onChange={(e) => {
+                            setFormIsbn(e.target.value);
+                            if (isbnFormatError) setIsbnFormatError(false);
+                          }}
                           onKeyDown={(e) => onEnter(e, () => void saveEdits())}
                           placeholder="Add ISBN"
                         />
@@ -4831,7 +4835,8 @@ export default function BookDetailPage() {
                       )}
                     </div>
                     {editMode && (
-                      <div style={{ marginLeft: "var(--space-sm)" }}>
+                      <div style={{ marginLeft: "auto", display: "flex", alignItems: "baseline", gap: "var(--space-sm)" }}>
+                        {isbnFormatError ? <div className="text-muted">Invalid format</div> : null}
                         <FieldVisibilityToggle visible={fieldVisibility.isbn !== false} onChange={() => toggleFieldVisibility("isbn")} />
                       </div>
                     )}
