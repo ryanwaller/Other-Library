@@ -653,6 +653,7 @@ function AppShell({
   const controlsBandRef = useRef<HTMLDivElement | null>(null);
   const controlsBandTopRef = useRef(0);
   const lastScrollYRef = useRef(0);
+  const wasControlsPinnedOpenRef = useRef(false);
   const [controlsDocked, setControlsDocked] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [controlsBandHeight, setControlsBandHeight] = useState(0);
@@ -800,8 +801,14 @@ function AppShell({
   }, [controlsPinnedOpen, isMobile]);
 
   useEffect(() => {
-    if (controlsPinnedOpen) setControlsVisible(true);
-  }, [controlsPinnedOpen]);
+    const wasPinnedOpen = wasControlsPinnedOpenRef.current;
+    if (controlsPinnedOpen) {
+      setControlsVisible(true);
+    } else if (wasPinnedOpen && controlsDocked) {
+      setControlsVisible(true);
+    }
+    wasControlsPinnedOpenRef.current = controlsPinnedOpen;
+  }, [controlsDocked, controlsPinnedOpen]);
 
   const controlsFixed = !isMobile && controlsDocked;
 
