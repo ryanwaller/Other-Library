@@ -760,7 +760,7 @@ function AppShell({
       const y = window.scrollY;
 
       if (isMobile) {
-        setControlsDocked(false);
+        setControlsDocked(true);
         setControlsVisible(true);
         lastScrollYRef.current = y;
         return;
@@ -810,7 +810,7 @@ function AppShell({
     wasControlsPinnedOpenRef.current = controlsPinnedOpen;
   }, [controlsDocked, controlsPinnedOpen]);
 
-  const controlsFixed = !isMobile && controlsDocked;
+  const controlsFixed = isMobile || controlsDocked;
 
   useEffect(() => {
     try {
