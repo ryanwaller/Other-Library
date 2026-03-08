@@ -655,6 +655,7 @@ function AppShell({
   const lastScrollYRef = useRef(0);
   const [controlsDocked, setControlsDocked] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [controlsBandHeight, setControlsBandHeight] = useState(0);
 
   const [isMobile, setIsMobile] = useState(false);
   const autoReducedGridColsRef = useRef<4 | 8 | null>(null);
@@ -729,6 +730,7 @@ function AppShell({
     if (typeof window === "undefined" || !controlsBandRef.current) return;
     const rect = controlsBandRef.current.getBoundingClientRect();
     controlsBandTopRef.current = rect.top + window.scrollY;
+    setControlsBandHeight(rect.height);
   }, []);
 
   useEffect(() => {
@@ -792,6 +794,8 @@ function AppShell({
   useEffect(() => {
     if (controlsPinnedOpen) setControlsVisible(true);
   }, [controlsPinnedOpen]);
+
+  const controlsFixed = controlsDocked;
 
   useEffect(() => {
     try {
@@ -3177,11 +3181,13 @@ function AppShell({
         </div>
       </div>
 
+        {controlsFixed ? <div aria-hidden style={{ height: controlsBandHeight }} /> : null}
         <div
           ref={controlsBandRef}
           className="om-smart-sticky-band"
           data-docked={controlsDocked ? "true" : "false"}
           data-visible={!controlsDocked || controlsVisible ? "true" : "false"}
+          data-fixed={controlsFixed ? "true" : "false"}
         >
         {isMobile ? (
           <>
