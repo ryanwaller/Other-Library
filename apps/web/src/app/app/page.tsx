@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
@@ -8,8 +8,8 @@ import { supabase } from "../../lib/supabaseClient";
 import SignInCard from "../components/SignInCard";
 import BulkBar from "./components/BulkBar";
 import LibraryBlock from "./components/LibraryBlock";
-import BookCard from "./components/BookCard";
 import HomepageSkeleton from "./components/HomepageSkeleton";
+import SortableCatalogGrid from "./components/SortableCatalogGrid";
 import { useBookScanner } from "../../hooks/useBookScanner";
 import usePageTitle from "../../hooks/usePageTitle";
 import dynamic from "next/dynamic";
@@ -36,6 +36,7 @@ import { saveBookNavContext } from "../../lib/bookNav";
 import { parseMusicMetadata, type MusicMetadata, type MusicContributorRole } from "../../lib/music";
 import { contextFromFilterParams } from "../../lib/pageTitle";
 import { DETAIL_FILTER_KEYS, detailFilterLabel, type DetailFilterKey } from "../../lib/detailFilters";
+import { arrayMove } from "@dnd-kit/sortable";
 
 const BookScannerModal = dynamic(() => import("../../components/BookScannerModal"), { ssr: false });
 
@@ -582,253 +583,8 @@ function AppShell({
   const [addLibraryId, setAddLibraryId] = useState<number | null>(null);
   const [editingLibraryId, setEditingLibraryId] = useState<number | null>(null);
   const [rearrangingLibraryId, setRearrangingLibraryId] = useState<number | null>(null);
-  const [draggedItemKey, setDraggedItemKey] = useState<string | null>(null);
-  const [draggedItemLibId, setDraggedItemLibId] = useState<number | null>(null);
-  const [dragOverItemKey, setDragOverItemKey] = useState<string | null>(null);
-  const [backupItems, setBackupItems] = useState<CatalogItem[] | null>(null);
-  const scrollIntervalRef = useRef<any>(null);
-  const dragImageRef = useRef<HTMLElement | null>(null);
-  const reorderRectsRef = useRef<Map<string, DOMRect>>(new Map());
-  const reorderAnimationFrameRef = useRef<number | null>(null);
-
-  function clearDragImage() {
-    if (dragImageRef.current?.parentNode) {
-      dragImageRef.current.parentNode.removeChild(dragImageRef.current);
-    }
-    dragImageRef.current = null;
-  }
-
-  function captureReorderRects(libraryId: number) {
-    const next = new Map<string, DOMRect>();
-    const nodes = document.querySelectorAll<HTMLElement>(`[data-reorder-lib-id="${libraryId}"]`);
-    nodes.forEach((node) => {
-      const key = node.dataset.reorderKey;
-      if (!key) return;
-      next.set(key, node.getBoundingClientRect());
-    });
-    reorderRectsRef.current = next;
-  }
-
-  function animateReorderRects(libraryId: number) {
-    if (reorderAnimationFrameRef.current != null) {
-      window.cancelAnimationFrame(reorderAnimationFrameRef.current);
-    }
-    reorderAnimationFrameRef.current = window.requestAnimationFrame(() => {
-      const previousRects = reorderRectsRef.current;
-      if (previousRects.size === 0) return;
-      const nodes = document.querySelectorAll<HTMLElement>(`[data-reorder-lib-id="${libraryId}"]`);
-      nodes.forEach((node) => {
-        const key = node.dataset.reorderKey;
-        if (!key) return;
-        const previous = previousRects.get(key);
-        if (!previous) return;
-        const next = node.getBoundingClientRect();
-        const deltaX = previous.left - next.left;
-        const deltaY = previous.top - next.top;
-        if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
-        node.style.setProperty("--reorder-tx", `${deltaX}px`);
-        node.style.setProperty("--reorder-ty", `${deltaY}px`);
-        node.getBoundingClientRect();
-        node.style.setProperty("--reorder-tx", "0px");
-        node.style.setProperty("--reorder-ty", "0px");
-      });
-      reorderRectsRef.current = new Map();
-      reorderAnimationFrameRef.current = null;
-    });
-  }
-
-  function applyOptimisticReorder(targetKey: string, targetLibId: number) {
-    if (!draggedItemKey || draggedItemKey === targetKey || targetLibId !== draggedItemLibId) return;
-    const libId = targetLibId;
-    const groups = displayGroupsByLibraryId[libId] ?? [];
-    const sourceIdx = groups.findIndex((g) => g.key === draggedItemKey);
-    const targetIdx = groups.findIndex((g) => g.key === targetKey);
-
-    if (sourceIdx === -1 || targetIdx === -1) return;
-    setDragOverItemKey(targetKey);
-    captureReorderRects(libId);
-
-    let newOrder: number;
-    if (targetIdx === 0) {
-      newOrder = (groups[0].sortOrder ?? 0) - 1000;
-    } else if (targetIdx === groups.length - 1 && sourceIdx < targetIdx) {
-      newOrder = (groups[groups.length - 1].sortOrder ?? 0) + 1000;
-    } else if (targetIdx > sourceIdx) {
-      const afterTarget = groups[targetIdx + 1];
-      newOrder = ((groups[targetIdx].sortOrder ?? 0) + (afterTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) + 2000)) / 2;
-    } else {
-      const beforeTarget = groups[targetIdx - 1];
-      newOrder = ((beforeTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) - 2000) + (groups[targetIdx].sortOrder ?? 0)) / 2;
-    }
-
-    const sourceGroup = groups[sourceIdx];
-    setItems((prev) =>
-      prev.map((item) => {
-        if (sourceGroup.copies.some((c) => c.id === item.id)) {
-          return { ...item, sort_order: newOrder };
-        }
-        return item;
-      })
-    );
-    animateReorderRects(libId);
-  }
-
-  function handleDragStart(e: React.DragEvent, key: string, libraryId: number) {
-    setDraggedItemKey(key);
-    setDraggedItemLibId(libraryId);
-    setBackupItems([...items]);
-    e.dataTransfer.effectAllowed = "move";
-    const target = e.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
-    const preview = target.cloneNode(true) as HTMLElement;
-    preview.style.position = "fixed";
-    preview.style.top = "-10000px";
-    preview.style.left = "-10000px";
-    preview.style.width = `${rect.width}px`;
-    preview.style.margin = "0";
-    preview.style.pointerEvents = "none";
-    preview.style.transform = "scale(1.03)";
-    preview.style.boxShadow = "0 16px 30px rgba(0,0,0,0.18)";
-    preview.style.zIndex = "9999";
-    preview.style.background = "var(--bg)";
-    preview.style.borderRadius = "2px";
-    preview.style.overflow = "hidden";
-    document.body.appendChild(preview);
-    dragImageRef.current = preview;
-    if (e.dataTransfer) {
-      e.dataTransfer.setDragImage(preview, rect.width / 2, rect.height / 2);
-    }
-  }
-
-  function handleDragOver(e: React.DragEvent, key: string) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-
-    // Auto-scroll logic
-    const threshold = 100;
-    const speed = 15;
-    if (e.clientY < threshold) {
-      if (!scrollIntervalRef.current) {
-        scrollIntervalRef.current = setInterval(() => window.scrollBy(0, -speed), 16);
-      }
-    } else if (e.clientY > window.innerHeight - threshold) {
-      if (!scrollIntervalRef.current) {
-        scrollIntervalRef.current = setInterval(() => window.scrollBy(0, speed), 16);
-      }
-    } else {
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-        scrollIntervalRef.current = null;
-      }
-    }
-  }
-
-  function handleDragEnter(e: React.DragEvent, targetKey: string, targetLibId: number) {
-    e.preventDefault();
-    applyOptimisticReorder(targetKey, targetLibId);
-  }
-
-  function handleDragEnd() {
-    setDraggedItemKey(null);
-    setDraggedItemLibId(null);
-    setDragOverItemKey(null);
-    clearDragImage();
-    if (scrollIntervalRef.current) {
-      clearInterval(scrollIntervalRef.current);
-      scrollIntervalRef.current = null;
-    }
-  }
-
-  // Mobile Touch Handlers
-  function handleTouchStart(e: React.TouchEvent, key: string, libraryId: number) {
-    if (rearrangingLibraryId !== libraryId) return;
-    setDraggedItemKey(key);
-    setDraggedItemLibId(libraryId);
-    setBackupItems([...items]);
-  }
-
-  function handleTouchMove(e: React.TouchEvent) {
-    if (!draggedItemKey || !draggedItemLibId) return;
-    const touch = e.touches[0];
-    
-    // Find all items in the current rearranging library
-    const itemsEls = document.querySelectorAll(`[data-reorder-lib-id="${draggedItemLibId}"]`);
-    let nearestKey = null;
-    let minDistance = Infinity;
-
-    for (let i = 0; i < itemsEls.length; i++) {
-      const el = itemsEls[i] as HTMLElement;
-      const rect = el.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const distance = Math.sqrt(Math.pow(touch.clientX - centerX, 2) + Math.pow(touch.clientY - centerY, 2));
-      
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearestKey = el.getAttribute("data-reorder-key");
-      }
-    }
-
-    if (nearestKey && nearestKey !== draggedItemKey) {
-      applyOptimisticReorder(nearestKey, draggedItemLibId);
-    }
-
-    // Auto-scroll logic for touch
-    const threshold = 80;
-    const speed = 12;
-    if (touch.clientY < threshold) {
-      if (!scrollIntervalRef.current) {
-        scrollIntervalRef.current = setInterval(() => window.scrollBy(0, -speed), 16);
-      }
-    } else if (touch.clientY > window.innerHeight - threshold) {
-      if (!scrollIntervalRef.current) {
-        scrollIntervalRef.current = setInterval(() => window.scrollBy(0, speed), 16);
-      }
-    } else {
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-        scrollIntervalRef.current = null;
-      }
-    }
-  }
-
-  async function handleTouchEnd(e: React.TouchEvent) {
-    if (!draggedItemKey || !draggedItemLibId) return;
-    // Reuse drop logic
-    await handleDrop(null as any, draggedItemKey, draggedItemLibId);
-  }
-
-  async function handleDrop(e: React.DragEvent, targetKey: string, targetLibId: number) {
-    if (e) e.preventDefault();
-    const finalItems = [...items];
-    const sourceKey = draggedItemKey;
-    const libId = draggedItemLibId;
-    handleDragEnd();
-
-    if (!sourceKey || !libId || !supabase) return;
-
-    // Persist the final state of the dragged items
-    const sourceGroupItems = finalItems.filter(item => 
-      item.library_id === libId && 
-      displayGroups.find(g => g.key === sourceKey)?.copies.some(c => c.id === item.id)
-    );
-    
-    if (sourceGroupItems.length === 0) return;
-    
-    const finalSortOrder = sourceGroupItems[0].sort_order;
-    const ids = sourceGroupItems.map(it => it.id);
-
-    try {
-      const { error } = await supabase.from("user_books").update({ sort_order: finalSortOrder }).in("id", ids);
-      if (error) throw error;
-    } catch (err: any) {
-      console.error("Failed to persist new order", err);
-      if (backupItems) setItems(backupItems);
-      window.alert("Failed to save new order. Reverting.");
-    } finally {
-      setBackupItems(null);
-    }
-  }
+  const [reorderBackupItems, setReorderBackupItems] = useState<CatalogItem[] | null>(null);
+  const itemsRef = useRef<CatalogItem[]>([]);
   const [libraryNameDraft, setLibraryNameDraft] = useState("");
   const [newLibraryName, setNewLibraryName] = useState("");
   const [newLibraryFocused, setNewLibraryFocused] = useState(false);
@@ -842,15 +598,6 @@ function AppShell({
     const fallbackId = addLibraryId ?? libraries[0]?.id ?? null;
     setAddPreviewLibraryId((prev) => (prev && libraries.some((l) => l.id === prev) ? prev : fallbackId));
   }, [addLibraryId, libraries]);
-
-  useEffect(() => {
-    return () => {
-      clearDragImage();
-      if (reorderAnimationFrameRef.current != null) {
-        window.cancelAnimationFrame(reorderAnimationFrameRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     const fallbackId = addLibraryId ?? libraries[0]?.id ?? null;
@@ -3118,6 +2865,73 @@ function AppShell({
     return by;
   }, [displayGroups]);
 
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  function beginItemReorder(activeKey: string, libraryId: number) {
+    if (rearrangingLibraryId !== libraryId) return;
+    setReorderBackupItems((prev) => prev ?? [...itemsRef.current]);
+  }
+
+  function previewItemReorder(activeKey: string, overKey: string, libraryId: number) {
+    if (activeKey === overKey) return;
+    const groups = displayGroupsByLibraryId[libraryId] ?? [];
+    const fromIndex = groups.findIndex((group) => group.key === activeKey);
+    const toIndex = groups.findIndex((group) => group.key === overKey);
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
+
+    const reordered = arrayMove(groups, fromIndex, toIndex);
+    const nextSortByItemId = new Map<number, number>();
+    reordered.forEach((group, index) => {
+      const nextSortOrder = (index + 1) * 1000;
+      group.copies.forEach((copy) => nextSortByItemId.set(copy.id, nextSortOrder));
+    });
+
+    setItems((prev) => {
+      let changed = false;
+      const next = prev.map((item) => {
+        const nextSort = nextSortByItemId.get(item.id);
+        if (nextSort == null || item.sort_order === nextSort) return item;
+        changed = true;
+        return { ...item, sort_order: nextSort };
+      });
+      return changed ? next : prev;
+    });
+  }
+
+  async function commitItemReorder(libraryId: number) {
+    const snapshot = reorderBackupItems;
+    setReorderBackupItems(null);
+    if (!supabase) return;
+
+    const rows = itemsRef.current
+      .filter((item) => item.library_id === libraryId)
+      .map((item) => ({ id: item.id, sort_order: item.sort_order ?? null }));
+
+    if (rows.length === 0) return;
+
+    try {
+      const { error } = await supabase.from("user_books").upsert(rows as any, { onConflict: "id" });
+      if (error) throw error;
+    } catch (err: any) {
+      console.error("Failed to persist new order", err);
+      if (snapshot) {
+        setItems(snapshot);
+        itemsRef.current = snapshot;
+      }
+      window.alert("Failed to save new order. Reverting.");
+    }
+  }
+
+  function cancelItemReorder(libraryId: number) {
+    const snapshot = reorderBackupItems;
+    setReorderBackupItems(null);
+    if (!snapshot) return;
+    setItems(snapshot);
+    itemsRef.current = snapshot;
+  }
+
   const renderLibraries = useMemo<LibrarySummary[]>(() => {
     if (libraries.length > 0) return libraries;
     const ids = Array.from(new Set(displayGroups.map((g) => g.libraryId))).filter((id) => Number.isFinite(id) && id > 0);
@@ -3824,79 +3638,26 @@ function AppShell({
               isMobile={isMobile}
               searchQuery={searchQuery}
               renderBooks={(limit, effectiveViewMode) => (
-                <div style={{ display: effectiveViewMode === "grid" ? "grid" : "flex", flexDirection: effectiveViewMode === "list" ? "column" : undefined, gridTemplateColumns: effectiveViewMode === "grid" ? `repeat(${effectiveCols}, minmax(0, 1fr))` : undefined, gap: "var(--space-md)" }}>
-                  {showBookSkeleton
-                    ? Array.from({ length: Math.min(4, Math.max(1, effectiveCols)) }).map((_, i) => (
-                        <div key={`skeleton-${lib.id}-${i}`} className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
-                      ))
-                    : null}
-                  {groups.slice(0, limit).map((g) => {
-                    const orderedBookIds = groups.map((group) => Number(group.primary.id)).filter((id) => Number.isFinite(id) && id > 0);
-                    const resolvedCoverUrl =
-                      typeof g.primary.resolved_cover_url === "string" && g.primary.resolved_cover_url.trim()
-                        ? g.primary.resolved_cover_url
-                        : null;
-                    
-                    const isRearrangingThis = rearrangingLibraryId === lib.id;
-                    const isDragged = draggedItemKey === g.key;
-                    const isDragOver = dragOverItemKey === g.key;
-
-                    return (
-                      <div
-                        key={g.key}
-                        data-reorder-key={g.key}
-                        data-reorder-lib-id={lib.id}
-                        draggable={isRearrangingThis}
-                        onDragStart={isRearrangingThis ? (e) => handleDragStart(e, g.key, lib.id) : undefined}
-                        onDragOver={isRearrangingThis ? (e) => handleDragOver(e, g.key) : undefined}
-                        onDragEnter={isRearrangingThis ? (e) => handleDragEnter(e, g.key, lib.id) : undefined}
-                        onDragEnd={isRearrangingThis ? handleDragEnd : undefined}
-                        onDrop={isRearrangingThis ? (e) => handleDrop(e, g.key, lib.id) : undefined}
-                        onTouchStart={isRearrangingThis ? (e) => handleTouchStart(e, g.key, lib.id) : undefined}
-                        onTouchMove={isRearrangingThis ? handleTouchMove : undefined}
-                        onTouchEnd={isRearrangingThis ? handleTouchEnd : undefined}
-                        style={{
-                          opacity: isDragged ? 0.22 : 1,
-                          cursor: isRearrangingThis ? "grab" : "default",
-                          transition: "transform 220ms cubic-bezier(0.2, 0, 0, 1), box-shadow 180ms ease, opacity 180ms ease, outline-color 180ms ease, background-color 180ms ease",
-                          transform: `translate3d(var(--reorder-tx, 0px), var(--reorder-ty, 0px), 0) scale(${isDragged ? 0.985 : 1})`,
-                          zIndex: isDragged ? 1000 : 1,
-                          boxShadow: isDragged ? "inset 0 0 0 1px var(--border)" : isDragOver ? "0 0 0 1px var(--fg)" : "none",
-                          position: "relative",
-                          touchAction: isRearrangingThis ? "none" : "auto",
-                          outline: isDragged ? "1px dashed var(--border)" : "1px solid transparent",
-                          outlineOffset: 0,
-                          background: isDragged ? "var(--bg-muted)" : "transparent",
-                          borderRadius: 2,
-                          willChange: isRearrangingThis ? "transform" : undefined
-                        }}
-                      >
-                        <BookCard
-                          viewMode={viewMode}
-                          bulkMode={bulkMode || isRearrangingThis}
-                          selected={!!bulkSelectedKeys[g.key]}
-                          onToggleSelected={() => toggleBulkKey(g.key)}
-                          title={g.title}
-                          authors={g.filterAuthors}
-                          isbn13={g.primary.edition?.isbn13 ?? null}
-                          tags={g.tagNames}
-                          copiesCount={g.copiesCount}
-                          href={isRearrangingThis ? "" : `/app/books/${g.primary.id}`}
-                          coverUrl={resolvedCoverUrl}
-                          originalSrc={resolvedCoverUrl}
-                          onOpen={() => storeBookNavContext(lib.id, orderedBookIds)}
-                          cropData={g.primary.cover_crop}
-                          onDeleteCopy={() => deleteEntry(g.primary.id)}
-                          deleteState={deleteStateByBookId[g.primary.id]}
-                          gridCols={effectiveCols}
-                        />
-                        {isRearrangingThis && (
-                          <div style={{ position: "absolute", inset: 0, zIndex: 10, cursor: "grab" }} />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <SortableCatalogGrid
+                  libraryId={lib.id}
+                  groups={groups}
+                  limit={limit}
+                  effectiveViewMode={effectiveViewMode}
+                  effectiveCols={effectiveCols}
+                  showBookSkeleton={showBookSkeleton}
+                  isRearranging={rearrangingLibraryId === lib.id}
+                  bulkMode={bulkMode}
+                  viewMode={viewMode}
+                  bulkSelectedKeys={bulkSelectedKeys}
+                  deleteStateByBookId={deleteStateByBookId}
+                  onToggleSelected={toggleBulkKey}
+                  onDeleteCopy={deleteEntry}
+                  onStoreBookNavContext={storeBookNavContext}
+                  onReorderStart={beginItemReorder}
+                  onReorderPreview={previewItemReorder}
+                  onReorderCommit={commitItemReorder}
+                  onReorderCancel={cancelItemReorder}
+                />
               )}
             />
             {idx < displayLibraries.length - 1 && <hr className="om-hr" />}

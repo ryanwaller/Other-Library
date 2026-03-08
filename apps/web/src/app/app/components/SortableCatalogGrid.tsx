@@ -1,0 +1,332 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragCancelEvent,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { motion } from "motion/react";
+import type { CatalogGroup } from "../../../lib/types";
+import BookCard, { type BookCardViewMode } from "./BookCard";
+
+type DeleteState = { busy: boolean; error: string | null; message: string | null } | undefined;
+
+type SortableCatalogGridProps = {
+  libraryId: number;
+  groups: CatalogGroup[];
+  limit: number;
+  effectiveViewMode: BookCardViewMode;
+  effectiveCols: number;
+  showBookSkeleton: boolean;
+  isRearranging: boolean;
+  bulkMode: boolean;
+  viewMode: BookCardViewMode;
+  bulkSelectedKeys: Record<string, boolean | undefined>;
+  deleteStateByBookId: Record<number, DeleteState>;
+  onToggleSelected: (key: string) => void;
+  onDeleteCopy: (bookId: number) => void;
+  onStoreBookNavContext: (libraryId: number, orderedBookIds: number[]) => void;
+  onReorderStart: (activeKey: string, libraryId: number) => void;
+  onReorderPreview: (activeKey: string, overKey: string, libraryId: number) => void;
+  onReorderCommit: (libraryId: number) => Promise<void>;
+  onReorderCancel: (libraryId: number) => void;
+};
+
+type SortableCatalogCardProps = {
+  group: CatalogGroup;
+  libraryId: number;
+  viewMode: BookCardViewMode;
+  bulkMode: boolean;
+  effectiveCols: number;
+  selected: boolean;
+  deleteState: DeleteState;
+  isRearranging: boolean;
+  orderedBookIds: number[];
+  onToggleSelected: () => void;
+  onDeleteCopy: () => void;
+  onStoreBookNavContext: () => void;
+};
+
+function renderCard({
+  group,
+  viewMode,
+  bulkMode,
+  effectiveCols,
+  selected,
+  deleteState,
+  isRearranging,
+  orderedBookIds,
+  onToggleSelected,
+  onDeleteCopy,
+  onStoreBookNavContext
+}: Omit<SortableCatalogCardProps, "libraryId">) {
+  const resolvedCoverUrl =
+    typeof group.primary.resolved_cover_url === "string" && group.primary.resolved_cover_url.trim()
+      ? group.primary.resolved_cover_url
+      : null;
+
+  return (
+    <BookCard
+      viewMode={viewMode}
+      bulkMode={bulkMode || isRearranging}
+      selected={selected}
+      onToggleSelected={onToggleSelected}
+      title={group.title}
+      authors={group.filterAuthors}
+      isbn13={group.primary.edition?.isbn13 ?? null}
+      tags={group.tagNames}
+      copiesCount={group.copiesCount}
+      href={isRearranging ? "" : `/app/books/${group.primary.id}`}
+      coverUrl={resolvedCoverUrl}
+      originalSrc={resolvedCoverUrl}
+      onOpen={() => onStoreBookNavContext()}
+      cropData={group.primary.cover_crop}
+      onDeleteCopy={onDeleteCopy}
+      deleteState={deleteState}
+      gridCols={effectiveCols}
+    />
+  );
+}
+
+function SortableCatalogCard({
+  group,
+  libraryId,
+  viewMode,
+  bulkMode,
+  effectiveCols,
+  selected,
+  deleteState,
+  isRearranging,
+  orderedBookIds,
+  onToggleSelected,
+  onDeleteCopy,
+  onStoreBookNavContext
+}: SortableCatalogCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({
+    id: group.key,
+    disabled: !isRearranging
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: transition ?? "transform 180ms cubic-bezier(0.2, 0, 0, 1)"
+  };
+
+  const card = renderCard({
+    group,
+    viewMode,
+    bulkMode,
+    effectiveCols,
+    selected,
+    deleteState,
+    isRearranging,
+    orderedBookIds,
+    onToggleSelected,
+    onDeleteCopy,
+    onStoreBookNavContext
+  });
+
+  return (
+    <motion.div
+      ref={setNodeRef}
+      data-reorder-key={group.key}
+      data-reorder-lib-id={libraryId}
+      style={{ ...style, position: "relative", zIndex: isDragging ? 2 : 1 }}
+      animate={{
+        opacity: isDragging ? 0.18 : 1,
+        scale: isDragging ? 0.985 : 1,
+        backgroundColor: isDragging
+          ? "color-mix(in srgb, var(--bg-muted) 72%, transparent)"
+          : isOver
+            ? "color-mix(in srgb, var(--bg-muted) 38%, transparent)"
+            : "transparent"
+      }}
+      transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+    >
+      <div style={{ pointerEvents: isDragging ? "none" : "auto" }}>{card}</div>
+      {isRearranging ? (
+        <button
+          type="button"
+          aria-label={`Reorder ${group.title}`}
+          {...attributes}
+          {...listeners}
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 10,
+            cursor: isDragging ? "grabbing" : "grab",
+            background: "transparent",
+            border: 0,
+            outline: "none",
+            padding: 0,
+            touchAction: "none"
+          }}
+        />
+      ) : null}
+    </motion.div>
+  );
+}
+
+export default function SortableCatalogGrid({
+  libraryId,
+  groups,
+  limit,
+  effectiveViewMode,
+  effectiveCols,
+  showBookSkeleton,
+  isRearranging,
+  bulkMode,
+  viewMode,
+  bulkSelectedKeys,
+  deleteStateByBookId,
+  onToggleSelected,
+  onDeleteCopy,
+  onStoreBookNavContext,
+  onReorderStart,
+  onReorderPreview,
+  onReorderCommit,
+  onReorderCancel
+}: SortableCatalogGridProps) {
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const orderedBookIds = useMemo(
+    () => groups.map((group) => Number(group.primary.id)).filter((id) => Number.isFinite(id) && id > 0),
+    [groups]
+  );
+  const visibleGroups = useMemo(() => (isRearranging ? groups : groups.slice(0, limit)), [groups, isRearranging, limit]);
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const activeGroup = useMemo(
+    () => (activeKey ? groups.find((group) => group.key === activeKey) ?? null : null),
+    [activeKey, groups]
+  );
+
+  const strategy = effectiveViewMode === "grid" ? rectSortingStrategy : verticalListSortingStrategy;
+
+  const grid = (
+    <div
+      style={{
+        display: effectiveViewMode === "grid" ? "grid" : "flex",
+        flexDirection: effectiveViewMode === "list" ? "column" : undefined,
+        gridTemplateColumns: effectiveViewMode === "grid" ? `repeat(${effectiveCols}, minmax(0, 1fr))` : undefined,
+        gap: "var(--space-md)"
+      }}
+    >
+      {showBookSkeleton
+        ? Array.from({ length: Math.min(4, Math.max(1, effectiveCols)) }).map((_, i) => (
+            <div key={`skeleton-${libraryId}-${i}`} className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
+          ))
+        : null}
+      {visibleGroups.map((group) => (
+        <SortableCatalogCard
+          key={group.key}
+          group={group}
+          libraryId={libraryId}
+          viewMode={viewMode}
+          bulkMode={bulkMode}
+          effectiveCols={effectiveCols}
+          selected={!!bulkSelectedKeys[group.key]}
+          deleteState={deleteStateByBookId[group.primary.id]}
+          isRearranging={isRearranging}
+          orderedBookIds={orderedBookIds}
+          onToggleSelected={() => onToggleSelected(group.key)}
+          onDeleteCopy={() => onDeleteCopy(group.primary.id)}
+          onStoreBookNavContext={() => onStoreBookNavContext(libraryId, orderedBookIds)}
+        />
+      ))}
+    </div>
+  );
+
+  if (!isRearranging) return grid;
+
+  function handleDragStart(event: DragStartEvent) {
+    const nextActiveKey = String(event.active.id);
+    setActiveKey(nextActiveKey);
+    onReorderStart(nextActiveKey, libraryId);
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    const overId = event.over?.id;
+    if (!overId || !activeKey) return;
+    const overKey = String(overId);
+    if (overKey === activeKey) return;
+    onReorderPreview(activeKey, overKey, libraryId);
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const overId = event.over?.id;
+    const shouldCommit = Boolean(activeKey && overId);
+    setActiveKey(null);
+    if (!shouldCommit) {
+      onReorderCancel(libraryId);
+      return;
+    }
+    await onReorderCommit(libraryId);
+  }
+
+  function handleDragCancel(_event: DragCancelEvent) {
+    setActiveKey(null);
+    onReorderCancel(libraryId);
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <SortableContext items={visibleGroups.map((group) => group.key)} strategy={strategy}>
+        {grid}
+      </SortableContext>
+      <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.2, 0, 0, 1)" }}>
+        {activeGroup ? (
+          <motion.div
+            initial={{ scale: 1, boxShadow: "0 0 0 rgba(0,0,0,0)" }}
+            animate={{ scale: 1.025, boxShadow: "0 16px 28px rgba(0,0,0,0.16)" }}
+            transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
+            style={{ transformOrigin: "center center" }}
+          >
+            {renderCard({
+              group: activeGroup,
+              viewMode,
+              bulkMode: false,
+              effectiveCols,
+              selected: false,
+              deleteState: deleteStateByBookId[activeGroup.primary.id],
+              isRearranging: false,
+              orderedBookIds,
+              onToggleSelected: () => {},
+              onDeleteCopy: () => {},
+              onStoreBookNavContext: () => {}
+            })}
+          </motion.div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+}
