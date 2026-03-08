@@ -18,7 +18,7 @@ export async function generateMetadata({
   const profileRes = await supabase.from("profiles").select("username,display_name").eq("username", usernameNorm).maybeSingle();
   const profile = profileRes.data as { username?: string | null; display_name?: string | null } | null;
   const context = String(profile?.display_name ?? "").trim() || String(profile?.username ?? "").trim() || username;
-  return { title: `${context} Follows` };
+  return { title: `${context} is followed by` };
 }
 
 export default async function PublicFollowersPage({ params }: { params: Promise<{ username: string }> }) {

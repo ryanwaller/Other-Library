@@ -93,7 +93,7 @@ export default function PublicFollowListClient({ username, mode }: { username: s
     );
   }
 
-  const headingLabel = mode === "followers" ? "follows" : mode;
+  const headingLabel = mode === "followers" ? "is followed by" : "follows";
   const headerAvatarUrl = profile ? (profile.avatar_path ? signedMap[profile.avatar_path] ?? null : null) : null;
   const heading = (
     <div className="row" style={{ alignItems: "center", gap: "var(--space-8)" }}>
