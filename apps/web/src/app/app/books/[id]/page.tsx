@@ -292,6 +292,13 @@ function joinTokenValues(values: string[]): string {
   return uniqStrings(values).join(", ");
 }
 
+function normalizeIsbnInput(input: string): string {
+  return String(input ?? "")
+    .trim()
+    .replace(/[\s-]+/g, "")
+    .toUpperCase();
+}
+
 function normalizePublishDateForStorage(input: string): string | null {
   const trimmed = String(input ?? "").trim();
   if (!trimmed) return null;
@@ -438,6 +445,7 @@ export default function BookDetailPage() {
     formEditors: string;
     formDesigners: string;
     formPublisher: string;
+    formIsbn: string;
     formPrinter: string;
     formMaterials: string;
     formEditionOverride: string;
@@ -515,6 +523,7 @@ export default function BookDetailPage() {
   const [formEditors, setFormEditors] = useState("");
   const [formDesigners, setFormDesigners] = useState("");
   const [formPublisher, setFormPublisher] = useState("");
+  const [formIsbn, setFormIsbn] = useState("");
   const [formPrinter, setFormPrinter] = useState("");
   const [formMaterials, setFormMaterials] = useState("");
   const [formEditionOverride, setFormEditionOverride] = useState("");
@@ -1055,6 +1064,7 @@ export default function BookDetailPage() {
       setFormEditors((nextFacets.editor ?? []).join(", "));
       setFormDesigners((nextFacets.designer ?? []).join(", "));
       setFormPublisher(joinTokenValues(nextFacets.publisher ?? parseAuthorsInput(String(row.publisher_override ?? row.edition?.publisher ?? "").trim())));
+      setFormIsbn(String(row.edition?.isbn13 ?? row.edition?.isbn10 ?? "").trim());
       setFormPrinter(joinTokenValues(nextFacets.printer ?? parseAuthorsInput(String(row.printer_override ?? "").trim())));
       setFormMaterials(joinTokenValues(nextFacets.material ?? parseAuthorsInput(String(row.materials_override ?? "").trim())));
       setFormEditionOverride(row.edition_override ?? "");
@@ -1932,6 +1942,7 @@ export default function BookDetailPage() {
       formEditors,
       formDesigners,
       formPublisher,
+      formIsbn,
       formPrinter,
       formMaterials,
       formEditionOverride,
@@ -1971,6 +1982,7 @@ export default function BookDetailPage() {
       setFormEditors(snap.formEditors);
       setFormDesigners(snap.formDesigners);
       setFormPublisher(snap.formPublisher);
+      setFormIsbn(snap.formIsbn);
       setFormPrinter(snap.formPrinter);
       setFormMaterials(snap.formMaterials);
       setFormEditionOverride(snap.formEditionOverride);
@@ -2004,6 +2016,49 @@ export default function BookDetailPage() {
     setDeleteConfirm(false);
   }
 
+  async function ensureEditionForManualIsbn(input: string): Promise<number | null> {
+    if (!supabase || !book) return book?.edition?.id ?? null;
+
+    const normalized = normalizeIsbnInput(input);
+    if (!normalized) return book?.edition?.id ?? null;
+
+    const currentIsbn = normalizeIsbnInput(String(book.edition?.isbn13 ?? book.edition?.isbn10 ?? ""));
+    if (currentIsbn && currentIsbn === normalized) return book.edition?.id ?? null;
+
+    const isbn10 = normalized.length === 10 ? normalized : null;
+    const isbn13 = normalized.length === 13 ? normalized : null;
+
+    if (isbn13) {
+      const existing = await supabase.from("editions").select("id").eq("isbn13", isbn13).maybeSingle();
+      if (existing.error) throw new Error(existing.error.message);
+      if (existing.data?.id) return Number(existing.data.id);
+    } else if (isbn10) {
+      const existing = await supabase.from("editions").select("id").eq("isbn10", isbn10).maybeSingle();
+      if (existing.error) throw new Error(existing.error.message);
+      if (existing.data?.id) return Number(existing.data.id);
+    }
+
+    const inserted = await supabase
+      .from("editions")
+      .insert({
+        isbn10,
+        isbn13,
+        title: formTitle.trim() || book.title_override || book.edition?.title || null,
+        authors: effectiveAuthors,
+        publisher: joinTokenValues(effectivePublishers) || null,
+        publish_date: normalizePublishDateForStorage(formPublishDate) ?? normalizePublishDateForStorage(String(book.edition?.publish_date ?? "").trim()),
+        description: formDescription.trim() || book.description_override || book.edition?.description || null,
+        subjects: effectiveSubjects,
+        cover_url: book.edition?.cover_url ?? null,
+        raw: book.edition?.raw ?? null
+      })
+      .select("id")
+      .single();
+
+    if (inserted.error) throw new Error(inserted.error.message);
+    return Number(inserted.data.id);
+  }
+
   async function saveEdits(): Promise<boolean> {
     if (!supabase || !book || !userId) return false;
     setSaveState({ busy: true, error: null, message: "Saving…" });
@@ -2022,6 +2077,11 @@ export default function BookDetailPage() {
       const subjects_override = uniqStrings(facetDraft.subject ?? effectiveSubjects);
       const group_label = formGroupLabel.trim() ? formGroupLabel.trim() : null;
       const object_type = formObjectType.trim() ? formObjectType.trim() : null;
+      const manualIsbn = isMusicObject ? "" : normalizeIsbnInput(formIsbn);
+      if (!isMusicObject && manualIsbn && !/^\d{9}[\dX]$/.test(manualIsbn) && !/^\d{13}$/.test(manualIsbn)) {
+        setSaveState({ busy: false, error: "ISBN must be 10 or 13 characters.", message: "Save failed" });
+        return false;
+      }
       const decade = formDecade.trim() ? formDecade.trim() : null;
       const pagesRaw = formPages.trim();
       const pages = pagesRaw ? Number(pagesRaw) : null;
@@ -2068,6 +2128,10 @@ export default function BookDetailPage() {
         borrowable_override: formBorrowable === "inherit" ? null : formBorrowable === "yes",
         music_metadata: isMusicObject ? formMusic : null
       };
+      if (!isMusicObject && manualIsbn) {
+        const nextEditionId = await ensureEditionForManualIsbn(manualIsbn);
+        if (nextEditionId) payload.edition_id = nextEditionId;
+      }
       if (isMusicObject) {
         payload.authors_override = null;
         payload.editors_override = null;
@@ -4738,7 +4802,17 @@ export default function BookDetailPage() {
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.isbn === false ? 0.6 : 1 }}>
                     <div style={{ minWidth: 110 }} className="text-muted">ISBN</div>
                     <div style={{ flex: "1 1 auto" }}>
-                      <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10}</div>
+                      {editMode ? (
+                        <input
+                          className="om-inline-control"
+                          value={formIsbn}
+                          onChange={(e) => setFormIsbn(e.target.value)}
+                          onKeyDown={(e) => onEnter(e, () => void saveEdits())}
+                          placeholder="Add ISBN"
+                        />
+                      ) : (
+                        <div>{book?.edition?.isbn13 ?? book?.edition?.isbn10}</div>
+                      )}
                     </div>
                     {editMode && (
                       <div style={{ marginLeft: "var(--space-sm)" }}>
