@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, Fragment } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from "react";
 import Link from "next/link";
 import { bookIdSlug } from "../../../lib/slug";
 import AddToLibraryButton from "./AddToLibraryButton";
@@ -123,6 +123,80 @@ export default function PublicBookList({
       return prev;
     });
   }, [isMobile]);
+
+  // Sticky band
+  const controlsBandRef = useRef<HTMLDivElement | null>(null);
+  const controlsBandTopRef = useRef(0);
+  const lastScrollYRef = useRef(0);
+  const wasControlsPinnedOpenRef = useRef(false);
+  const [controlsDocked, setControlsDocked] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [controlsBandHeight, setControlsBandHeight] = useState(0);
+  const controlsFixed = controlsDocked;
+  const controlsPinnedOpen = sortOpen;
+
+  const measureControlsBand = useCallback(() => {
+    if (typeof window === "undefined" || !controlsBandRef.current) return;
+    const rect = controlsBandRef.current.getBoundingClientRect();
+    if (!controlsDocked) controlsBandTopRef.current = rect.top + window.scrollY;
+    setControlsBandHeight(rect.height);
+  }, [controlsDocked]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = window.requestAnimationFrame(measureControlsBand);
+    const handleResize = () => window.requestAnimationFrame(measureControlsBand);
+    window.addEventListener("resize", handleResize);
+    return () => { window.cancelAnimationFrame(id); window.removeEventListener("resize", handleResize); };
+  }, [measureControlsBand]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = window.requestAnimationFrame(measureControlsBand);
+    return () => window.cancelAnimationFrame(id);
+  }, [measureControlsBand, isMobile, sortOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    lastScrollYRef.current = window.scrollY;
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const y = window.scrollY;
+      const stickyStart = Math.max(controlsBandTopRef.current - 8, 0);
+      if (isMobile) {
+        setControlsDocked(y > stickyStart);
+        setControlsVisible(true);
+        lastScrollYRef.current = y;
+        return;
+      }
+      const lastY = lastScrollYRef.current;
+      const isNearTop = y <= stickyStart;
+      const scrollingDown = y > lastY + 2;
+      const scrollingUp = y < lastY - 2;
+      if (isNearTop) {
+        setControlsDocked(false);
+        setControlsVisible(true);
+      } else {
+        setControlsDocked(true);
+        if (controlsPinnedOpen) setControlsVisible(true);
+        else if (scrollingDown) setControlsVisible(false);
+        else if (scrollingUp) setControlsVisible(true);
+      }
+      lastScrollYRef.current = y;
+    };
+    const onScroll = () => { if (ticking) return; ticking = true; window.requestAnimationFrame(update); };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [controlsPinnedOpen, isMobile]);
+
+  useEffect(() => {
+    const wasPinnedOpen = wasControlsPinnedOpenRef.current;
+    if (controlsPinnedOpen) setControlsVisible(true);
+    else if (wasPinnedOpen && controlsDocked) setControlsVisible(true);
+    wasControlsPinnedOpenRef.current = controlsPinnedOpen;
+  }, [controlsDocked, controlsPinnedOpen]);
 
   useEffect(() => {
     try {
@@ -643,6 +717,14 @@ export default function PublicBookList({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      {controlsFixed ? <div aria-hidden style={{ height: controlsBandHeight }} /> : null}
+      <div
+        ref={controlsBandRef}
+        className="om-smart-sticky-band"
+        data-docked={controlsDocked ? "true" : "false"}
+        data-visible={!controlsDocked || controlsVisible ? "true" : "false"}
+        data-fixed={controlsFixed ? "true" : "false"}
+      >
       <div className="toolbar" style={{ flexDirection: "column", gap: "var(--space-sm)", marginBottom: 0 }}>
         <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
           <div className="om-stat-line" style={{ margin: 0 }}>
@@ -768,6 +850,7 @@ export default function PublicBookList({
             )}
           </div>
         )}
+      </div>
       </div>
       <div style={{ height: "var(--catalog-top-gap)" }} />
 
