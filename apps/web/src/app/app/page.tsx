@@ -725,17 +725,17 @@ function AppShell({
   }, [isMobile]);
 
   const searchParamsKey = searchParams.toString();
-  const controlsPinnedOpen = sortOpen || bulkMode;
+  const controlsPinnedOpen = sortOpen || bulkMode || searchOpen;
   const controlsFixed = !isMobile && controlsDocked;
 
   const measureControlsBand = useCallback(() => {
     if (typeof window === "undefined" || !controlsBandRef.current) return;
     const rect = controlsBandRef.current.getBoundingClientRect();
-    if (!controlsFixed) {
+    if (!controlsDocked) {
       controlsBandTopRef.current = rect.top + window.scrollY;
     }
     setControlsBandHeight(rect.height);
-  }, [controlsFixed]);
+  }, [controlsDocked]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
