@@ -3657,15 +3657,19 @@ function AppShell({
               </div>
             </div>
           ))}
-          {addSearchResults.length > addSearchLimit && (
-            <button onClick={() => setAddSearchLimit((prev) => prev + addSearchPageSize)} className="text-muted">
-              Show more
-            </button>
-          )}
-          {addSearchLimit > addSearchPageSize && (
-            <button onClick={() => setAddSearchLimit(addSearchPageSize)} className="text-muted">
-              Show less
-            </button>
+          {(addSearchResults.length > addSearchLimit || addSearchLimit > addSearchPageSize) && (
+            <div style={{ display: "flex", justifyContent: "center", marginTop: "var(--space-14)" }}>
+              {addSearchResults.length > addSearchLimit && (
+                <button onClick={() => setAddSearchLimit((prev) => prev + addSearchPageSize)} className="text-muted">
+                  Show more
+                </button>
+              )}
+              {addSearchLimit > addSearchPageSize && (
+                <button onClick={() => setAddSearchLimit(addSearchPageSize)} className="text-muted">
+                  Show less
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
