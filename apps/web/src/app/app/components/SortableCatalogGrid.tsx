@@ -160,12 +160,7 @@ function SortableCatalogCard({
       <motion.div
         animate={{
           opacity: isDragging ? 0.18 : 1,
-          scale: isDragging ? 0.985 : 1,
-          backgroundColor: isDragging
-            ? "color-mix(in srgb, var(--bg-muted) 72%, transparent)"
-            : isOver
-              ? "color-mix(in srgb, var(--bg-muted) 38%, transparent)"
-              : "transparent"
+          scale: isDragging ? 0.985 : 1
         }}
         transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
         style={{ pointerEvents: isDragging ? "none" : "auto", transformOrigin: "center center" }}
