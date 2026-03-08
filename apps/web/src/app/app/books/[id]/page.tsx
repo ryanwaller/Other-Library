@@ -786,6 +786,9 @@ export default function BookDetailPage() {
       if (isNearTop) {
         setControlsDocked(false);
         setControlsVisible(true);
+      } else if (isMobileViewport) {
+        setControlsDocked(true);
+        setControlsVisible(true);
       } else {
         setControlsDocked(true);
         if (controlsPinnedOpen) {
@@ -806,7 +809,7 @@ export default function BookDetailPage() {
     update();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [controlsPinnedOpen]);
+  }, [controlsPinnedOpen, isMobileViewport]);
 
   useEffect(() => {
     const wasPinnedOpen = wasControlsPinnedOpenRef.current;
