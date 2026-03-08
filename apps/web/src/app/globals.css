@@ -984,7 +984,7 @@ a.text-muted:hover {
 .om-hr, .divider {
   border: 0;
   border-top: 1px solid var(--border);
-  margin: var(--space-16) 0;
+  margin: var(--space-8) 0;
   width: 100%;
 }
 

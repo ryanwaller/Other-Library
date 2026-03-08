@@ -144,17 +144,17 @@ export default function PublicFollowListClient({ username, mode }: { username: s
           {heading}
           <div className="text-muted">{rows.length}</div>
         </div>
-        <hr className="divider" />
+        <hr className="divider" style={{ marginTop: "var(--space-xs)" }} />
       </div>
 
-      <div style={{ marginTop: "var(--space-md)" }}>
+      <div style={{ marginTop: "var(--space-xs)" }}>
         {rows.length === 0 ? (
           <div className="text-muted">None.</div>
         ) : (
           rows.map((p) => {
             const avatarUrl = p.avatar_path ? signedMap[p.avatar_path] ?? null : null;
             return (
-              <div key={p.id} className="card" style={{ marginTop: "var(--space-10)" }}>
+              <div key={p.id} className="card" style={{ marginTop: "var(--space-xs)" }}>
                 <IdentityRow
                   avatarUrl={avatarUrl}
                   displayName={p.display_name}
