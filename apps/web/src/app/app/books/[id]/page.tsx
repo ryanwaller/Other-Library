@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, Fragment, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment, type KeyboardEvent, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
 import { isValidTrimSize, convertTrimUnit, formatTrimRatio, type TrimUnit } from "../../../../lib/trimSize";
@@ -451,6 +451,14 @@ export default function BookDetailPage() {
     return () => mq.removeEventListener("change", sync);
   }, []);
 
+  const controlsBandRef = useRef<HTMLDivElement | null>(null);
+  const controlsBandTopRef = useRef(0);
+  const lastScrollYRef = useRef(0);
+  const wasControlsPinnedOpenRef = useRef(false);
+  const [controlsDocked, setControlsDocked] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [controlsBandHeight, setControlsBandHeight] = useState(0);
+
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
   const [memberCanEdit, setMemberCanEdit] = useState(false);
@@ -732,6 +740,83 @@ export default function BookDetailPage() {
     mq.addEventListener?.("change", update);
     return () => mq.removeEventListener?.("change", update);
   }, []);
+
+  const controlsFixed = controlsDocked;
+  const controlsPinnedOpen = editMode || findMoreOpen;
+
+  const measureControlsBand = useCallback(() => {
+    if (typeof window === "undefined" || !controlsBandRef.current) return;
+    const rect = controlsBandRef.current.getBoundingClientRect();
+    if (!controlsDocked) {
+      controlsBandTopRef.current = rect.top + window.scrollY;
+    }
+    setControlsBandHeight(rect.height);
+  }, [controlsDocked]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = window.requestAnimationFrame(measureControlsBand);
+    const handleResize = () => window.requestAnimationFrame(measureControlsBand);
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.cancelAnimationFrame(id);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [measureControlsBand]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = window.requestAnimationFrame(measureControlsBand);
+    return () => window.cancelAnimationFrame(id);
+  }, [measureControlsBand, editMode, findMoreOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    lastScrollYRef.current = window.scrollY;
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const y = window.scrollY;
+      const stickyStart = Math.max(controlsBandTopRef.current - 8, 0);
+      const lastY = lastScrollYRef.current;
+      const isNearTop = y <= stickyStart;
+      const scrollingDown = y > lastY + 2;
+      const scrollingUp = y < lastY - 2;
+
+      if (isNearTop) {
+        setControlsDocked(false);
+        setControlsVisible(true);
+      } else {
+        setControlsDocked(true);
+        if (controlsPinnedOpen) {
+          setControlsVisible(true);
+        } else if (scrollingDown) {
+          setControlsVisible(false);
+        } else if (scrollingUp) {
+          setControlsVisible(true);
+        }
+      }
+      lastScrollYRef.current = y;
+    };
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [controlsPinnedOpen]);
+
+  useEffect(() => {
+    const wasPinnedOpen = wasControlsPinnedOpenRef.current;
+    if (controlsPinnedOpen) {
+      setControlsVisible(true);
+    } else if (wasPinnedOpen && controlsDocked) {
+      setControlsVisible(true);
+    }
+    wasControlsPinnedOpenRef.current = controlsPinnedOpen;
+  }, [controlsDocked, controlsPinnedOpen]);
 
   useEffect(() => {
     if (!pendingCover) return;
@@ -3460,6 +3545,14 @@ export default function BookDetailPage() {
             }}
           >
             <div style={{ gridColumn: "1 / -1", marginBottom: 0 }}>
+              {controlsFixed ? <div aria-hidden style={{ height: controlsBandHeight }} /> : null}
+              <div
+                ref={controlsBandRef}
+                className="om-smart-sticky-band"
+                data-docked={controlsDocked ? "true" : "false"}
+                data-visible={!controlsDocked || controlsVisible ? "true" : "false"}
+                data-fixed={controlsFixed ? "true" : "false"}
+              >
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: "var(--space-10)" }}>
                 {/* Left group: primary action + updates indicator */}
                 {isOwner ? (
@@ -3557,6 +3650,7 @@ export default function BookDetailPage() {
                           ? error
                           : ""}
               </div>
+              </div>{/* end om-smart-sticky-band */}
 
               {isOwner && mergePanelOpen && mergeAllSources.length > 0 ? (
                 <div style={{ marginTop: "var(--space-14)", paddingBottom: 24 }}>
