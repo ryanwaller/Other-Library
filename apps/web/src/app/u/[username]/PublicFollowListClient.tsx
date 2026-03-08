@@ -144,27 +144,27 @@ export default function PublicFollowListClient({ username, mode }: { username: s
           {heading}
           <div className="text-muted">{rows.length}</div>
         </div>
-        <hr className="divider" style={{ marginTop: "var(--space-xs)" }} />
-      </div>
+        <hr className="divider" />
 
-      <div style={{ marginTop: "var(--space-xs)" }}>
-        {rows.length === 0 ? (
-          <div className="text-muted">None.</div>
-        ) : (
-          rows.map((p) => {
-            const avatarUrl = p.avatar_path ? signedMap[p.avatar_path] ?? null : null;
-            return (
-              <div key={p.id} className="card" style={{ marginTop: "var(--space-xs)" }}>
-                <IdentityRow
-                  avatarUrl={avatarUrl}
-                  displayName={p.display_name}
-                  username={p.username}
-                  rightSlot={<FollowControls profileId={p.id} profileUsername={p.username} compact />}
-                />
-              </div>
-            );
-          })
-        )}
+        <div style={{ marginTop: "var(--space-8)" }}>
+          {rows.length === 0 ? (
+            <div className="text-muted">None.</div>
+          ) : (
+            rows.map((p) => {
+              const avatarUrl = p.avatar_path ? signedMap[p.avatar_path] ?? null : null;
+              return (
+                <div key={p.id} style={{ marginTop: "var(--space-8)" }}>
+                  <IdentityRow
+                    avatarUrl={avatarUrl}
+                    displayName={p.display_name}
+                    username={p.username}
+                    rightSlot={<FollowControls profileId={p.id} profileUsername={p.username} compact />}
+                  />
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </main>
   );
