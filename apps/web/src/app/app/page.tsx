@@ -757,6 +757,14 @@ function AppShell({
     const update = () => {
       ticking = false;
       const y = window.scrollY;
+
+      if (isMobile) {
+        setControlsDocked(false);
+        setControlsVisible(true);
+        lastScrollYRef.current = y;
+        return;
+      }
+
       const lastY = lastScrollYRef.current;
       const stickyStart = Math.max(controlsBandTopRef.current - 8, 0);
       const isNearTop = y <= stickyStart;
@@ -789,13 +797,13 @@ function AppShell({
     update();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [controlsPinnedOpen]);
+  }, [controlsPinnedOpen, isMobile]);
 
   useEffect(() => {
     if (controlsPinnedOpen) setControlsVisible(true);
   }, [controlsPinnedOpen]);
 
-  const controlsFixed = controlsDocked;
+  const controlsFixed = !isMobile && controlsDocked;
 
   useEffect(() => {
     try {
