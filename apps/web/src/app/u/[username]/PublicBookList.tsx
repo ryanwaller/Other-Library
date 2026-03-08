@@ -55,6 +55,20 @@ const EXTRA_DETAIL_FILTER_KEYS: Exclude<
   "reissue"
 ];
 
+function uniqCaseInsensitive(values: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of values) {
+    const normalized = String(raw ?? "").trim();
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(normalized);
+  }
+  return out;
+}
+
 export default function PublicBookList({
   libraries,
   allBooks,
@@ -159,7 +173,7 @@ export default function PublicBookList({
         .filter((row) => String(row?.role ?? "").trim() === role)
         .map((row) => String(row?.entity?.name ?? "").trim())
         .filter(Boolean);
-      return Array.from(new Set([...fromTags, ...fromEntities]));
+      return uniqCaseInsensitive([...fromTags, ...fromEntities]);
     }
     if (role === "subject") {
       const fromOverrides = (b.subjects_override ?? b.edition?.subjects ?? []).map((s) => String(s ?? "").trim()).filter(Boolean);
@@ -469,23 +483,19 @@ export default function PublicBookList({
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
   const availableCategories = useMemo(
     () =>
-      Array.from(
-        new Set(
-          mergedAllBooks
-            .flatMap((b) => namesForRole(b, "category"))
-            .filter(Boolean)
-        )
+      uniqCaseInsensitive(
+        mergedAllBooks
+          .flatMap((b) => namesForRole(b, "category"))
+          .filter(Boolean)
       ).sort((a, b) => a.localeCompare(b)),
     [mergedAllBooks]
   );
   const availableTags = useMemo(
     () =>
-      Array.from(
-        new Set(
-          mergedAllBooks
-            .flatMap((b) => namesForRole(b, "tag"))
-            .filter(Boolean)
-        )
+      uniqCaseInsensitive(
+        mergedAllBooks
+          .flatMap((b) => namesForRole(b, "tag"))
+          .filter(Boolean)
       ).sort((a, b) => a.localeCompare(b)),
     [mergedAllBooks]
   );

@@ -58,6 +58,20 @@ function looksLikeBarcode(input: string): boolean {
   return /^\d{12,14}$/.test(digits);
 }
 
+function uniqCaseInsensitive(values: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of values) {
+    const normalized = String(raw ?? "").trim();
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(normalized);
+  }
+  return out;
+}
+
 type SearchCandidate = {
   source: "openlibrary" | "googleBooks" | "discogs";
   object_type?: "book" | "music" | null;
@@ -3061,25 +3075,25 @@ function AppShell({
   const firstSharedDisplayIndex = useMemo(() => displayLibraries.findIndex((l) => l.myRole === "editor"), [displayLibraries]);
 
   const availableCategories = useMemo(() => {
-    const set = new Set<string>();
+    const values: string[] = [];
     for (const g of displayGroups) {
       for (const name of g.categoryNames ?? []) {
         const normalized = String(name ?? "").trim();
-        if (normalized) set.add(normalized);
+        if (normalized) values.push(normalized);
       }
     }
-    return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
+    return uniqCaseInsensitive(values).sort((a, b) => a.localeCompare(b));
   }, [displayGroups]);
 
   const availableTags = useMemo(() => {
-    const set = new Set<string>();
+    const values: string[] = [];
     for (const g of displayGroups) {
       for (const name of g.tagNames ?? []) {
         const normalized = String(name ?? "").trim();
-        if (normalized) set.add(normalized);
+        if (normalized) values.push(normalized);
       }
     }
-    return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
+    return uniqCaseInsensitive(values).sort((a, b) => a.localeCompare(b));
   }, [displayGroups]);
   const availableDecades = useMemo(() => {
     const set = new Set<string>();
