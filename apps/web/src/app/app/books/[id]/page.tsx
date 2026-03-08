@@ -1664,6 +1664,7 @@ export default function BookDetailPage() {
     for (const r of entities) {
       if (!r.role || !r.entity?.name) continue;
       const role = (r.role === ("design" as any) ? "designer" : r.role) as FacetRole;
+      if (role === "tag" || role === "category") continue;
       const isVisible = r.visibility !== false;
       if (!canSeeHidden && !isVisible) continue;
       out[role].push(r.entity);
