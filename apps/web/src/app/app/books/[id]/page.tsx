@@ -3779,6 +3779,7 @@ export default function BookDetailPage() {
                         <RotatingHintInput
                           className="om-inline-search-input"
                           value={lookupInput}
+                          autoFocus
                           onFocus={() => setLookupInputFocused(true)}
                           onBlur={() => setTimeout(() => setLookupInputFocused(false), 150)}
                           onChange={(e) => setLookupInput(e.target.value)}
@@ -3787,11 +3788,12 @@ export default function BookDetailPage() {
                           isMobile={isMobileViewport}
                         />
                       </div>
-                      {(lookupInput.trim() || lookupInputFocused) ? (
+                      {lookupInput.trim() ? (
                         <div className="row" style={{ gap: "var(--space-md)", alignItems: "center" }}>
                           <button
                             onClick={() => smartLookup()}
                             disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
+                            className="no-underline"
                             style={{ whiteSpace: "nowrap" }}
                           >
                             Find
