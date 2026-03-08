@@ -1557,11 +1557,14 @@ summary::-webkit-details-marker {
   }
 
   .om-smart-sticky-band {
-    position: sticky;
-    top: 0;
-    z-index: 30;
     transform: none !important;
     will-change: auto;
+  }
+
+  .om-smart-sticky-band[data-fixed="true"] {
+    left: 0;
+    right: 0;
+    z-index: 30;
   }
 
   .container {

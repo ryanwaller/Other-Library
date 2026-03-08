@@ -726,7 +726,7 @@ function AppShell({
 
   const searchParamsKey = searchParams.toString();
   const controlsPinnedOpen = sortOpen || bulkMode || searchOpen;
-  const controlsFixed = !isMobile && controlsDocked;
+  const controlsFixed = controlsDocked;
 
   const measureControlsBand = useCallback(() => {
     if (typeof window === "undefined" || !controlsBandRef.current) return;
@@ -3278,6 +3278,75 @@ function AppShell({
                 <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`} className="text-muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>Search others</Link>
               )}
             </div>
+            {sortOpen && (
+              <div className="om-filter-row" style={{ marginTop: "var(--space-10)", marginBottom: 4, gap: "var(--space-10)", alignItems: "center", paddingBottom: "var(--space-8)" }}>
+                <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
+                  <option value="grid">grid</option>
+                  <option value="list">list</option>
+                </select>
+                {viewMode === "grid" && (
+                  <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
+                    {isMobile && <option value={1}>1</option>}
+                    <option value={2}>2</option>
+                    {!isMobile && (
+                      <>
+                        <option value={4}>4</option>
+                        <option value={8}>8</option>
+                      </>
+                    )}
+                  </select>
+                )}
+
+                <select className="om-filter-control" value={sortMode} onChange={(e) => {
+                  const val = e.target.value as any;
+                  setSortMode(val);
+                  if (val === "custom" && rearrangingLibraryId === null && displayLibraries.length > 0) {
+                    setRearrangingLibraryId(displayLibraries[0].id);
+                  }
+                }}>
+                  <option value="custom">custom order</option>
+                  <option value="latest">latest</option>
+                  <option value="earliest">earliest</option>
+                  <option value="title_asc">title A-Z</option>
+                  <option value="title_desc">title Z-A</option>
+                </select>
+                {(availableCategories.length > 0 || !!(filterCategory ?? "").trim()) && (
+                  <select className="om-filter-control" value={filterCategory ?? ""} onChange={(e) => setUrlFilters({ category: e.target.value || null })}>
+                    <option value="">category</option>
+                    {availableCategories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {(availableTags.length > 0 || !!(filterTag ?? "").trim()) && (
+                  <select className="om-filter-control" value={filterTag ?? ""} onChange={(e) => setUrlFilters({ tag: e.target.value || null })}>
+                    <option value="">tags</option>
+                    {availableTags.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {(availableDecades.length > 0 || !!(filterDecade ?? "").trim()) && (
+                  <select className="om-filter-control" value={filterDecade ?? ""} onChange={(e) => setUrlFilters({ decade: e.target.value || null })}>
+                    <option value="">decade</option>
+                    {availableDecades.map((decade) => (
+                      <option key={decade} value={decade}>
+                        {decade}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
+                  <option value="all">visibility</option>
+                  <option value="public">public</option>
+                  <option value="private">private</option>
+                </select>
+              </div>
+            )}
           </>
         ) : (
           <div className="om-sticky-controls">
