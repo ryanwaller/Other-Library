@@ -3508,6 +3508,151 @@ function AppShell({
 
       <div style={{ height: "var(--space-md)" }} />
 
+      {(addState.message || addSearchState.message) && (
+        <div className="text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+          {addState.message || addSearchState.message}
+        </div>
+      )}
+      {addUrlPreview && (
+        <div className="om-lookup-item" style={{ marginBottom: "var(--space-sm)" }}>
+          <div className="om-lookup-row">
+            <div style={{ width: 62, flex: "0 0 auto" }}>
+              {addUrlPreview.cover_url && !addPreviewCoverFailed ? (
+                <div className="om-cover-slot om-cover-slot-has-image" style={{ width: 60, height: "auto" }}>
+                  <img
+                    src={addUrlPreview.cover_url}
+                    alt=""
+                    width={60}
+                    style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
+                    onError={() => setAddPreviewCoverFailed(true)}
+                  />
+                </div>
+              ) : (
+                <div className="om-cover-slot" style={{ width: 60, height: "auto" }}><div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} /></div>
+              )}
+            </div>
+            <div className="om-lookup-main">
+              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(addUrlPreview.title ?? "").trim() || "—"}</div>
+              <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {(addUrlPreview.authors ?? []).filter(Boolean).join(", ") || "—"}
+              </div>
+              <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {[addUrlPreview.publisher ?? "", addUrlPreview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
+              </div>
+            </div>
+            <div className="om-lookup-actions">
+              {renderLibraries.length > 1 ? (
+                <div className="row no-wrap" style={{ gap: "var(--space-sm)", alignItems: "baseline" }}>
+                  <span className="text-muted">Add to</span>
+                  <select
+                    value={String(addPreviewLibraryId ?? addLibraryId ?? renderLibraries[0]?.id ?? "")}
+                    onChange={(e) => setAddPreviewLibraryId(Number(e.target.value))}
+                    disabled={addState.busy}
+                  >
+                    {renderLibraries.map((l) => (
+                      <option key={l.id} value={String(l.id)}>{l.name}</option>
+                    ))}
+                  </select>
+                  <button onClick={confirmAddFromPreview} disabled={addState.busy}>
+                    {addState.busy ? "…" : "OK"}
+                  </button>
+                </div>
+              ) : (
+                <button onClick={confirmAddFromPreview} disabled={addState.busy}>
+                  {addState.busy ? "…" : "Add to catalog"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {addSearchResults.length > 0 && (
+        <div style={{ marginBottom: "var(--space-sm)" }}>
+          {addSearchResults.slice(0, addSearchLimit).map((result, i) => (
+            <div key={i} className="om-lookup-item">
+              <div className="om-lookup-row">
+                <div style={{ width: 62, flex: "0 0 auto" }}>
+                  {result.cover_url ? (
+                    <div className="om-cover-slot om-cover-slot-has-image" style={{ width: 60, height: "auto" }}>
+                      <img
+                        src={proxyExternalImageUrl(result.cover_url)}
+                        alt=""
+                        width={60}
+                        style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
+                        onError={(e) => {
+                          const candidates = result.cover_candidates || [];
+                          const currentSrc = e.currentTarget.src;
+                          const nextCandidate = candidates.find(c => proxyExternalImageUrl(c) !== currentSrc);
+                          if (nextCandidate) {
+                            e.currentTarget.src = proxyExternalImageUrl(nextCandidate);
+                          } else {
+                            e.currentTarget.style.display = "none";
+                          }
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }}><div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} /></div>
+                  )}
+                </div>
+                <div className="om-lookup-main">
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(result.title ?? "").trim() || "—"}</div>
+                  <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {(result.authors ?? []).filter(Boolean).join(", ") || "—"}
+                  </div>
+                  <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {[
+                      result.publisher ?? "",
+                      result.publish_year ? String(result.publish_year) : (result.publish_date ?? ""),
+                      (result.object_type === "music" ? (result.music_metadata as any)?.format : "") ?? "",
+                      (result.object_type === "music" ? (result.music_metadata as any)?.catalog_number : "") ?? ""
+                    ].filter(Boolean).join(" · ") || "—"}
+                  </div>
+                  {result.object_type === "music" && (result.subjects ?? []).length > 0 && (
+                    <div className="text-muted" style={{ marginTop: 2, fontSize: "0.9em", opacity: 0.8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {(result.subjects ?? []).slice(0, 5).join(", ")}
+                    </div>
+                  )}
+                </div>
+                <div className="om-lookup-actions">
+                  {renderLibraries.length > 1 ? (
+                    <div className="row no-wrap" style={{ gap: "var(--space-sm)", alignItems: "baseline" }}>
+                      <span className="text-muted">Add to</span>
+                      <select
+                        value={String(addSearchLibraryIds[i] ?? addLibraryId ?? renderLibraries[0]?.id ?? "")}
+                        onChange={(e) => setAddSearchLibraryIds((prev) => ({ ...prev, [i]: Number(e.target.value) }))}
+                        disabled={addState.busy}
+                      >
+                        {renderLibraries.map((l) => (
+                          <option key={l.id} value={String(l.id)}>{l.name}</option>
+                        ))}
+                      </select>
+                      <button onClick={() => addFromSearchResultItem(result, addSearchLibraryIds[i])} disabled={addState.busy}>
+                        {addState.busy ? "…" : "Add"}
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => addFromSearchResultItem(result)} disabled={addState.busy}>
+                      {addState.busy ? "…" : "Add to catalog"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          {addSearchResults.length > addSearchLimit && (
+            <button onClick={() => setAddSearchLimit((prev) => prev + addSearchPageSize)} className="text-muted">
+              Show more
+            </button>
+          )}
+          {addSearchLimit > addSearchPageSize && (
+            <button onClick={() => setAddSearchLimit(addSearchPageSize)} className="text-muted">
+              Show less
+            </button>
+          )}
+        </div>
+      )}
+
       {displayLibraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];
         const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
