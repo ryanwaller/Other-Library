@@ -29,6 +29,20 @@ function publicMusicFilterHref(username: string, value: string, key: DetailFilte
   return detailFilterHref(`/u/${username}`, key, value);
 }
 
+function parseMultiValue(input: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of String(input ?? "").split(",")) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+}
+
 type PublicBookDetail = {
   id: number;
   owner_id: string;
@@ -278,7 +292,10 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const effectiveMaterials = (book.materials_override ?? "").trim();
   const effectiveEdition = (book.edition_override ?? "").trim();
 
-  const effectivePublisher = isMusicObject ? (music?.label ?? "").trim() : (book.publisher_override ?? "").trim() || book.edition?.publisher || "";
+  const effectivePublishers = isMusicObject
+    ? ((music?.label ?? "").trim() ? [String(music?.label ?? "").trim()] : [])
+    : parseMultiValue((book.publisher_override ?? "").trim() || String(book.edition?.publisher ?? "").trim());
+  const effectivePublisher = effectivePublishers[0] ?? "";
   const effectivePublishDate = isMusicObject ? (music?.release_date ?? "").trim() : (book.publish_date_override ?? "").trim() || book.edition?.publish_date || "";
   const displayPublishDate = formatDateShort(effectivePublishDate || null);
   const effectiveDescription = (book.description_override ?? "").trim() || book.edition?.description || "";
@@ -583,13 +600,18 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {!isMusicObject && effectivePublisher ? (
+              {!isMusicObject && effectivePublishers.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Publisher
                   </div>
                   <div>
-                    <Link href={`/u/${profile.username}/p/${encodeURIComponent(effectivePublisher)}`}>{effectivePublisher}</Link>
+                    {effectivePublishers.map((publisher, index) => (
+                      <span key={publisher}>
+                        <Link href={`/u/${profile.username}/p/${encodeURIComponent(publisher)}`}>{publisher}</Link>
+                        {index < effectivePublishers.length - 1 ? <span>, </span> : null}
+                      </span>
+                    ))}
                   </div>
                 </div>
               ) : null}

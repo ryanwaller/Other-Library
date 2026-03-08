@@ -288,6 +288,10 @@ function parseAuthorsInput(input: string): string[] {
   return out;
 }
 
+function joinTokenValues(values: string[]): string {
+  return uniqStrings(values).join(", ");
+}
+
 function normalizePublishDateForStorage(input: string): string | null {
   const trimmed = String(input ?? "").trim();
   if (!trimmed) return null;
@@ -1021,11 +1025,11 @@ export default function BookDetailPage() {
         nextFacets.designer = (row.designers_override ?? []).filter(Boolean);
         nextFacets.subject = (subjectsFallback ?? []).filter(Boolean);
         const publisherFallback = String(row.publisher_override ?? row.edition?.publisher ?? "").trim();
-        if (publisherFallback) nextFacets.publisher = [publisherFallback];
+        if (publisherFallback) nextFacets.publisher = parseAuthorsInput(publisherFallback);
         const printerFallback = String(row.printer_override ?? "").trim();
-        if (printerFallback) nextFacets.printer = [printerFallback];
+        if (printerFallback) nextFacets.printer = parseAuthorsInput(printerFallback);
         const materialFallback = String(row.materials_override ?? "").trim();
-        if (materialFallback) nextFacets.material = [materialFallback];
+        if (materialFallback) nextFacets.material = parseAuthorsInput(materialFallback);
         const tagRows = ((row as any).book_tags ?? []) as any[];
         const tagsFallback = tagRows.map((bt) => bt?.tag).filter(Boolean);
         nextFacets.tag = tagsFallback.filter((t) => t.kind === "tag").map((t) => String(t.name)).filter(Boolean);
@@ -1050,9 +1054,9 @@ export default function BookDetailPage() {
       setFormAuthors((nextFacets.author ?? []).join(", "));
       setFormEditors((nextFacets.editor ?? []).join(", "));
       setFormDesigners((nextFacets.designer ?? []).join(", "));
-      setFormPublisher((nextFacets.publisher?.[0] ?? row.publisher_override ?? row.edition?.publisher ?? "").trim());
-      setFormPrinter((nextFacets.printer?.[0] ?? row.printer_override ?? "").trim());
-      setFormMaterials((nextFacets.material?.[0] ?? row.materials_override ?? "").trim());
+      setFormPublisher(joinTokenValues(nextFacets.publisher ?? parseAuthorsInput(String(row.publisher_override ?? row.edition?.publisher ?? "").trim())));
+      setFormPrinter(joinTokenValues(nextFacets.printer ?? parseAuthorsInput(String(row.printer_override ?? "").trim())));
+      setFormMaterials(joinTokenValues(nextFacets.material ?? parseAuthorsInput(String(row.materials_override ?? "").trim())));
       setFormEditionOverride(row.edition_override ?? "");
       setFormPublishDate(row.publish_date_override ?? row.edition?.publish_date ?? "");
       setFormDescription(row.description_override ?? row.edition?.description ?? "");
@@ -1279,14 +1283,19 @@ export default function BookDetailPage() {
   }), [book?.music_metadata, formMusic]);
   const musicGenres = useMemo(() => musicDisplayGenres(effectiveMusic), [effectiveMusic]);
 
-  const effectivePublisher = useMemo(() => {
+  const effectivePublishers = useMemo(() => {
     if (isMusicObject) {
-      return (effectiveMusic.label ?? "").trim();
+      const label = (effectiveMusic.label ?? "").trim();
+      return label ? [label] : [];
     }
-    const fromFacet = (facetDraft.publisher?.[0] ?? "").trim();
-    if (fromFacet) return fromFacet;
-    return formPublisher.trim() ? formPublisher.trim() : book?.edition?.publisher ?? "";
+    const fromFacet = uniqStrings(facetDraft.publisher ?? []);
+    if (fromFacet.length > 0) return fromFacet;
+    const fromForm = parseAuthorsInput(formPublisher);
+    if (fromForm.length > 0) return fromForm;
+    return parseAuthorsInput(String(book?.edition?.publisher ?? "").trim());
   }, [effectiveMusic.label, facetDraft.publisher, formPublisher, book, isMusicObject]);
+
+  const effectivePublisher = useMemo(() => effectivePublishers[0] ?? "", [effectivePublishers]);
 
   const effectivePublishDate = useMemo(() => {
     if (isMusicObject) return (effectiveMusic.release_date ?? "").trim();
@@ -1353,7 +1362,7 @@ export default function BookDetailPage() {
         ...(facetDraft.author ?? parseAuthorsInput(formAuthors)),
         ...effectiveAuthors
       ])[0] ?? null;
-      const mappedLabel = String((facetDraft.publisher?.[0] ?? formPublisher ?? effectivePublisher) || "").trim() || null;
+      const mappedLabel = String((facetDraft.publisher?.[0] ?? parseAuthorsInput(formPublisher)[0] ?? effectivePublisher) || "").trim() || null;
       const mappedReleaseDate = String(formPublishDate || effectivePublishDate || "").trim() || null;
       const mappedDesigners = uniqStrings([...(facetDraft.designer ?? parseAuthorsInput(formDesigners))]);
       const nextMusic = {
@@ -1652,11 +1661,9 @@ export default function BookDetailPage() {
     supplement("subject", effectiveSubjects);
     supplement("tag", tags.map((t) => t.name));
     supplement("category", categories.map((t) => t.name));
-    if (effectivePublisher.trim()) supplement("publisher", [effectivePublisher.trim()]);
-    const printerName = (facetDraft.printer?.[0] ?? formPrinter).trim();
-    if (printerName) supplement("printer", [printerName]);
-    const materialName = (facetDraft.material?.[0] ?? formMaterials).trim();
-    if (materialName) supplement("material", [materialName]);
+    supplement("publisher", effectivePublishers);
+    supplement("printer", uniqStrings((facetDraft.printer ?? []).length > 0 ? facetDraft.printer ?? [] : parseAuthorsInput(formPrinter)));
+    supplement("material", uniqStrings((facetDraft.material ?? []).length > 0 ? facetDraft.material ?? [] : parseAuthorsInput(formMaterials)));
     for (const role of MUSIC_CONTRIBUTOR_ROLES) {
       supplement(role, facetDraft[role] ?? []);
     }
@@ -1671,7 +1678,7 @@ export default function BookDetailPage() {
     effectiveSubjects, 
     tags, 
     categories, 
-    effectivePublisher, 
+    effectivePublishers,
     facetDraft, 
     formPrinter, 
     formMaterials
@@ -2006,9 +2013,12 @@ export default function BookDetailPage() {
       const authors_override = uniqStrings(facetDraft.author ?? parseAuthorsInput(formAuthors));
       const editors_override = uniqStrings(facetDraft.editor ?? parseAuthorsInput(formEditors));
       const designers_override = uniqStrings(facetDraft.designer ?? parseAuthorsInput(formDesigners));
-      const publisher_override = (facetDraft.publisher?.[0] ?? formPublisher).trim();
-      const printer_override = (facetDraft.printer?.[0] ?? formPrinter).trim();
-      const materials_override = (facetDraft.material?.[0] ?? formMaterials).trim();
+      const publisherNames = uniqStrings((facetDraft.publisher ?? []).length > 0 ? facetDraft.publisher ?? [] : parseAuthorsInput(formPublisher));
+      const printerNames = uniqStrings((facetDraft.printer ?? []).length > 0 ? facetDraft.printer ?? [] : parseAuthorsInput(formPrinter));
+      const materialNames = uniqStrings((facetDraft.material ?? []).length > 0 ? facetDraft.material ?? [] : parseAuthorsInput(formMaterials));
+      const publisher_override = joinTokenValues(publisherNames);
+      const printer_override = joinTokenValues(printerNames);
+      const materials_override = joinTokenValues(materialNames);
       const subjects_override = uniqStrings(facetDraft.subject ?? effectiveSubjects);
       const group_label = formGroupLabel.trim() ? formGroupLabel.trim() : null;
       const object_type = formObjectType.trim() ? formObjectType.trim() : null;
@@ -2094,9 +2104,9 @@ export default function BookDetailPage() {
           ["editor", facetDraft.editor ?? effectiveEditors],
           ["designer", facetDraft.designer ?? effectiveDesigners],
           ["subject", facetDraft.subject ?? effectiveSubjects],
-          ["publisher", facetDraft.publisher ?? (effectivePublisher.trim() ? [effectivePublisher.trim()] : [])],
-          ["printer", facetDraft.printer ?? (formPrinter.trim() ? [formPrinter.trim()] : [])],
-          ["material", facetDraft.material ?? (formMaterials.trim() ? [formMaterials.trim()] : [])],
+          ["publisher", facetDraft.publisher ?? effectivePublishers],
+          ["printer", facetDraft.printer ?? parseAuthorsInput(formPrinter)],
+          ["material", facetDraft.material ?? parseAuthorsInput(formMaterials)],
           ["tag", facetDraft.tag ?? tags.map((t) => t.name)],
           ["category", facetDraft.category ?? categories.map((t) => t.name)]
         ];
@@ -2218,9 +2228,9 @@ export default function BookDetailPage() {
     const matchedAuthors = uniqStrings(facetDraft.author ?? parseAuthorsInput(formAuthors));
     const matchedEditors = uniqStrings(facetDraft.editor ?? parseAuthorsInput(formEditors));
     const matchedDesigners = uniqStrings(facetDraft.designer ?? parseAuthorsInput(formDesigners));
-    const matchedPublisher = (facetDraft.publisher?.[0] ?? formPublisher ?? "").trim() || null;
-    const matchedPrinter = (facetDraft.printer?.[0] ?? formPrinter ?? "").trim() || null;
-    const matchedMaterials = (facetDraft.material?.[0] ?? formMaterials ?? "").trim() || null;
+      const matchedPublisher = joinTokenValues(uniqStrings((facetDraft.publisher ?? []).length > 0 ? facetDraft.publisher ?? [] : parseAuthorsInput(formPublisher))) || null;
+      const matchedPrinter = joinTokenValues(uniqStrings((facetDraft.printer ?? []).length > 0 ? facetDraft.printer ?? [] : parseAuthorsInput(formPrinter))) || null;
+      const matchedMaterials = joinTokenValues(uniqStrings((facetDraft.material ?? []).length > 0 ? facetDraft.material ?? [] : parseAuthorsInput(formMaterials))) || null;
     const matchedEdition = (formEditionOverride ?? "").trim() || null;
     const matchedPublishDate = (formPublishDate ?? "").trim() || null;
     const matchedDescription = (formDescription ?? "").trim() || null;
@@ -2925,7 +2935,7 @@ export default function BookDetailPage() {
       }
       const label = String(nextMusic?.label ?? nextPublisher ?? "").trim();
       if (label) {
-        setFacetDraft((state) => ({ ...state, publisher: [label] }));
+        setFacetDraft((state) => ({ ...state, publisher: uniqStrings([...(state.publisher ?? []), label]) }));
       }
       for (const role of MUSIC_CONTRIBUTOR_ROLES) {
         const nextNames = input.contributor_entities?.[role] ?? [];
@@ -2939,9 +2949,12 @@ export default function BookDetailPage() {
     const hasCurrentCover = Boolean((book?.media ?? []).some((m) => m.kind === "cover"));
 
     if (!currentEffectiveTitle && nextTitle) setFormTitle(nextTitle);
-    if (!currentEffectivePublisher && nextPublisher) {
-      setFormPublisher(nextPublisher);
-      setFacetDraft((s) => ({ ...s, publisher: [nextPublisher] }));
+    if (nextPublisher) {
+      const mergedPublishers = uniqStrings([...(facetDraft.publisher ?? []), ...parseAuthorsInput(nextPublisher)]);
+      if (mergedPublishers.length > 0) {
+        setFormPublisher(joinTokenValues(mergedPublishers));
+        setFacetDraft((s) => ({ ...s, publisher: mergedPublishers }));
+      }
     }
     if (!currentEffectivePublishDate && nextPublishDate) setFormPublishDate(nextPublishDate);
     if (!currentEffectiveDescription && nextDescription) setFormDescription(nextDescription);
@@ -2974,12 +2987,12 @@ export default function BookDetailPage() {
       setFormDesigners(mergedDesigners.join(", "));
     }
 
-    // Printer (single; only fill if empty)
+    // Printer (additive)
     const nextPrinters = (input.printers ?? []).map((p) => String(p ?? "").trim()).filter(Boolean);
-    if (nextPrinters.length > 0 && !formPrinter.trim()) {
-      const only = nextPrinters.slice(0, 1);
-      setFacetDraft((s) => ({ ...s, printer: only }));
-      setFormPrinter(only[0] ?? "");
+    if (nextPrinters.length > 0) {
+      const mergedPrinters = uniqStrings([...(facetDraft.printer ?? []), ...nextPrinters]);
+      setFacetDraft((s) => ({ ...s, printer: mergedPrinters }));
+      setFormPrinter(joinTokenValues(mergedPrinters));
     }
 
     // Trim size (only fill if both dimensions are absent)
@@ -3192,9 +3205,9 @@ export default function BookDetailPage() {
         if (updates.editors_override) roleSyncs.push(["editor", updates.editors_override]);
         if (updates.designers_override) roleSyncs.push(["designer", updates.designers_override]);
         if (updates.subjects_override) roleSyncs.push(["subject", updates.subjects_override]);
-        if (updates.publisher_override) roleSyncs.push(["publisher", [updates.publisher_override]]);
-        if (updates.printer_override) roleSyncs.push(["printer", [updates.printer_override]]);
-        if (updates.materials_override) roleSyncs.push(["material", [updates.materials_override]]);
+        if (updates.publisher_override) roleSyncs.push(["publisher", parseAuthorsInput(updates.publisher_override)]);
+        if (updates.printer_override) roleSyncs.push(["printer", parseAuthorsInput(updates.printer_override)]);
+        if (updates.materials_override) roleSyncs.push(["material", parseAuthorsInput(updates.materials_override)]);
         for (const [role, names] of roleSyncs) {
           const rpc = await supabase.rpc("set_book_entities", { p_user_book_id: book.id, p_role: role, p_names: names });
           if (rpc.error) {
@@ -3258,9 +3271,9 @@ export default function BookDetailPage() {
         if (fields.editors_override != null) roleSyncs.push(["editor", fields.editors_override as string[]]);
         if (fields.designers_override != null) roleSyncs.push(["designer", fields.designers_override as string[]]);
         if (fields.subjects_override != null) roleSyncs.push(["subject", fields.subjects_override as string[]]);
-        if (fields.publisher_override != null) roleSyncs.push(["publisher", [fields.publisher_override as string]]);
-        if (fields.printer_override != null) roleSyncs.push(["printer", [fields.printer_override as string]]);
-        if (fields.materials_override != null) roleSyncs.push(["material", [fields.materials_override as string]]);
+        if (fields.publisher_override != null) roleSyncs.push(["publisher", parseAuthorsInput(fields.publisher_override as string)]);
+        if (fields.printer_override != null) roleSyncs.push(["printer", parseAuthorsInput(fields.printer_override as string)]);
+        if (fields.materials_override != null) roleSyncs.push(["material", parseAuthorsInput(fields.materials_override as string)]);
         for (const [role, names] of roleSyncs) {
           await supabase.rpc("set_book_entities", { p_user_book_id: book.id, p_role: role, p_names: names });
         }
@@ -4515,7 +4528,7 @@ export default function BookDetailPage() {
                           <div style={{ minWidth: 110 }} className="text-muted">{label as string}</div>
                           <div style={{ flex: "1 1 auto" }}>
                             {editMode ? (
-                              <EntityTokenField role={role as FacetRole} value={draftItems as string[]} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, [role as string]: only })); (setForm as any)(only[0] ?? ""); }} placeholder={placeholder as string} disabled={!isOwner || busy || saveState.busy} />
+                              <EntityTokenField role={role as FacetRole} value={draftItems as string[]} onChange={(next) => { setFacetDraft((s) => ({ ...s, [role as string]: next })); (setForm as any)(joinTokenValues(next)); }} placeholder={placeholder as string} disabled={!isOwner || busy || saveState.busy} />
                             ) : (
                               <FacetLinks role={role as FacetRole} items={viewItems as EntityRef[]} />
                             )}
@@ -4536,12 +4549,12 @@ export default function BookDetailPage() {
                       );
                     })}
 
-                    {(editMode || (effectivePublisher.trim() && fieldVisibility.publisher !== false)) && (
+                    {(editMode || (facetView.publisher.length > 0 && fieldVisibility.publisher !== false)) && (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.publisher === false ? 0.6 : 1 }}>
                         <div style={{ minWidth: 110 }} className="text-muted">Publisher</div>
                         <div style={{ flex: "1 1 auto" }}>
                           {editMode ? (
-                            <EntityTokenField role="publisher" value={facetDraft.publisher} onChange={(next) => { const only = next.slice(0, 1); setFacetDraft((s) => ({ ...s, publisher: only })); setFormPublisher(only[0] ?? ""); }} placeholder="Add a publisher" disabled={!isOwner || busy || saveState.busy} />
+                            <EntityTokenField role="publisher" value={facetDraft.publisher} onChange={(next) => { setFacetDraft((s) => ({ ...s, publisher: next })); setFormPublisher(joinTokenValues(next)); }} placeholder="Add a publisher" disabled={!isOwner || busy || saveState.busy} />
                           ) : facetView.publisher.length > 0 ? (
                             <FacetLinks role="publisher" items={facetView.publisher} />
                           ) : (
