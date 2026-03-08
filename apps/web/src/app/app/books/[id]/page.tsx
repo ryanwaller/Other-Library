@@ -2476,15 +2476,18 @@ export default function BookDetailPage() {
 
   function checkImageDimensions(url: string | null): Promise<boolean> {
     if (!url) return Promise.resolve(false);
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const ok = img.naturalWidth >= 100 && img.naturalHeight >= 100;
-        resolve(ok);
-      };
-      img.onerror = () => resolve(false);
-      img.src = url;
-    });
+    return Promise.race([
+      new Promise<boolean>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const ok = img.naturalWidth >= 100 && img.naturalHeight >= 100;
+          resolve(ok);
+        };
+        img.onerror = () => resolve(false);
+        img.src = url;
+      }),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 8000)),
+    ]);
   }
 
   async function importCoverFromUrl(url: string) {
