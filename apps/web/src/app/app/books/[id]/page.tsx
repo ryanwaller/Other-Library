@@ -3534,7 +3534,7 @@ export default function BookDetailPage() {
             transform: swipeOffsetX ? `translate3d(${swipeOffsetX}px, 0, 0)` : undefined,
             filter: swipeBlurPx > 0 ? `blur(${swipeBlurPx}px)` : undefined,
             transition: swipeAnimating ? "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), filter 220ms ease-out" : "none",
-            willChange: isNarrow ? "transform, filter" : undefined
+            willChange: isNarrow && (swipeOffsetX !== 0 || swipeAnimating) ? "transform, filter" : undefined
           }}
         >
           <div
