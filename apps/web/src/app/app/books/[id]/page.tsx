@@ -299,6 +299,18 @@ function normalizeIsbnInput(input: string): string {
     .toUpperCase();
 }
 
+function isbn10ToIsbn13Local(isbn10: string): string | null {
+  if (!/^\d{9}[\dX]$/.test(isbn10)) return null;
+  const core = `978${isbn10.slice(0, 9)}`;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    const digit = Number(core[i]!);
+    sum += digit * (i % 2 === 0 ? 1 : 3);
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return `${core}${check}`;
+}
+
 function normalizePublishDateForStorage(input: string): string | null {
   const trimmed = String(input ?? "").trim();
   if (!trimmed) return null;
@@ -3040,19 +3052,51 @@ export default function BookDetailPage() {
 
     const value = isbn.trim();
     if (!value) return false;
+    const normalizedInput = normalizeIsbnInput(value);
 
     const hadCover = Boolean((book.media ?? []).some((m) => m.kind === "cover"));
     setLinkState({ busy: true, error: null, message: "Looking up ISBN…" });
 
     try {
-      const res = await fetch(`/api/isbn?isbn=${encodeURIComponent(value)}`);
-      const json = await res.json();
-      if (!res.ok || !json?.ok) throw new Error(json?.error ?? "ISBN lookup failed");
-      const edition = (json.edition ?? {}) as any;
-      const isbn13 = String(edition.isbn13 ?? "").trim();
-      if (!isbn13) throw new Error("No ISBN-13 returned by resolver");
+      let edition: any = null;
 
-      const existing = await supabase.from("editions").select("id").eq("isbn13", isbn13).maybeSingle();
+      try {
+        const res = await fetch(`/api/isbn?isbn=${encodeURIComponent(value)}`);
+        const json = await res.json();
+        if (res.ok && json?.ok) {
+          edition = (json.edition ?? {}) as any;
+        }
+      } catch {
+        // fall through to manual edition fallback
+      }
+
+      const fallbackIsbn13 = /^\d{13}$/.test(normalizedInput)
+        ? normalizedInput
+        : isbn10ToIsbn13Local(normalizedInput);
+      const fallbackIsbn10 = /^\d{9}[\dX]$/.test(normalizedInput) ? normalizedInput : null;
+
+      if (!edition || (typeof edition !== "object")) {
+        edition = {
+          isbn10: fallbackIsbn10,
+          isbn13: fallbackIsbn13,
+          title: formTitle.trim() || book.title_override || book.edition?.title || null,
+          authors: effectiveAuthors,
+          publisher: joinTokenValues(effectivePublishers) || null,
+          publish_date: normalizePublishDateForStorage(formPublishDate) ?? normalizePublishDateForStorage(String(book.edition?.publish_date ?? "").trim()),
+          description: formDescription.trim() || book.description_override || book.edition?.description || null,
+          subjects: effectiveSubjects,
+          cover_url: book.edition?.cover_url ?? null,
+          raw: book.edition?.raw ?? null
+        };
+      }
+
+      const isbn13 = String(edition.isbn13 ?? fallbackIsbn13 ?? "").trim();
+      const isbn10 = String(edition.isbn10 ?? fallbackIsbn10 ?? "").trim() || null;
+      if (!isbn13 && !isbn10) throw new Error("Could not save ISBN.");
+
+      const existing = isbn13
+        ? await supabase.from("editions").select("id").eq("isbn13", isbn13).maybeSingle()
+        : await supabase.from("editions").select("id").eq("isbn10", isbn10 as string).maybeSingle();
       if (existing.error) throw new Error(existing.error.message);
 
       let editionId = existing.data?.id as number | undefined;
@@ -3060,8 +3104,8 @@ export default function BookDetailPage() {
         const inserted = await supabase
           .from("editions")
           .insert({
-            isbn10: edition.isbn10 ?? null,
-            isbn13,
+            isbn10,
+            isbn13: isbn13 || null,
             title: edition.title ?? null,
             authors: edition.authors ?? [],
             publisher: edition.publisher ?? null,
