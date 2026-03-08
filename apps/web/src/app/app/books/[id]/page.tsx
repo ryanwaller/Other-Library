@@ -4191,7 +4191,7 @@ export default function BookDetailPage() {
                     {(editMode || effectiveAuthors.length > 0) && (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                         <div style={{ minWidth: 110 }} className="text-muted">Primary artist</div>
-                        <div style={{ flex: "1 1 auto" }}>
+                        <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                           {editMode ? (
                             <input
                               className="om-inline-control"
@@ -4504,9 +4504,9 @@ export default function BookDetailPage() {
                     )}
 
                     {(editMode || (effectiveMusic.tracklist.length > 0 && fieldVisibility.tracklist !== false)) && (
-                      <div className="row" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.tracklist === false ? 0.6 : 1, alignItems: "flex-start" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Tracklist</div>
-                        <div style={{ flex: "1 1 auto" }}>
+                      <div className="row om-tracklist-row" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.tracklist === false ? 0.6 : 1, alignItems: "flex-start" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted om-tracklist-label">Tracklist</div>
+                        <div className="om-tracklist-value" style={{ flex: "1 1 auto", minWidth: 0 }}>
                           {editMode ? (
                             <textarea
                               className="om-inline-control"
@@ -4525,11 +4525,11 @@ export default function BookDetailPage() {
                               rows={Math.max(3, effectiveMusic.tracklist.length || 3)}
                             />
                           ) : (
-                            <div style={{ display: "grid", gap: "var(--space-4)" }}>
+                            <div style={{ display: "grid", gap: "var(--space-4)", minWidth: 0 }}>
                               {effectiveMusic.tracklist.map((track, index) => (
-                                <div key={`${track.position ?? ""}-${track.title}-${index}`} className="row om-row-baseline" style={{ gap: "var(--space-sm)" }}>
+                                <div key={`${track.position ?? ""}-${track.title}-${index}`} className="row om-row-baseline om-tracklist-line" style={{ gap: "var(--space-sm)" }}>
                                   {track.position ? <div className="text-muted" style={{ minWidth: 32 }}>{track.position}</div> : null}
-                                  <div style={{ flex: "1 1 auto" }}>
+                                  <div className="om-tracklist-line-title" style={{ flex: "1 1 auto", minWidth: 0 }}>
                                     <Link href={musicValueHref(track.title)} style={{ textDecoration: "none" }}>{track.title}</Link>
                                   </div>
                                   {track.duration ? <div className="text-muted">{track.duration}</div> : null}

@@ -514,13 +514,13 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     </div>
                   ) : null}
                   {(music?.tracklist ?? []).length > 0 ? (
-                    <div className="row" style={{ marginTop: "var(--space-md)", alignItems: "flex-start" }}>
-                      <div style={{ minWidth: 110 }} className="text-muted">Tracklist</div>
-                      <div style={{ display: "grid", gap: "var(--space-4)", flex: "1 1 auto" }}>
+                    <div className="row om-tracklist-row" style={{ marginTop: "var(--space-md)", alignItems: "flex-start" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted om-tracklist-label">Tracklist</div>
+                      <div className="om-tracklist-value" style={{ display: "grid", gap: "var(--space-4)", flex: "1 1 auto", minWidth: 0 }}>
                         {(music?.tracklist ?? []).map((track, index) => (
-                          <div key={`${track.position ?? ""}-${track.title}-${index}`} className="row om-row-baseline" style={{ gap: "var(--space-sm)" }}>
+                          <div key={`${track.position ?? ""}-${track.title}-${index}`} className="row om-row-baseline om-tracklist-line" style={{ gap: "var(--space-sm)" }}>
                             {track.position ? <div className="text-muted" style={{ minWidth: 32 }}>{track.position}</div> : null}
-                            <div style={{ flex: "1 1 auto" }}>
+                            <div className="om-tracklist-line-title" style={{ flex: "1 1 auto", minWidth: 0 }}>
                               <Link href={publicMusicFilterHref(profile.username, track.title)} title={formatMusicTrackLine(track)}>{track.title}</Link>
                             </div>
                             {track.duration ? <div className="text-muted">{track.duration}</div> : null}

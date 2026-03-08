@@ -844,6 +844,11 @@ select.om-filter-control::-ms-expand {
   display: none;
 }
 
+.om-tracklist-value,
+.om-tracklist-line-title {
+  min-width: 0;
+}
+
 @media (max-width: 720px) {
   .om-hide-mobile {
     display: none !important;
@@ -851,6 +856,20 @@ select.om-filter-control::-ms-expand {
 
   .om-only-mobile {
     display: block !important;
+  }
+
+  .om-tracklist-row {
+    display: block;
+  }
+
+  .om-tracklist-label {
+    display: block;
+    min-width: 0 !important;
+    margin-bottom: var(--space-xs);
+  }
+
+  .om-tracklist-value {
+    width: 100%;
   }
 }
 
