@@ -871,6 +871,23 @@ select.om-filter-control::-ms-expand {
   .om-tracklist-value {
     width: 100%;
   }
+
+  .om-bulkbar-row {
+    position: relative;
+  }
+
+  .om-bulkbar details {
+    position: static;
+  }
+
+  .om-bulkbar .om-menu-panel {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    min-width: 0;
+    width: min(320px, calc(100vw - (var(--page-pad) * 2)));
+    max-width: calc(100vw - (var(--page-pad) * 2));
+  }
 }
 
 .container {

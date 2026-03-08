@@ -76,7 +76,7 @@ export default function BulkBar({
 
   return (
     <div className="om-bulkbar" style={{ marginTop: "var(--space-sm)" }}>
-      <div className="row" style={{ justifyContent: "flex-start", alignItems: "baseline", gap: 14 }}>
+      <div className="row om-bulkbar-row" style={{ justifyContent: "flex-start", alignItems: "baseline", gap: 14 }}>
         <details
           ref={visibilityRef}
           className="om-menu"
