@@ -726,6 +726,7 @@ function AppShell({
 
   const searchParamsKey = searchParams.toString();
   const controlsPinnedOpen = sortOpen || bulkMode;
+  const controlsFixed = !isMobile && controlsDocked;
 
   const measureControlsBand = useCallback(() => {
     if (typeof window === "undefined" || !controlsBandRef.current) return;
@@ -760,16 +761,16 @@ function AppShell({
     const update = () => {
       ticking = false;
       const y = window.scrollY;
+      const stickyStart = Math.max(controlsBandTopRef.current - 8, 0);
 
       if (isMobile) {
-        setControlsDocked(true);
+        setControlsDocked(y > stickyStart);
         setControlsVisible(true);
         lastScrollYRef.current = y;
         return;
       }
 
       const lastY = lastScrollYRef.current;
-      const stickyStart = Math.max(controlsBandTopRef.current - 8, 0);
       const isNearTop = y <= stickyStart;
       const scrollingDown = y > lastY + 2;
       const scrollingUp = y < lastY - 2;
@@ -811,8 +812,6 @@ function AppShell({
     }
     wasControlsPinnedOpenRef.current = controlsPinnedOpen;
   }, [controlsDocked, controlsPinnedOpen]);
-
-  const controlsFixed = isMobile || controlsDocked;
 
   useEffect(() => {
     try {
