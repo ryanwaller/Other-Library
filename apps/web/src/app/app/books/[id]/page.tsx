@@ -2016,49 +2016,6 @@ export default function BookDetailPage() {
     setDeleteConfirm(false);
   }
 
-  async function ensureEditionForManualIsbn(input: string): Promise<number | null> {
-    if (!supabase || !book) return book?.edition?.id ?? null;
-
-    const normalized = normalizeIsbnInput(input);
-    if (!normalized) return book?.edition?.id ?? null;
-
-    const currentIsbn = normalizeIsbnInput(String(book.edition?.isbn13 ?? book.edition?.isbn10 ?? ""));
-    if (currentIsbn && currentIsbn === normalized) return book.edition?.id ?? null;
-
-    const isbn10 = normalized.length === 10 ? normalized : null;
-    const isbn13 = normalized.length === 13 ? normalized : null;
-
-    if (isbn13) {
-      const existing = await supabase.from("editions").select("id").eq("isbn13", isbn13).maybeSingle();
-      if (existing.error) throw new Error(existing.error.message);
-      if (existing.data?.id) return Number(existing.data.id);
-    } else if (isbn10) {
-      const existing = await supabase.from("editions").select("id").eq("isbn10", isbn10).maybeSingle();
-      if (existing.error) throw new Error(existing.error.message);
-      if (existing.data?.id) return Number(existing.data.id);
-    }
-
-    const inserted = await supabase
-      .from("editions")
-      .insert({
-        isbn10,
-        isbn13,
-        title: formTitle.trim() || book.title_override || book.edition?.title || null,
-        authors: effectiveAuthors,
-        publisher: joinTokenValues(effectivePublishers) || null,
-        publish_date: normalizePublishDateForStorage(formPublishDate) ?? normalizePublishDateForStorage(String(book.edition?.publish_date ?? "").trim()),
-        description: formDescription.trim() || book.description_override || book.edition?.description || null,
-        subjects: effectiveSubjects,
-        cover_url: book.edition?.cover_url ?? null,
-        raw: book.edition?.raw ?? null
-      })
-      .select("id")
-      .single();
-
-    if (inserted.error) throw new Error(inserted.error.message);
-    return Number(inserted.data.id);
-  }
-
   async function saveEdits(): Promise<boolean> {
     if (!supabase || !book || !userId) return false;
     setSaveState({ busy: true, error: null, message: "Saving…" });
@@ -2128,10 +2085,6 @@ export default function BookDetailPage() {
         borrowable_override: formBorrowable === "inherit" ? null : formBorrowable === "yes",
         music_metadata: isMusicObject ? formMusic : null
       };
-      if (!isMusicObject && manualIsbn) {
-        const nextEditionId = await ensureEditionForManualIsbn(manualIsbn);
-        if (nextEditionId) payload.edition_id = nextEditionId;
-      }
       if (isMusicObject) {
         payload.authors_override = null;
         payload.editors_override = null;
@@ -2208,6 +2161,15 @@ export default function BookDetailPage() {
 
       if (suggestedCoverUrl) {
         await importCoverFromUrl(suggestedCoverUrl);
+      }
+
+      const currentStoredIsbn = normalizeIsbnInput(String(book.edition?.isbn13 ?? book.edition?.isbn10 ?? ""));
+      if (!isMusicObject && manualIsbn && manualIsbn !== currentStoredIsbn) {
+        const linked = await linkEditionByIsbn(manualIsbn);
+        if (!linked) {
+          setSaveState({ busy: false, error: "Could not save ISBN.", message: "Save failed" });
+          return false;
+        }
       }
 
       await refresh();
@@ -3072,12 +3034,12 @@ export default function BookDetailPage() {
     setImportState((s) => ({ ...s, message: "Filled missing fields (not saved)" }));
   }
 
-  async function linkEditionByIsbn(isbn: string, coverUrlHint?: string | null) {
-    if (!supabase || !book || !userId) return;
-    if (!isOwner) return;
+  async function linkEditionByIsbn(isbn: string, coverUrlHint?: string | null): Promise<boolean> {
+    if (!supabase || !book || !userId) return false;
+    if (!isOwner) return false;
 
     const value = isbn.trim();
-    if (!value) return;
+    if (!value) return false;
 
     const hadCover = Boolean((book.media ?? []).some((m) => m.kind === "cover"));
     setLinkState({ busy: true, error: null, message: "Looking up ISBN…" });
@@ -3173,8 +3135,10 @@ export default function BookDetailPage() {
 
       setLinkState({ busy: false, error: null, message: "Linked" });
       window.setTimeout(() => setLinkState({ busy: false, error: null, message: null }), 1500);
+      return true;
     } catch (e: any) {
       setLinkState({ busy: false, error: e?.message ?? "Link failed", message: "Link failed" });
+      return false;
     }
   }
 
