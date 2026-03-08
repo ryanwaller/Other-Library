@@ -338,6 +338,11 @@ button.muted:focus-visible {
 
 .om-cover-slot-has-image {
   background: #f5f5f2;
+  isolation: isolate;
+}
+
+.om-cover-slot-has-image img {
+  mix-blend-mode: multiply;
 }
 
 .om-cover-placeholder {
