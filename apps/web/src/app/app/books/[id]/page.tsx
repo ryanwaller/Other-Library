@@ -3695,7 +3695,7 @@ export default function BookDetailPage() {
                               <div className="om-lookup-row">
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
                                   {r.cover_url ? (
-                                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
+                                    <div className="om-cover-slot om-cover-slot-has-image" style={{ width: 60, height: "auto" }}>
                                       <img
                                         src={toProxyImageUrl(r.cover_url)}
                                         alt=""
@@ -3814,7 +3814,7 @@ export default function BookDetailPage() {
                               <div className="om-lookup-row">
                                 <div style={{ width: 62, flex: "0 0 auto" }}>
                                   {previewCoverUrl ? (
-                                    <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
+                                    <div className="om-cover-slot om-cover-slot-has-image" style={{ width: 60, height: "auto" }}>
                                       <img
                                         src={previewCoverUrl}
                                         alt=""

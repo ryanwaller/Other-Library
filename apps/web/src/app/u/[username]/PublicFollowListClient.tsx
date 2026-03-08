@@ -140,10 +140,11 @@ export default function PublicFollowListClient({ username, mode }: { username: s
   return (
     <main className="container">
       <div className="card">
-        <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
           {heading}
           <div className="text-muted">{rows.length}</div>
         </div>
+        
         <hr className="divider" />
 
         <div style={{ marginTop: "var(--space-8)" }}>

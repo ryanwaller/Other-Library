@@ -336,6 +336,10 @@ button.muted:focus-visible {
   box-shadow: none !important;
 }
 
+.om-cover-slot-has-image {
+  background: #f5f5f2;
+}
+
 .om-cover-placeholder {
   background: var(--placeholder-bg);
   width: 100%;

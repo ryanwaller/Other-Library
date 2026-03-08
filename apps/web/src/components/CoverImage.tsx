@@ -38,6 +38,7 @@ export default function CoverImage({
 }) {
 
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
+  const slotClassName = [className, src && status !== "error" ? "om-cover-slot-has-image" : null].filter(Boolean).join(" ");
 
   if (!src || status === "error") {
     return (
@@ -113,7 +114,7 @@ export default function CoverImage({
 
   return (
     <div 
-      className={className} 
+      className={slotClassName} 
       style={{ 
         ...style, 
         position: "relative", 

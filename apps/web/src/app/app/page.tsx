@@ -3246,7 +3246,7 @@ function AppShell({
             <div className="om-lookup-row">
               <div style={{ width: 62, flex: "0 0 auto" }}>
                 {addUrlPreview.cover_url && !addPreviewCoverFailed ? (
-                  <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
+                  <div className="om-cover-slot om-cover-slot-has-image" style={{ width: 60, height: "auto" }}>
                     <img
                       src={addUrlPreview.cover_url}
                       alt=""
@@ -3304,7 +3304,7 @@ function AppShell({
                 <div className="om-lookup-row">
                   <div style={{ width: 62, flex: "0 0 auto" }}>
                     {result.cover_url ? (
-                      <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
+                      <div className="om-cover-slot om-cover-slot-has-image" style={{ width: 60, height: "auto" }}>
                         <img 
                           src={proxyExternalImageUrl(result.cover_url)} 
                           alt="" 
