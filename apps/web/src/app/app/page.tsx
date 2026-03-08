@@ -587,17 +587,116 @@ function AppShell({
   const [dragOverItemKey, setDragOverItemKey] = useState<string | null>(null);
   const [backupItems, setBackupItems] = useState<CatalogItem[] | null>(null);
   const scrollIntervalRef = useRef<any>(null);
+  const dragImageRef = useRef<HTMLElement | null>(null);
+  const reorderRectsRef = useRef<Map<string, DOMRect>>(new Map());
+  const reorderAnimationFrameRef = useRef<number | null>(null);
+
+  function clearDragImage() {
+    if (dragImageRef.current?.parentNode) {
+      dragImageRef.current.parentNode.removeChild(dragImageRef.current);
+    }
+    dragImageRef.current = null;
+  }
+
+  function captureReorderRects(libraryId: number) {
+    const next = new Map<string, DOMRect>();
+    const nodes = document.querySelectorAll<HTMLElement>(`[data-reorder-lib-id="${libraryId}"]`);
+    nodes.forEach((node) => {
+      const key = node.dataset.reorderKey;
+      if (!key) return;
+      next.set(key, node.getBoundingClientRect());
+    });
+    reorderRectsRef.current = next;
+  }
+
+  function animateReorderRects(libraryId: number) {
+    if (reorderAnimationFrameRef.current != null) {
+      window.cancelAnimationFrame(reorderAnimationFrameRef.current);
+    }
+    reorderAnimationFrameRef.current = window.requestAnimationFrame(() => {
+      const previousRects = reorderRectsRef.current;
+      if (previousRects.size === 0) return;
+      const nodes = document.querySelectorAll<HTMLElement>(`[data-reorder-lib-id="${libraryId}"]`);
+      nodes.forEach((node) => {
+        const key = node.dataset.reorderKey;
+        if (!key) return;
+        const previous = previousRects.get(key);
+        if (!previous) return;
+        const next = node.getBoundingClientRect();
+        const deltaX = previous.left - next.left;
+        const deltaY = previous.top - next.top;
+        if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
+        node.style.setProperty("--reorder-tx", `${deltaX}px`);
+        node.style.setProperty("--reorder-ty", `${deltaY}px`);
+        node.getBoundingClientRect();
+        node.style.setProperty("--reorder-tx", "0px");
+        node.style.setProperty("--reorder-ty", "0px");
+      });
+      reorderRectsRef.current = new Map();
+      reorderAnimationFrameRef.current = null;
+    });
+  }
+
+  function applyOptimisticReorder(targetKey: string, targetLibId: number) {
+    if (!draggedItemKey || draggedItemKey === targetKey || targetLibId !== draggedItemLibId) return;
+    const libId = targetLibId;
+    const groups = displayGroupsByLibraryId[libId] ?? [];
+    const sourceIdx = groups.findIndex((g) => g.key === draggedItemKey);
+    const targetIdx = groups.findIndex((g) => g.key === targetKey);
+
+    if (sourceIdx === -1 || targetIdx === -1) return;
+    setDragOverItemKey(targetKey);
+    captureReorderRects(libId);
+
+    let newOrder: number;
+    if (targetIdx === 0) {
+      newOrder = (groups[0].sortOrder ?? 0) - 1000;
+    } else if (targetIdx === groups.length - 1 && sourceIdx < targetIdx) {
+      newOrder = (groups[groups.length - 1].sortOrder ?? 0) + 1000;
+    } else if (targetIdx > sourceIdx) {
+      const afterTarget = groups[targetIdx + 1];
+      newOrder = ((groups[targetIdx].sortOrder ?? 0) + (afterTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) + 2000)) / 2;
+    } else {
+      const beforeTarget = groups[targetIdx - 1];
+      newOrder = ((beforeTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) - 2000) + (groups[targetIdx].sortOrder ?? 0)) / 2;
+    }
+
+    const sourceGroup = groups[sourceIdx];
+    setItems((prev) =>
+      prev.map((item) => {
+        if (sourceGroup.copies.some((c) => c.id === item.id)) {
+          return { ...item, sort_order: newOrder };
+        }
+        return item;
+      })
+    );
+    animateReorderRects(libId);
+  }
 
   function handleDragStart(e: React.DragEvent, key: string, libraryId: number) {
     setDraggedItemKey(key);
     setDraggedItemLibId(libraryId);
     setBackupItems([...items]);
     e.dataTransfer.effectAllowed = "move";
-    
-    // Create a ghost image that is slightly larger
     const target = e.currentTarget as HTMLElement;
-    if (target) {
-      target.style.opacity = "0.99"; // force a layer
+    const rect = target.getBoundingClientRect();
+    const preview = target.cloneNode(true) as HTMLElement;
+    preview.style.position = "fixed";
+    preview.style.top = "-10000px";
+    preview.style.left = "-10000px";
+    preview.style.width = `${rect.width}px`;
+    preview.style.margin = "0";
+    preview.style.pointerEvents = "none";
+    preview.style.transform = "scale(1.03)";
+    preview.style.boxShadow = "0 16px 30px rgba(0,0,0,0.18)";
+    preview.style.zIndex = "9999";
+    preview.style.background = "var(--bg)";
+    preview.style.borderRadius = "2px";
+    preview.style.overflow = "hidden";
+    document.body.appendChild(preview);
+    dragImageRef.current = preview;
+    if (e.dataTransfer) {
+      e.dataTransfer.setDragImage(preview, rect.width / 2, rect.height / 2);
     }
   }
 
@@ -626,50 +725,14 @@ function AppShell({
 
   function handleDragEnter(e: React.DragEvent, targetKey: string, targetLibId: number) {
     e.preventDefault();
-    if (!draggedItemKey || draggedItemKey === targetKey || targetLibId !== draggedItemLibId) return;
-    setDragOverItemKey(targetKey);
-
-    // Live reorder logic (Optimistic)
-    const libId = targetLibId;
-    const groups = displayGroupsByLibraryId[libId] ?? [];
-    const sourceIdx = groups.findIndex(g => g.key === draggedItemKey);
-    const targetIdx = groups.findIndex(g => g.key === targetKey);
-    
-    if (sourceIdx === -1 || targetIdx === -1) return;
-
-    // Calculate new temporary sort_order for the source group items
-    let newOrder: number;
-    if (targetIdx === 0) {
-      newOrder = (groups[0].sortOrder ?? 0) - 1000;
-    } else if (targetIdx === groups.length - 1 && sourceIdx < targetIdx) {
-      newOrder = (groups[groups.length - 1].sortOrder ?? 0) + 1000;
-    } else {
-      // If moving "down", we want to insert AFTER the target. 
-      // If moving "up", we want to insert BEFORE.
-      if (targetIdx > sourceIdx) {
-        // Moving down: insert after target
-        const afterTarget = groups[targetIdx + 1];
-        newOrder = ((groups[targetIdx].sortOrder ?? 0) + (afterTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) + 2000)) / 2;
-      } else {
-        // Moving up: insert before target
-        const beforeTarget = groups[targetIdx - 1];
-        newOrder = ((beforeTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) - 2000) + (groups[targetIdx].sortOrder ?? 0)) / 2;
-      }
-    }
-
-    const sourceGroup = groups[sourceIdx];
-    setItems(prev => prev.map(item => {
-      if (sourceGroup.copies.some(c => c.id === item.id)) {
-        return { ...item, sort_order: newOrder };
-      }
-      return item;
-    }));
+    applyOptimisticReorder(targetKey, targetLibId);
   }
 
   function handleDragEnd() {
     setDraggedItemKey(null);
     setDraggedItemLibId(null);
     setDragOverItemKey(null);
+    clearDragImage();
     if (scrollIntervalRef.current) {
       clearInterval(scrollIntervalRef.current);
       scrollIntervalRef.current = null;
@@ -707,38 +770,7 @@ function AppShell({
     }
 
     if (nearestKey && nearestKey !== draggedItemKey) {
-      // Trigger reorder logic
-      const libId = draggedItemLibId;
-      const groups = displayGroupsByLibraryId[libId] ?? [];
-      const sourceIdx = groups.findIndex(g => g.key === draggedItemKey);
-      const targetIdx = groups.findIndex(g => g.key === nearestKey);
-      
-      if (sourceIdx !== -1 && targetIdx !== -1) {
-        setDragOverItemKey(nearestKey);
-        
-        let newOrder: number;
-        if (targetIdx === 0) {
-          newOrder = (groups[0].sortOrder ?? 0) - 1000;
-        } else if (targetIdx === groups.length - 1 && sourceIdx < targetIdx) {
-          newOrder = (groups[groups.length - 1].sortOrder ?? 0) + 1000;
-        } else {
-          if (targetIdx > sourceIdx) {
-            const afterTarget = groups[targetIdx + 1];
-            newOrder = ((groups[targetIdx].sortOrder ?? 0) + (afterTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) + 2000)) / 2;
-          } else {
-            const beforeTarget = groups[targetIdx - 1];
-            newOrder = ((beforeTarget?.sortOrder ?? (groups[targetIdx].sortOrder ?? 0) - 2000) + (groups[targetIdx].sortOrder ?? 0)) / 2;
-          }
-        }
-
-        const sourceGroup = groups[sourceIdx];
-        setItems(prev => prev.map(item => {
-          if (sourceGroup.copies.some(c => c.id === item.id)) {
-            return { ...item, sort_order: newOrder };
-          }
-          return item;
-        }));
-      }
+      applyOptimisticReorder(nearestKey, draggedItemLibId);
     }
 
     // Auto-scroll logic for touch
@@ -810,6 +842,15 @@ function AppShell({
     const fallbackId = addLibraryId ?? libraries[0]?.id ?? null;
     setAddPreviewLibraryId((prev) => (prev && libraries.some((l) => l.id === prev) ? prev : fallbackId));
   }, [addLibraryId, libraries]);
+
+  useEffect(() => {
+    return () => {
+      clearDragImage();
+      if (reorderAnimationFrameRef.current != null) {
+        window.cancelAnimationFrame(reorderAnimationFrameRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const fallbackId = addLibraryId ?? libraries[0]?.id ?? null;
@@ -3815,14 +3856,19 @@ function AppShell({
                         onTouchMove={isRearrangingThis ? handleTouchMove : undefined}
                         onTouchEnd={isRearrangingThis ? handleTouchEnd : undefined}
                         style={{
-                          opacity: isDragged ? 0.3 : 1,
+                          opacity: isDragged ? 0.22 : 1,
                           cursor: isRearrangingThis ? "grab" : "default",
-                          transition: "all 0.3s cubic-bezier(0.2, 0, 0, 1)",
-                          transform: isDragged ? "scale(1.05)" : "none",
+                          transition: "transform 220ms cubic-bezier(0.2, 0, 0, 1), box-shadow 180ms ease, opacity 180ms ease, outline-color 180ms ease, background-color 180ms ease",
+                          transform: `translate3d(var(--reorder-tx, 0px), var(--reorder-ty, 0px), 0) scale(${isDragged ? 0.985 : 1})`,
                           zIndex: isDragged ? 1000 : 1,
-                          boxShadow: isDragged ? "0 8px 24px rgba(0,0,0,0.2)" : "none",
+                          boxShadow: isDragged ? "inset 0 0 0 1px var(--border)" : isDragOver ? "0 0 0 1px var(--fg)" : "none",
                           position: "relative",
-                          touchAction: isRearrangingThis ? "none" : "auto"
+                          touchAction: isRearrangingThis ? "none" : "auto",
+                          outline: isDragged ? "1px dashed var(--border)" : "1px solid transparent",
+                          outlineOffset: 0,
+                          background: isDragged ? "var(--bg-muted)" : "transparent",
+                          borderRadius: 2,
+                          willChange: isRearrangingThis ? "transform" : undefined
                         }}
                       >
                         <BookCard
