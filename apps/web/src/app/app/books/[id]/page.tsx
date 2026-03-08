@@ -203,6 +203,17 @@ function uniqStrings(values: Array<string | null | undefined>): string[] {
   return out;
 }
 
+async function getOrCreateOwnedTagId(ownerId: string, name: string, kind: "tag" | "category"): Promise<number> {
+  if (!supabase) throw new Error("Not signed in");
+  const normalized = name.trim().replace(/\s+/g, " ");
+  const existing = await supabase.from("tags").select("id").eq("owner_id", ownerId).eq("name", normalized).eq("kind", kind).maybeSingle();
+  if (existing.error) throw new Error(existing.error.message);
+  if (existing.data?.id) return existing.data.id as number;
+  const inserted = await supabase.from("tags").insert({ owner_id: ownerId, name: normalized, kind }).select("id").single();
+  if (inserted.error) throw new Error(inserted.error.message);
+  return inserted.data.id as number;
+}
+
 function safeFileName(name: string): string {
   return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
 }
@@ -1029,6 +1040,7 @@ export default function BookDetailPage() {
           .sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999));
         for (const r of sorted) {
           const role = (r.role === ("design" as any) ? "designer" : r.role) as FacetRole;
+          if (role === "tag" || role === "category") continue;
           const name = String(r.entity!.name ?? "").trim();
           if (!name) continue;
           const existing = nextFacets[role] ?? [];
@@ -1052,11 +1064,12 @@ export default function BookDetailPage() {
         if (printerFallback) nextFacets.printer = parseAuthorsInput(printerFallback);
         const materialFallback = String(row.materials_override ?? "").trim();
         if (materialFallback) nextFacets.material = parseAuthorsInput(materialFallback);
-        const tagRows = ((row as any).book_tags ?? []) as any[];
-        const tagsFallback = tagRows.map((bt) => bt?.tag).filter(Boolean);
-        nextFacets.tag = tagsFallback.filter((t) => t.kind === "tag").map((t) => String(t.name)).filter(Boolean);
-        nextFacets.category = tagsFallback.filter((t) => t.kind === "category").map((t) => String(t.name)).filter(Boolean);
       }
+
+      const tagRows = ((row as any).book_tags ?? []) as any[];
+      const tagsFallback = tagRows.map((bt) => bt?.tag).filter(Boolean);
+      nextFacets.tag = tagsFallback.filter((t) => t.kind === "tag").map((t) => String(t.name)).filter(Boolean);
+      nextFacets.category = tagsFallback.filter((t) => t.kind === "category").map((t) => String(t.name)).filter(Boolean);
 
       const nextVisibility: Record<string, boolean> = { ...(row.field_visibility as Record<string, boolean> ?? {}) };
       for (const r of entityRows) {
@@ -2172,6 +2185,27 @@ export default function BookDetailPage() {
           if (rpc.error) {
             await supabase.rpc("set_book_entities", { p_user_book_id: book.id, p_role: role, p_names: names ?? [] });
           }
+        }
+
+        const nextTagRows: Array<{ user_book_id: number; tag_id: number }> = [];
+        for (const name of facetDraft.tag ?? tags.map((t) => t.name)) {
+          const tagId = await getOrCreateOwnedTagId(book.owner_id, name, "tag");
+          nextTagRows.push({ user_book_id: book.id, tag_id: tagId });
+        }
+        for (const name of facetDraft.category ?? categories.map((t) => t.name)) {
+          const tagId = await getOrCreateOwnedTagId(book.owner_id, name, "category");
+          nextTagRows.push({ user_book_id: book.id, tag_id: tagId });
+        }
+
+        const clearLegacyTags = await supabase
+          .from("user_book_tags")
+          .delete()
+          .eq("user_book_id", book.id);
+        if (clearLegacyTags.error) throw new Error(clearLegacyTags.error.message);
+
+        if (nextTagRows.length > 0) {
+          const upTags = await supabase.from("user_book_tags").upsert(nextTagRows as any, { onConflict: "user_book_id,tag_id" });
+          if (upTags.error) throw new Error(upTags.error.message);
         }
       } catch {
         // ignore
