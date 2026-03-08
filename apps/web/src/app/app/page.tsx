@@ -1951,6 +1951,7 @@ function AppShell({
         domain_kind: typeof json.domain_kind === "string" ? json.domain_kind : null
       });
       setAddState({ busy: false, error: null, message: json.info ?? null });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e: any) {
       setAddState({ busy: false, error: e?.message ?? "Import failed", message: "Import failed" });
     }
@@ -1987,6 +1988,7 @@ function AppShell({
         sources: Array.from(new Set(["isbn", ...((edition.sources ?? []) as any[]).map((s: any) => String(s))])).filter(Boolean)
       });
       setAddState({ busy: false, error: null, message: null });
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return true;
     } catch (e: any) {
       setAddState({ busy: false, error: e?.message ?? "ISBN lookup failed", message: "ISBN lookup failed" });
@@ -2007,6 +2009,7 @@ function AppShell({
       if (!res.ok || !json?.ok) throw new Error(json?.error ?? "Search failed");
       setAddSearchResults((json.results ?? []) as SearchCandidate[]);
       setAddSearchState({ busy: false, error: null, message: null });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e: any) {
       setAddSearchState({ busy: false, error: e?.message ?? "Search failed", message: "Search failed" });
     }
