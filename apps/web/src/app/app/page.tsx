@@ -3234,6 +3234,16 @@ function AppShell({
                   <span className="text-muted" style={{ fontSize: "0.9em" }}>or</span>
                 </div>
               )}
+              {isMobile && addInput && (
+                <button
+                  type="button"
+                  onClick={() => setAddInput("")}
+                  style={{ padding: "0 4px", fontSize: "1.2em", border: 0, background: "none", cursor: "pointer", color: "var(--text-muted)", flex: "0 0 auto" }}
+                  title="Clear"
+                >
+                  ×
+                </button>
+              )}
               <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                 <RotatingHintInput
                   value={addInput}
@@ -3247,16 +3257,6 @@ function AppShell({
               </div>
               {((addInput.trim() || addInputFocused) || (addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message)) && (
                 <div className="row" style={{ gap: "var(--space-10)", flex: "0 0 auto", alignItems: "center" }}>
-                  {isMobile && addInput && (
-                    <button 
-                      type="button" 
-                      onClick={() => setAddInput("")}
-                      style={{ padding: "0 4px", fontSize: "1.2em", border: 0, background: "none", cursor: "pointer", color: "var(--text-muted)" }}
-                      title="Clear"
-                    >
-                      ×
-                    </button>
-                  )}
                   {(addInput.trim() || addInputFocused) && (
                     <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
                       {addState.busy ? "…" : "Go"}
@@ -3275,6 +3275,16 @@ function AppShell({
               <button type="button" className={sortOpen ? "text-primary" : "text-muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !sortOpen; setSortOpen(next); if (next) { setSearchOpen(false); } }}>
                 View by
               </button>
+              {isMobile && searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  style={{ padding: "0 4px", fontSize: "1.2em", border: 0, background: "none", cursor: "pointer", color: "var(--text-muted)", flex: "0 0 auto" }}
+                  title="Clear"
+                >
+                  ×
+                </button>
+              )}
               <input
                 className="om-inline-search-input"
                 placeholder="Search your catalog"
@@ -3284,16 +3294,6 @@ function AppShell({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ minWidth: 0, flex: 1 }}
               />
-              {isMobile && searchQuery && (
-                <button 
-                  type="button" 
-                  onClick={() => setSearchQuery("")}
-                  style={{ padding: "0 4px", fontSize: "1.2em", border: 0, background: "none", cursor: "pointer", color: "var(--text-muted)" }}
-                  title="Clear"
-                >
-                  ×
-                </button>
-              )}
               {(searchFocused || searchQuery.trim()) && (
                 <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`} className="text-muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>Search others</Link>
               )}
