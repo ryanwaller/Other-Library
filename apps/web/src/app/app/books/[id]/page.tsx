@@ -3636,6 +3636,16 @@ export default function BookDetailPage() {
                           <span className="text-muted">or</span>
                         </div>
                       )}
+                      {isMobileViewport && lookupInput && (
+                        <button 
+                          type="button" 
+                          onClick={() => setLookupInput("")}
+                          style={{ padding: "0 4px", fontSize: "1.2em", border: 0, background: "none", cursor: "pointer", color: "var(--text-muted)", flex: "0 0 auto" }}
+                          title="Clear"
+                        >
+                          ×
+                        </button>
+                      )}
                       <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                         <RotatingHintInput
                           className="om-inline-search-input"
@@ -3650,16 +3660,6 @@ export default function BookDetailPage() {
                       </div>
                       {(lookupInput.trim() || lookupInputFocused) ? (
                         <div className="row" style={{ gap: "var(--space-md)", alignItems: "center" }}>
-                          {isMobileViewport && lookupInput && (
-                            <button 
-                              type="button" 
-                              onClick={() => setLookupInput("")}
-                              style={{ padding: "0 4px", fontSize: "1.2em", border: 0, background: "none", cursor: "pointer", color: "var(--text-muted)" }}
-                              title="Clear"
-                            >
-                              ×
-                            </button>
-                          )}
                           <button
                             onClick={() => smartLookup()}
                             disabled={(importState.busy || searchState.busy) || !lookupInput.trim()}
