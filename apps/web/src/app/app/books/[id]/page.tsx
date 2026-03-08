@@ -3095,11 +3095,11 @@ export default function BookDetailPage() {
       if (!isbn13 && !isbn10) throw new Error("Could not save ISBN.");
 
       const existing = isbn13
-        ? await supabase.from("editions").select("id").eq("isbn13", isbn13).maybeSingle()
-        : await supabase.from("editions").select("id").eq("isbn10", isbn10 as string).maybeSingle();
+        ? await supabase.from("editions").select("id").eq("isbn13", isbn13).order("id", { ascending: true }).limit(1)
+        : await supabase.from("editions").select("id").eq("isbn10", isbn10 as string).order("id", { ascending: true }).limit(1);
       if (existing.error) throw new Error(existing.error.message);
 
-      let editionId = existing.data?.id as number | undefined;
+      let editionId = Array.isArray(existing.data) && existing.data.length > 0 ? Number(existing.data[0]?.id) : undefined;
       if (!editionId) {
         const inserted = await supabase
           .from("editions")
@@ -3117,8 +3117,16 @@ export default function BookDetailPage() {
           })
           .select("id")
           .single();
-        if (inserted.error) throw new Error(inserted.error.message);
-        editionId = inserted.data.id as number;
+        if (inserted.error) {
+          const retryExisting = isbn13
+            ? await supabase.from("editions").select("id").eq("isbn13", isbn13).order("id", { ascending: true }).limit(1)
+            : await supabase.from("editions").select("id").eq("isbn10", isbn10 as string).order("id", { ascending: true }).limit(1);
+          if (retryExisting.error) throw new Error(retryExisting.error.message);
+          editionId = Array.isArray(retryExisting.data) && retryExisting.data.length > 0 ? Number(retryExisting.data[0]?.id) : undefined;
+          if (!editionId) throw new Error(inserted.error.message);
+        } else {
+          editionId = inserted.data.id as number;
+        }
       }
 
       // Additive linking: preserve existing effective values via overrides so nothing is "lost" when edition_id changes.
