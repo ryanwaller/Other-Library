@@ -3059,39 +3059,25 @@ function AppShell({
 
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
-    for (const it of items) {
-      for (const row of (it.book_tags ?? [])) {
-        const tag = row?.tag;
-        const kind = String(tag?.kind ?? "").trim().toLowerCase();
-        const name = String(tag?.name ?? "").trim();
-        if (kind === "category" && name) set.add(name);
-      }
-      for (const row of (it.book_entities ?? [])) {
-        const role = String(row?.role ?? "").trim().toLowerCase();
-        const name = String(row?.entity?.name ?? "").trim();
-        if (role === "category" && name) set.add(name);
+    for (const g of displayGroups) {
+      for (const name of g.categoryNames ?? []) {
+        const normalized = String(name ?? "").trim();
+        if (normalized) set.add(normalized);
       }
     }
     return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
-  }, [items]);
+  }, [displayGroups]);
 
   const availableTags = useMemo(() => {
     const set = new Set<string>();
-    for (const it of items) {
-      for (const row of (it.book_tags ?? [])) {
-        const tag = row?.tag;
-        const kind = String(tag?.kind ?? "").trim().toLowerCase();
-        const name = String(tag?.name ?? "").trim();
-        if (kind === "tag" && name) set.add(name);
-      }
-      for (const row of (it.book_entities ?? [])) {
-        const role = String(row?.role ?? "").trim().toLowerCase();
-        const name = String(row?.entity?.name ?? "").trim();
-        if (role === "tag" && name) set.add(name);
+    for (const g of displayGroups) {
+      for (const name of g.tagNames ?? []) {
+        const normalized = String(name ?? "").trim();
+        if (normalized) set.add(normalized);
       }
     }
     return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
-  }, [items]);
+  }, [displayGroups]);
   const availableDecades = useMemo(() => {
     const set = new Set<string>();
     for (const g of displayGroups) {
@@ -3497,24 +3483,24 @@ function AppShell({
               </div>
             )}
 
-            <BulkBar
-              bulkMode={bulkMode}
-              bulkState={bulkState}
-              selectedGroupsCount={bulkSelectedGroups.length}
-              libraries={renderLibraries.map((l) => ({ id: l.id, name: l.name }))}
-              bulkCategoryName={bulkCategoryName}
-              setBulkCategoryName={setBulkCategoryName}
-              onClearSelected={() => setBulkSelectedKeys({})}
-              onBulkDeleteSelected={bulkDeleteSelected}
-              onBulkMakePublic={bulkMakePublic}
-              onBulkMakePrivate={bulkMakePrivate}
-              onBulkAssignCategory={bulkAssignCategory}
-              onBulkMoveSelected={bulkMoveSelected}
-              onBulkCopySelected={bulkCopySelected}
-              onAnyMenuOpen={() => { closeTagMenu(); closeCategoryMenu(); }}
-            />
           </div>
         )}
+          <BulkBar
+            bulkMode={bulkMode}
+            bulkState={bulkState}
+            selectedGroupsCount={bulkSelectedGroups.length}
+            libraries={renderLibraries.map((l) => ({ id: l.id, name: l.name }))}
+            bulkCategoryName={bulkCategoryName}
+            setBulkCategoryName={setBulkCategoryName}
+            onClearSelected={() => setBulkSelectedKeys({})}
+            onBulkDeleteSelected={bulkDeleteSelected}
+            onBulkMakePublic={bulkMakePublic}
+            onBulkMakePrivate={bulkMakePrivate}
+            onBulkAssignCategory={bulkAssignCategory}
+            onBulkMoveSelected={bulkMoveSelected}
+            onBulkCopySelected={bulkCopySelected}
+            onAnyMenuOpen={() => { closeTagMenu(); closeCategoryMenu(); }}
+          />
         </div>
 
       <div style={{ height: "var(--space-md)" }} />
