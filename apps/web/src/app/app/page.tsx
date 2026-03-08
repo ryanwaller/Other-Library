@@ -629,6 +629,19 @@ function AppShell({
   const [membersEditorCatalogId, setMembersEditorCatalogId] = useState<number | null>(null);
 
   const [bulkMode, setBulkMode] = useState(false);
+  const [stuck, setStuck] = useState(false);
+  const stickyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = stickyRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([e]) => setStuck(e.intersectionRatio < 1),
+      { threshold: [1] }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   const [addOpen, setAddOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
@@ -3102,7 +3115,7 @@ function AppShell({
 
         {isMobile ? (
           <>
-            <div className="row" style={{ width: "100%", margin: 0, gap: "var(--space-10)", alignItems: "baseline", flexWrap: "nowrap" }}>
+            <div className="row" style={{ width: "100%", margin: 0, gap: "var(--space-10)", alignItems: "baseline", flexWrap: "nowrap", marginBottom: "var(--space-md)" }}>
               {showScan && (
                 <div className="row" style={{ gap: "var(--space-sm)", flex: "0 0 auto", alignItems: "baseline" }}>
                   <button className="text-muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}>Scan</button>
@@ -3175,50 +3188,70 @@ function AppShell({
             </div>
           </>
         ) : (
-          <div className="row" style={{ width: "100%", margin: 0, alignItems: "baseline", justifyContent: "space-between", flexWrap: "nowrap" }}>
-            <div className="row" style={{ flex: "1 1 auto", gap: "var(--space-md)", alignItems: "baseline", minWidth: 0, flexWrap: "nowrap", margin: 0 }}>
-              {showScan && (
-                <div className="row" style={{ gap: "var(--space-sm)", flex: "0 0 auto", alignItems: "baseline" }}>
-                  <button className="text-muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}>Scan</button>
-                  <span className="text-muted" style={{ fontSize: "0.9em" }}>or</span>
+          <div 
+            ref={stickyRef}
+            className="om-sticky-controls" 
+            style={{ 
+              position: "sticky", 
+              top: -1, 
+              zIndex: 10, 
+              background: "var(--bg)", 
+              paddingTop: "var(--space-md)",
+              paddingBottom: stuck ? "var(--space-8)" : "var(--space-sm)",
+              marginTop: "var(--space-md)",
+              borderBottom: stuck ? "1px solid var(--border)" : "1px solid transparent",
+              transition: "border-color 0.2s, padding 0.2s",
+              marginRight: "calc(var(--page-pad) * -1)",
+              marginLeft: "calc(var(--page-pad) * -1)",
+              paddingRight: "var(--page-pad)",
+              paddingLeft: "var(--page-pad)"
+            }}
+          >
+            <div className="row" style={{ width: "100%", margin: 0, alignItems: "baseline", justifyContent: "space-between", flexWrap: "nowrap" }}>
+              <div className="row" style={{ flex: "1 1 auto", gap: "var(--space-md)", alignItems: "baseline", minWidth: 0, flexWrap: "nowrap", margin: 0 }}>
+                {showScan && (
+                  <div className="row" style={{ gap: "var(--space-sm)", flex: "0 0 auto", alignItems: "baseline" }}>
+                    <button className="text-muted" onClick={openScanner} style={{ whiteSpace: "nowrap", padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline" }}>Scan</button>
+                    <span className="text-muted" style={{ fontSize: "0.9em" }}>or</span>
+                  </div>
+                )}
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                  <RotatingHintInput
+                    value={addInput}
+                    onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); }}
+                    onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
+                    onChange={(e) => setAddInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); smartAddOrSearch(); } }}
+                    style={{ width: "100%" }}
+                  />
                 </div>
-              )}
-              <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                <RotatingHintInput
-                  value={addInput}
-                  onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); }}
-                  onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
-                  onChange={(e) => setAddInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); smartAddOrSearch(); } }}
-                  style={{ width: "100%" }}
-                />
+                <div className="row" style={{ gap: "var(--space-10)", flex: "0 0 auto" }}>
+                  {(addInput.trim() || addInputFocused) && (
+                    <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
+                      {addState.busy ? "…" : "Go"}
+                    </button>
+                  )}
+                  {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message) && (
+                    <button onClick={cancelAddPreview} disabled={addState.busy}>Cancel</button>
+                  )}
+                </div>
+                <button onClick={() => { const next = !bulkMode; if (next) { setAddOpen(false); setSortOpen(false); setSearchOpen(false); setReorderMode(true); } else { exitEditMode(); } setBulkMode(next); }}>
+                  {bulkMode ? "Done" : "Edit"}
+                </button>
+                <button type="button" className={sortOpen ? "text-primary" : "text-muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !sortOpen; setSortOpen(next); if (next) { setSearchOpen(false); } }}>
+                  View by
+                </button>
               </div>
-              <div className="row" style={{ gap: "var(--space-10)", flex: "0 0 auto" }}>
-                {(addInput.trim() || addInputFocused) && (
-                  <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
-                    {addState.busy ? "…" : "Go"}
-                  </button>
-                )}
-                {(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message) && (
-                  <button onClick={cancelAddPreview} disabled={addState.busy}>Cancel</button>
-                )}
-              </div>
-              <button onClick={() => { const next = !bulkMode; if (next) { setAddOpen(false); setSortOpen(false); setSearchOpen(false); setReorderMode(true); } else { exitEditMode(); } setBulkMode(next); }}>
-                {bulkMode ? "Done" : "Edit"}
-              </button>
-              <button type="button" className={sortOpen ? "text-primary" : "text-muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !sortOpen; setSortOpen(next); if (next) { setSearchOpen(false); } }}>
-                View by
+              <button type="button" className={searchOpen ? "text-primary" : "text-muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !searchOpen; setSearchOpen(next); if (next) { setSortOpen(false); } }}>
+                Search
               </button>
             </div>
-            <button type="button" className={searchOpen ? "text-primary" : "text-muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !searchOpen; setSearchOpen(next); if (next) { setSortOpen(false); } }}>
-              Search
-            </button>
           </div>
         )}
       </div>
 
       {!isMobile && searchOpen && (
-        <div className="row" style={{ width: "100%", marginTop: "var(--space-sm)", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap", position: "relative", zIndex: 2 }}>
+        <div className="row" style={{ width: "100%", marginTop: "var(--space-sm)", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap", position: "relative", zIndex: 9 }}>
           <input
             className="om-inline-search-input"
             placeholder="Search your catalog"
@@ -3226,7 +3259,7 @@ function AppShell({
             onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); cancelAddPreview(); setSearchFocused(true); }}
             onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ minWidth: 0, flex: 1, maxWidth: "100%", position: "relative", zIndex: 2, pointerEvents: "auto" }}
+            style={{ minWidth: 0, flex: 1, maxWidth: "100%", position: "relative", zIndex: 9, pointerEvents: "auto" }}
           />
           {(searchFocused || searchQuery.trim()) && (
             <Link href={`/app/discover${searchQuery.trim() ? `?q=${encodeURIComponent(searchQuery.trim())}` : ""}`} className="text-muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>Search others</Link>
@@ -3392,91 +3425,105 @@ function AppShell({
           </div>
         )}
 
-      {sortOpen && (
-        <div className="om-filter-row" style={{ marginTop: "var(--space-10)", marginBottom: 4, gap: "var(--space-10)", alignItems: "center" }}>
-          <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
-            <option value="grid">grid</option>
-            <option value="list">list</option>
-          </select>
-          {viewMode === "grid" && (
-            <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
-              {isMobile && <option value={1}>1</option>}
-              <option value={2}>2</option>
-              {!isMobile && (
-                <>
-                  <option value={4}>4</option>
-                  <option value={8}>8</option>
-                </>
-              )}
+      <div 
+        style={{ 
+          position: "sticky", 
+          top: stuck ? 48 : -1, // Height of the primary sticky bar when stuck
+          zIndex: 9, 
+          background: "var(--bg)",
+          marginRight: "calc(var(--page-pad) * -1)",
+          marginLeft: "calc(var(--page-pad) * -1)",
+          paddingRight: "var(--page-pad)",
+          paddingLeft: "var(--page-pad)"
+        }}
+      >
+        {sortOpen && (
+          <div className="om-filter-row" style={{ marginTop: "var(--space-10)", marginBottom: 4, gap: "var(--space-10)", alignItems: "center", paddingBottom: "var(--space-8)" }}>
+            <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as any)}>
+              <option value="grid">grid</option>
+              <option value="list">list</option>
             </select>
-          )}
+            {viewMode === "grid" && (
+              <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
+                {isMobile && <option value={1}>1</option>}
+                <option value={2}>2</option>
+                {!isMobile && (
+                  <>
+                    <option value={4}>4</option>
+                    <option value={8}>8</option>
+                  </>
+                )}
+              </select>
+            )}
 
-          <select className="om-filter-control" value={sortMode} onChange={(e) => {
-            const val = e.target.value as any;
-            setSortMode(val);
-            if (val === "custom" && rearrangingLibraryId === null && displayLibraries.length > 0) {
-              setRearrangingLibraryId(displayLibraries[0].id);
-            }
-          }}>
-            <option value="custom">custom order</option>
-            <option value="latest">latest</option>
-            <option value="earliest">earliest</option>
-            <option value="title_asc">title A-Z</option>
-            <option value="title_desc">title Z-A</option>
-          </select>          {(availableCategories.length > 0 || !!(filterCategory ?? "").trim()) && (
-            <select className="om-filter-control" value={filterCategory ?? ""} onChange={(e) => setUrlFilters({ category: e.target.value || null })}>
-              <option value="">category</option>
-              {availableCategories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+            <select className="om-filter-control" value={sortMode} onChange={(e) => {
+              const val = e.target.value as any;
+              setSortMode(val);
+              if (val === "custom" && rearrangingLibraryId === null && displayLibraries.length > 0) {
+                setRearrangingLibraryId(displayLibraries[0].id);
+              }
+            }}>
+              <option value="custom">custom order</option>
+              <option value="latest">latest</option>
+              <option value="earliest">earliest</option>
+              <option value="title_asc">title A-Z</option>
+              <option value="title_desc">title Z-A</option>
             </select>
-          )}
-          {(availableTags.length > 0 || !!(filterTag ?? "").trim()) && (
-            <select className="om-filter-control" value={filterTag ?? ""} onChange={(e) => setUrlFilters({ tag: e.target.value || null })}>
-              <option value="">tags</option>
-              {availableTags.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
+            {(availableCategories.length > 0 || !!(filterCategory ?? "").trim()) && (
+              <select className="om-filter-control" value={filterCategory ?? ""} onChange={(e) => setUrlFilters({ category: e.target.value || null })}>
+                <option value="">category</option>
+                {availableCategories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            )}
+            {(availableTags.length > 0 || !!(filterTag ?? "").trim()) && (
+              <select className="om-filter-control" value={filterTag ?? ""} onChange={(e) => setUrlFilters({ tag: e.target.value || null })}>
+                <option value="">tags</option>
+                {availableTags.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            )}
+            {(availableDecades.length > 0 || !!(filterDecade ?? "").trim()) && (
+              <select className="om-filter-control" value={filterDecade ?? ""} onChange={(e) => setUrlFilters({ decade: e.target.value || null })}>
+                <option value="">decade</option>
+                {availableDecades.map((decade) => (
+                  <option key={decade} value={decade}>
+                    {decade}
+                  </option>
+                ))}
+              </select>
+            )}
+            <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
+              <option value="all">visibility</option>
+              <option value="public">public</option>
+              <option value="private">private</option>
             </select>
-          )}
-          {(availableDecades.length > 0 || !!(filterDecade ?? "").trim()) && (
-            <select className="om-filter-control" value={filterDecade ?? ""} onChange={(e) => setUrlFilters({ decade: e.target.value || null })}>
-              <option value="">decade</option>
-              {availableDecades.map((decade) => (
-                <option key={decade} value={decade}>
-                  {decade}
-                </option>
-              ))}
-            </select>
-          )}
-          <select className="om-filter-control" value={visibilityMode} onChange={(e) => setVisibilityMode(e.target.value as any)}>
-            <option value="all">visibility</option>
-            <option value="public">public</option>
-            <option value="private">private</option>
-          </select>
-        </div>
-      )}
+          </div>
+        )}
 
-      <BulkBar
-        bulkMode={bulkMode}
-        bulkState={bulkState}
-        selectedGroupsCount={bulkSelectedGroups.length}
-        libraries={renderLibraries.map((l) => ({ id: l.id, name: l.name }))}
-        bulkCategoryName={bulkCategoryName}
-        setBulkCategoryName={setBulkCategoryName}
-        onClearSelected={() => setBulkSelectedKeys({})}
-        onBulkDeleteSelected={bulkDeleteSelected}
-        onBulkMakePublic={bulkMakePublic}
-        onBulkMakePrivate={bulkMakePrivate}
-        onBulkAssignCategory={bulkAssignCategory}
-        onBulkMoveSelected={bulkMoveSelected}
-        onBulkCopySelected={bulkCopySelected}
-        onAnyMenuOpen={() => { closeTagMenu(); closeCategoryMenu(); }}
-      />
+        <BulkBar
+          bulkMode={bulkMode}
+          bulkState={bulkState}
+          selectedGroupsCount={bulkSelectedGroups.length}
+          libraries={renderLibraries.map((l) => ({ id: l.id, name: l.name }))}
+          bulkCategoryName={bulkCategoryName}
+          setBulkCategoryName={setBulkCategoryName}
+          onClearSelected={() => setBulkSelectedKeys({})}
+          onBulkDeleteSelected={bulkDeleteSelected}
+          onBulkMakePublic={bulkMakePublic}
+          onBulkMakePrivate={bulkMakePrivate}
+          onBulkAssignCategory={bulkAssignCategory}
+          onBulkMoveSelected={bulkMoveSelected}
+          onBulkCopySelected={bulkCopySelected}
+          onAnyMenuOpen={() => { closeTagMenu(); closeCategoryMenu(); }}
+        />
+      </div>
 
       <div style={{ height: "var(--catalog-top-gap)" }} />
 
