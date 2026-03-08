@@ -2904,16 +2904,27 @@ function AppShell({
     const snapshot = reorderBackupItems;
     setReorderBackupItems(null);
     if (!supabase) return;
+    const db = supabase;
+
+    const previousSortOrderById = new Map<number, number | null>(
+      (snapshot ?? [])
+        .filter((item) => item.library_id === libraryId)
+        .map((item) => [item.id, item.sort_order ?? null])
+    );
 
     const rows = itemsRef.current
       .filter((item) => item.library_id === libraryId)
-      .map((item) => ({ id: item.id, sort_order: item.sort_order ?? null }));
+      .map((item) => ({ id: item.id, sort_order: item.sort_order ?? null }))
+      .filter((row) => previousSortOrderById.get(row.id) !== row.sort_order);
 
     if (rows.length === 0) return;
 
     try {
-      const { error } = await supabase.from("user_books").upsert(rows as any, { onConflict: "id" });
-      if (error) throw error;
+      const results = await Promise.all(
+        rows.map((row) => db.from("user_books").update({ sort_order: row.sort_order }).eq("id", row.id))
+      );
+      const failed = results.find((result) => result.error);
+      if (failed?.error) throw failed.error;
     } catch (err: any) {
       console.error("Failed to persist new order", err);
       if (snapshot) {

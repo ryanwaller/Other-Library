@@ -17,6 +17,7 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
+  defaultAnimateLayoutChanges,
   rectSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
@@ -122,7 +123,12 @@ function SortableCatalogCard({
 }: SortableCatalogCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({
     id: group.key,
-    disabled: !isRearranging
+    disabled: !isRearranging,
+    animateLayoutChanges: (args) => defaultAnimateLayoutChanges({ ...args, wasDragging: true }),
+    transition: {
+      duration: 220,
+      easing: "cubic-bezier(0.2, 0, 0, 1)"
+    }
   });
 
   const style = {
@@ -145,23 +151,27 @@ function SortableCatalogCard({
   });
 
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
       data-reorder-key={group.key}
       data-reorder-lib-id={libraryId}
       style={{ ...style, position: "relative", zIndex: isDragging ? 2 : 1 }}
-      animate={{
-        opacity: isDragging ? 0.18 : 1,
-        scale: isDragging ? 0.985 : 1,
-        backgroundColor: isDragging
-          ? "color-mix(in srgb, var(--bg-muted) 72%, transparent)"
-          : isOver
-            ? "color-mix(in srgb, var(--bg-muted) 38%, transparent)"
-            : "transparent"
-      }}
-      transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
     >
-      <div style={{ pointerEvents: isDragging ? "none" : "auto" }}>{card}</div>
+      <motion.div
+        animate={{
+          opacity: isDragging ? 0.18 : 1,
+          scale: isDragging ? 0.985 : 1,
+          backgroundColor: isDragging
+            ? "color-mix(in srgb, var(--bg-muted) 72%, transparent)"
+            : isOver
+              ? "color-mix(in srgb, var(--bg-muted) 38%, transparent)"
+              : "transparent"
+        }}
+        transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+        style={{ pointerEvents: isDragging ? "none" : "auto", transformOrigin: "center center" }}
+      >
+        {card}
+      </motion.div>
       {isRearranging ? (
         <button
           type="button"
@@ -181,7 +191,7 @@ function SortableCatalogCard({
           }}
         />
       ) : null}
-    </motion.div>
+    </div>
   );
 }
 
