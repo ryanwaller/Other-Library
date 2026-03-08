@@ -730,9 +730,11 @@ function AppShell({
   const measureControlsBand = useCallback(() => {
     if (typeof window === "undefined" || !controlsBandRef.current) return;
     const rect = controlsBandRef.current.getBoundingClientRect();
-    controlsBandTopRef.current = rect.top + window.scrollY;
+    if (!controlsFixed) {
+      controlsBandTopRef.current = rect.top + window.scrollY;
+    }
     setControlsBandHeight(rect.height);
-  }, []);
+  }, [controlsFixed]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
