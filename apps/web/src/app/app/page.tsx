@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
@@ -650,6 +650,11 @@ function AppShell({
   });
 
   const [reorderMode, setReorderMode] = useState(false);
+  const controlsBandRef = useRef<HTMLDivElement | null>(null);
+  const controlsBandTopRef = useRef(0);
+  const lastScrollYRef = useRef(0);
+  const [controlsDocked, setControlsDocked] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
 
   const [isMobile, setIsMobile] = useState(false);
   const autoReducedGridColsRef = useRef<4 | 8 | null>(null);
@@ -716,6 +721,77 @@ function AppShell({
       return prev;
     });
   }, [isMobile]);
+
+  const searchParamsKey = searchParams.toString();
+  const controlsPinnedOpen = sortOpen || bulkMode;
+
+  const measureControlsBand = useCallback(() => {
+    if (typeof window === "undefined" || !controlsBandRef.current) return;
+    const rect = controlsBandRef.current.getBoundingClientRect();
+    controlsBandTopRef.current = rect.top + window.scrollY;
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = window.requestAnimationFrame(measureControlsBand);
+    const handleResize = () => window.requestAnimationFrame(measureControlsBand);
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.cancelAnimationFrame(id);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [measureControlsBand]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = window.requestAnimationFrame(measureControlsBand);
+    return () => window.cancelAnimationFrame(id);
+  }, [measureControlsBand, isMobile, bulkMode, sortOpen, searchOpen, searchParamsKey, libraries.length]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    lastScrollYRef.current = window.scrollY;
+    let ticking = false;
+    const update = () => {
+      ticking = false;
+      const y = window.scrollY;
+      const lastY = lastScrollYRef.current;
+      const stickyStart = Math.max(controlsBandTopRef.current - 8, 0);
+      const isNearTop = y <= stickyStart;
+      const scrollingDown = y > lastY + 2;
+      const scrollingUp = y < lastY - 2;
+
+      if (isNearTop) {
+        setControlsDocked(false);
+        setControlsVisible(true);
+      } else {
+        setControlsDocked(true);
+        if (controlsPinnedOpen) {
+          setControlsVisible(true);
+        } else if (scrollingDown) {
+          setControlsVisible(false);
+        } else if (scrollingUp) {
+          setControlsVisible(true);
+        }
+      }
+
+      lastScrollYRef.current = y;
+    };
+
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [controlsPinnedOpen]);
+
+  useEffect(() => {
+    if (controlsPinnedOpen) setControlsVisible(true);
+  }, [controlsPinnedOpen]);
 
   useEffect(() => {
     try {
@@ -3101,6 +3177,12 @@ function AppShell({
         </div>
       </div>
 
+        <div
+          ref={controlsBandRef}
+          className="om-smart-sticky-band"
+          data-docked={controlsDocked ? "true" : "false"}
+          data-visible={!controlsDocked || controlsVisible ? "true" : "false"}
+        >
         {isMobile ? (
           <>
             <div className="row" style={{ width: "100%", margin: 0, gap: "var(--space-10)", alignItems: "baseline", flexWrap: "nowrap", marginBottom: "var(--space-md)" }}>
@@ -3176,23 +3258,7 @@ function AppShell({
             </div>
           </>
         ) : (
-          <div 
-            className="om-sticky-controls" 
-            style={{ 
-              position: "sticky", 
-              top: 0, 
-              zIndex: 10, 
-              background: "var(--bg)", 
-              paddingTop: "var(--space-md)",
-              paddingBottom: "var(--space-sm)",
-              marginTop: "var(--space-md)",
-              borderBottom: "1px solid var(--border)",
-              marginRight: "calc(var(--page-pad) * -1)",
-              marginLeft: "calc(var(--page-pad) * -1)",
-              paddingRight: "var(--page-pad)",
-              paddingLeft: "var(--page-pad)"
-            }}
-          >
+          <div className="om-sticky-controls">
             <div className="row" style={{ width: "100%", margin: 0, alignItems: "baseline", justifyContent: "space-between", flexWrap: "nowrap" }}>
               <div className="row" style={{ flex: "1 1 auto", gap: "var(--space-md)", alignItems: "baseline", minWidth: 0, flexWrap: "nowrap", margin: 0 }}>
                 {showScan && (
@@ -3338,6 +3404,7 @@ function AppShell({
             />
           </div>
         )}
+        </div>
 
       <div style={{ height: "var(--space-md)" }} />
 
