@@ -668,7 +668,7 @@ button:disabled {
 }
 
 .om-smart-sticky-band .om-filter-control {
-  background: var(--card-bg);
+  background-color: var(--card-bg);
 }
 
 .om-filter-control:focus,

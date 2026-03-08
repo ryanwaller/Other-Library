@@ -3060,7 +3060,17 @@ function AppShell({
   const availableCategories = useMemo(() => {
     const set = new Set<string>();
     for (const it of items) {
-      for (const t of tagsFor(it)) if (t.kind === "category") set.add(t.name);
+      for (const row of (it.book_tags ?? [])) {
+        const tag = row?.tag;
+        const kind = String(tag?.kind ?? "").trim().toLowerCase();
+        const name = String(tag?.name ?? "").trim();
+        if (kind === "category" && name) set.add(name);
+      }
+      for (const row of (it.book_entities ?? [])) {
+        const role = String(row?.role ?? "").trim().toLowerCase();
+        const name = String(row?.entity?.name ?? "").trim();
+        if (role === "category" && name) set.add(name);
+      }
     }
     return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
   }, [items]);
@@ -3068,7 +3078,17 @@ function AppShell({
   const availableTags = useMemo(() => {
     const set = new Set<string>();
     for (const it of items) {
-      for (const t of tagsFor(it)) if (t.kind === "tag") set.add(t.name);
+      for (const row of (it.book_tags ?? [])) {
+        const tag = row?.tag;
+        const kind = String(tag?.kind ?? "").trim().toLowerCase();
+        const name = String(tag?.name ?? "").trim();
+        if (kind === "tag" && name) set.add(name);
+      }
+      for (const row of (it.book_entities ?? [])) {
+        const role = String(row?.role ?? "").trim().toLowerCase();
+        const name = String(row?.entity?.name ?? "").trim();
+        if (role === "tag" && name) set.add(name);
+      }
     }
     return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
   }, [items]);
