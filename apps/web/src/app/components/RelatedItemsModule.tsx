@@ -20,6 +20,7 @@ export type RelatedItemsCandidate = {
 type RelatedItemRow = {
   id: number;
   library_id?: number | null;
+  resolved_cover_url?: string | null;
   visibility: "inherit" | "followers_only" | "public";
   object_type: string | null;
   title_override: string | null;
@@ -30,7 +31,7 @@ type RelatedItemRow = {
   cover_crop: CoverCrop | null;
   edition: { title: string | null; cover_url: string | null; authors?: string[] | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
-  book_entities?: Array<{ role: string; entity_id?: string | null; entity?: { name?: string | null } | null }>;
+  book_entities?: Array<{ role: string; entity_id?: string | null; entity?: { id?: string | null; name?: string | null } | null }>;
 };
 
 function isUuid(input: string | null | undefined): boolean {
@@ -55,6 +56,8 @@ function coverStoragePath(row: RelatedItemRow): string | null {
 }
 
 function coverSrc(row: RelatedItemRow, signedMap: Record<string, string>): string | null {
+  const resolved = String(row.resolved_cover_url ?? "").trim();
+  if (resolved) return resolved;
   const original = String(row.cover_original_url ?? "").trim();
   if (original) {
     if (isRemoteUrl(original)) return original;
@@ -89,7 +92,8 @@ function rowMatchesCandidate(row: RelatedItemRow, candidate: RelatedItemsCandida
   if (entityId) {
     const hasEntityMatch = (row.book_entities ?? []).some((entry) => {
       const role = String(entry?.role ?? "").trim().toLowerCase();
-      return role === candidate.role && String(entry?.entity_id ?? "").trim() === entityId;
+      const rowEntityId = String(entry?.entity_id ?? entry?.entity?.id ?? "").trim();
+      return role === candidate.role && rowEntityId === entityId;
     });
     if (hasEntityMatch) return true;
   }
@@ -182,29 +186,12 @@ export default function RelatedItemsModule({
       }
 
       const resolvedEntityIds = new Map<string, string | null>();
-      const validLibraryIds = new Set<number>();
+      let ownerRows: RelatedItemRow[] | null = null;
 
-      const [ownedLibrariesRes, membershipLibrariesRes] = await Promise.all([
-        supabase.from("libraries").select("id").eq("owner_id", ownerId),
-        supabase.from("catalog_members").select("catalog_id,accepted_at").eq("user_id", ownerId).not("accepted_at", "is", null)
-      ]);
-
-      for (const row of (ownedLibrariesRes.data ?? []) as Array<{ id?: number | null }>) {
-        const id = Number(row?.id);
-        if (Number.isFinite(id) && id > 0) validLibraryIds.add(id);
-      }
-      for (const row of (membershipLibrariesRes.data ?? []) as Array<{ catalog_id?: number | null }>) {
-        const id = Number(row?.catalog_id);
-        if (Number.isFinite(id) && id > 0) validLibraryIds.add(id);
-      }
-
-      if (validLibraryIds.size === 0) {
-        if (!alive) return;
-        setHeading(null);
-        setRows([]);
-        setSignedMap({});
-        setExpanded(false);
-        return;
+      if (hrefMode === "owner") {
+        const res = await fetch("/api/catalog/home?lite=1", { credentials: "include" });
+        const payload = res.ok ? await res.json() : null;
+        ownerRows = Array.isArray(payload?.books) ? (payload.books as RelatedItemRow[]) : [];
       }
 
       for (const candidate of dedupedCandidates) {
@@ -216,42 +203,49 @@ export default function RelatedItemsModule({
         }
         if (!entityId) continue;
 
-        let query = supabase
-          .from("user_books")
-          .select(
-            "id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,cover_url,authors),media:user_book_media(kind,storage_path),book_entities(role,entity_id,entity:entities(name))"
-          )
-          .eq("owner_id", ownerId)
-          .in("library_id", Array.from(validLibraryIds))
-          .neq("id", currentUserBookId)
-          .order("created_at", { ascending: false })
-          .limit(64);
+        let matchedRows: RelatedItemRow[] = [];
+        let nextSignedMap: Record<string, string> = {};
 
-        if (hrefMode === "public") {
-          if (publicProfileVisibility === "public") query = query.neq("visibility", "followers_only");
-          else query = query.eq("visibility", "public");
+        if (hrefMode === "owner" && ownerRows) {
+          matchedRows = ownerRows.filter((row) => Number(row.id) !== currentUserBookId && rowMatchesCandidate(row, candidate, entityId));
+        } else {
+          let query = supabase
+            .from("user_books")
+            .select(
+              "id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,cover_url,authors),media:user_book_media(kind,storage_path),book_entities(role,entity_id,entity:entities(id,name))"
+            )
+            .eq("owner_id", ownerId)
+            .neq("id", currentUserBookId)
+            .order("created_at", { ascending: false })
+            .limit(64);
+
+          if (hrefMode === "public") {
+            if (publicProfileVisibility === "public") query = query.neq("visibility", "followers_only");
+            else query = query.eq("visibility", "public");
+          }
+
+          const result = await query;
+          if (result.error) continue;
+
+          const allRows = (result.data ?? []) as unknown as RelatedItemRow[];
+          matchedRows = allRows.filter((row) => rowMatchesCandidate(row, candidate, entityId));
         }
-
-        const result = await query;
-        if (result.error) continue;
-
-        const allRows = (result.data ?? []) as unknown as RelatedItemRow[];
-        const matchedRows = allRows.filter((row) => rowMatchesCandidate(row, candidate, entityId));
         if (matchedRows.length < 1) continue;
 
-        const paths = Array.from(
-          new Set(
-            matchedRows
-              .map((row) => coverStoragePath(row))
-              .filter((value): value is string => Boolean(value))
-          )
-        );
+        if (!(hrefMode === "owner" && ownerRows)) {
+          const paths = Array.from(
+            new Set(
+              matchedRows
+                .map((row) => coverStoragePath(row))
+                .filter((value): value is string => Boolean(value))
+            )
+          );
 
-        let nextSignedMap: Record<string, string> = {};
-        if (paths.length > 0) {
-          const signed = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 30);
-          for (const row of signed.data ?? []) {
-            if (row.path && row.signedUrl) nextSignedMap[row.path] = row.signedUrl;
+          if (paths.length > 0) {
+            const signed = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 30);
+            for (const row of signed.data ?? []) {
+              if (row.path && row.signedUrl) nextSignedMap[row.path] = row.signedUrl;
+            }
           }
         }
 
