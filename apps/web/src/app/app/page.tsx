@@ -2074,9 +2074,20 @@ function AppShell({
   }
 
   async function handleAddManually() {
-    const title = addInput.trim();
     try {
-      const id = await addManualValue({ title, authors: [] });
+      if (!supabase) throw new Error("Supabase is not configured");
+      if (!addLibraryId) throw new Error("Choose a catalog first");
+      const created = await supabase
+        .from("user_books")
+        .insert({
+          owner_id: userId,
+          library_id: addLibraryId,
+          edition_id: null
+        })
+        .select("id")
+        .single();
+      if (created.error) throw new Error(created.error.message);
+      const id = created.data.id as number;
       cancelAddMode();
       router.push(`/app/books/${id}?edit=1`);
     } catch (e: any) {
