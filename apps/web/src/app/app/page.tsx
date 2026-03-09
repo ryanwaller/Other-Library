@@ -2078,7 +2078,7 @@ function AppShell({
     try {
       const id = await addManualValue({ title, authors: [] });
       cancelAddMode();
-      router.push(`/app/books/${id}`);
+      router.push(`/app/books/${id}?edit=1`);
     } catch (e: any) {
       setAddState({ busy: false, error: e?.message ?? "Failed to add", message: null });
     }
@@ -3294,8 +3294,8 @@ function AppShell({
                       {addState.busy ? "…" : "Go"}
                     </button>
                   )}
-                  <button type="button" className="text-muted" onClick={handleAddManually} disabled={addState.busy} style={{ padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline", whiteSpace: "nowrap" }}>Add manually</button>
-                  <button type="button" className="text-muted" onClick={cancelAddMode} disabled={addState.busy} style={{ padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline", whiteSpace: "nowrap" }}>Cancel</button>
+                  <button type="button" className="text-muted" onClick={handleAddManually} disabled={addState.busy} style={{ padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>Add manually</button>
+                  <button type="button" className="text-muted" onClick={cancelAddMode} disabled={addState.busy} style={{ padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>Cancel</button>
                 </div>
               )}
             </div>
@@ -3426,10 +3426,10 @@ function AppShell({
                     </button>
                   )}
                   {addMode && (
-                    <button type="button" className="text-muted" onClick={handleAddManually} disabled={addState.busy} style={{ padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline", whiteSpace: "nowrap" }}>Add manually</button>
+                    <button type="button" className="text-muted" onClick={handleAddManually} disabled={addState.busy} style={{ padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>Add manually</button>
                   )}
                   {addMode && (
-                    <button type="button" className="text-muted" onClick={cancelAddMode} disabled={addState.busy} style={{ padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", textDecoration: "underline", whiteSpace: "nowrap" }}>Cancel</button>
+                    <button type="button" className="text-muted" onClick={cancelAddMode} disabled={addState.busy} style={{ padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>Cancel</button>
                   )}
                 </div>
                 {!addMode && <button onClick={() => { const next = !bulkMode; if (next) { setAddOpen(false); setSortOpen(false); setSearchOpen(false); setReorderMode(true); } else { exitEditMode(); } setBulkMode(next); }}>

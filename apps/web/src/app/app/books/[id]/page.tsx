@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, Fragment, type KeyboardEvent, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
@@ -449,6 +449,7 @@ function parseTitleAndAuthor(input: string): { title: string; author: string | n
 export default function BookDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const idParam = (params as any)?.id;
   const bookId = Number(Array.isArray(idParam) ? idParam[0] : idParam);
   const [isNarrow, setIsNarrow] = useState(false);
@@ -474,7 +475,15 @@ export default function BookDetailPage() {
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
   const [memberCanEdit, setMemberCanEdit] = useState(false);
-  const [editMode, setEditMode] = useState(false);
+  const [editMode, setEditMode] = useState(() => searchParams.get("edit") === "1");
+  useEffect(() => {
+    if (searchParams.get("edit") === "1") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("edit");
+      router.replace(url.pathname + (url.search || ""));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [findMoreOpen, setFindMoreOpen] = useState(false);
   const [coverToolsOpen, setCoverToolsOpen] = useState(false);
   const [coverExpanded, setCoverExpanded] = useState(false);
