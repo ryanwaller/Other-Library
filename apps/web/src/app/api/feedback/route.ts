@@ -4,7 +4,7 @@ import { getSupabaseAdmin, getCurrentUser } from "../../../lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
-type FeedbackCategory = "bug" | "feels_wrong" | "feature_idea" | "spacing_issue" | "other";
+type FeedbackCategory = "bug" | "feels_wrong" | "feature_idea" | "spacing_issue" | "design_issue" | "other";
 type FeedbackDeviceType = "desktop" | "mobile" | "tablet" | "unknown";
 
 function normalizeCategory(input: string): FeedbackCategory | null {
@@ -13,6 +13,7 @@ function normalizeCategory(input: string): FeedbackCategory | null {
   if (raw === "feels_wrong") return "feels_wrong";
   if (raw === "feature_idea") return "feature_idea";
   if (raw === "spacing_issue") return "spacing_issue";
+  if (raw === "design_issue") return "design_issue";
   if (raw === "other") return "other";
   return null;
 }
@@ -109,7 +110,7 @@ export async function POST(req: Request) {
       ins = await insertFeedback({ useScreenshotPath: includeScreenshotPath, useDeviceType: includeDeviceType, categoryValue: category });
     }
 
-    if (ins.error && category === "spacing_issue") {
+    if (ins.error && (category === "spacing_issue" || category === "design_issue")) {
       // Backward-compatible fallback while DB migrations catch up.
       ins = await insertFeedback({ useScreenshotPath: includeScreenshotPath, useDeviceType: includeDeviceType, categoryValue: "other" });
       if (ins.error && /screenshot_path/i.test(String(ins.error.message ?? ""))) {

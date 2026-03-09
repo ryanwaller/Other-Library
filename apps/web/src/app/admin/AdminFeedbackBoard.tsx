@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 type FeedbackStatus = "new" | "reviewing" | "resolved" | "wont_fix";
 type FeedbackStatusAction = FeedbackStatus | "delete";
-type FeedbackCategory = "bug" | "feels_wrong" | "feature_idea" | "spacing_issue" | "other";
+type FeedbackCategory = "bug" | "feels_wrong" | "feature_idea" | "spacing_issue" | "design_issue" | "other";
 type FeedbackDeviceType = "desktop" | "mobile" | "tablet" | "unknown";
 export type FeedbackMetrics = Record<FeedbackStatus, number>;
 
@@ -43,6 +43,7 @@ const CATEGORIES: Array<{ key: FeedbackCategory; label: string }> = [
   { key: "feels_wrong", label: "Feels wrong" },
   { key: "feature_idea", label: "Feature idea" },
   { key: "spacing_issue", label: "Spacing issue" },
+  { key: "design_issue", label: "Design issue" },
   { key: "other", label: "Other" }
 ];
 

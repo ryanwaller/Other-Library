@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 
-type FeedbackCategory = "bug" | "feels_wrong" | "feature_idea" | "spacing_issue" | "other";
+type FeedbackCategory = "bug" | "feels_wrong" | "feature_idea" | "spacing_issue" | "design_issue" | "other";
 
 function routeTitle(pathname: string): string {
   const p = String(pathname ?? "").trim();
@@ -167,6 +167,7 @@ export default function FeedbackWidget() {
             <option value="feels_wrong">Feels wrong</option>
             <option value="feature_idea">Feature idea</option>
             <option value="spacing_issue">Spacing issue</option>
+            <option value="design_issue">Design issue</option>
             <option value="other">Other</option>
           </select>
           <textarea

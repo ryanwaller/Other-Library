@@ -9,9 +9,9 @@ function normStatus(input: string | null): "all" | "new" | "reviewing" | "resolv
   return "all";
 }
 
-function normCategory(input: string | null): "all" | "bug" | "feels_wrong" | "feature_idea" | "spacing_issue" | "other" {
+function normCategory(input: string | null): "all" | "bug" | "feels_wrong" | "feature_idea" | "spacing_issue" | "design_issue" | "other" {
   const v = String(input ?? "").trim().toLowerCase();
-  if (v === "bug" || v === "feels_wrong" || v === "feature_idea" || v === "spacing_issue" || v === "other") return v;
+  if (v === "bug" || v === "feels_wrong" || v === "feature_idea" || v === "spacing_issue" || v === "design_issue" || v === "other") return v;
   return "all";
 }
 
