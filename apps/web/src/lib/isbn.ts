@@ -39,3 +39,32 @@ export function parseTitleAndAuthor(input: string): { title: string; author: str
   if (slash.length === 2 && slash[0] && slash[1]) return { title: slash[0].trim(), author: slash[1].trim() || null };
   return { title: s, author: null };
 }
+
+export function normalizeLccn(input: string): string {
+  return input.trim()
+    .replace(/^https?:\/\/lccn\.loc\.gov\//i, "")
+    .replace(/[\s\-]+/g, "")
+    .toLowerCase();
+}
+
+export function looksLikeLccn(input: string): boolean {
+  const n = normalizeLccn(input);
+  if (/^[a-z]{1,3}\d{6,10}$/.test(n)) return true;
+  if (/^(19|20)\d{8}$/.test(n)) return true;
+  return false;
+}
+
+export function normalizeOclc(input: string): string {
+  const stripped = input.trim()
+    .replace(/^oclc[:\s\/]*/i, "")
+    .replace(/^oc[mn]/i, "")
+    .replace(/^on/i, "")
+    .replace(/\s+/g, "")
+    .replace(/^0+/, "");
+  return stripped || "0";
+}
+
+export function looksLikeOclc(input: string): boolean {
+  const raw = input.trim();
+  return /^(ocm|ocn|on)\d+$/i.test(raw) || /^oclc[:\s\/]\d+$/i.test(raw);
+}

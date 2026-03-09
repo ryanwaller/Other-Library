@@ -405,6 +405,18 @@ function looksLikeIsbn(input: string): boolean {
   return n.length === 10 || n.length === 13;
 }
 
+function looksLikeLccn(input: string): boolean {
+  const n = input.trim().replace(/^https?:\/\/lccn\.loc\.gov\//i, "").replace(/[\s\-]+/g, "").toLowerCase();
+  if (/^[a-z]{1,3}\d{6,10}$/.test(n)) return true;
+  if (/^(19|20)\d{8}$/.test(n)) return true;
+  return false;
+}
+
+function looksLikeOclc(input: string): boolean {
+  const raw = input.trim();
+  return /^(ocm|ocn|on)\d+$/i.test(raw) || /^oclc[:\s\/]\d+$/i.test(raw);
+}
+
 function tryParseUrl(input: string): URL | null {
   const raw = input.trim();
   if (!raw) return null;
@@ -3005,6 +3017,11 @@ export default function BookDetailPage() {
       if (looksLikeBarcode(value)) {
         await searchMetadata("", "", value);
       }
+      return;
+    }
+
+    if (looksLikeLccn(value) || looksLikeOclc(value)) {
+      await previewImportFromIsbn(value);
       return;
     }
 

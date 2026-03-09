@@ -28,6 +28,8 @@ import {
 import {
   normalizeIsbn,
   looksLikeIsbn,
+  looksLikeLccn,
+  looksLikeOclc,
   tryParseUrl,
   parseTitleAndAuthor
 } from "../../lib/isbn";
@@ -2030,6 +2032,11 @@ function AppShell({
       if (looksLikeBarcode(value)) {
         await searchAddResults("", null, value);
       }
+      return;
+    }
+
+    if (looksLikeLccn(value) || looksLikeOclc(value)) {
+      await previewIsbn(value);
       return;
     }
 
