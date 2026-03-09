@@ -1241,6 +1241,12 @@ a.text-muted:hover {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.om-related-items-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .om-book-secondary a {
   color: var(--muted);
   text-decoration-color: var(--muted);
@@ -1630,6 +1636,10 @@ summary::-webkit-details-marker {
   }
 
   .om-images-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .om-related-items-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

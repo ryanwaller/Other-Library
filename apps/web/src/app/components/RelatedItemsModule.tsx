@@ -260,7 +260,7 @@ export default function RelatedItemsModule({
       <hr className="divider" />
       <div style={{ marginTop: "var(--space-lg)" }}>
         <div>{heading}</div>
-        <div className="om-images-grid" style={{ marginTop: "var(--space-14)" }}>
+        <div className="om-related-items-grid" style={{ marginTop: "var(--space-14)" }}>
           {visibleRows.map((row) => {
             const title = effectiveTitle(row);
             const href =
