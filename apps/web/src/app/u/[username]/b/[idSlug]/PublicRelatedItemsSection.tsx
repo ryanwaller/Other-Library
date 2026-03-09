@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { bookIdSlug } from "../../../../../lib/slug";
@@ -222,13 +225,31 @@ export default async function PublicRelatedItemsSection({
     }
   }
 
+  return <PublicRelatedItemsGrid heading={heading} profileUsername={profileUsername} relatedRows={relatedRows} signedMap={signedMap} />;
+}
+
+function PublicRelatedItemsGrid({
+  heading,
+  profileUsername,
+  relatedRows,
+  signedMap
+}: {
+  heading: string;
+  profileUsername: string;
+  relatedRows: PublicBookLike[];
+  signedMap: Record<string, string>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const visibleRows = expanded ? relatedRows : relatedRows.slice(0, 4);
+  const showPager = relatedRows.length > 4;
+
   return (
     <>
       <hr className="divider" />
       <div style={{ marginTop: "var(--space-lg)" }}>
         <div>{heading}</div>
         <div className="om-images-grid" style={{ marginTop: "var(--space-14)" }}>
-          {relatedRows.map((row) => {
+          {visibleRows.map((row) => {
             const title = effectiveTitle(row);
             const href = `/u/${encodeURIComponent(profileUsername)}/b/${bookIdSlug(row.id, title)}`;
             return (
@@ -247,6 +268,13 @@ export default async function PublicRelatedItemsSection({
             );
           })}
         </div>
+        {showPager ? (
+          <div className="row" style={{ marginTop: "var(--space-md)", justifyContent: "center" }}>
+            <button className="text-muted" onClick={() => setExpanded((value) => !value)}>
+              {expanded ? "See less" : "Load more"}
+            </button>
+          </div>
+        ) : null}
       </div>
     </>
   );

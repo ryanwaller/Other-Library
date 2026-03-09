@@ -3611,7 +3611,11 @@ export default function BookDetailPage() {
               rowGap: 12,
               columnGap: 14,
               alignItems: "start",
-              gridTemplateColumns: isNarrow ? "1fr" : coverExpanded ? "minmax(0, 1fr) minmax(0, 1fr)" : "220px minmax(0, 1fr)"
+              gridTemplateColumns: isNarrow
+                ? "1fr"
+                : coverExpanded
+                  ? "minmax(0, 1fr) minmax(0, 1fr)"
+                  : "minmax(0, calc((100% - (14px * 3)) / 4)) minmax(0, 1fr)"
             }}
           >
             <div style={{ gridColumn: "1 / -1", marginBottom: 0 }}>

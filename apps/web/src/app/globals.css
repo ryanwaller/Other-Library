@@ -1231,7 +1231,7 @@ a.text-muted:hover {
 /* Book detail helpers (public + app) */
 .om-book-detail-grid {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: minmax(0, calc((100% - (14px * 3)) / 4)) minmax(0, 1fr);
   gap: 14px;
 }
 

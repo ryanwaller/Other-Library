@@ -150,6 +150,7 @@ export default function RelatedItemsModule({
   const [heading, setHeading] = useState<string | null>(null);
   const [rows, setRows] = useState<RelatedItemRow[]>([]);
   const [signedMap, setSignedMap] = useState<Record<string, string>>({});
+  const [expanded, setExpanded] = useState(false);
 
   const dedupedCandidates = useMemo(() => {
     const seen = new Set<string>();
@@ -212,10 +213,9 @@ export default function RelatedItemsModule({
         const matchedRows = allRows.filter((row) => rowMatchesCandidate(row, candidate, entityId));
         if (matchedRows.length < 3) continue;
 
-        const displayRows = matchedRows.slice(0, 4);
         const paths = Array.from(
           new Set(
-            displayRows
+            matchedRows
               .map((row) => coverStoragePath(row))
               .filter((value): value is string => Boolean(value))
           )
@@ -231,8 +231,9 @@ export default function RelatedItemsModule({
 
         if (!alive) return;
         setHeading(candidate.heading);
-        setRows(displayRows);
+        setRows(matchedRows);
         setSignedMap(nextSignedMap);
+        setExpanded(false);
         return;
       }
 
@@ -240,6 +241,7 @@ export default function RelatedItemsModule({
       setHeading(null);
       setRows([]);
       setSignedMap({});
+      setExpanded(false);
     }
 
     void load();
@@ -250,6 +252,8 @@ export default function RelatedItemsModule({
   }, [currentUserBookId, dedupedCandidates, hrefMode, ownerId, publicProfileVisibility]);
 
   if (!heading || rows.length < 3) return null;
+  const visibleRows = expanded ? rows : rows.slice(0, 4);
+  const showPager = rows.length > 4;
 
   return (
     <>
@@ -257,7 +261,7 @@ export default function RelatedItemsModule({
       <div style={{ marginTop: "var(--space-lg)" }}>
         <div>{heading}</div>
         <div className="om-images-grid" style={{ marginTop: "var(--space-14)" }}>
-          {rows.map((row) => {
+          {visibleRows.map((row) => {
             const title = effectiveTitle(row);
             const href =
               hrefMode === "public" && username
@@ -280,6 +284,13 @@ export default function RelatedItemsModule({
             );
           })}
         </div>
+        {showPager ? (
+          <div className="row" style={{ marginTop: "var(--space-md)", justifyContent: "center" }}>
+            <button className="text-muted" onClick={() => setExpanded((value) => !value)}>
+              {expanded ? "See less" : "Load more"}
+            </button>
+          </div>
+        ) : null}
       </div>
     </>
   );
