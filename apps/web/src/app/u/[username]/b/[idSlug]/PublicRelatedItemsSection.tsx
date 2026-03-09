@@ -202,13 +202,13 @@ export default async function PublicRelatedItemsSection({
   let relatedRows: PublicBookLike[] = [];
   for (const candidate of candidates) {
     const matches = allBooks.filter((row) => rowMatchesCandidate(row, candidate));
-    if (matches.length < 3) continue;
+    if (matches.length < 1) continue;
     heading = candidate.heading;
     relatedRows = matches.slice(0, 4);
     break;
   }
 
-  if (!heading || relatedRows.length < 3) return null;
+  if (!heading || relatedRows.length < 1) return null;
 
   const mediaPaths = Array.from(
     new Set(

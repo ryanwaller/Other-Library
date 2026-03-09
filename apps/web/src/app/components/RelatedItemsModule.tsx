@@ -211,7 +211,7 @@ export default function RelatedItemsModule({
 
         const allRows = (result.data ?? []) as unknown as RelatedItemRow[];
         const matchedRows = allRows.filter((row) => rowMatchesCandidate(row, candidate, entityId));
-        if (matchedRows.length < 3) continue;
+        if (matchedRows.length < 1) continue;
 
         const paths = Array.from(
           new Set(
@@ -251,7 +251,7 @@ export default function RelatedItemsModule({
     };
   }, [currentUserBookId, dedupedCandidates, hrefMode, ownerId, publicProfileVisibility]);
 
-  if (!heading || rows.length < 3) return null;
+  if (!heading || rows.length < 1) return null;
   const visibleRows = expanded ? rows : rows.slice(0, 4);
   const showPager = rows.length > 4;
 
