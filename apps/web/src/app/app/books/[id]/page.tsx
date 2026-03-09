@@ -25,6 +25,7 @@ import {
   type MusicMetadata
 } from "../../../../lib/music";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
+import RelatedItemsModule, { type RelatedItemsCandidate } from "../../../components/RelatedItemsModule";
 import SignInCard from "../../../components/SignInCard";
 import EntityTokenField from "../../components/EntityTokenField";
 import CoverImage, { type CoverCrop } from "../../../../components/CoverImage";
@@ -1830,6 +1831,46 @@ export default function BookDetailPage() {
     formPrinter, 
     formMaterials
   ]);
+
+  const relatedItemsCandidates = useMemo<RelatedItemsCandidate[]>(() => {
+    const out: RelatedItemsCandidate[] = [];
+    for (const entity of facetView.author) {
+      out.push({
+        role: "author",
+        name: entity.name,
+        entityId: entity.id,
+        entitySlug: entity.slug,
+        heading: `Other books by ${entity.name}`,
+        mediaScope: "book"
+      });
+    }
+
+    for (const role of MUSIC_CONTRIBUTOR_ROLES.filter((role) => !["designer", "art direction", "artwork", "photography"].includes(role))) {
+      for (const entity of facetView[role]) {
+        out.push({
+          role,
+          name: entity.name,
+          entityId: entity.id,
+          entitySlug: entity.slug,
+          heading: `Other records by ${entity.name}`,
+          mediaScope: "music"
+        });
+      }
+    }
+
+    for (const entity of facetView.designer) {
+      out.push({
+        role: "designer",
+        name: entity.name,
+        entityId: entity.id,
+        entitySlug: entity.slug,
+        heading: `Other items designed by ${entity.name}`,
+        mediaScope: "all"
+      });
+    }
+
+    return out;
+  }, [facetView]);
 
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
   const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : suggestedCoverUrl ?? book?.edition?.cover_url ?? null;
@@ -5474,6 +5515,17 @@ export default function BookDetailPage() {
           {editionId ? (
             <div style={{ gridColumn: "1 / -1", marginTop: "var(--space-md)" }}>
               <AlsoOwnedBy editionId={editionId} excludeUserBookId={bookId} excludeOwnerId={userId} />
+            </div>
+          ) : null}
+
+          {book?.owner_id ? (
+            <div style={{ gridColumn: "1 / -1", marginTop: "var(--space-md)" }}>
+              <RelatedItemsModule
+                ownerId={book.owner_id}
+                currentUserBookId={bookId}
+                candidates={relatedItemsCandidates}
+                hrefMode="owner"
+              />
             </div>
           ) : null}
         </div>

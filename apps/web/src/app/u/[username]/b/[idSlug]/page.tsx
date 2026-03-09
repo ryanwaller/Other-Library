@@ -17,6 +17,7 @@ import { type CoverCrop } from "../../../../../components/CoverImage";
 import PublicImageGrid from "./PublicImageGrid";
 import PublicBookDetailGrid from "./PublicBookDetailGrid";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
+import RelatedItemsModule, { type RelatedItemsCandidate } from "../../../../components/RelatedItemsModule";
 
 export const dynamic = "force-dynamic";
 
@@ -332,6 +333,94 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
         .filter((row) => row.name && row.slug)
     ])
   ) as Record<(typeof MUSIC_CONTRIBUTOR_ROLES)[number], Array<{ name: string; slug: string }>>;
+
+  const relatedItemsCandidates: RelatedItemsCandidate[] = [];
+  const usedCandidateKeys = new Set<string>();
+  const pushCandidate = (candidate: RelatedItemsCandidate) => {
+    const key = `${candidate.role}:${candidate.name.toLowerCase()}`;
+    if (usedCandidateKeys.has(key)) return;
+    usedCandidateKeys.add(key);
+    relatedItemsCandidates.push(candidate);
+  };
+
+  for (const row of book.book_entities ?? []) {
+    if (String(row?.role ?? "").trim() !== "author") continue;
+    const entity = row.entity;
+    const name = String(entity?.name ?? "").trim();
+    if (!name) continue;
+    pushCandidate({
+      role: "author",
+      name,
+      entityId: entity?.id ?? null,
+      entitySlug: entity?.slug ?? null,
+      heading: `Other books by ${name}`,
+      mediaScope: "book"
+    });
+  }
+  if (relatedItemsCandidates.length === 0) {
+    for (const name of effectiveAuthors) {
+      pushCandidate({
+        role: "author",
+        name,
+        heading: `Other books by ${name}`,
+        mediaScope: "book"
+      });
+    }
+  }
+
+  for (const role of MUSIC_CONTRIBUTOR_ROLES.filter((role) => !["designer", "art direction", "artwork", "photography"].includes(role))) {
+    const rows = (book.book_entities ?? []).filter((row) => String(row?.role ?? "").trim() === role);
+    for (const row of rows) {
+      const entity = row.entity;
+      const name = String(entity?.name ?? "").trim();
+      if (!name) continue;
+      pushCandidate({
+        role,
+        name,
+        entityId: entity?.id ?? null,
+        entitySlug: entity?.slug ?? null,
+        heading: `Other records by ${name}`,
+        mediaScope: "music"
+      });
+    }
+  }
+  if (!relatedItemsCandidates.some((candidate) => candidate.mediaScope === "music")) {
+    const primaryArtist = String(music?.primary_artist ?? "").trim();
+    if (primaryArtist) {
+      pushCandidate({
+        role: "performer",
+        name: primaryArtist,
+        heading: `Other records by ${primaryArtist}`,
+        mediaScope: "music"
+      });
+    }
+  }
+
+  for (const row of book.book_entities ?? []) {
+    const role = String(row?.role ?? "").trim();
+    if (role !== "designer" && role !== "design") continue;
+    const entity = row.entity;
+    const name = String(entity?.name ?? "").trim();
+    if (!name) continue;
+    pushCandidate({
+      role: "designer",
+      name,
+      entityId: entity?.id ?? null,
+      entitySlug: entity?.slug ?? null,
+      heading: `Other items designed by ${name}`,
+      mediaScope: "all"
+    });
+  }
+  if (!relatedItemsCandidates.some((candidate) => candidate.role === "designer")) {
+    for (const name of effectiveDesigners) {
+      pushCandidate({
+        role: "designer",
+        name,
+        heading: `Other items designed by ${name}`,
+        mediaScope: "all"
+      });
+    }
+  }
 
   const paths = Array.from(new Set([
     ...(book.media ?? []).map((m) => m.storage_path).filter(Boolean),
@@ -830,6 +919,17 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
           <div style={{ marginTop: 16 }}>
             {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={book.id} excludeOwnerId={book.owner_id} /> : null}
+          </div>
+
+          <div style={{ marginTop: 16 }}>
+            <RelatedItemsModule
+              ownerId={book.owner_id}
+              currentUserBookId={book.id}
+              candidates={relatedItemsCandidates}
+              hrefMode="public"
+              username={profile.username}
+              publicProfileVisibility={profile.visibility ?? null}
+            />
           </div>
         </div>
       </AddToLibraryProvider>
