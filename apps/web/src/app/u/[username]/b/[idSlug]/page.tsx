@@ -13,8 +13,9 @@ import ScrollToTopOnMount from "../../../../components/ScrollToTopOnMount";
 import { ExpandableSubjects, ExpandableDescription } from "./PublicExpandables";
 import FollowControls from "../../FollowControls";
 import PublicProfileHeader from "../../../../components/PublicProfileHeader";
-import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
+import { type CoverCrop } from "../../../../../components/CoverImage";
 import PublicImageGrid from "./PublicImageGrid";
+import PublicBookDetailGrid from "./PublicBookDetailGrid";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
 
 export const dynamic = "force-dynamic";
@@ -408,13 +409,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
         />
 
         <div style={{ marginTop: "var(--space-14)" }} className="card">
-          <div className="om-book-detail-grid">
-            <div>
-              <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
-                <CoverImage alt={effectiveTitle} src={coverSrc} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
-              </div>
-            </div>
-
+          <PublicBookDetailGrid coverSrc={coverSrc} cropData={cropData} effectiveTitle={effectiveTitle}>
             <div>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
                 <div>{effectiveTitle}</div>
@@ -821,7 +816,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 />
               </div>
             </div>
-          </div>
+          </PublicBookDetailGrid>
 
           {images.length > 0 ? (
             <div style={{ marginTop: 16 }}>
