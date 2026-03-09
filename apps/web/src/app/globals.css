@@ -630,7 +630,7 @@ button:disabled {
   top: 0;
   right: 0;
   left: 0;
-  height: calc(100% + 48px);
+  height: calc(100% + var(--sticky-band-overhang, 48px));
   opacity: 0;
   pointer-events: none;
   z-index: -1;

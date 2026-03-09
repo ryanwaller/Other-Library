@@ -3534,7 +3534,7 @@ export default function BookDetailPage() {
             transform: swipeOffsetX ? `translate3d(${swipeOffsetX}px, 0, 0)` : undefined,
             filter: swipeBlurPx > 0 ? `blur(${swipeBlurPx}px)` : undefined,
             transition: swipeAnimating ? "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), filter 220ms ease-out" : "none",
-            willChange: isNarrow && (swipeOffsetX !== 0 || swipeAnimating) ? "transform, filter" : undefined
+            willChange: undefined
           }}
         >
           <div
@@ -3555,6 +3555,7 @@ export default function BookDetailPage() {
                 data-docked={controlsDocked ? "true" : "false"}
                 data-visible={!controlsDocked || controlsVisible ? "true" : "false"}
                 data-fixed={controlsFixed ? "true" : "false"}
+                style={{ "--sticky-band-overhang": "18px" } as React.CSSProperties}
               >
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap", gap: "var(--space-10)" }}>
                 {/* Left group: primary action + updates indicator */}
