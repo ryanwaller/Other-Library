@@ -193,7 +193,7 @@ export default function LibraryBlock({
                     className={membersEditorOpen ? "text-primary" : "text-muted"}
                     style={{ border: "none", background: "transparent", padding: 0, textDecoration: "underline", cursor: "pointer" }}
                   >
-                    Edit Members
+                    {(memberPreviews ?? []).length > 0 ? "Edit Members" : "Add members"}
                   </button>
                 ) : (memberPreviews ?? []).length > 0 ? (
                   <span className="om-member-stack" aria-label="Shared catalog members">
