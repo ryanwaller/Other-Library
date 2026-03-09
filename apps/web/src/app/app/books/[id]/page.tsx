@@ -3632,7 +3632,7 @@ export default function BookDetailPage() {
                       </>
                     ) : null}
                     <button
-                      onClick={() => { if (!findMoreOpen) { cancelEditMode(); setMergePanelOpen(false); } setFindMoreOpen((v) => !v); }}
+                      onClick={() => { if (!findMoreOpen) { cancelEditMode(); setMergePanelOpen(false); if (controlsDocked) window.scrollTo({ top: 0, behavior: "smooth" }); } setFindMoreOpen((v) => !v); }}
                       className="text-muted"
                       style={{ whiteSpace: "nowrap" }}
                     >

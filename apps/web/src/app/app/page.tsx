@@ -3253,7 +3253,7 @@ function AppShell({
               <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                 <RotatingHintInput
                   value={addInput}
-                  onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); }}
+                  onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); if (controlsDocked) window.scrollTo({ top: 0, behavior: "smooth" }); }}
                   onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
                   onChange={(e) => setAddInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); smartAddOrSearch(); } }}
@@ -3387,7 +3387,7 @@ function AppShell({
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <RotatingHintInput
                     value={addInput}
-                    onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); }}
+                    onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); setAddInputFocused(true); if (controlsDocked) window.scrollTo({ top: 0, behavior: "smooth" }); }}
                     onBlur={() => setTimeout(() => setAddInputFocused(false), 150)}
                     onChange={(e) => setAddInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); smartAddOrSearch(); } }}
