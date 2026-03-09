@@ -3726,7 +3726,8 @@ function AppShell({
           (lib.memberPreviews ?? []).length > 0 ||
           acceptedMembers.some((m) => m.user_id !== userId) ||
           pendingMembers.length > 0;
-        const showMembersEditor = bulkMode && hasSharedCatalogMembers && membersEditorCatalogId === lib.id;
+        const showEditMembersAction = bulkMode && iAmOwner;
+        const showMembersEditor = bulkMode && iAmOwner && membersEditorCatalogId === lib.id;
         const membersPanel = showMembersEditor ? (
           <div style={{ marginTop: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
             <div className="text-muted">Members</div>
@@ -3834,7 +3835,7 @@ function AppShell({
               libraryId={lib.id}
               libraryName={lib.name}
               memberPreviews={lib.memberPreviews ?? []}
-              showEditMembers={bulkMode && hasSharedCatalogMembers}
+              showEditMembers={showEditMembersAction}
               membersEditorOpen={membersEditorCatalogId === lib.id}
               onToggleMembersEditor={(catalogId) => {
                 setMembersEditorCatalogId((prev) => (prev === catalogId ? null : catalogId));
