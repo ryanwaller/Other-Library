@@ -138,16 +138,16 @@ export default function LibraryBlock({
                   borderBottom: "1px solid var(--border)"
                 }}
               />
-              {hasNameChanges ? (
-                <div className="row" style={{ gap: 24, alignItems: "baseline" }}>
+              <div className="row" style={{ gap: 24, alignItems: "baseline" }}>
+                {hasNameChanges ? (
                   <button onClick={() => onSaveName(libraryId, nameDraft)} disabled={busy || !nameDraft.trim()}>
                     Save
                   </button>
-                  <button onClick={onCancelEdit} disabled={busy}>
-                    Cancel
-                  </button>
-                </div>
-              ) : null}
+                ) : null}
+                <button onClick={onCancelEdit} disabled={busy}>
+                  Cancel
+                </button>
+              </div>
             </span>
           ) : (
             <div className="row" style={{ flex: 1, justifyContent: "space-between", alignItems: "baseline", minWidth: 0 }}>
