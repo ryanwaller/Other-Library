@@ -201,7 +201,6 @@ export default function RelatedItemsModule({
           entityId = await resolveEntityId(candidate);
           resolvedEntityIds.set(cacheKey, entityId);
         }
-        if (!entityId) continue;
 
         let matchedRows: RelatedItemRow[] = [];
         let nextSignedMap: Record<string, string> = {};
