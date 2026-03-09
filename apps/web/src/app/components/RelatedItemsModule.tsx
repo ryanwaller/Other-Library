@@ -19,6 +19,7 @@ export type RelatedItemsCandidate = {
 
 type RelatedItemRow = {
   id: number;
+  library_id?: number | null;
   visibility: "inherit" | "followers_only" | "public";
   object_type: string | null;
   title_override: string | null;
@@ -181,6 +182,30 @@ export default function RelatedItemsModule({
       }
 
       const resolvedEntityIds = new Map<string, string | null>();
+      const validLibraryIds = new Set<number>();
+
+      const [ownedLibrariesRes, membershipLibrariesRes] = await Promise.all([
+        supabase.from("libraries").select("id").eq("owner_id", ownerId),
+        supabase.from("catalog_members").select("catalog_id,accepted_at").eq("user_id", ownerId).not("accepted_at", "is", null)
+      ]);
+
+      for (const row of (ownedLibrariesRes.data ?? []) as Array<{ id?: number | null }>) {
+        const id = Number(row?.id);
+        if (Number.isFinite(id) && id > 0) validLibraryIds.add(id);
+      }
+      for (const row of (membershipLibrariesRes.data ?? []) as Array<{ catalog_id?: number | null }>) {
+        const id = Number(row?.catalog_id);
+        if (Number.isFinite(id) && id > 0) validLibraryIds.add(id);
+      }
+
+      if (validLibraryIds.size === 0) {
+        if (!alive) return;
+        setHeading(null);
+        setRows([]);
+        setSignedMap({});
+        setExpanded(false);
+        return;
+      }
 
       for (const candidate of dedupedCandidates) {
         const cacheKey = `${candidate.role}:${candidate.entityId ?? ""}:${candidate.entitySlug ?? ""}:${candidate.name.toLowerCase()}`;
@@ -194,9 +219,10 @@ export default function RelatedItemsModule({
         let query = supabase
           .from("user_books")
           .select(
-            "id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,cover_url,authors),media:user_book_media(kind,storage_path),book_entities(role,entity_id,entity:entities(name))"
+            "id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,cover_url,authors),media:user_book_media(kind,storage_path),book_entities(role,entity_id,entity:entities(name))"
           )
           .eq("owner_id", ownerId)
+          .in("library_id", Array.from(validLibraryIds))
           .neq("id", currentUserBookId)
           .order("created_at", { ascending: false })
           .limit(64);

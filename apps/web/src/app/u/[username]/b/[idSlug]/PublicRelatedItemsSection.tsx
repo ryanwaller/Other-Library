@@ -10,6 +10,7 @@ import { MUSIC_CONTRIBUTOR_ROLES, parseMusicMetadata, type MusicMetadata } from 
 type PublicBookLike = {
   id: number;
   owner_id: string;
+  library_id?: number | null;
   visibility: "inherit" | "followers_only" | "public";
   object_type: string | null;
   title_override: string | null;
@@ -188,10 +189,24 @@ export default async function PublicRelatedItemsSection({
   const candidates = deriveCandidates(book);
   if (candidates.length === 0) return null;
 
+  const [ownedLibrariesRes, membershipLibrariesRes] = await Promise.all([
+    supabase.from("libraries").select("id").eq("owner_id", profileId),
+    supabase.from("catalog_members").select("catalog_id,accepted_at").eq("user_id", profileId).not("accepted_at", "is", null)
+  ]);
+
+  const validLibraryIds = Array.from(
+    new Set([
+      ...((ownedLibrariesRes.data ?? []) as Array<{ id?: number | null }>).map((row) => Number(row?.id)).filter((id) => Number.isFinite(id) && id > 0),
+      ...((membershipLibrariesRes.data ?? []) as Array<{ catalog_id?: number | null }>).map((row) => Number(row?.catalog_id)).filter((id) => Number.isFinite(id) && id > 0)
+    ])
+  );
+  if (validLibraryIds.length === 0) return null;
+
   const booksRes = await supabase
     .from("user_books")
-    .select("id,owner_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))")
+    .select("id,owner_id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))")
     .eq("owner_id", profileId)
+    .in("library_id", validLibraryIds)
     .neq("id", book.id)
     .order("created_at", { ascending: false })
     .limit(1000);
