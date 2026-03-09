@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CoverCrop } from "../../components/CoverImage";
 import CoverImage from "../../components/CoverImage";
+import { parseMusicMetadata } from "../../lib/music";
 import { bookIdSlug } from "../../lib/slug";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -21,10 +22,14 @@ type RelatedItemRow = {
   visibility: "inherit" | "followers_only" | "public";
   object_type: string | null;
   title_override: string | null;
+  authors_override?: string[] | null;
+  designers_override?: string[] | null;
+  music_metadata?: unknown;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
-  edition: { title: string | null; cover_url: string | null } | null;
+  edition: { title: string | null; cover_url: string | null; authors?: string[] | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
+  book_entities?: Array<{ role: string; entity_id?: string | null; entity?: { name?: string | null } | null }>;
 };
 
 function isUuid(input: string | null | undefined): boolean {
@@ -65,6 +70,47 @@ function matchesMediaScope(row: RelatedItemRow, scope: RelatedItemsCandidate["me
   if (scope === "book") return objectType !== "music";
   if (scope === "music") return objectType === "music";
   return true;
+}
+
+function normalizeName(value: string | null | undefined): string {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function includesName(values: Array<string | null | undefined>, target: string): boolean {
+  const normalizedTarget = normalizeName(target);
+  if (!normalizedTarget) return false;
+  return values.some((value) => normalizeName(value) === normalizedTarget);
+}
+
+function rowMatchesCandidate(row: RelatedItemRow, candidate: RelatedItemsCandidate, entityId: string | null): boolean {
+  if (!matchesMediaScope(row, candidate.mediaScope)) return false;
+
+  if (entityId) {
+    const hasEntityMatch = (row.book_entities ?? []).some((entry) => {
+      const role = String(entry?.role ?? "").trim().toLowerCase();
+      return role === candidate.role && String(entry?.entity_id ?? "").trim() === entityId;
+    });
+    if (hasEntityMatch) return true;
+  }
+
+  if (candidate.role === "author") {
+    return includesName([...(row.authors_override ?? []), ...((row.edition?.authors ?? []) as string[])], candidate.name);
+  }
+
+  if (candidate.role === "designer") {
+    return includesName([...(row.designers_override ?? []), ...((row.book_entities ?? []).filter((entry) => String(entry?.role ?? "").trim().toLowerCase() === "designer").map((entry) => entry.entity?.name ?? null))], candidate.name);
+  }
+
+  const music = parseMusicMetadata(row.music_metadata);
+  if (candidate.mediaScope === "music") {
+    if (candidate.role === "performer" && includesName([music?.primary_artist ?? null], candidate.name)) return true;
+    return (row.book_entities ?? []).some((entry) => {
+      const role = String(entry?.role ?? "").trim().toLowerCase();
+      return role === candidate.role && normalizeName(entry?.entity?.name ?? "") === normalizeName(candidate.name);
+    });
+  }
+
+  return false;
 }
 
 async function resolveEntityId(candidate: RelatedItemsCandidate): Promise<string | null> {
@@ -147,12 +193,10 @@ export default function RelatedItemsModule({
         let query = supabase
           .from("user_books")
           .select(
-            "id,visibility,object_type,title_override,cover_original_url,cover_crop,edition:editions(title,cover_url),media:user_book_media(kind,storage_path),book_entities!inner(role,entity_id)"
+            "id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,cover_url,authors),media:user_book_media(kind,storage_path),book_entities(role,entity_id,entity:entities(name))"
           )
           .eq("owner_id", ownerId)
           .neq("id", currentUserBookId)
-          .eq("book_entities.role", candidate.role)
-          .eq("book_entities.entity_id", entityId)
           .order("created_at", { ascending: false })
           .limit(64);
 
@@ -164,7 +208,8 @@ export default function RelatedItemsModule({
         const result = await query;
         if (result.error) continue;
 
-        const matchedRows = ((result.data ?? []) as unknown as RelatedItemRow[]).filter((row) => matchesMediaScope(row, candidate.mediaScope));
+        const allRows = (result.data ?? []) as unknown as RelatedItemRow[];
+        const matchedRows = allRows.filter((row) => rowMatchesCandidate(row, candidate, entityId));
         if (matchedRows.length < 3) continue;
 
         const displayRows = matchedRows.slice(0, 4);
