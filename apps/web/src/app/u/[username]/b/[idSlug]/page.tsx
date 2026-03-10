@@ -180,17 +180,31 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     permanentRedirect(`/u/${usernameNorm}/b/${idSlug}`);
   }
 
-  const aliasRes = await supabase.from("username_aliases").select("current_username").eq("old_username", usernameNorm).maybeSingle();
+  // Round trip 1: alias check + profile + book + viewer auth — all independent, run in parallel.
+  // If aliasRes triggers a redirect the other results are discarded; in the common case we save
+  // the extra sequential round trip that the old aliasRes → profileRes → bookRes waterfall imposed.
+  const signingClient = getSupabaseAdmin() ?? supabase;
+  const [aliasRes, profileRes, authUserRes, bookRes] = await Promise.all([
+    supabase.from("username_aliases").select("current_username").eq("old_username", usernameNorm).maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("id,username,display_name,bio,visibility,avatar_path,borrowable_default,borrow_request_scope")
+      .eq("username", usernameNorm)
+      .maybeSingle(),
+    supabase.auth.getUser(),
+    supabase
+      .from("user_books")
+      .select(
+        "*,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))"
+      )
+      .eq("id", bookId)
+      .maybeSingle()
+  ]);
+
   const alias = (aliasRes.data as any)?.current_username as string | undefined;
   if (alias && alias !== usernameNorm) {
     permanentRedirect(`/u/${alias}/b/${idSlug}`);
   }
-
-  const profileRes = await supabase
-    .from("profiles")
-    .select("id,username,display_name,bio,visibility,avatar_path,borrowable_default,borrow_request_scope")
-    .eq("username", usernameNorm)
-    .maybeSingle();
 
   const profile = profileRes.data as any;
   if (!profile) {
@@ -204,36 +218,6 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
         </div>
       </main>
     );
-  }
-
-  const signingClient = getSupabaseAdmin() ?? supabase;
-  const [avatarSignedRes, authUserRes, followCountsRes, bookRes] = await Promise.all([
-    profile.avatar_path ? signingClient.storage.from("avatars").createSignedUrl(profile.avatar_path, 60 * 30) : Promise.resolve(null),
-    supabase.auth.getUser(),
-    supabase.rpc("get_follow_counts", { target_username: profile.username }),
-    supabase
-      .from("user_books")
-      .select(
-        "*,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))"
-      )
-      .eq("id", bookId)
-      .maybeSingle()
-  ]);
-
-  let followersCount: number | null = null;
-  let followingCount: number | null = null;
-  const viewerId = String(authUserRes.data.user?.id ?? "").trim() || null;
-  if (!followCountsRes.error) {
-    const row = Array.isArray(followCountsRes.data) ? ((followCountsRes.data[0] as any) ?? null) : ((followCountsRes.data as any) ?? null);
-    followersCount = row && row.followers_count != null ? Number(row.followers_count) : null;
-    followingCount = row && row.following_count != null ? Number(row.following_count) : null;
-  } else {
-    const [followersCountRes, followingCountRes] = await Promise.all([
-      supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("followee_id", profile.id).eq("status", "approved"),
-      supabase.from("follows").select("followee_id", { count: "exact", head: true }).eq("follower_id", profile.id).eq("status", "approved")
-    ]);
-    followersCount = followersCountRes.count ?? null;
-    followingCount = followingCountRes.count ?? null;
   }
 
   if (bookRes.error) {
@@ -265,27 +249,80 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     );
   }
 
-  let canViewInContext = String(book.owner_id ?? "") === String(profile.id ?? "");
-  if (!canViewInContext) {
-    const requiredIds = Array.from(new Set([String(profile.id ?? ""), String(viewerId ?? "")].filter(Boolean)));
-    if (requiredIds.length > 0) {
-      const membershipsRes = await supabase
-        .from("catalog_members")
-        .select("user_id,accepted_at")
-        .eq("catalog_id", Number(book.library_id))
-        .in("user_id", requiredIds)
-        .not("accepted_at", "is", null);
-      if (!membershipsRes.error) {
-        const memberSet = new Set(
-          ((membershipsRes.data ?? []) as any[])
-            .map((r) => String(r.user_id ?? "").trim())
-            .filter(Boolean)
-        );
-        const profileIsMember = memberSet.has(String(profile.id));
-        const viewerAllowed = viewerId ? memberSet.has(String(viewerId)) : false;
-        canViewInContext = profileIsMember && viewerAllowed;
-      }
-    }
+  const viewerId = String(authUserRes.data.user?.id ?? "").trim() || null;
+  const canViewInContextFast = String(book.owner_id ?? "") === String(profile.id ?? "");
+  const membershipRequiredIds = !canViewInContextFast
+    ? Array.from(new Set([String(profile.id ?? ""), String(viewerId ?? "")].filter(Boolean)))
+    : [];
+
+  const paths = Array.from(new Set([
+    ...(book.media ?? []).map((m) => m.storage_path).filter(Boolean),
+    ...(book.cover_crop && book.cover_original_url ? [book.cover_original_url] : [])
+  ]));
+
+  // Round trip 2: all post-book queries in parallel — avatar signing, follow counts,
+  // catalog membership check (if needed), media signing, library name, copies count.
+  const [
+    avatarSignedRes,
+    followCountsRes,
+    membershipsRes,
+    signedRes,
+    libRes,
+    copiesRes,
+  ] = await Promise.all([
+    profile.avatar_path
+      ? signingClient.storage.from("avatars").createSignedUrl(profile.avatar_path, 60 * 30)
+      : Promise.resolve(null),
+    supabase.rpc("get_follow_counts", { target_username: profile.username }),
+    membershipRequiredIds.length > 0
+      ? supabase
+          .from("catalog_members")
+          .select("user_id,accepted_at")
+          .eq("catalog_id", Number(book.library_id))
+          .in("user_id", membershipRequiredIds)
+          .not("accepted_at", "is", null)
+      : Promise.resolve(null),
+    paths.length > 0
+      ? signingClient.storage.from("user-book-media").createSignedUrls(paths, 60 * 30)
+      : Promise.resolve(null),
+    Number.isFinite(Number(book.library_id)) && Number(book.library_id) > 0
+      ? supabase.from("libraries").select("name").eq("id", Number(book.library_id)).maybeSingle()
+      : Promise.resolve(null),
+    book.edition?.id
+      ? supabase
+          .from("user_books")
+          .select("id", { count: "exact", head: true })
+          .eq("owner_id", profile.id)
+          .eq("library_id", Number(book.library_id))
+          .eq("edition_id", book.edition.id)
+      : Promise.resolve(null),
+  ]);
+
+  let followersCount: number | null = null;
+  let followingCount: number | null = null;
+  if (!followCountsRes.error) {
+    const row = Array.isArray(followCountsRes.data) ? ((followCountsRes.data[0] as any) ?? null) : ((followCountsRes.data as any) ?? null);
+    followersCount = row && row.followers_count != null ? Number(row.followers_count) : null;
+    followingCount = row && row.following_count != null ? Number(row.following_count) : null;
+  } else {
+    const [followersCountRes, followingCountRes] = await Promise.all([
+      supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("followee_id", profile.id).eq("status", "approved"),
+      supabase.from("follows").select("followee_id", { count: "exact", head: true }).eq("follower_id", profile.id).eq("status", "approved")
+    ]);
+    followersCount = followersCountRes.count ?? null;
+    followingCount = followingCountRes.count ?? null;
+  }
+
+  let canViewInContext = canViewInContextFast;
+  if (!canViewInContext && membershipsRes && !membershipsRes.error) {
+    const memberSet = new Set(
+      ((membershipsRes.data ?? []) as any[])
+        .map((r) => String(r.user_id ?? "").trim())
+        .filter(Boolean)
+    );
+    const profileIsMember = memberSet.has(String(profile.id));
+    const viewerAllowed = viewerId ? memberSet.has(String(viewerId)) : false;
+    canViewInContext = profileIsMember && viewerAllowed;
   }
 
   if (!canViewInContext) {
@@ -355,24 +392,6 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     ])
   ) as Record<(typeof MUSIC_CONTRIBUTOR_ROLES)[number], Array<{ name: string; slug: string }>>;
 
-  const paths = Array.from(new Set([
-    ...(book.media ?? []).map((m) => m.storage_path).filter(Boolean),
-    ...(book.cover_crop && book.cover_original_url ? [book.cover_original_url] : [])
-  ]));
-  const [signedRes, libRes, copiesRes] = await Promise.all([
-    paths.length > 0 ? signingClient.storage.from("user-book-media").createSignedUrls(paths, 60 * 30) : Promise.resolve(null),
-    Number.isFinite(Number(book.library_id)) && Number(book.library_id) > 0
-      ? supabase.from("libraries").select("name").eq("id", Number(book.library_id)).maybeSingle()
-      : Promise.resolve(null),
-    book.edition?.id
-      ? supabase
-          .from("user_books")
-          .select("id", { count: "exact", head: true })
-          .eq("owner_id", profile.id)
-          .eq("library_id", Number(book.library_id))
-          .eq("edition_id", book.edition.id)
-      : Promise.resolve(null)
-  ]);
   const signedMap: Record<string, string> = {};
   for (const s of signedRes?.data ?? []) {
     if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;

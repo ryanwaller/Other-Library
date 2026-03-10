@@ -31,8 +31,7 @@ import EntityTokenField from "../../components/EntityTokenField";
 import CoverImage, { type CoverCrop } from "../../../../components/CoverImage";
 import ExpandableContent from "../../../../components/ExpandableContent";
 import RotatingHintInput from "../../../../components/RotatingHintInput";
-import CustomSlider from "../../../../components/CustomSlider";
-import CoverEditor, { type EditorState } from "./components/CoverEditor";
+import CoverEditorSection, { type CoverEditorSectionHandle } from "./components/CoverEditorSection";
 import { useBookScanner } from "../../../../hooks/useBookScanner";
 import usePageTitle from "../../../../hooks/usePageTitle";
 import { useStickyBand } from "../../hooks/useStickyBand";
@@ -524,24 +523,8 @@ export default function BookDetailPage() {
     cropTrimUnit: TrimUnit | "ratio";
   } | null>(null);
 
-  const [pendingCover, setPendingCover] = useState<File | null>(null);
-  const [coverEditorSrc, setCoverEditorSrc] = useState<string | null>(null);
-  const coverEditorObjectUrlRef = useRef<string | null>(null);
-  const [editorState, setEditorState] = useState<EditorState>({
-    x: 0,
-    y: 0,
-    zoom: 1,
-    rotation: 0,
-    brightness: 1,
-    contrast: 1
-  });
-  const [minZoomFloor, setMinZoomFloor] = useState<number>(1);
-  const [coverState, setCoverState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
-    busy: false,
-    error: null,
-    message: null
-  });
-  const [coverInputKey, setCoverInputKey] = useState(0);
+  const coverEditorSectionRef = useRef<CoverEditorSectionHandle | null>(null);
+  const [coverOperationBusy, setCoverOperationBusy] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -771,34 +754,6 @@ export default function BookDetailPage() {
     const id = window.requestAnimationFrame(measureControlsBand);
     return () => window.cancelAnimationFrame(id);
   }, [measureControlsBand, editMode, findMoreOpen]);
-
-  useEffect(() => {
-    if (!pendingCover) return;
-    const url = URL.createObjectURL(pendingCover);
-    if (coverEditorObjectUrlRef.current) URL.revokeObjectURL(coverEditorObjectUrlRef.current);
-    coverEditorObjectUrlRef.current = url;
-    setCoverEditorSrc(url);
-    setEditorState({
-      x: 0,
-      y: 0,
-      zoom: 1.0, // fit-to-fill
-      rotation: 0,
-      brightness: 1,
-      contrast: 1
-    });
-    return () => {
-      URL.revokeObjectURL(url);
-    };
-  }, [pendingCover]);
-
-  useEffect(() => {
-    return () => {
-      if (coverEditorObjectUrlRef.current) {
-        URL.revokeObjectURL(coverEditorObjectUrlRef.current);
-        coverEditorObjectUrlRef.current = null;
-      }
-    };
-  }, []);
 
   // Restore last-used crop unit from localStorage on first mount (when no book loaded yet).
   useEffect(() => {
@@ -1857,20 +1812,6 @@ export default function BookDetailPage() {
     [formTrimWidth, formTrimHeight, formTrimUnit]
   );
 
-  // True when crop W/H are valid positive numbers (regardless of unit mode).
-  const cropTrimSizeValid = useMemo(() => {
-    const w = parseFloat(cropTrimWidth);
-    const h = parseFloat(cropTrimHeight);
-    return Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0;
-  }, [cropTrimWidth, cropTrimHeight]);
-
-  const coverAspect = useMemo(() => {
-    if (cropTrimSizeValid) {
-      return parseFloat(cropTrimWidth) / parseFloat(cropTrimHeight);
-    }
-    return undefined; // Free aspect
-  }, [cropTrimSizeValid, cropTrimWidth, cropTrimHeight]);
-
   const publicBookPath = useMemo(() => {
     if (!book || !ownerProfile?.username) return null;
     return `/u/${ownerProfile.username}/b/${bookIdSlug(book.id, effectiveTitle)}`;
@@ -2164,8 +2105,7 @@ export default function BookDetailPage() {
       setCropTrimUnit(snap.cropTrimUnit);
     }
     setCoverToolsOpen(false);
-    setPendingCover(null);
-    setCoverEditorSrc(null);
+    coverEditorSectionRef.current?.resetEditor();
     setSaveState({ busy: false, error: null, message: null });
     setEditMode(false);
     setDeleteConfirm(false);
@@ -2373,10 +2313,9 @@ export default function BookDetailPage() {
 
       router.push("/app");
     } catch (e: any) {
-      setCoverState({ busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" });
+      setDeleteState({ busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" });
     }
-    }
-
+  }
 
   async function doneEditMode() {
     if (!isOwner) return;
@@ -2520,111 +2459,6 @@ export default function BookDetailPage() {
     }
   }
 
-  function cancelCoverEdit() {
-    setPendingCover(null);
-    setCoverEditorSrc(null);
-    setCoverInputKey((k) => k + 1);
-    setCoverToolsOpen(false);
-  }
-
-  function resetCoverEdit() {
-    setEditorState({
-      zoom: 1.0,
-      x: 0,
-      y: 0,
-      rotation: 0,
-      brightness: 1,
-      contrast: 1
-    });
-    const origSrc = toFullSizeImageUrl((coverOriginalSrc ?? coverUrl) || "");
-    setCoverEditorSrc(origSrc);
-  }
-
-  async function uploadCover() {
-    if (!supabase || !book || !userId) return;
-    if (!isOwner) return;
-
-    setCoverState({ busy: true, error: null, message: "Saving…" });
-    try {
-      // Build crop data to store using the new transform mode
-      const cropData: CoverCrop = {
-        zoom: editorState.zoom,
-        rotation: editorState.rotation,
-        brightness: editorState.brightness,
-        contrast: editorState.contrast,
-        x: editorState.x,
-        y: editorState.y,
-        mode: "transform"
-      };
-
-      // If there's a new file to upload (pendingCover set), upload it as the new original
-      if (pendingCover && coverEditorSrc) {
-        const baseName = safeFileName(pendingCover.name.replace(/\.[^/.]+$/, ""));
-        const ext = extFromContentType(pendingCover.type);
-        const path = `${userId}/${book.id}/cover-original-${Date.now()}-${baseName}.${ext}`;
-
-        // Remove existing cover(s) from storage + media table
-        const existing = (book.media ?? []).filter((m) => m.kind === "cover");
-        for (const m of existing) {
-          if (m.storage_path) await supabase.storage.from("user-book-media").remove([m.storage_path]);
-          if (m.id) await supabase.from("user_book_media").delete().eq("id", m.id);
-        }
-
-        // Upload original file
-        const up = await supabase.storage.from("user-book-media").upload(path, pendingCover, {
-          cacheControl: "31536000", upsert: false, contentType: pendingCover.type || "image/jpeg"
-        });
-        if (up.error) throw new Error(up.error.message);
-
-        // Record in user_book_media
-        await supabase.from("user_book_media").insert({ user_book_id: book.id, kind: "cover", storage_path: path, caption: null });
-
-        // Update cover_original_url and sign immediately for coverOriginalSrc state
-        await supabase.from("user_books").update({ cover_original_url: path }).eq("id", book.id);
-        try {
-          const { data: sd } = await supabase.storage.from("user-book-media").createSignedUrl(path, 3600);
-          if (sd?.signedUrl) setCoverOriginalSrc(toFullSizeImageUrl(sd.signedUrl));
-        } catch { /* best-effort */ }
-      }
-
-      // Save crop params (always — for both new file and re-edit)
-      await supabase.from("user_books").update({ cover_crop: cropData as any }).eq("id", book.id);
-
-      // Persist trim values to the database before refresh() reloads form state from Supabase.
-      {
-        let tw: number | null = null;
-        let th: number | null = null;
-        let tu: string | null = null;
-        if (cropTrimUnit !== "ratio") {
-          const w = parseFloat(cropTrimWidth);
-          const h = parseFloat(cropTrimHeight);
-          if (Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0) {
-            tw = w; th = h; tu = cropTrimUnit;
-          }
-        } else {
-          const w = parseFloat(formTrimWidth);
-          const h = parseFloat(formTrimHeight);
-          if (Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0) {
-            tw = w; th = h; tu = formTrimUnit;
-          }
-        }
-        await supabase.from("user_books").update({ trim_width: tw, trim_height: th, trim_unit: tu }).eq("id", book.id);
-      }
-
-      setPendingCover(null);
-      setCoverEditorSrc(null);
-      setCoverInputKey((k) => k + 1);
-      await refresh();
-      setCoverState({ busy: false, error: null, message: "Saved" });
-      setCoverToolsOpen(false);
-      setTimeout(() => {
-        setCoverState(s => s.message === "Saved" ? { ...s, message: null } : s);
-      }, 1000);
-    } catch (e: any) {
-      setCoverState({ busy: false, error: e?.message ?? "Save failed", message: "Save failed" });
-    }
-  }
-
   function extFromContentType(contentType: string | null): string {
     const ct = (contentType ?? "").toLowerCase();
     if (ct.includes("image/png")) return "png";
@@ -2721,61 +2555,25 @@ export default function BookDetailPage() {
   async function setAsCover(mediaId: number) {
     if (!supabase || !book || !userId) return;
     if (!isOwner) return;
-    setCoverState({ busy: true, error: null, message: "Setting cover…" });
+    setCoverOperationBusy(true);
     const demote = await supabase.from("user_book_media").update({ kind: "image" }).eq("user_book_id", book.id).eq("kind", "cover");
     if (demote.error) {
-      setCoverState({ busy: false, error: demote.error.message, message: "Failed" });
+      setCoverOperationBusy(false);
       return;
     }
     const promote = await supabase.from("user_book_media").update({ kind: "cover" }).eq("id", mediaId);
     if (promote.error) {
-      setCoverState({ busy: false, error: promote.error.message, message: "Failed" });
+      setCoverOperationBusy(false);
       return;
     }
     await refresh();
-    setCoverState({ busy: false, error: null, message: "Updated" });
+    setCoverOperationBusy(false);
   }
 
-  async function deleteCover() {
-    if (!supabase || !book || !userId) return;
-    if (!isOwner) return;
-    setCoverState({ busy: true, error: null, message: "Deleting cover…" });
-    try {
-      // Clear cover columns
-      const up = await supabase.from("user_books").update({ cover_original_url: null, cover_crop: null }).eq("id", book.id);
-      if (up.error) throw new Error(up.error.message);
-
-      // Remove cover entry from media
-      const existing = (book.media ?? []).filter((m) => m.kind === "cover");
-      for (const m of existing) {
-        if (m?.storage_path) {
-          await supabase.storage.from("user-book-media").remove([m.storage_path]);
-        }
-        if (m?.id) {
-          await supabase.from("user_book_media").delete().eq("id", m.id);
-        }
-      }
-
-      setCoverEditorSrc(null);
-      setPendingCover(null);
-      setCoverOriginalSrc(null);
-      setSuggestedCoverUrl(null);
-      setCoverToolsOpen(false);
-      
-      // Also clear the edition cover_url so the grey placeholder shows
-      if (book.edition?.id) {
-        await supabase.from("editions").update({ cover_url: null }).eq("id", book.edition.id);
-      }
-
-      // Clear locally so useMemo updates immediately while refresh() is pending
-      setBook(s => s ? { ...s, media: s.media.filter(m => m.kind !== "cover"), cover_original_url: null, cover_crop: null, edition: s.edition ? { ...s.edition, cover_url: null } : null } : null);
-
-      await refresh();
-      setCoverState({ busy: false, error: null, message: "Deleted" });
-      window.setTimeout(() => setCoverState(s => s.message === "Deleted" ? { ...s, message: null } : s), 1500);
-    } catch (e: any) {
-      setCoverState({ busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" });
-    }
+  function onOptimisticCoverDelete() {
+    setCoverOriginalSrc(null);
+    setSuggestedCoverUrl(null);
+    setBook(s => s ? { ...s, media: s.media.filter(m => m.kind !== "cover"), cover_original_url: null, cover_crop: null, edition: s.edition ? { ...s.edition, cover_url: null } : null } : null);
   }
 
   async function deleteMedia(mediaId: number, storagePath: string) {
@@ -4104,251 +3902,37 @@ export default function BookDetailPage() {
               ) : null}
               <hr className="divider" />
             </div>
-            <div>
-              <div
-                className="om-cover-slot"
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  height: "auto",
-                  padding: 0,
-                  overflow: "hidden",
-                  display: coverEditorSrc ? "block" : "flex",
-                  touchAction: "pan-y",
-                  filter: coverEditorSrc
-                    ? `brightness(${editorState.brightness}) contrast(${editorState.contrast})`
-                    : undefined
-                }}
-                onTouchStart={handleCoverTouchStart}
-                onTouchMove={handleCoverTouchMove}
-                onTouchEnd={handleCoverTouchEnd}
-                onTouchCancel={handleCoverTouchCancel}
-              >
-                {coverEditorSrc ? (
-                  <CoverEditor
-                    src={coverEditorSrc}
-                    state={editorState}
-                    onChange={(next) => setEditorState(s => ({ ...s, ...next }))}
-                    onLoad={({ minZoom }) => setMinZoomFloor(minZoom)}
-                    aspectRatio={coverAspect ?? (2/3)}
-                    style={{ width: "100%", height: "auto", aspectRatio: `${coverAspect ?? (2/3)}` }}
-                  />
-                ) : (
-                  <CoverImage
-                    alt={effectiveTitle}
-                    src={coverOriginalSrc ?? coverUrl}
-                    cropData={book?.cover_crop ?? null}
-                    style={{ width: "100%", height: "auto", display: "block" }}
-                    objectFit="contain"
-                  />
-                )}
-              </div>
-
-              {isOwner ? (
-                <details
-                  open={coverToolsOpen}
-                  onToggle={(e) => {
-                    const open = (e.currentTarget as HTMLDetailsElement).open;
-                    setCoverToolsOpen(open);
-                    
-                    // Initialize editor if opening and we have a cover
-                    if (open && coverUrl && !coverEditorSrc && !pendingCover) {
-                      const origSrc = toFullSizeImageUrl((coverOriginalSrc ?? coverUrl) || "");
-                      setCoverEditorSrc(origSrc);
-                      const crop = book?.cover_crop;
-                      const isTransform = crop?.mode === "transform";
-                      setEditorState({
-                        zoom: isTransform ? (crop.zoom ?? 1.0) : 1.0,
-                        x: isTransform ? (crop.x ?? 0) : 0,
-                        y: isTransform ? (crop.y ?? 0) : 0,
-                        rotation: crop?.rotation ?? 0,
-                        brightness: crop?.brightness ?? 1,
-                        contrast: crop?.contrast ?? 1
-                      });
-                    }
-                  }}
-                  style={{ marginTop: "var(--space-10)", border: "none", outline: "none", boxShadow: "none" }}
-                >
-                  <summary className="om-disclosure-summary" style={{ listStyle: "none", border: "none", outline: "none", boxShadow: "none", display: "flex", width: "100%" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-                      {coverToolsOpen ? (
-                        <button 
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); void uploadCover(); }} 
-                          disabled={coverState.busy}
-                        >
-                          {coverState.busy ? "Saving…" : "Save"}
-                        </button>
-                      ) : (
-                        <span className="text-muted" style={{ cursor: "pointer" }}>
-                          {coverUrl ? "Edit cover" : "Add cover"}
-                        </span>
-                      )}
-
-                      <div className="row" style={{ gap: "var(--space-md)", alignItems: "baseline", justifyContent: "flex-end" }}>
-                        {!isNarrow && coverUrl ? (
-                          <button
-                            className="text-muted"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setCoverExpanded((prev) => !prev);
-                            }}
-                            disabled={coverState.busy}
-                          >
-                            {coverExpanded ? "Smaller" : "Bigger"}
-                          </button>
-                        ) : null}
-                        {coverToolsOpen ? (
-                          <button
-                            className="text-muted"
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); cancelCoverEdit(); }}
-                            disabled={coverState.busy}
-                          >
-                            Cancel
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </summary>
-                  <div style={{ marginTop: 0 }}>
-                      {coverEditorSrc ? (
-                        <div style={{ marginTop: 0 }}>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                            {/* Trim size — crop-local state; syncs to metadata when a real unit is selected */}
-                            <div className="row" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
-                              <div className="text-muted" style={{ minWidth: 110 }}>Trim size</div>
-                              <div className="row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
-                                <input
-                                  type="number"
-                                  value={cropTrimWidth}
-                                  min={0.01}
-                                  step={0.01}
-                                  onChange={(e) => setCropTrimWidth(e.target.value)}
-                                  placeholder="W"
-                                  style={{ width: 68 }}
-                                />
-                                <span className="text-muted">×</span>
-                                <input
-                                  type="number"
-                                  value={cropTrimHeight}
-                                  min={0.01}
-                                  step={0.01}
-                                  onChange={(e) => setCropTrimHeight(e.target.value)}
-                                  placeholder="H"
-                                  style={{ width: 68 }}
-                                />
-                                <select
-                                  value={cropTrimUnit}
-                                  onChange={(e) => setCropTrimUnit(e.target.value as any)}
-                                  style={{ width: "auto", minWidth: 0 }}
-                                >
-                                  <option value="ratio">ratio</option>
-                                  <option value="in">in</option>
-                                  <option value="mm">mm</option>
-                                </select>
-                              </div>
-                            </div>
-
-                            <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
-                              <div className="text-muted" style={{ minWidth: 110 }}>Zoom</div>
-                              <CustomSlider
-                                min={1}
-                                max={4}
-                                step={0.01}
-                                value={editorState.zoom}
-                                onChange={(zoom) => setEditorState(s => ({ ...s, zoom }))}
-                                style={{ flex: "1 1 auto" }}
-                              />
-                            </div>
-                            <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
-                              <div className="text-muted" style={{ minWidth: 110 }}>Rotate</div>
-                              <CustomSlider
-                                min={-180}
-                                max={180}
-                                step={1}
-                                value={editorState.rotation}
-                                onChange={(rotation) => setEditorState(s => ({ ...s, rotation }))}
-                                style={{ flex: "1 1 auto" }}
-                              />
-                            </div>
-                            <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
-                              <div className="text-muted" style={{ minWidth: 110 }}>Bright</div>
-                              <CustomSlider
-                                min={0.5}
-                                max={1.5}
-                                step={0.01}
-                                value={editorState.brightness}
-                                onChange={(brightness) => setEditorState(s => ({ ...s, brightness }))}
-                                style={{ flex: "1 1 auto" }}
-                              />
-                            </div>
-                            <div className="row no-wrap" style={{ marginTop: "var(--space-8)", alignItems: "center" }}>
-                              <div className="text-muted" style={{ minWidth: 110 }}>Contrast</div>
-                              <CustomSlider
-                                min={0.5}
-                                max={1.5}
-                                step={0.01}
-                                value={editorState.contrast}
-                                onChange={(contrast) => setEditorState(s => ({ ...s, contrast }))}
-                                style={{ flex: "1 1 auto" }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ) : coverUrl ? (
-                        <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>Click Replace or wait for cover to load.</div>
-                      ) : (
-                        <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>No cover image. Click “Add cover” to upload.</div>
-                      )}
-                      {coverToolsOpen && (
-                        <div className="row" style={{ marginTop: "var(--space-md)", gap: 16 }}>
-                          <label 
-                            className="text-muted" 
-                            style={{ cursor: "pointer", textDecoration: "underline" }}
-                          >
-                            Replace
-                            <input
-                              key={coverInputKey}
-                              type="file"
-                              accept="image/*"
-                              onChange={(ev) => {
-                                setPendingCover((ev.target.files ?? [])[0] ?? null);
-                              }}
-                              style={{ display: "none" }}
-                            />
-                          </label>
-
-                          {coverUrl && (
-                            <button 
-                              className="text-muted" 
-                              style={{ textDecoration: "underline" }}
-                              onClick={resetCoverEdit}
-                            >
-                              Reset
-                            </button>
-                          )}
-
-                          {coverUrl && (
-                            <button 
-                              className="text-muted" 
-                              style={{ textDecoration: "underline" }}
-                              onClick={() => void deleteCover()}
-                              disabled={coverState.busy}
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      )}
-                      {coverState.message ? (
-                        <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
-                          {coverState.error ? `${coverState.message} (${coverState.error})` : coverState.message}
-                        </div>
-                      ) : null}
-                    </div>
-                </details>
-              ) : null}
-            </div>
+            <CoverEditorSection
+              ref={coverEditorSectionRef}
+              book={book}
+              coverUrl={coverUrl}
+              coverOriginalSrc={coverOriginalSrc}
+              setCoverOriginalSrc={setCoverOriginalSrc}
+              isOwner={isOwner}
+              isNarrow={isNarrow}
+              userId={userId}
+              effectiveTitle={effectiveTitle}
+              formTrimWidth={formTrimWidth}
+              formTrimHeight={formTrimHeight}
+              formTrimUnit={formTrimUnit}
+              cropTrimWidth={cropTrimWidth}
+              cropTrimHeight={cropTrimHeight}
+              cropTrimUnit={cropTrimUnit}
+              onCropTrimWidthChange={handleCropTrimWidthChange}
+              onCropTrimHeightChange={handleCropTrimHeightChange}
+              onCropTrimUnitChange={handleCropTrimUnitChange}
+              coverToolsOpen={coverToolsOpen}
+              setCoverToolsOpen={setCoverToolsOpen}
+              coverExpanded={coverExpanded}
+              setCoverExpanded={setCoverExpanded}
+              refresh={refresh}
+              setSuggestedCoverUrl={setSuggestedCoverUrl}
+              onOptimisticCoverDelete={onOptimisticCoverDelete}
+              onTouchStart={handleCoverTouchStart}
+              onTouchMove={handleCoverTouchMove}
+              onTouchEnd={handleCoverTouchEnd}
+              onTouchCancel={handleCoverTouchCancel}
+            />
 
             <div style={{ alignSelf: "start" }}>
               <div style={{ minHeight: "1.4em" }}>
@@ -5472,10 +5056,10 @@ export default function BookDetailPage() {
                         )}
                         {editMode ? (
                           <div className="row" style={{ marginTop: "var(--space-8)", justifyContent: "space-between" }}>
-                            <button onClick={() => setAsCover(m.id)} disabled={coverState.busy}>
+                            <button onClick={() => setAsCover(m.id)} disabled={coverOperationBusy}>
                               Use as cover
                             </button>
-                            <button onClick={() => deleteMedia(m.id, m.storage_path)} disabled={imagesState.busy || coverState.busy}>
+                            <button onClick={() => deleteMedia(m.id, m.storage_path)} disabled={imagesState.busy || coverOperationBusy}>
                               Delete
                             </button>
                           </div>

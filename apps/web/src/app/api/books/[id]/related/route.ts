@@ -83,7 +83,7 @@ function rowMatchesCandidate(row: BookLike, candidate: Candidate): boolean {
     const entityNames = (row.book_entities ?? [])
       .filter((entry) => {
         const role = String(entry?.role ?? "").trim().toLowerCase();
-        return role === "designer" || role === "design";
+        return role === "designer" || role === "design" || role === "art direction";
       })
       .map((entry) => entry.entity?.name ?? null);
     return uniqueNames([...(row.designers_override ?? []), ...entityNames]).some((name) => normalizeName(name) === target);
@@ -134,7 +134,7 @@ function deriveCandidates(book: BookLike): Candidate[] {
   const designerEntityNames = (book.book_entities ?? [])
     .filter((entry) => {
       const role = String(entry?.role ?? "").trim().toLowerCase();
-      return role === "designer" || role === "design";
+      return role === "designer" || role === "design" || role === "art direction";
     })
     .map((entry) => String(entry?.entity?.name ?? "").trim())
     .filter(Boolean);
