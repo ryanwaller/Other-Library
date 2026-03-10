@@ -56,14 +56,31 @@ export default function DiscoverClient() {
     }
     setBusy(true);
     setError(null);
-    const res = await supabase.rpc("search_visible_user_books", { query_text: query, max_results: 80 });
+    const [rpcRes, sessionRes] = await Promise.all([
+      supabase.rpc("search_visible_user_books", { query_text: query, max_results: 80 }),
+      supabase.auth.getSession()
+    ]);
+    const token = sessionRes.data.session?.access_token ?? null;
+    let entityRows: ResultRow[] = [];
+    if (token) {
+      const entityRes = await fetch(`/api/discover/entities?q=${encodeURIComponent(query)}&max=80`, {
+        headers: { authorization: `Bearer ${token}` }
+      });
+      const entityJson = await entityRes.json().catch(() => ({}));
+      if (entityRes.ok && Array.isArray((entityJson as any)?.rows)) {
+        entityRows = ((entityJson as any).rows ?? []) as ResultRow[];
+      }
+    }
     setBusy(false);
-    if (res.error) {
-      setError(res.error.message);
-      setRows([]);
+    if (rpcRes.error) {
+      setError(rpcRes.error.message);
+      setRows(entityRows);
       return;
     }
-    setRows(((res.data as any) ?? []) as ResultRow[]);
+    const merged = new Map<number, ResultRow>();
+    for (const row of (((rpcRes.data as any) ?? []) as ResultRow[])) merged.set(Number(row.user_book_id), row);
+    for (const row of entityRows) if (!merged.has(Number(row.user_book_id))) merged.set(Number(row.user_book_id), row);
+    setRows(Array.from(merged.values()));
   }
 
   useEffect(() => {

@@ -2851,6 +2851,12 @@ function AppShell({
         const p = effectivePublisherFor(c);
         if (p) publishersSet.add(p);
         for (const d of (c.designers_override ?? [])) if (d) designersSet.add(d);
+        for (const row of c.book_entities ?? []) {
+          const role = String(row?.role ?? "").trim().toLowerCase();
+          if (role !== "designer" && role !== "design") continue;
+          const name = String(row?.entity?.name ?? "").trim();
+          if (name) designersSet.add(name);
+        }
         if (c.group_label) groupsSet.add(c.group_label);
         if (c.decade) decadesSet.add(c.decade);
 
