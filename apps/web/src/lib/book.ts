@@ -35,6 +35,11 @@ export function effectiveSubjectsFor(b: PublicBook): string[] {
 }
 
 export function effectivePublisherFor(b: PublicBook): string {
+  if ((b.object_type ?? "").trim() === "music") {
+    const music = parseMusicMetadata(b.music_metadata);
+    const label = (music?.label ?? "").trim();
+    if (label) return label;
+  }
   const o = (b.publisher_override ?? "").trim();
   if (o) return o;
   return (b.edition?.publisher ?? "").trim();

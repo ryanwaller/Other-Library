@@ -374,7 +374,7 @@ export default function PublicBookList({
         if (!authors.includes(activeFilters.author.toLowerCase())) return false;
       }
       if (activeFilters.publisher) {
-        const pub = b.publisher_override || b.edition?.publisher;
+        const pub = effectivePublisherFor(b);
         if (String(pub ?? "").toLowerCase() !== activeFilters.publisher.toLowerCase()) return false;
       }
       if (activeFilters.category) {
@@ -519,7 +519,13 @@ export default function PublicBookList({
         categoryNames,
         filterAuthors: effectiveAuthorsFor(primary),
         filterSubjects: namesForRole(primary, "subject"),
-        filterPublishers: [primary.publisher_override || primary.edition?.publisher || ""],
+        filterPublishers: Array.from(
+          new Set(
+            sorted
+              .map((copy) => effectivePublisherFor(copy))
+              .filter((value) => String(value ?? "").trim().length > 0)
+          )
+        ),
         filterDesigners: namesForRole(primary, "designer"),
         filterGroups: [primary.group_label || ""],
         filterDecades: [primary.decade || ""],
