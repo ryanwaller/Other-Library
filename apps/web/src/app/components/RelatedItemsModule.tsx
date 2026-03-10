@@ -235,7 +235,7 @@ export default function RelatedItemsModule({
             .eq("owner_id", ownerId)
             .neq("id", currentUserBookId)
             .order("created_at", { ascending: false })
-            .limit(64);
+            .limit(1000);
 
           if (hrefMode === "owner" && ownerCatalogIds && ownerCatalogIds.length > 0) {
             query = query.in("library_id", ownerCatalogIds);
