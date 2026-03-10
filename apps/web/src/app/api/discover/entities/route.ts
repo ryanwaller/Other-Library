@@ -63,7 +63,7 @@ export async function GET(req: Request) {
 
     const entityMatchesRes = await admin
       .from("book_entities")
-      .select("user_book_id,role,entity:entities(name)")
+      .select("user_book_id,role,entity:entities!inner(name)")
       .ilike("entity.name", `%${q}%`)
       .limit(400);
     if (entityMatchesRes.error) {
@@ -73,6 +73,7 @@ export async function GET(req: Request) {
     const userBookIds = Array.from(
       new Set(
         ((entityMatchesRes.data ?? []) as any[])
+          .filter((row) => row.entity !== null)
           .map((row) => Number(row.user_book_id))
           .filter((id) => Number.isFinite(id) && id > 0)
       )
