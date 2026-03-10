@@ -15,6 +15,7 @@ import { detailFilterLabel, type DetailFilterKey } from "../../../lib/detailFilt
 import { 
   effectiveTitleFor, 
   effectiveAuthorsFor, 
+  effectivePublisherFor,
   groupKeyFor 
 } from "../../../lib/book";
 
