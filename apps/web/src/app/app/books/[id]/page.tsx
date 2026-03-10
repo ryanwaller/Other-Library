@@ -5543,10 +5543,10 @@ export default function BookDetailPage() {
             </div>
           ) : null}
 
-          {book?.owner_id ? (
+          {userId || book?.owner_id ? (
             <div style={{ gridColumn: "1 / -1", marginTop: "var(--space-md)" }}>
               <RelatedItemsModule
-                ownerId={book.owner_id}
+                ownerId={userId ?? book?.owner_id}
                 currentUserBookId={bookId}
                 candidates={relatedItemsCandidates}
                 hrefMode="owner"
