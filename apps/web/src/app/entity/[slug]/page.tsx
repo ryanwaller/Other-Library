@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getServerSupabase } from "../../../lib/supabaseServer";
 import { getSupabaseAdmin } from "../../../lib/supabaseAdmin";
-import CoverImage, { type CoverCrop } from "../../../components/CoverImage";
+import { bookIdSlug } from "../../../lib/slug";
+import type { CoverCrop } from "../../../components/CoverImage";
+import EntityBookGrid, { type EntityModuleItem } from "./EntityBookGrid";
 import EntityLibraryOwners, { type OwnerProfile } from "./EntityLibraryOwners";
 
 export const dynamic = "force-dynamic";
@@ -93,6 +95,16 @@ function effectiveTitle(row: BookRow): string {
   return String(row.title_override ?? "").trim() || String(row.edition?.title ?? "").trim() || "(untitled)";
 }
 
+// Returns a stable key for grouping user_books that are copies of the same edition.
+// Priority: edition_id > isbn13 > normalized title.
+function editionKey(row: BookRow): string {
+  if (row.edition_id) return `eid:${row.edition_id}`;
+  const isbn = String(row.edition?.isbn13 ?? "").trim();
+  if (isbn) return `isbn:${isbn}`;
+  const title = effectiveTitle(row).toLowerCase().replace(/\s+/g, " ");
+  return `title:${title}`;
+}
+
 function isRemoteUrl(s: string | null | undefined): boolean {
   return /^https?:\/\//i.test(String(s ?? "").trim());
 }
@@ -104,30 +116,6 @@ function coverStoragePath(row: BookRow): string | null {
   if (firstMedia) return firstMedia;
   const original = String(row.cover_original_url ?? "").trim();
   return original && !isRemoteUrl(original) ? original : null;
-}
-
-// Returns a stable key for deduplicating books that are copies of the same edition.
-// Priority: edition_id > isbn13 > normalized title.
-function editionKey(row: BookRow): string {
-  if (row.edition_id) return `eid:${row.edition_id}`;
-  const isbn = String(row.edition?.isbn13 ?? "").trim();
-  if (isbn) return `isbn:${isbn}`;
-  const title = effectiveTitle(row).toLowerCase().replace(/\s+/g, " ");
-  return `title:${title}`;
-}
-
-// Deduplicates an already-sorted (newest first) list by edition, returning
-// one representative book per unique edition key.
-function dedupeByEdition(books: BookRow[]): BookRow[] {
-  const seen = new Set<string>();
-  const out: BookRow[] = [];
-  for (const book of books) {
-    const key = editionKey(book);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(book);
-  }
-  return out;
 }
 
 function coverSrc(row: BookRow, signedMap: Record<string, string>): string | null {
@@ -259,19 +247,16 @@ export default async function EntityPage({
     byRole.get(role)!.set(book.id, book);
   };
 
-  // Linked books (primary source)
   for (const [bookId, roles] of idToRoles.entries()) {
     const book = linkedBooksMap.get(bookId);
-    if (!book) continue; // filtered by RLS (private book)
+    if (!book) continue;
     for (const role of roles) addBook(role, book);
   }
 
-  // Override matches
   for (const { role, books } of [...arrayOverrideResults, ...stringOverrideResults]) {
     for (const book of books) addBook(role, book);
   }
 
-  // Remove empty buckets
   for (const [role, books] of byRole.entries()) {
     if (books.size === 0) byRole.delete(role);
   }
@@ -279,7 +264,7 @@ export default async function EntityPage({
   if (byRole.size === 0) {
     return (
       <main className="container">
-        <h1 style={{ margin: 0 }}>{entity.name}</h1>
+        <div>{entity.name}</div>
         <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>No items found.</div>
       </main>
     );
@@ -290,14 +275,30 @@ export default async function EntityPage({
     (a, b) => roleSortIndex(a[0]) - roleSortIndex(b[0])
   );
 
-  // 7. Sign cover storage URLs
-  const allBooksFlat = Array.from(
-    new Map(
-      sortedRoles.flatMap(([, booksMap]) => [...booksMap.entries()])
-    ).values()
-  );
+  // 7. Group books by edition within each role (newest-first within each group)
+  type EditionGroup = { rep: BookRow; allBooks: BookRow[] };
+
+  const roleGroups = sortedRoles.map(([role, booksMap]) => {
+    const sorted = Array.from(booksMap.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    const byEd = new Map<string, BookRow[]>();
+    for (const book of sorted) {
+      const key = editionKey(book);
+      if (!byEd.has(key)) byEd.set(key, []);
+      byEd.get(key)!.push(book);
+    }
+    const groups: EditionGroup[] = Array.from(byEd.values()).map((books) => ({
+      rep: books[0],
+      allBooks: books
+    }));
+    return { role, groups };
+  });
+
+  // 8. Sign cover storage URLs (using representative books only)
+  const repBooks = roleGroups.flatMap(({ groups }) => groups.map((g) => g.rep));
   const mediaPaths = Array.from(
-    new Set(allBooksFlat.map((b) => coverStoragePath(b)).filter((p): p is string => Boolean(p)))
+    new Set(repBooks.map((b) => coverStoragePath(b)).filter((p): p is string => Boolean(p)))
   );
   const signedMap: Record<string, string> = {};
   const signingClient = admin ?? supabase;
@@ -310,37 +311,9 @@ export default async function EntityPage({
     }
   }
 
-  // 8. Build modules — deduplicate by edition within each role
-  const modules = sortedRoles.map(([role, booksMap]) => {
-    const sorted = Array.from(booksMap.values()).sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-    const deduped = dedupeByEdition(sorted);
-    const total = deduped.length;
-    const displayed = deduped.slice(0, 12);
-    return {
-      role,
-      heading: roleHeading(role, entity.name),
-      items: displayed.map((book) => {
-        const title = effectiveTitle(book);
-        return {
-          id: book.id,
-          href: `/app/books/${book.id}`,
-          title,
-          coverUrl: coverSrc(book, signedMap),
-          coverCrop: book.cover_crop
-        };
-      }),
-      total,
-      viewAllHref:
-        total > 12
-          ? `/facet/${encodeURIComponent(role)}/${encodeURIComponent(entity.slug)}`
-          : null
-    };
-  });
-
-  // 9. Owner profiles for library section (public profiles only)
-  const ownerIds = Array.from(new Set(allBooksFlat.map((b) => b.owner_id).filter(Boolean)));
+  // 9. Owner profiles — collect all owner_ids across all copies (pre-dedup) for accurate count
+  const allCopies = roleGroups.flatMap(({ groups }) => groups.flatMap((g) => g.allBooks));
+  const ownerIds = Array.from(new Set(allCopies.map((b) => b.owner_id).filter(Boolean)));
   let ownerProfiles: Array<{ id: string; username: string; avatar_path: string | null }> = [];
   if (ownerIds.length > 0) {
     const profilesRes = await supabase
@@ -351,6 +324,7 @@ export default async function EntityPage({
       .limit(100);
     if (!profilesRes.error) ownerProfiles = (profilesRes.data ?? []) as any[];
   }
+  const profileByOwnerId = new Map(ownerProfiles.map((p) => [p.id, p.username]));
 
   // Sign avatar URLs
   const avatarPaths = ownerProfiles.map((p) => p.avatar_path).filter((p): p is string => Boolean(p));
@@ -364,6 +338,51 @@ export default async function EntityPage({
     }
   }
 
+  // 10. Finalize modules — build items with link resolution data
+  const modules = roleGroups.map(({ role, groups }) => {
+    const total = groups.length;
+    const displayed = groups.slice(0, 12);
+
+    const items: EntityModuleItem[] = displayed.map(({ rep, allBooks }) => {
+      const title = effectiveTitle(rep);
+
+      // Only include public owners (those whose profile is in profileByOwnerId).
+      const ownerEntries = allBooks
+        .map((b) => {
+          if (!profileByOwnerId.has(b.owner_id)) return null;
+          return { ownerId: b.owner_id, userBookId: b.id };
+        })
+        .filter((e): e is { ownerId: string; userBookId: number } => e !== null);
+
+      // Public fallback: first public owner (allBooks is sorted newest-first).
+      const firstPublic = allBooks.find((b) => profileByOwnerId.has(b.owner_id));
+      const publicFallbackHref = firstPublic
+        ? `/u/${encodeURIComponent(profileByOwnerId.get(firstPublic.owner_id)!)}/b/${bookIdSlug(firstPublic.id, title)}`
+        : null;
+
+      return {
+        id: rep.id,
+        title,
+        coverUrl: coverSrc(rep, signedMap),
+        coverCrop: rep.cover_crop,
+        ownerEntries,
+        publicFallbackHref
+      };
+    });
+
+    return {
+      role,
+      heading: roleHeading(role, entity.name),
+      items,
+      total,
+      viewAllHref:
+        total > 12
+          ? `/facet/${encodeURIComponent(role)}/${encodeURIComponent(entity.slug)}`
+          : null
+    };
+  });
+
+  // 11. Library section owners
   const ownersForClient: OwnerProfile[] = ownerProfiles
     .map((p) => ({
       id: p.id,
@@ -372,7 +391,7 @@ export default async function EntityPage({
     }))
     .sort((a, b) => a.username.localeCompare(b.username));
 
-  // 10. Summary line — use deduplicated counts per role
+  // 12. Summary line
   const summaryParts: string[] = modules
     .map((mod) => roleSummaryLabel(mod.role, mod.total))
     .filter(Boolean);
@@ -383,7 +402,7 @@ export default async function EntityPage({
 
   return (
     <main className="container">
-      <h1 style={{ margin: 0 }}>{entity.name}</h1>
+      <div>{entity.name}</div>
       {summaryParts.length > 0 && (
         <div
           className="text-muted"
@@ -414,29 +433,7 @@ export default async function EntityPage({
                 </Link>
               ) : null}
             </div>
-            <div className="om-related-items-grid" style={{ marginTop: "var(--space-14)" }}>
-              {mod.items.map((item) => (
-                <div key={item.id}>
-                  <Link
-                    href={item.href}
-                    style={{ display: "block", textDecoration: "none", color: "inherit" }}
-                  >
-                    <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
-                      <CoverImage
-                        alt={item.title}
-                        src={item.coverUrl}
-                        cropData={item.coverCrop}
-                        style={{ display: "block", width: "100%", height: "auto" }}
-                        objectFit="contain"
-                      />
-                    </div>
-                    <div style={{ marginTop: "var(--space-sm)" }}>
-                      <span className="om-book-title">{item.title}</span>
-                    </div>
-                  </Link>
-                </div>
-              ))}
-            </div>
+            <EntityBookGrid items={mod.items} />
           </div>
         </div>
       ))}
