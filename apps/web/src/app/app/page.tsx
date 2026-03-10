@@ -1203,6 +1203,25 @@ function AppShell({
     }
   }
 
+  function persistAddLibrarySelection(libraryId: number | null) {
+    const normalized = Number(libraryId ?? 0);
+    if (!Number.isFinite(normalized) || normalized <= 0) {
+      setAddLibraryId(null);
+      try {
+        window.localStorage.removeItem("om_addLibraryId");
+      } catch {
+        // ignore
+      }
+      return;
+    }
+    setAddLibraryId(normalized);
+    try {
+      window.localStorage.setItem("om_addLibraryId", String(normalized));
+    } catch {
+      // ignore
+    }
+  }
+
   async function refreshLibraryMemberPreviewsFromApi() {
     if (memberPreviewHydratingRef.current) return;
     memberPreviewHydratingRef.current = true;
@@ -1349,7 +1368,7 @@ function AppShell({
         if (isStale()) return [];
         setLibraries(ownerList);
         setShowSharedLibraries(true);
-        setAddLibraryId(ownerList[0]?.id ?? null);
+        applyLibrarySelection(ownerList);
         try {
           await refreshAllBooks(ownerList.map((l) => Number(l.id)).filter((id) => Number.isFinite(id) && id > 0));
         } catch {
@@ -1365,7 +1384,7 @@ function AppShell({
       setDebugLibrariesSource("libs:failed");
       setDebugLastError(e?.message ?? "libs_failed");
       setLibraries([]);
-      setAddLibraryId(null);
+      persistAddLibrarySelection(null);
       setLibraryState({ busy: false, error: e?.message ?? "Failed to load catalogs", message: null });
       setBooksLoading(false);
       return [];
@@ -1390,12 +1409,7 @@ function AppShell({
       await refreshLibraries();
       const id = (created.data as any)?.id as number | undefined;
       if (id) {
-        setAddLibraryId(id);
-        try {
-          window.localStorage.setItem("om_addLibraryId", String(id));
-        } catch {
-          // ignore
-        }
+        persistAddLibrarySelection(id);
       }
       setNewLibraryName("");
       setLibraryState({ busy: false, error: null, message: "Created" });
@@ -2115,6 +2129,7 @@ function AppShell({
     if (!supabase) throw new Error("Supabase is not configured");
     const selectedLibraryId = Number(targetLibraryId ?? addLibraryId ?? 0);
     if (!selectedLibraryId) throw new Error("Choose a catalog first");
+    persistAddLibrarySelection(selectedLibraryId);
     const objectType = (data.object_type ?? "book") === "music" ? "music" : "book";
     if (objectType === "music") {
       const musicMetadata = data.music_metadata ?? null;
@@ -3602,7 +3617,11 @@ function AppShell({
                   <span className="text-muted">Add to</span>
                   <select
                     value={String(addPreviewLibraryId ?? addLibraryId ?? renderLibraries[0]?.id ?? "")}
-                    onChange={(e) => setAddPreviewLibraryId(Number(e.target.value))}
+                    onChange={(e) => {
+                      const nextId = Number(e.target.value);
+                      setAddPreviewLibraryId(nextId);
+                      persistAddLibrarySelection(nextId);
+                    }}
                     disabled={addState.busy}
                   >
                     {renderLibraries.map((l) => (
@@ -3676,7 +3695,11 @@ function AppShell({
                       <span className="text-muted">Add to</span>
                       <select
                         value={String(addSearchLibraryIds[i] ?? addLibraryId ?? renderLibraries[0]?.id ?? "")}
-                        onChange={(e) => setAddSearchLibraryIds((prev) => ({ ...prev, [i]: Number(e.target.value) }))}
+                        onChange={(e) => {
+                          const nextId = Number(e.target.value);
+                          setAddSearchLibraryIds((prev) => ({ ...prev, [i]: nextId }));
+                          persistAddLibrarySelection(nextId);
+                        }}
                         disabled={addState.busy}
                       >
                         {renderLibraries.map((l) => (
