@@ -46,11 +46,7 @@ function rowMatchesVisibleText(row: ResultRow, query: string): boolean {
     .filter(Boolean)
     .join(" "));
   if (!haystack) return false;
-  if (haystack.includes(q)) return true;
-  const terms = significantQueryTerms(q);
-  if (terms.length === 0) return false;
-  if (terms.length === 1) return haystack.includes(terms[0]);
-  return terms.every((term) => haystack.includes(term));
+  return haystack.includes(q);
 }
 
 export default function DiscoverClient() {
@@ -112,12 +108,17 @@ export default function DiscoverClient() {
       return;
     }
     const rpcRows = (((rpcRes.data as any) ?? []) as ResultRow[]);
-    const strictRpcRows = rpcRows.filter((row) => rowMatchesVisibleText(row, query));
-    const preferStrictRows = entityRows.length > 0 || significantQueryTerms(query).length > 1;
-    const baseRows = preferStrictRows ? strictRpcRows : rpcRows;
+    const phraseRpcRows = rpcRows.filter((row) => rowMatchesVisibleText(row, query));
     const merged = new Map<number, ResultRow>();
-    for (const row of baseRows) merged.set(Number(row.user_book_id), row);
-    for (const row of entityRows) if (!merged.has(Number(row.user_book_id))) merged.set(Number(row.user_book_id), row);
+    if (entityRows.length > 0) {
+      // Entity search found designer/creator matches — anchor results to those.
+      // Only add RPC rows that also contain the exact phrase in visible metadata.
+      for (const row of phraseRpcRows) merged.set(Number(row.user_book_id), row);
+      for (const row of entityRows) if (!merged.has(Number(row.user_book_id))) merged.set(Number(row.user_book_id), row);
+    } else {
+      const baseRows = significantQueryTerms(query).length > 1 ? phraseRpcRows : rpcRows;
+      for (const row of baseRows) merged.set(Number(row.user_book_id), row);
+    }
     setRows(Array.from(merged.values()));
   }
 
