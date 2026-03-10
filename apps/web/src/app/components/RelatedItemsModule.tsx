@@ -234,22 +234,52 @@ export default function RelatedItemsModule({
         let nextSignedMap: Record<string, string> = {};
 
         {
-          let query = supabase
-            .from("user_books")
-            .select(
-              "id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,cover_url,authors),media:user_book_media(kind,storage_path),book_entities(role,entity_id,entity:entities(id,name))"
-            )
-            .eq("owner_id", ownerId)
-            .neq("id", currentUserBookId)
-            .order("created_at", { ascending: false })
-            .limit(1000);
+          const BOOK_SELECT = "id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,cover_url,authors),media:user_book_media(kind,storage_path),book_entities(role,entity_id,entity:entities(id,name))";
 
-          if (hrefMode === "public") {
-            if (publicProfileVisibility === "public") query = query.neq("visibility", "followers_only");
-            else query = query.eq("visibility", "public");
+          let candidateBookIds: number[] | null = null;
+          if (entityId) {
+            // Pre-filter via book_entities to avoid full catalog scan
+            const entityBooksRes = await supabase
+              .from("book_entities")
+              .select("user_book_id")
+              .eq("entity_id", entityId);
+            if (!entityBooksRes.error) {
+              candidateBookIds = ((entityBooksRes.data ?? []) as any[])
+                .map((r) => Number(r.user_book_id))
+                .filter((n) => Number.isFinite(n) && n > 0 && n !== currentUserBookId);
+            }
           }
 
-          const result = await query;
+          let result;
+          if (candidateBookIds !== null) {
+            if (candidateBookIds.length === 0) continue;
+            let query = supabase
+              .from("user_books")
+              .select(BOOK_SELECT)
+              .eq("owner_id", ownerId)
+              .in("id", candidateBookIds)
+              .order("created_at", { ascending: false })
+              .limit(100);
+            if (hrefMode === "public") {
+              if (publicProfileVisibility === "public") query = query.neq("visibility", "followers_only");
+              else query = query.eq("visibility", "public");
+            }
+            result = await query;
+          } else {
+            let query = supabase
+              .from("user_books")
+              .select(BOOK_SELECT)
+              .eq("owner_id", ownerId)
+              .neq("id", currentUserBookId)
+              .order("created_at", { ascending: false })
+              .limit(500);
+            if (hrefMode === "public") {
+              if (publicProfileVisibility === "public") query = query.neq("visibility", "followers_only");
+              else query = query.eq("visibility", "public");
+            }
+            result = await query;
+          }
+
           if (result.error) continue;
 
           const allRows = (result.data ?? []) as unknown as RelatedItemRow[];

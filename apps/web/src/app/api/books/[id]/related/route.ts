@@ -187,43 +187,85 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       return NextResponse.json({ ok: true, heading: null, rows: [] });
     }
 
-    const booksRes = await admin
-      .from("user_books")
-      .select("id,owner_id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))")
-      .in("library_id", allowedCatalogIds)
-      .neq("id", bookId)
-      .order("created_at", { ascending: false })
-      .limit(1000);
-    if (booksRes.error) throw new Error(booksRes.error.message);
-    const allBooks = (booksRes.data ?? []) as unknown as BookLike[];
+    const BOOK_SELECT = "id,owner_id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))";
 
-    let heading: string | null = null;
-    let matchedRows: BookLike[] = [];
-    for (const candidate of candidates) {
-      const matches = allBooks.filter((row) => rowMatchesCandidate(row, candidate));
-      if (matches.length < 1) continue;
-      heading = candidate.heading;
+    function dedupeByGroup(matches: BookLike[]): BookLike[] {
       const byGroup = new Map<string, BookLike[]>();
       for (const row of matches) {
         const key = `${row.library_id}:${groupKeyFor(row as any)}`;
-        const current = byGroup.get(key);
-        if (current) current.push(row);
+        const cur = byGroup.get(key);
+        if (cur) cur.push(row);
         else byGroup.set(key, [row]);
       }
-      matchedRows = Array.from(byGroup.values()).map((rows) => {
-        const sorted = rows.slice().sort((a, b) => {
-          const score = (row: BookLike): number => {
-            let value = 0;
-            if ((row.media ?? []).some((m) => m.kind === "cover")) value += 1000;
-            if (row.edition?.cover_url) value += 150;
-            return value;
+      return Array.from(byGroup.values()).map((rows) => {
+        return rows.slice().sort((a, b) => {
+          const score = (r: BookLike) => {
+            let v = 0;
+            if ((r.media ?? []).some((m) => m.kind === "cover")) v += 1000;
+            if (r.edition?.cover_url) v += 150;
+            return v;
           };
-          const scoreDiff = score(b) - score(a);
-          if (scoreDiff !== 0) return scoreDiff;
-          return b.id - a.id;
-        });
-        return sorted[0]!;
+          const diff = score(b) - score(a);
+          return diff !== 0 ? diff : b.id - a.id;
+        })[0]!;
       });
+    }
+
+    let heading: string | null = null;
+    let matchedRows: BookLike[] = [];
+
+    for (const candidate of candidates) {
+      let fetchedRows: BookLike[];
+
+      if (candidate.role === "author") {
+        // Authors: filter by authors_override array containment; still limited fetch for edition.authors fallback
+        const booksRes = await admin
+          .from("user_books")
+          .select(BOOK_SELECT)
+          .in("library_id", allowedCatalogIds)
+          .neq("id", bookId)
+          .order("created_at", { ascending: false })
+          .limit(500);
+        if (booksRes.error) continue;
+        fetchedRows = (booksRes.data ?? []) as unknown as BookLike[];
+      } else {
+        // Entity-based roles: pre-filter via book_entities to avoid full catalog scan
+        const entityRes = await admin
+          .from("entities")
+          .select("id")
+          .ilike("name", candidate.name)
+          .limit(1)
+          .maybeSingle();
+        const entityId = (entityRes.data as any)?.id as string | null;
+
+        if (!entityId) continue;
+
+        const entityBooksRes = await admin
+          .from("book_entities")
+          .select("user_book_id")
+          .eq("entity_id", entityId);
+        const candidateBookIds = ((entityBooksRes.data ?? []) as any[])
+          .map((r) => Number(r.user_book_id))
+          .filter((n) => Number.isFinite(n) && n > 0 && n !== bookId);
+
+        if (candidateBookIds.length === 0) continue;
+
+        const booksRes = await admin
+          .from("user_books")
+          .select(BOOK_SELECT)
+          .in("library_id", allowedCatalogIds)
+          .in("id", candidateBookIds)
+          .order("created_at", { ascending: false })
+          .limit(100);
+        if (booksRes.error) continue;
+        fetchedRows = (booksRes.data ?? []) as unknown as BookLike[];
+      }
+
+      const matches = fetchedRows.filter((row) => rowMatchesCandidate(row, candidate));
+      if (matches.length < 1) continue;
+
+      heading = candidate.heading;
+      matchedRows = dedupeByGroup(matches);
       break;
     }
 

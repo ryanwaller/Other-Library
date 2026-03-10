@@ -152,7 +152,7 @@ export default async function PublicProfilePage({
     supabase.rpc("get_follow_counts", { target_username: profile.username }),
     supabase
       .from("user_books")
-      .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))")
+      .select("id,library_id,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,materials_override,designers_override,group_label,object_type,decade,sort_order,source_type,source_url,external_source_ids,music_metadata,publish_date_override,description_override,location,shelf,status,primary_cover_ref,cover_original_url,cover_crop,created_at,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))")
       .eq("owner_id", profile.id)
       .order("created_at", { ascending: false })
       .limit(1000)
