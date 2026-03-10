@@ -395,18 +395,6 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     ])
   ) as Record<(typeof MUSIC_CONTRIBUTOR_ROLES)[number], Array<{ name: string; slug: string }>>;
 
-  // Entity slug lookup by role+name for linked entities
-  const entitySlugByRoleName = new Map<string, string>();
-  for (const row of book.book_entities ?? []) {
-    const role = String(row?.role ?? "").trim().toLowerCase();
-    const name = String(row?.entity?.name ?? "").trim().toLowerCase();
-    const slug = String(row?.entity?.slug ?? "").trim();
-    if (role && name && slug) entitySlugByRoleName.set(`${role}:${name}`, slug);
-  }
-  const entityHref = (role: string, name: string): string => {
-    const slug = entitySlugByRoleName.get(`${role.toLowerCase()}:${name.toLowerCase()}`);
-    return slug ? `/entity/${encodeURIComponent(slug)}` : "";
-  };
 
   const signedMap: Record<string, string> = {};
   for (const s of signedRes?.data ?? []) {
@@ -480,7 +468,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                       <div style={{ minWidth: 110 }} className="text-muted">Primary artist</div>
                       <div>
-                        <Link href={entityHref("author", effectiveAuthors[0] ?? "") || entityHref("performer", effectiveAuthors[0] ?? "") || publicMusicFilterHref(profile.username, effectiveAuthors[0] ?? "", "author")}>
+                        <Link href={publicMusicFilterHref(profile.username, effectiveAuthors[0] ?? "", "author")}>
                           {effectiveAuthors[0]}
                         </Link>
                       </div>
@@ -493,7 +481,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                         <div className="om-hanging-value">
                           {contributorMap[role].map((row, idx) => (
                             <span key={`${role}-${row.slug}`}>
-                              <Link href={`/entity/${encodeURIComponent(row.slug)}`}>{row.name}</Link>
+                              <Link href={publicMusicFilterHref(profile.username, row.name)}>{row.name}</Link>
                               {idx < contributorMap[role].length - 1 ? <span>, </span> : null}
                             </span>
                           ))}
@@ -590,15 +578,12 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     Authors
                   </div>
                   <div className="om-hanging-value">
-                    {effectiveAuthors.map((a, idx) => {
-                      const href = entityHref("author", a) || `/u/${profile.username}/a/${encodeURIComponent(a)}`;
-                      return (
-                        <span key={a}>
-                          <Link href={href}>{a}</Link>
-                          {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                        </span>
-                      );
-                    })}
+                    {effectiveAuthors.map((a, idx) => (
+                      <span key={a}>
+                        <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                        {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                      </span>
+                    ))}
                   </div>
                 </div>
               ) : null}
@@ -618,15 +603,12 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     Designers
                   </div>
                   <div className="om-hanging-value">
-                    {effectiveDesigners.map((name, idx) => {
-                      const href = entityHref("designer", name) || entityHref("design", name) || entityHref("art direction", name) || `/u/${profile.username}?designer=${encodeURIComponent(name)}`;
-                      return (
-                        <span key={`designer-${name}`}>
-                          <Link href={href}>{name}</Link>
-                          {idx < effectiveDesigners.length - 1 ? <span>, </span> : null}
-                        </span>
-                      );
-                    })}
+                    {effectiveDesigners.map((name, idx) => (
+                      <span key={`designer-${name}`}>
+                        <Link href={`/u/${profile.username}?designer=${encodeURIComponent(name)}`}>{name}</Link>
+                        {idx < effectiveDesigners.length - 1 ? <span>, </span> : null}
+                      </span>
+                    ))}
                   </div>
                 </div>
               ) : null}
@@ -664,15 +646,12 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     Publisher
                   </div>
                   <div>
-                    {effectivePublishers.map((publisher, index) => {
-                      const href = entityHref("publisher", publisher) || `/u/${profile.username}/p/${encodeURIComponent(publisher)}`;
-                      return (
-                        <span key={publisher}>
-                          <Link href={href}>{publisher}</Link>
-                          {index < effectivePublishers.length - 1 ? <span>, </span> : null}
-                        </span>
-                      );
-                    })}
+                    {effectivePublishers.map((publisher, index) => (
+                      <span key={publisher}>
+                        <Link href={`/u/${profile.username}/p/${encodeURIComponent(publisher)}`}>{publisher}</Link>
+                        {index < effectivePublishers.length - 1 ? <span>, </span> : null}
+                      </span>
+                    ))}
                   </div>
                 </div>
               ) : null}

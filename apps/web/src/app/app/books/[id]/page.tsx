@@ -331,14 +331,14 @@ function normalizePublishDateForStorage(input: string): string | null {
 }
 
 function facetHref(role: string, name: string, slug?: string): string {
-  if (slug) {
-    return `/entity/${encodeURIComponent(slug)}`;
-  }
   const filterKey = roleToDetailFilterKey(role);
-  if (filterKey) {
-    return detailFilterHref("/app", filterKey, name);
+  if (!filterKey && slug) {
+    return `/facet/${encodeURIComponent(role)}/${encodeURIComponent(slug)}`;
   }
-  return `/app?q=${encodeURIComponent(name)}`;
+  if (!filterKey) {
+    return `/app?q=${encodeURIComponent(name)}`;
+  }
+  return detailFilterHref("/app", filterKey, name);
 }
 
 function musicRoleLabel(role: string): string {
