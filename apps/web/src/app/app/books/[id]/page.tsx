@@ -35,6 +35,7 @@ import CustomSlider from "../../../../components/CustomSlider";
 import CoverEditor, { type EditorState } from "./components/CoverEditor";
 import { useBookScanner } from "../../../../hooks/useBookScanner";
 import usePageTitle from "../../../../hooks/usePageTitle";
+import { useStickyBand } from "../../hooks/useStickyBand";
 import dynamic from "next/dynamic";
 const BookScannerModal = dynamic(() => import("../../../../components/BookScannerModal"), { ssr: false });
 
@@ -465,14 +466,6 @@ export default function BookDetailPage() {
     return () => mq.removeEventListener("change", sync);
   }, []);
 
-  const controlsBandRef = useRef<HTMLDivElement | null>(null);
-  const controlsBandTopRef = useRef(0);
-  const lastScrollYRef = useRef(0);
-  const wasControlsPinnedOpenRef = useRef(false);
-  const [controlsDocked, setControlsDocked] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const [controlsBandHeight, setControlsBandHeight] = useState(0);
-
   const [session, setSession] = useState<Session | null>(null);
   const userId = session?.user?.id ?? null;
   const [memberCanEdit, setMemberCanEdit] = useState(false);
@@ -486,6 +479,12 @@ export default function BookDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [findMoreOpen, setFindMoreOpen] = useState(false);
+
+  // Sticky band — scroll-driven docked/visible state.
+  const { controlsDocked, controlsVisible, controlsBandHeight, controlsBandRef, measureControlsBand } = useStickyBand({
+    controlsPinnedOpen: editMode || findMoreOpen,
+    isMobile: isMobileViewport,
+  });
   const [coverToolsOpen, setCoverToolsOpen] = useState(false);
   const [coverExpanded, setCoverExpanded] = useState(false);
   const [bookNavContext, setBookNavContext] = useState<BookNavContext | null>(null);
@@ -766,82 +765,12 @@ export default function BookDetailPage() {
   const controlsFixed = controlsDocked;
   const controlsPinnedOpen = editMode || findMoreOpen;
 
-  const measureControlsBand = useCallback(() => {
-    if (typeof window === "undefined" || !controlsBandRef.current) return;
-    const rect = controlsBandRef.current.getBoundingClientRect();
-    if (!controlsDocked) {
-      controlsBandTopRef.current = rect.top + window.scrollY;
-    }
-    setControlsBandHeight(rect.height);
-  }, [controlsDocked]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const id = window.requestAnimationFrame(measureControlsBand);
-    const handleResize = () => window.requestAnimationFrame(measureControlsBand);
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.cancelAnimationFrame(id);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [measureControlsBand]);
-
+  // Re-measure the band height whenever its content can change size.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const id = window.requestAnimationFrame(measureControlsBand);
     return () => window.cancelAnimationFrame(id);
   }, [measureControlsBand, editMode, findMoreOpen]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    lastScrollYRef.current = window.scrollY;
-    let ticking = false;
-    const update = () => {
-      ticking = false;
-      const y = window.scrollY;
-      const stickyStart = Math.max(controlsBandTopRef.current - 8, 0);
-      const lastY = lastScrollYRef.current;
-      const isNearTop = y <= stickyStart;
-      const scrollingDown = y > lastY + 2;
-      const scrollingUp = y < lastY - 2;
-
-      if (isNearTop) {
-        setControlsDocked(false);
-        setControlsVisible(true);
-      } else if (isMobileViewport) {
-        setControlsDocked(true);
-        setControlsVisible(true);
-      } else {
-        setControlsDocked(true);
-        if (controlsPinnedOpen) {
-          setControlsVisible(true);
-        } else if (scrollingDown) {
-          setControlsVisible(false);
-        } else if (scrollingUp) {
-          setControlsVisible(true);
-        }
-      }
-      lastScrollYRef.current = y;
-    };
-    const onScroll = () => {
-      if (ticking) return;
-      ticking = true;
-      window.requestAnimationFrame(update);
-    };
-    update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [controlsPinnedOpen, isMobileViewport]);
-
-  useEffect(() => {
-    const wasPinnedOpen = wasControlsPinnedOpenRef.current;
-    if (controlsPinnedOpen) {
-      setControlsVisible(true);
-    } else if (wasPinnedOpen && controlsDocked) {
-      setControlsVisible(true);
-    }
-    wasControlsPinnedOpenRef.current = controlsPinnedOpen;
-  }, [controlsDocked, controlsPinnedOpen]);
 
   useEffect(() => {
     if (!pendingCover) return;

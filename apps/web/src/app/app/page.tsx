@@ -39,6 +39,7 @@ import { parseMusicMetadata, type MusicMetadata, type MusicContributorRole } fro
 import { contextFromFilterParams } from "../../lib/pageTitle";
 import { DETAIL_FILTER_KEYS, detailFilterLabel, type DetailFilterKey } from "../../lib/detailFilters";
 import { arrayMove } from "@dnd-kit/sortable";
+import { useStickyBand } from "./hooks/useStickyBand";
 
 const BookScannerModal = dynamic(() => import("../../components/BookScannerModal"), { ssr: false });
 
@@ -601,6 +602,10 @@ function AppShell({
   const [rearrangingLibraryId, setRearrangingLibraryId] = useState<number | null>(null);
   const [reorderBackupItems, setReorderBackupItems] = useState<CatalogItem[] | null>(null);
   const itemsRef = useRef<CatalogItem[]>([]);
+  // Refs that mirror state for use inside stable useCallback functions.
+  const rearrangingLibraryIdRef = useRef<number | null>(null);
+  const reorderBackupItemsRef = useRef<CatalogItem[] | null>(null);
+  const displayGroupsByLibraryIdRef = useRef<Record<number, import("../../lib/types").CatalogGroup[]>>({});
   const [libraryNameDraft, setLibraryNameDraft] = useState("");
   const [newLibraryName, setNewLibraryName] = useState("");
   const [newLibraryFocused, setNewLibraryFocused] = useState(false);
@@ -666,15 +671,16 @@ function AppShell({
   });
 
   const [reorderMode, setReorderMode] = useState(false);
-  const controlsBandRef = useRef<HTMLDivElement | null>(null);
-  const controlsBandTopRef = useRef(0);
-  const lastScrollYRef = useRef(0);
-  const wasControlsPinnedOpenRef = useRef(false);
-  const [controlsDocked, setControlsDocked] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const [controlsBandHeight, setControlsBandHeight] = useState(0);
-
   const [isMobile, setIsMobile] = useState(false);
+
+  // Sticky band — scroll-driven docked/visible state lives in a shared hook so
+  // the scroll listener only re-renders this component when truly necessary.
+  // controlsPinnedOpen is inlined here (same computation as line ~744 below).
+  const { controlsDocked, controlsVisible, controlsBandHeight, controlsBandRef, measureControlsBand } = useStickyBand({
+    controlsPinnedOpen: sortOpen || bulkMode || searchOpen ||
+      (addInputFocused || Boolean(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message)),
+    isMobile,
+  });
   const autoReducedGridColsRef = useRef<4 | 8 | null>(null);
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, true | undefined>>({});
   const [initialLoadDone, setInitialLoadDone] = useState(false);
@@ -745,90 +751,12 @@ function AppShell({
   const controlsPinnedOpen = sortOpen || bulkMode || searchOpen || addMode;
   const controlsFixed = controlsDocked;
 
-  const measureControlsBand = useCallback(() => {
-    if (typeof window === "undefined" || !controlsBandRef.current) return;
-    const rect = controlsBandRef.current.getBoundingClientRect();
-    if (!controlsDocked) {
-      controlsBandTopRef.current = rect.top + window.scrollY;
-    }
-    setControlsBandHeight(rect.height);
-  }, [controlsDocked]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const id = window.requestAnimationFrame(measureControlsBand);
-    const handleResize = () => window.requestAnimationFrame(measureControlsBand);
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.cancelAnimationFrame(id);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [measureControlsBand]);
-
+  // Re-measure the band height whenever its content can change size.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const id = window.requestAnimationFrame(measureControlsBand);
     return () => window.cancelAnimationFrame(id);
   }, [measureControlsBand, isMobile, bulkMode, sortOpen, searchOpen, searchParamsKey, libraries.length]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    lastScrollYRef.current = window.scrollY;
-    let ticking = false;
-    const update = () => {
-      ticking = false;
-      const y = window.scrollY;
-      const stickyStart = Math.max(controlsBandTopRef.current - 8, 0);
-
-      if (isMobile) {
-        setControlsDocked(y > stickyStart);
-        setControlsVisible(true);
-        lastScrollYRef.current = y;
-        return;
-      }
-
-      const lastY = lastScrollYRef.current;
-      const isNearTop = y <= stickyStart;
-      const scrollingDown = y > lastY + 2;
-      const scrollingUp = y < lastY - 2;
-
-      if (isNearTop) {
-        setControlsDocked(false);
-        setControlsVisible(true);
-      } else {
-        setControlsDocked(true);
-        if (controlsPinnedOpen) {
-          setControlsVisible(true);
-        } else if (scrollingDown) {
-          setControlsVisible(false);
-        } else if (scrollingUp) {
-          setControlsVisible(true);
-        }
-      }
-
-      lastScrollYRef.current = y;
-    };
-
-    const onScroll = () => {
-      if (ticking) return;
-      ticking = true;
-      window.requestAnimationFrame(update);
-    };
-
-    update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [controlsPinnedOpen, isMobile]);
-
-  useEffect(() => {
-    const wasPinnedOpen = wasControlsPinnedOpenRef.current;
-    if (controlsPinnedOpen) {
-      setControlsVisible(true);
-    } else if (wasPinnedOpen && controlsDocked) {
-      setControlsVisible(true);
-    }
-    wasControlsPinnedOpenRef.current = controlsPinnedOpen;
-  }, [controlsDocked, controlsPinnedOpen]);
 
   useEffect(() => {
     try {
@@ -1004,7 +932,7 @@ function AppShell({
     return () => window.removeEventListener("om:home-reset-filters", onReset);
   }, [router]);
 
-  function storeBookNavContext(libraryId: number, orderedBookIds: number[]) {
+  const storeBookNavContext = useCallback(function storeBookNavContext(libraryId: number, orderedBookIds: number[]) {
     const bookIds = orderedBookIds.filter((id) => Number.isFinite(id) && id > 0);
     if (bookIds.length === 0) return;
     saveBookNavContext({
@@ -1013,7 +941,7 @@ function AppShell({
       source: "app-home",
       ts: Date.now()
     });
-  }
+  }, []);
 
   async function applyBooksFromServer(serverRows: any[], source: string, requestSeq?: number) {
     const client = supabase;
@@ -2604,12 +2532,12 @@ function AppShell({
     }
   }
 
-  async function deleteEntry(userBookId: number) {
+  const deleteEntry = useCallback(async function deleteEntry(userBookId: number) {
     if (!supabase) return;
     if (!window.confirm("Delete this entry?")) return;
     setDeleteStateByBookId((prev) => ({ ...prev, [userBookId]: { busy: true, error: null, message: "Deleting…" } }));
     try {
-      const it = items.find((x) => x.id === userBookId) ?? null;
+      const it = itemsRef.current.find((x) => x.id === userBookId) ?? null;
       const paths = (it?.media ?? []).map((m) => m.storage_path).filter(Boolean);
       if (paths.length > 0) {
         await supabase.storage.from("user-book-media").remove(paths);
@@ -2621,16 +2549,19 @@ function AppShell({
     } catch (e: any) {
       setDeleteStateByBookId((prev) => ({ ...prev, [userBookId]: { busy: false, error: e?.message ?? "Delete failed", message: "Delete failed" } }));
     }
-  }
+  // refreshAllBooks is a plain function recreated each render; calling it via
+  // closure is intentional — the latest version is always used at call time.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  function toggleBulkKey(key: string) {
+  const toggleBulkKey = useCallback(function toggleBulkKey(key: string) {
     setBulkSelectedKeys((prev) => {
       const next = { ...prev };
       if (next[key]) delete next[key];
       else next[key] = true;
       return next;
     });
-  }
+  }, []);
 
   function selectAll() {
     const next: Record<string, true> = {};
@@ -3043,14 +2974,26 @@ function AppShell({
     itemsRef.current = items;
   }, [items]);
 
-  function beginItemReorder(activeKey: string, libraryId: number) {
-    if (rearrangingLibraryId !== libraryId) return;
-    setReorderBackupItems((prev) => prev ?? [...itemsRef.current]);
-  }
+  useEffect(() => {
+    rearrangingLibraryIdRef.current = rearrangingLibraryId;
+  }, [rearrangingLibraryId]);
 
-  function previewItemReorder(activeKey: string, overKey: string, libraryId: number) {
+  useEffect(() => {
+    reorderBackupItemsRef.current = reorderBackupItems;
+  }, [reorderBackupItems]);
+
+  useEffect(() => {
+    displayGroupsByLibraryIdRef.current = displayGroupsByLibraryId;
+  }, [displayGroupsByLibraryId]);
+
+  const beginItemReorder = useCallback(function beginItemReorder(activeKey: string, libraryId: number) {
+    if (rearrangingLibraryIdRef.current !== libraryId) return;
+    setReorderBackupItems((prev) => prev ?? [...itemsRef.current]);
+  }, []);
+
+  const previewItemReorder = useCallback(function previewItemReorder(activeKey: string, overKey: string, libraryId: number) {
     if (activeKey === overKey) return;
-    const groups = displayGroupsByLibraryId[libraryId] ?? [];
+    const groups = displayGroupsByLibraryIdRef.current[libraryId] ?? [];
     const fromIndex = groups.findIndex((group) => group.key === activeKey);
     const toIndex = groups.findIndex((group) => group.key === overKey);
     if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
@@ -3072,10 +3015,10 @@ function AppShell({
       });
       return changed ? next : prev;
     });
-  }
+  }, []);
 
-  async function commitItemReorder(libraryId: number) {
-    const snapshot = reorderBackupItems;
+  const commitItemReorder = useCallback(async function commitItemReorder(libraryId: number) {
+    const snapshot = reorderBackupItemsRef.current;
     setReorderBackupItems(null);
     if (!supabase) return;
     const db = supabase;
@@ -3107,15 +3050,15 @@ function AppShell({
       }
       window.alert("Failed to save new order. Reverting.");
     }
-  }
+  }, []);
 
-  function cancelItemReorder(libraryId: number) {
-    const snapshot = reorderBackupItems;
+  const cancelItemReorder = useCallback(function cancelItemReorder(libraryId: number) {
+    const snapshot = reorderBackupItemsRef.current;
     setReorderBackupItems(null);
     if (!snapshot) return;
     setItems(snapshot);
     itemsRef.current = snapshot;
-  }
+  }, []);
 
   const renderLibraries = useMemo<LibrarySummary[]>(() => {
     if (libraries.length > 0) return libraries;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   closestCenter,
   DndContext,
@@ -190,7 +190,7 @@ function SortableCatalogCard({
   );
 }
 
-export default function SortableCatalogGrid({
+const SortableCatalogGrid = memo(function SortableCatalogGrid({
   libraryId,
   groups,
   limit,
@@ -334,4 +334,6 @@ export default function SortableCatalogGrid({
       </DragOverlay>
     </DndContext>
   );
-}
+});
+
+export default SortableCatalogGrid;
