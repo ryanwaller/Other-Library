@@ -51,17 +51,24 @@ function rowMatchesVisibleText(row: ResultRow, query: string): boolean {
 
 function CoverThumb({ isbn13 }: { isbn13: string | null }) {
   const [failed, setFailed] = useState(false);
-  const src = isbn13 && !failed ? `https://covers.openlibrary.org/b/isbn/${isbn13}-S.jpg` : null;
+  const src = isbn13 && !failed ? `https://covers.openlibrary.org/b/isbn/${isbn13}-M.jpg` : null;
   return (
-    <div style={{ width: 36, minWidth: 36, height: 54, background: "var(--bg-subtle, rgba(128,128,128,0.12))", borderRadius: 2, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ width: 62, flex: "0 0 auto" }}>
       {src ? (
-        <img
-          src={src}
-          alt=""
-          onError={() => setFailed(true)}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-        />
-      ) : null}
+        <div className="om-cover-slot om-cover-slot-has-image" style={{ width: 60, height: "auto" }}>
+          <img
+            src={src}
+            alt=""
+            onError={() => setFailed(true)}
+            onLoad={(e) => { if ((e.currentTarget as HTMLImageElement).naturalWidth < 10) setFailed(true); }}
+            style={{ display: "block", width: "100%", height: "auto", objectFit: "contain" }}
+          />
+        </div>
+      ) : (
+        <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
+          <div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
+        </div>
+      )}
     </div>
   );
 }
@@ -72,14 +79,13 @@ function ResultItem({ row, isMine }: { row: ResultRow; isMine: boolean }) {
     <div className="row" style={{ gap: "var(--space-md)", alignItems: "flex-start", padding: "var(--space-10) 0" }}>
       <CoverThumb isbn13={row.isbn13} />
       <div style={{ minWidth: 0, flex: 1 }}>
+        {!isMine && row.owner_username && (
+          <div className="row" style={{ gap: "var(--space-8)", alignItems: "center", marginBottom: "var(--space-8)" }}>
+            <div className="om-avatar-img" style={{ background: "var(--placeholder-bg, rgba(128,128,128,0.15))", flexShrink: 0 }} />
+            <Link href={`/u/${row.owner_username}`} className="text-muted" style={{ textDecoration: "none" }}>{row.owner_username}</Link>
+          </div>
+        )}
         <div><Link href={href}>{row.title}</Link></div>
-        <div className="text-muted" style={{ marginTop: 2 }}>
-          {!isMine && row.owner_username ? (
-            <><Link href={`/u/${row.owner_username}`} className="text-muted">{row.owner_username}</Link>{row.authors?.length ? ` · ${row.authors.join(", ")}` : ""}</>
-          ) : (
-            row.authors?.length ? row.authors.join(", ") : ""
-          )}
-        </div>
       </div>
     </div>
   );
@@ -91,7 +97,7 @@ function ResultSection({ label, items, isMine, searchQuery }: { label: string; i
     <div>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginBottom: "var(--space-8)" }}>
         <span>{label}</span>
-        <span className="text-muted">{items.length}</span>
+        <span className="text-muted">{items.length} {items.length === 1 ? "item" : "items"}</span>
       </div>
       <hr className="divider" style={{ margin: 0 }} />
       <PagedBookList
