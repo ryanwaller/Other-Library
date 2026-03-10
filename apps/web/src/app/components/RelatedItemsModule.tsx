@@ -232,13 +232,14 @@ export default function RelatedItemsModule({
             .select(
               "id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,cover_url,authors),media:user_book_media(kind,storage_path),book_entities(role,entity_id,entity:entities(id,name))"
             )
-            .eq("owner_id", ownerId)
             .neq("id", currentUserBookId)
             .order("created_at", { ascending: false })
             .limit(1000);
 
           if (hrefMode === "owner" && ownerCatalogIds && ownerCatalogIds.length > 0) {
             query = query.in("library_id", ownerCatalogIds);
+          } else {
+            query = query.eq("owner_id", ownerId);
           }
 
           if (hrefMode === "public") {
