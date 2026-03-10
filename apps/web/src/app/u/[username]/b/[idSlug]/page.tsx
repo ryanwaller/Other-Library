@@ -183,7 +183,10 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   // Round trip 1: alias check + profile + book + viewer auth — all independent, run in parallel.
   // If aliasRes triggers a redirect the other results are discarded; in the common case we save
   // the extra sequential round trip that the old aliasRes → profileRes → bookRes waterfall imposed.
-  const signingClient = getSupabaseAdmin() ?? supabase;
+  // The book fetch uses the admin client to bypass RLS — visibility is enforced by canViewInContext below.
+  const adminClient = getSupabaseAdmin();
+  const signingClient = adminClient ?? supabase;
+  const bookClient = adminClient ?? supabase;
   const [aliasRes, profileRes, authUserRes, bookRes] = await Promise.all([
     supabase.from("username_aliases").select("current_username").eq("old_username", usernameNorm).maybeSingle(),
     supabase
@@ -192,7 +195,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       .eq("username", usernameNorm)
       .maybeSingle(),
     supabase.auth.getUser(),
-    supabase
+    bookClient
       .from("user_books")
       .select(
         "*,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))"
