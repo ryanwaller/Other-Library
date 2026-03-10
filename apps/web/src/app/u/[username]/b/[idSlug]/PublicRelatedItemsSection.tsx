@@ -1,12 +1,9 @@
-"use client";
-
-import Link from "next/link";
-import { useState } from "react";
-import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
+import { type CoverCrop } from "../../../../../components/CoverImage";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { getSupabaseAdmin } from "../../../../../lib/supabaseAdmin";
 import { bookIdSlug } from "../../../../../lib/slug";
 import { MUSIC_CONTRIBUTOR_ROLES, parseMusicMetadata, type MusicMetadata } from "../../../../../lib/music";
+import PublicRelatedItemsGrid from "./PublicRelatedItemsGrid";
 
 type PublicBookLike = {
   id: number;
@@ -243,57 +240,16 @@ export default async function PublicRelatedItemsSection({
     }
   }
 
-  return <PublicRelatedItemsGrid heading={heading} profileUsername={profileUsername} relatedRows={relatedRows} signedMap={signedMap} />;
-}
+  const rows = relatedRows.map((row) => {
+    const title = effectiveTitle(row);
+    return {
+      id: row.id,
+      href: `/u/${encodeURIComponent(profileUsername)}/b/${bookIdSlug(row.id, title)}`,
+      title,
+      coverUrl: coverSrc(row, signedMap),
+      coverCrop: row.cover_crop
+    };
+  });
 
-function PublicRelatedItemsGrid({
-  heading,
-  profileUsername,
-  relatedRows,
-  signedMap
-}: {
-  heading: string;
-  profileUsername: string;
-  relatedRows: PublicBookLike[];
-  signedMap: Record<string, string>;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const visibleRows = expanded ? relatedRows : relatedRows.slice(0, 4);
-  const showPager = relatedRows.length > 4;
-
-  return (
-    <>
-      <hr className="divider" />
-      <div style={{ marginTop: "var(--space-lg)" }}>
-        <div>{heading}</div>
-        <div className="om-related-items-grid" style={{ marginTop: "var(--space-14)" }}>
-          {visibleRows.map((row) => {
-            const title = effectiveTitle(row);
-            const href = `/u/${encodeURIComponent(profileUsername)}/b/${bookIdSlug(row.id, title)}`;
-            return (
-              <div key={row.id}>
-                <Link href={href} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
-                  <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
-                    <CoverImage alt={title} src={coverSrc(row, signedMap)} cropData={row.cover_crop} style={{ display: "block", width: "100%", height: "auto" }} objectFit="contain" />
-                  </div>
-                </Link>
-                <div style={{ marginTop: "var(--space-sm)" }}>
-                  <Link href={href} style={{ color: "inherit", textDecoration: "none" }}>
-                    <span className="om-book-title">{title}</span>
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {showPager ? (
-          <div className="row" style={{ marginTop: "var(--space-md)", justifyContent: "center" }}>
-            <button className="text-muted" onClick={() => setExpanded((value) => !value)}>
-              {expanded ? "See less" : "Load more"}
-            </button>
-          </div>
-        ) : null}
-      </div>
-    </>
-  );
+  return <PublicRelatedItemsGrid heading={heading} rows={rows} />;
 }
