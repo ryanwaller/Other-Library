@@ -1845,7 +1845,17 @@ export default function BookDetailPage() {
       out.push(candidate);
     };
 
-    for (const entity of facetView.author) {
+    const bookEntities = book?.book_entities ?? [];
+    const authorEntityNames = bookEntities
+      .filter((entry) => String(entry?.role ?? "").trim().toLowerCase() === "author")
+      .map((entry) => entry.entity)
+      .filter((entity): entity is EntityRef => Boolean(entity?.name));
+    const authorNames =
+      authorEntityNames.length > 0
+        ? authorEntityNames
+        : uniqStrings([...(book?.authors_override ?? []), ...((book?.edition?.authors ?? []) as string[])])
+            .map((name) => ({ id: `author:${slugifyFallback(name)}`, name, slug: slugifyFallback(name) }));
+    for (const entity of authorNames) {
       pushCandidate({
         role: "author",
         name: entity.name,
@@ -1856,7 +1866,8 @@ export default function BookDetailPage() {
       });
     }
 
-    const primaryArtist = String(effectiveMusic.primary_artist ?? "").trim();
+    const music = parseMusicMetadata(book?.music_metadata);
+    const primaryArtist = String(music?.primary_artist ?? "").trim();
     if (primaryArtist) {
       pushCandidate({
         role: "performer",
@@ -1867,7 +1878,11 @@ export default function BookDetailPage() {
     }
 
     for (const role of MUSIC_CONTRIBUTOR_ROLES.filter((role) => !["designer", "art direction", "artwork", "photography"].includes(role))) {
-      for (const entity of facetView[role]) {
+      const entities = bookEntities
+        .filter((entry) => String(entry?.role ?? "").trim().toLowerCase() === role)
+        .map((entry) => entry.entity)
+        .filter((entity): entity is EntityRef => Boolean(entity?.name));
+      for (const entity of entities) {
         pushCandidate({
           role,
           name: entity.name,
@@ -1879,7 +1894,18 @@ export default function BookDetailPage() {
       }
     }
 
-    for (const entity of facetView.designer) {
+    const designerEntityNames = bookEntities
+      .filter((entry) => {
+        const role = String(entry?.role ?? "").trim().toLowerCase();
+        return role === "designer" || role === "design";
+      })
+      .map((entry) => entry.entity)
+      .filter((entity): entity is EntityRef => Boolean(entity?.name));
+    const designerNames =
+      designerEntityNames.length > 0
+        ? designerEntityNames
+        : uniqStrings(book?.designers_override ?? []).map((name) => ({ id: `designer:${slugifyFallback(name)}`, name, slug: slugifyFallback(name) }));
+    for (const entity of designerNames) {
       pushCandidate({
         role: "designer",
         name: entity.name,
@@ -1891,7 +1917,7 @@ export default function BookDetailPage() {
     }
 
     return out;
-  }, [effectiveMusic.primary_artist, facetView]);
+  }, [book]);
 
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
   const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : suggestedCoverUrl ?? book?.edition?.cover_url ?? null;
