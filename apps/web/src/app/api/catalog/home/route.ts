@@ -107,7 +107,9 @@ async function attachResolvedCoverUrls(req: Request, admin: ReturnType<typeof re
   const storageRefs = Array.from(new Set(refs.map((ref) => toStoragePathCandidate(ref)).filter(Boolean) as string[]));
   const signedByPath = new Map<string, string>();
   if (storageRefs.length > 0) {
-    const signedRes = await admin.storage.from("user-book-media").createSignedUrls(storageRefs, 60 * 60);
+    const signedRes = await admin.storage.from("user-book-media").createSignedUrls(storageRefs, 60 * 60, {
+      transform: { width: 400, quality: 80, resize: "contain" }
+    } as any);
     if (!signedRes.error) {
       for (const item of signedRes.data ?? []) {
         if (item.path && item.signedUrl) signedByPath.set(item.path, item.signedUrl);

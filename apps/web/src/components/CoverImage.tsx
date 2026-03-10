@@ -134,11 +134,13 @@ export default function CoverImage({
           src={src}
           onLoad={handleLoad}
           onError={handleError}
-          style={{ 
-            width: "100%", 
-            height: isNatural ? "auto" : "100%", 
-            objectFit: isNatural ? "contain" : "cover", 
-            display: status === "ok" ? "block" : "none" 
+          loading="lazy"
+          decoding="async"
+          style={{
+            width: "100%",
+            height: isNatural ? "auto" : "100%",
+            objectFit: isNatural ? "contain" : "cover",
+            display: status === "ok" ? "block" : "none"
           }}
         />
         {status === "loading" && <div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />}

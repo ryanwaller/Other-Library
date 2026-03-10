@@ -145,15 +145,23 @@ export default async function PublicProfilePage({
     );
   }
 
-  let avatarUrl: string | null = null;
-  if (profile.avatar_path) {
-    const signed = await supabase.storage.from("avatars").createSignedUrl(profile.avatar_path, 60 * 30);
-    avatarUrl = signed.data?.signedUrl ?? null;
-  }
+  const [avatarSigned, followCountsRes, booksRes] = await Promise.all([
+    profile.avatar_path
+      ? supabase.storage.from("avatars").createSignedUrl(profile.avatar_path, 60 * 30)
+      : Promise.resolve(null),
+    supabase.rpc("get_follow_counts", { target_username: profile.username }),
+    supabase
+      .from("user_books")
+      .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))")
+      .eq("owner_id", profile.id)
+      .order("created_at", { ascending: false })
+      .limit(1000)
+  ]);
+
+  const avatarUrl: string | null = (avatarSigned as any)?.data?.signedUrl ?? null;
 
   let followersCount: number | null = null;
   let followingCount: number | null = null;
-  const followCountsRes = await supabase.rpc("get_follow_counts", { target_username: profile.username });
   if (!followCountsRes.error) {
     const row = Array.isArray(followCountsRes.data) ? ((followCountsRes.data[0] as any) ?? null) : ((followCountsRes.data as any) ?? null);
     followersCount = row && row.followers_count != null ? Number(row.followers_count) : null;
@@ -166,13 +174,6 @@ export default async function PublicProfilePage({
     followersCount = followersCountRes.count ?? null;
     followingCount = followingCountRes.count ?? null;
   }
-
-  const booksRes = await supabase
-    .from("user_books")
-    .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))")
-    .eq("owner_id", profile.id)
-    .order("created_at", { ascending: false })
-    .limit(1000);
 
   const books = (booksRes.data ?? []) as any as PublicBook[];
   const visibleBooks = books.filter((b) => {

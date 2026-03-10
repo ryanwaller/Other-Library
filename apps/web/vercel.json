@@ -1,6 +1,7 @@
 {
   "installCommand": "cd ../.. && npm install -w @om/shared -w @om/web",
   "buildCommand": "cd ../.. && npm -w @om/web run build",
-  "devCommand": "cd ../.. && npm -w @om/web run dev"
+  "devCommand": "cd ../.. && npm -w @om/web run dev",
+  "regions": ["sfo1"]
 }
 
