@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../lib/supabaseClient";
@@ -49,6 +49,63 @@ function rowMatchesVisibleText(row: ResultRow, query: string): boolean {
   return haystack.includes(q);
 }
 
+function CoverThumb({ isbn13 }: { isbn13: string | null }) {
+  const [failed, setFailed] = useState(false);
+  const src = isbn13 && !failed ? `https://covers.openlibrary.org/b/isbn/${isbn13}-S.jpg` : null;
+  return (
+    <div style={{ width: 36, minWidth: 36, height: 54, background: "var(--bg-subtle, rgba(128,128,128,0.12))", borderRadius: 2, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          onError={() => setFailed(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ResultItem({ row, isMine }: { row: ResultRow; isMine: boolean }) {
+  const href = isMine ? `/app/books/${row.user_book_id}` : `/u/${row.owner_username}/b/${row.user_book_id}`;
+  return (
+    <div className="row" style={{ gap: "var(--space-md)", alignItems: "flex-start", padding: "var(--space-10) 0" }}>
+      <CoverThumb isbn13={row.isbn13} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div><Link href={href}>{row.title}</Link></div>
+        <div className="text-muted" style={{ marginTop: 2 }}>
+          {!isMine && row.owner_username ? (
+            <><Link href={`/u/${row.owner_username}`} className="text-muted">{row.owner_username}</Link>{row.authors?.length ? ` · ${row.authors.join(", ")}` : ""}</>
+          ) : (
+            row.authors?.length ? row.authors.join(", ") : ""
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResultSection({ label, items, isMine, searchQuery }: { label: string; items: ResultRow[]; isMine: boolean; searchQuery: string }) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginBottom: "var(--space-8)" }}>
+        <span>{label}</span>
+        <span className="text-muted">{items.length}</span>
+      </div>
+      <hr className="divider" style={{ margin: 0 }} />
+      <PagedBookList
+        items={items}
+        viewMode="list"
+        gridCols={1}
+        searchQuery={searchQuery}
+        renderItem={(r) => <ResultItem key={r.user_book_id} row={r} isMine={isMine} />}
+        noItemsMessage=""
+      />
+    </div>
+  );
+}
+
 export default function DiscoverClient() {
   const sp = useSearchParams();
   const initialQ = (sp.get("q") ?? "").trim();
@@ -61,14 +118,9 @@ export default function DiscoverClient() {
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ResultRow[]>([]);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [searched, setSearched] = useState(false);
 
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -102,6 +154,7 @@ export default function DiscoverClient() {
       }
     }
     setBusy(false);
+    setSearched(true);
     if (rpcRes.error) {
       setError(rpcRes.error.message);
       setRows(entityRows);
@@ -111,8 +164,6 @@ export default function DiscoverClient() {
     const phraseRpcRows = rpcRows.filter((row) => rowMatchesVisibleText(row, query));
     const merged = new Map<number, ResultRow>();
     if (entityRows.length > 0) {
-      // Entity search found designer/creator matches — anchor results to those.
-      // Only add RPC rows that also contain the exact phrase in visible metadata.
       for (const row of phraseRpcRows) merged.set(Number(row.user_book_id), row);
       for (const row of entityRows) if (!merged.has(Number(row.user_book_id))) merged.set(Number(row.user_book_id), row);
     } else {
@@ -128,7 +179,10 @@ export default function DiscoverClient() {
       return;
     }
     (async () => {
-      if (initialQ) await runSearch(initialQ);
+      if (initialQ) {
+        await runSearch(initialQ);
+        setSearched(true);
+      }
       setInitialLoadDone(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,16 +190,12 @@ export default function DiscoverClient() {
 
   const grouped = useMemo(() => {
     const mine: ResultRow[] = [];
-    const following: ResultRow[] = [];
-    const second: ResultRow[] = [];
-    const pub: ResultRow[] = [];
+    const others: ResultRow[] = [];
     for (const r of rows) {
       if (r.relationship === "you") mine.push(r);
-      else if (r.relationship === "following") following.push(r);
-      else if (r.relationship === "2nd_degree") second.push(r);
-      else pub.push(r);
+      else others.push(r);
     }
-    return { mine, following, second, pub };
+    return { mine, others };
   }, [rows]);
 
   if (!supabase) {
@@ -169,14 +219,11 @@ export default function DiscoverClient() {
         <SignInCard note="Sign in to search your network." />
       ) : (
         <div className="card">
-          <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-md)" }}>
-            <div>Discovery</div>
-            <div className="text-muted">{busy ? "Searching…" : error ? error : ""}</div>
-          </div>
-
-          <div className="row" style={{ marginTop: "var(--space-10)", flexWrap: "wrap", gap: "var(--space-10)", alignItems: "center" }}>
+          <div className="row" style={{ alignItems: "baseline", gap: "var(--space-md)" }}>
             <input
-              placeholder="Search title, author, ISBN, tag, subject, publisher…"
+              ref={inputRef}
+              className="om-inline-search-input"
+              placeholder="Search books…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={(e) => {
@@ -184,103 +231,27 @@ export default function DiscoverClient() {
                 e.preventDefault();
                 runSearch();
               }}
-              style={{ minWidth: 360 }}
+              style={{ flex: 1, minWidth: 0 }}
             />
-            <button onClick={() => runSearch()} disabled={busy || !q.trim()}>
-              Search
+            <button onClick={() => runSearch()} disabled={busy || !q.trim()} className="text-muted" style={{ whiteSpace: "nowrap", flex: "0 0 auto" }}>
+              {busy ? "Searching…" : "Search"}
             </button>
           </div>
 
-          <div className="text-muted" style={{ marginTop: "var(--space-10)" }}>
-            Results show books that are visible to you (your own, people you follow, and public).
-          </div>
-
-          <div style={{ marginTop: "var(--space-md)" }}>
-            {rows.length === 0 && q.trim() && !busy ? <div className="text-muted">No results.</div> : null}
-
-            {grouped.mine.length > 0 ? (
-              <div className="card" style={{ marginTop: "var(--space-10)" }}>
-                <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>Your catalog</div>
-                <PagedBookList
-                  items={grouped.mine}
-                  viewMode="list"
-                  gridCols={isMobile ? 2 : 4}
-                  searchQuery={q}
-                  renderItem={(r) => (
-                    <div key={`mine-${r.user_book_id}`} style={{ marginTop: "var(--space-8)" }}>
-                      <Link href={`/app/books/${r.user_book_id}`}>{r.title}</Link>
-                      <div className="text-muted">
-                        {r.authors?.length ? r.authors.join(", ") : ""} {r.isbn13 ? `· ${r.isbn13}` : ""}
-                      </div>
-                    </div>
-                  )}
-                />
-              </div>
-            ) : null}
-
-            {grouped.following.length > 0 ? (
-              <div className="card" style={{ marginTop: "var(--space-10)" }}>
-                <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>People you follow</div>
-                <PagedBookList
-                  items={grouped.following}
-                  viewMode="list"
-                  gridCols={isMobile ? 2 : 4}
-                  searchQuery={q}
-                  renderItem={(r) => (
-                    <div key={`f-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: "var(--space-8)" }}>
-                      <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
-                      <div className="text-muted">
-                        <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
-                        {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
-                      </div>
-                    </div>
-                  )}
-                />
-              </div>
-            ) : null}
-
-            {grouped.second.length > 0 ? (
-              <div className="card" style={{ marginTop: "var(--space-10)" }}>
-                <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>2nd-degree (public)</div>
-                <PagedBookList
-                  items={grouped.second}
-                  viewMode="list"
-                  gridCols={isMobile ? 2 : 4}
-                  searchQuery={q}
-                  renderItem={(r) => (
-                    <div key={`s-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: "var(--space-8)" }}>
-                      <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
-                      <div className="text-muted">
-                        <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
-                        {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
-                      </div>
-                    </div>
-                  )}
-                />
-              </div>
-            ) : null}
-
-            {grouped.pub.length > 0 ? (
-              <div className="card" style={{ marginTop: "var(--space-10)" }}>
-                <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>Public</div>
-                <PagedBookList
-                  items={grouped.pub}
-                  viewMode="list"
-                  gridCols={isMobile ? 2 : 4}
-                  searchQuery={q}
-                  renderItem={(r) => (
-                    <div key={`p-${r.owner_username}-${r.user_book_id}`} style={{ marginTop: "var(--space-8)" }}>
-                      <Link href={`/u/${r.owner_username}/b/${r.user_book_id}`}>{r.title}</Link>
-                      <div className="text-muted">
-                        <Link href={`/u/${r.owner_username}`}>{r.owner_username}</Link>
-                        {r.authors?.length ? ` · ${r.authors.join(", ")}` : ""}
-                      </div>
-                    </div>
-                  )}
-                />
-              </div>
-            ) : null}
-          </div>
+          {searched && (
+            <div style={{ marginTop: "var(--space-xl)" }}>
+              {error ? (
+                <div className="text-muted">{error}</div>
+              ) : rows.length === 0 ? (
+                <div className="text-muted">No results.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-xl)" }}>
+                  <ResultSection label="Your catalog" items={grouped.mine} isMine searchQuery={q} />
+                  <ResultSection label="Others' catalogs" items={grouped.others} isMine={false} searchQuery={q} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </main>
