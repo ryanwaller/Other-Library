@@ -14,15 +14,16 @@ type BookRow = {
   id: number;
   owner_id: string;
   created_at: string;
+  edition_id: number | null;
   title_override: string | null;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
-  edition: { title: string | null; cover_url: string | null } | null;
+  edition: { title: string | null; isbn13: string | null; cover_url: string | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
 };
 
 const BOOK_SELECT =
-  "id,owner_id,created_at,title_override,cover_original_url,cover_crop,edition:editions(title,cover_url),media:user_book_media(kind,storage_path)";
+  "id,owner_id,created_at,edition_id,title_override,cover_original_url,cover_crop,edition:editions(title,isbn13,cover_url),media:user_book_media(kind,storage_path)";
 
 const ROLE_ORDER = [
   "author", "performer", "editor", "publisher", "composer", "producer",
@@ -103,6 +104,30 @@ function coverStoragePath(row: BookRow): string | null {
   if (firstMedia) return firstMedia;
   const original = String(row.cover_original_url ?? "").trim();
   return original && !isRemoteUrl(original) ? original : null;
+}
+
+// Returns a stable key for deduplicating books that are copies of the same edition.
+// Priority: edition_id > isbn13 > normalized title.
+function editionKey(row: BookRow): string {
+  if (row.edition_id) return `eid:${row.edition_id}`;
+  const isbn = String(row.edition?.isbn13 ?? "").trim();
+  if (isbn) return `isbn:${isbn}`;
+  const title = effectiveTitle(row).toLowerCase().replace(/\s+/g, " ");
+  return `title:${title}`;
+}
+
+// Deduplicates an already-sorted (newest first) list by edition, returning
+// one representative book per unique edition key.
+function dedupeByEdition(books: BookRow[]): BookRow[] {
+  const seen = new Set<string>();
+  const out: BookRow[] = [];
+  for (const book of books) {
+    const key = editionKey(book);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(book);
+  }
+  return out;
 }
 
 function coverSrc(row: BookRow, signedMap: Record<string, string>): string | null {
@@ -285,13 +310,14 @@ export default async function EntityPage({
     }
   }
 
-  // 8. Build modules
+  // 8. Build modules — deduplicate by edition within each role
   const modules = sortedRoles.map(([role, booksMap]) => {
-    const books = Array.from(booksMap.values()).sort(
+    const sorted = Array.from(booksMap.values()).sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
-    const total = books.length;
-    const displayed = books.slice(0, 12);
+    const deduped = dedupeByEdition(sorted);
+    const total = deduped.length;
+    const displayed = deduped.slice(0, 12);
     return {
       role,
       heading: roleHeading(role, entity.name),
@@ -346,9 +372,9 @@ export default async function EntityPage({
     }))
     .sort((a, b) => a.username.localeCompare(b.username));
 
-  // 10. Summary line
-  const summaryParts: string[] = sortedRoles
-    .map(([role, booksMap]) => roleSummaryLabel(role, booksMap.size))
+  // 10. Summary line — use deduplicated counts per role
+  const summaryParts: string[] = modules
+    .map((mod) => roleSummaryLabel(mod.role, mod.total))
     .filter(Boolean);
   if (ownersForClient.length > 0) {
     const n = ownersForClient.length;
@@ -359,8 +385,13 @@ export default async function EntityPage({
     <main className="container">
       <h1 style={{ margin: 0 }}>{entity.name}</h1>
       {summaryParts.length > 0 && (
-        <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
-          {summaryParts.join(" · ")}
+        <div
+          className="text-muted"
+          style={{ marginTop: "var(--space-sm)", display: "flex", flexWrap: "wrap", gap: "var(--space-lg)" }}
+        >
+          {summaryParts.map((part) => (
+            <span key={part}>{part}</span>
+          ))}
         </div>
       )}
 
@@ -377,7 +408,7 @@ export default async function EntityPage({
                 <Link
                   href={mod.viewAllHref}
                   className="text-muted"
-                  style={{ textDecoration: "none", fontSize: "0.875em" }}
+                  style={{ textDecoration: "none" }}
                 >
                   View all {mod.total}
                 </Link>
