@@ -81,30 +81,13 @@ export default function EntityPageModules({ modules }: { modules: ModuleData[] }
       )}
 
       {modules.map((mod) => {
-        // When the session is resolved, exclude editions the viewer already owns
-        // (they're shown in "Your copies" above).
-        const filteredItems: GridItem[] =
-          userId !== undefined
-            ? mod.items
-                .filter(
-                  (item) =>
-                    !userId ||
-                    !item.ownerEntries.some((e) => e.ownerId === userId)
-                )
-                .map((item) => ({
-                  id: item.id,
-                  title: item.title,
-                  coverUrl: item.coverUrl,
-                  coverCrop: item.coverCrop,
-                  href: item.publicFallbackHref
-                }))
-            : mod.items.map((item) => ({
-                id: item.id,
-                title: item.title,
-                coverUrl: item.coverUrl,
-                coverCrop: item.coverCrop,
-                href: item.publicFallbackHref
-              }));
+        const filteredItems: GridItem[] = mod.items.map((item) => ({
+          id: item.id,
+          title: item.title,
+          coverUrl: item.coverUrl,
+          coverCrop: item.coverCrop,
+          href: item.publicFallbackHref
+        }));
 
         if (filteredItems.length === 0) return null;
 
