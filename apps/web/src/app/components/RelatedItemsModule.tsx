@@ -103,7 +103,18 @@ function rowMatchesCandidate(row: RelatedItemRow, candidate: RelatedItemsCandida
   }
 
   if (candidate.role === "designer") {
-    return includesName([...(row.designers_override ?? []), ...((row.book_entities ?? []).filter((entry) => String(entry?.role ?? "").trim().toLowerCase() === "designer").map((entry) => entry.entity?.name ?? null))], candidate.name);
+    return includesName(
+      [
+        ...(row.designers_override ?? []),
+        ...((row.book_entities ?? [])
+          .filter((entry) => {
+            const role = String(entry?.role ?? "").trim().toLowerCase();
+            return role === "designer" || role === "design";
+          })
+          .map((entry) => entry.entity?.name ?? null))
+      ],
+      candidate.name
+    );
   }
 
   const music = parseMusicMetadata(row.music_metadata);
