@@ -1,12 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getServerSupabase } from "../../../../lib/supabaseServer";
-import { permanentRedirect } from "next/navigation";
 import FacetBookList from "./FacetBookList";
 import ActiveFilterDisplay from "../../../../components/ActiveFilterDisplay";
 import type { CoverCrop } from "../../../../components/CoverImage";
 import { facetLabelForRole } from "../../../../lib/pageTitle";
-import { detailFilterHref, roleToDetailFilterKey } from "../../../../lib/detailFilters";
 
 export const dynamic = "force-dynamic";
 
@@ -106,11 +104,6 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
         <div className="card">No matching facet.</div>
       </main>
     );
-  }
-
-  const filterKey = roleToDetailFilterKey(role);
-  if (filterKey) {
-    permanentRedirect(detailFilterHref("/app", filterKey, entity.name));
   }
 
   const idsRes = await supabase
