@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminClient, requireUser, toApiError } from "../../../catalog/_lib";
 import { MUSIC_CONTRIBUTOR_ROLES, parseMusicMetadata, type MusicMetadata } from "../../../../../lib/music";
+import { groupKeyFor } from "../../../../../lib/book";
 
 type BookLike = {
   id: number;
@@ -202,7 +203,27 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       const matches = allBooks.filter((row) => rowMatchesCandidate(row, candidate));
       if (matches.length < 1) continue;
       heading = candidate.heading;
-      matchedRows = matches;
+      const byGroup = new Map<string, BookLike[]>();
+      for (const row of matches) {
+        const key = `${row.library_id}:${groupKeyFor(row as any)}`;
+        const current = byGroup.get(key);
+        if (current) current.push(row);
+        else byGroup.set(key, [row]);
+      }
+      matchedRows = Array.from(byGroup.values()).map((rows) => {
+        const sorted = rows.slice().sort((a, b) => {
+          const score = (row: BookLike): number => {
+            let value = 0;
+            if ((row.media ?? []).some((m) => m.kind === "cover")) value += 1000;
+            if (row.edition?.cover_url) value += 150;
+            return value;
+          };
+          const scoreDiff = score(b) - score(a);
+          if (scoreDiff !== 0) return scoreDiff;
+          return b.id - a.id;
+        });
+        return sorted[0]!;
+      });
       break;
     }
 
