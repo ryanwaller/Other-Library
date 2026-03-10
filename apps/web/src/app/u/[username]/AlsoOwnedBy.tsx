@@ -25,6 +25,7 @@ export default function AlsoOwnedBy({
   const [rows, setRows] = useState<Array<AlsoOwnedRow & { copies: number }>>([]);
   const [initialized, setInitialized] = useState(false);
   const [avatarUrlsByPath, setAvatarUrlsByPath] = useState<Record<string, string>>({});
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -91,8 +92,8 @@ export default function AlsoOwnedBy({
 
   if (!supabase || !editionId || !initialized || owners.length === 0) return null;
 
-  const displayed = owners.slice(0, DISPLAY_LIMIT);
-  const extraCount = owners.length - displayed.length;
+  const displayed = expanded ? owners : owners.slice(0, DISPLAY_LIMIT);
+  const extraCount = owners.length - DISPLAY_LIMIT;
   const libraryWord = owners.length === 1 ? "library" : "libraries";
 
   return (
@@ -146,8 +147,10 @@ export default function AlsoOwnedBy({
           })}
         </div>
         {extraCount > 0 && (
-          <div className="text-muted" style={{ marginTop: "var(--space-sm)", fontSize: "0.9em" }}>
-            and {extraCount} more
+          <div style={{ marginTop: "var(--space-sm)" }}>
+            <button className="text-muted" onClick={() => setExpanded((v) => !v)}>
+              {expanded ? "See less" : `See all ${owners.length}`}
+            </button>
           </div>
         )}
       </div>
