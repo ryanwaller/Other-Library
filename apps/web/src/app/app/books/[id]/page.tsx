@@ -1834,8 +1834,19 @@ export default function BookDetailPage() {
 
   const relatedItemsCandidates = useMemo<RelatedItemsCandidate[]>(() => {
     const out: RelatedItemsCandidate[] = [];
+    const seen = new Set<string>();
+    const pushCandidate = (candidate: RelatedItemsCandidate) => {
+      const role = String(candidate.role ?? "").trim().toLowerCase();
+      const name = String(candidate.name ?? "").trim();
+      if (!role || !name) return;
+      const key = `${role}:${name.toLowerCase()}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(candidate);
+    };
+
     for (const entity of facetView.author) {
-      out.push({
+      pushCandidate({
         role: "author",
         name: entity.name,
         entityId: entity.id,
@@ -1845,9 +1856,19 @@ export default function BookDetailPage() {
       });
     }
 
+    const primaryArtist = String(effectiveMusic.primary_artist ?? "").trim();
+    if (primaryArtist) {
+      pushCandidate({
+        role: "performer",
+        name: primaryArtist,
+        heading: `Other records by ${primaryArtist}`,
+        mediaScope: "music"
+      });
+    }
+
     for (const role of MUSIC_CONTRIBUTOR_ROLES.filter((role) => !["designer", "art direction", "artwork", "photography"].includes(role))) {
       for (const entity of facetView[role]) {
-        out.push({
+        pushCandidate({
           role,
           name: entity.name,
           entityId: entity.id,
@@ -1859,7 +1880,7 @@ export default function BookDetailPage() {
     }
 
     for (const entity of facetView.designer) {
-      out.push({
+      pushCandidate({
         role: "designer",
         name: entity.name,
         entityId: entity.id,
@@ -1870,7 +1891,7 @@ export default function BookDetailPage() {
     }
 
     return out;
-  }, [facetView]);
+  }, [effectiveMusic.primary_artist, facetView]);
 
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
   const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : suggestedCoverUrl ?? book?.edition?.cover_url ?? null;
