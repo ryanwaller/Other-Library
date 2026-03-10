@@ -196,22 +196,31 @@ export default function RelatedItemsModule({
         return;
       }
 
-      const resolvedEntityIds = new Map<string, string | null>();
-      let ownerCatalogIds: number[] | null = null;
-
       if (hrefMode === "owner") {
-        const res = await fetch("/api/catalog/home?lite=1", { credentials: "include" });
+        const sessionRes = await supabase.auth.getSession();
+        const token = sessionRes.data.session?.access_token ?? null;
+        if (!token) {
+          if (!alive) return;
+          setHeading(null);
+          setRows([]);
+          setSignedMap({});
+          setExpanded(false);
+          return;
+        }
+
+        const res = await fetch(`/api/books/${currentUserBookId}/related`, {
+          headers: { authorization: `Bearer ${token}` }
+        });
         const payload = res.ok ? await res.json() : null;
-        ownerCatalogIds = Array.isArray(payload?.catalogs)
-          ? Array.from(
-              new Set(
-                (payload.catalogs as Array<{ id?: number | null }>)
-                  .map((row) => Number(row?.id))
-                  .filter((id) => Number.isFinite(id) && id > 0)
-              )
-            )
-          : [];
+        if (!alive) return;
+        setHeading(typeof payload?.heading === "string" ? payload.heading : null);
+        setRows(Array.isArray(payload?.rows) ? (payload.rows as RelatedItemRow[]) : []);
+        setSignedMap({});
+        setExpanded(false);
+        return;
       }
+
+      const resolvedEntityIds = new Map<string, string | null>();
 
       for (const candidate of dedupedCandidates) {
         const cacheKey = `${candidate.role}:${candidate.entityId ?? ""}:${candidate.entitySlug ?? ""}:${candidate.name.toLowerCase()}`;
@@ -224,23 +233,16 @@ export default function RelatedItemsModule({
         let matchedRows: RelatedItemRow[] = [];
         let nextSignedMap: Record<string, string> = {};
 
-        if (hrefMode === "owner" && ownerCatalogIds && ownerCatalogIds.length === 0) continue;
-
         {
           let query = supabase
             .from("user_books")
             .select(
               "id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,cover_url,authors),media:user_book_media(kind,storage_path),book_entities(role,entity_id,entity:entities(id,name))"
             )
+            .eq("owner_id", ownerId)
             .neq("id", currentUserBookId)
             .order("created_at", { ascending: false })
             .limit(1000);
-
-          if (hrefMode === "owner" && ownerCatalogIds && ownerCatalogIds.length > 0) {
-            query = query.in("library_id", ownerCatalogIds);
-          } else {
-            query = query.eq("owner_id", ownerId);
-          }
 
           if (hrefMode === "public") {
             if (publicProfileVisibility === "public") query = query.neq("visibility", "followers_only");
