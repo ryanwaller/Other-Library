@@ -18,15 +18,22 @@ export default function FollowControls({
   inline?: boolean;
 }) {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [row, setRow] = useState<{ status: FollowStatus } | null>(null);
   const [followsYou, setFollowsYou] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSessionUserId(data.session?.user?.id ?? null));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSessionUserId(newSession?.user?.id ?? null));
+    if (!supabase) { setAuthLoading(false); return; }
+    supabase.auth.getSession().then(({ data }) => {
+      setSessionUserId(data.session?.user?.id ?? null);
+      setAuthLoading(false);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSessionUserId(newSession?.user?.id ?? null);
+      setAuthLoading(false);
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -93,7 +100,7 @@ export default function FollowControls({
   if (isSelf) return null;
 
   if (!sessionUserId) {
-    if (compact) return null;
+    if (authLoading || compact) return null;
     return (
       <div style={{ marginTop: compact || inline ? 0 : 10 }} className="text-muted">
         <Link href="/app">Sign in</Link> to follow.
