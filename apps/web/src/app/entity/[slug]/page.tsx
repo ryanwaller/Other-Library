@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getServerSupabase } from "../../../lib/supabaseServer";
 import { getSupabaseAdmin } from "../../../lib/supabaseAdmin";
 import { bookIdSlug } from "../../../lib/slug";
 import type { CoverCrop } from "../../../components/CoverImage";
-import EntityBookGrid, { type EntityModuleItem } from "./EntityBookGrid";
+import EntityPageModules, { type ModuleData, type EntityModuleItem, type OwnerEntry } from "./EntityPageModules";
 import EntityLibraryOwners, { type OwnerProfile } from "./EntityLibraryOwners";
 
 export const dynamic = "force-dynamic";
@@ -95,8 +94,6 @@ function effectiveTitle(row: BookRow): string {
   return String(row.title_override ?? "").trim() || String(row.edition?.title ?? "").trim() || "(untitled)";
 }
 
-// Returns a stable key for grouping user_books that are copies of the same edition.
-// Priority: edition_id > isbn13 > normalized title.
 function editionKey(row: BookRow): string {
   if (row.edition_id) return `eid:${row.edition_id}`;
   const isbn = String(row.edition?.isbn13 ?? "").trim();
@@ -295,10 +292,13 @@ export default async function EntityPage({
     return { role, groups };
   });
 
-  // 8. Sign cover storage URLs (using representative books only)
-  const repBooks = roleGroups.flatMap(({ groups }) => groups.map((g) => g.rep));
+  // Collect ALL copies across all edition groups (for signing and owner queries)
+  const allCopies = roleGroups.flatMap(({ groups }) => groups.flatMap((g) => g.allBooks));
+
+  // 8. Sign cover storage URLs for ALL copies (not just representatives —
+  //    viewers' own copies may have different uploaded covers)
   const mediaPaths = Array.from(
-    new Set(repBooks.map((b) => coverStoragePath(b)).filter((p): p is string => Boolean(p)))
+    new Set(allCopies.map((b) => coverStoragePath(b)).filter((p): p is string => Boolean(p)))
   );
   const signedMap: Record<string, string> = {};
   const signingClient = admin ?? supabase;
@@ -311,8 +311,7 @@ export default async function EntityPage({
     }
   }
 
-  // 9. Owner profiles — collect all owner_ids across all copies (pre-dedup) for accurate count
-  const allCopies = roleGroups.flatMap(({ groups }) => groups.flatMap((g) => g.allBooks));
+  // 9. Owner profiles (public only — for library section and fallback hrefs)
   const ownerIds = Array.from(new Set(allCopies.map((b) => b.owner_id).filter(Boolean)));
   let ownerProfiles: Array<{ id: string; username: string; avatar_path: string | null }> = [];
   if (ownerIds.length > 0) {
@@ -338,23 +337,31 @@ export default async function EntityPage({
     }
   }
 
-  // 10. Finalize modules — build items with link resolution data
-  const modules = roleGroups.map(({ role, groups }) => {
+  // 10. Finalize modules — ownerEntries carry per-copy cover data so the
+  //     client can build "Your copies" with the viewer's own covers.
+  const modules: ModuleData[] = roleGroups.map(({ role, groups }) => {
     const total = groups.length;
     const displayed = groups.slice(0, 12);
 
     const items: EntityModuleItem[] = displayed.map(({ rep, allBooks }) => {
       const title = effectiveTitle(rep);
 
-      // Only include public owners (those whose profile is in profileByOwnerId).
-      const ownerEntries = allBooks
-        .map((b) => {
+      const ownerEntries: OwnerEntry[] = allBooks
+        .map((b): OwnerEntry | null => {
+          // Include any owner whose profile is public, so the viewer can see
+          // their own copies in "Your copies" and others see the fallback link.
           if (!profileByOwnerId.has(b.owner_id)) return null;
-          return { ownerId: b.owner_id, userBookId: b.id };
+          return {
+            ownerId: b.owner_id,
+            userBookId: b.id,
+            coverUrl: coverSrc(b, signedMap),
+            coverCrop: b.cover_crop,
+            title: effectiveTitle(b)
+          };
         })
-        .filter((e): e is { ownerId: string; userBookId: number } => e !== null);
+        .filter((e): e is OwnerEntry => e !== null);
 
-      // Public fallback: first public owner (allBooks is sorted newest-first).
+      // Public fallback: first public owner (allBooks is sorted newest-first)
       const firstPublic = allBooks.find((b) => profileByOwnerId.has(b.owner_id));
       const publicFallbackHref = firstPublic
         ? `/u/${encodeURIComponent(profileByOwnerId.get(firstPublic.owner_id)!)}/b/${bookIdSlug(firstPublic.id, title)}`
@@ -382,7 +389,7 @@ export default async function EntityPage({
     };
   });
 
-  // 11. Library section owners
+  // 11. Library section
   const ownersForClient: OwnerProfile[] = ownerProfiles
     .map((p) => ({
       id: p.id,
@@ -414,29 +421,7 @@ export default async function EntityPage({
         </div>
       )}
 
-      {modules.map((mod) => (
-        <div key={mod.role} style={{ marginTop: "var(--space-xl)" }}>
-          <hr className="divider" />
-          <div style={{ marginTop: "var(--space-lg)" }}>
-            <div
-              className="row"
-              style={{ justifyContent: "space-between", alignItems: "baseline" }}
-            >
-              <div>{mod.heading}</div>
-              {mod.viewAllHref ? (
-                <Link
-                  href={mod.viewAllHref}
-                  className="text-muted"
-                  style={{ textDecoration: "none" }}
-                >
-                  View all {mod.total}
-                </Link>
-              ) : null}
-            </div>
-            <EntityBookGrid items={mod.items} />
-          </div>
-        </div>
-      ))}
+      <EntityPageModules modules={modules} />
 
       {ownersForClient.length > 0 && (
         <div style={{ marginTop: "var(--space-xl)" }}>
