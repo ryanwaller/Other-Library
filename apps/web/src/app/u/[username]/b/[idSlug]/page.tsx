@@ -21,6 +21,7 @@ import PublicImageGrid from "./PublicImageGrid";
 import PublicBookDetailGrid from "./PublicBookDetailGrid";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
 import PublicRelatedItemsSection from "./PublicRelatedItemsSection";
+import PublicBookAccessFallback from "./PublicBookAccessFallback";
 
 export const dynamic = "force-dynamic";
 
@@ -282,18 +283,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   }
 
   if (!canViewInContext) {
-    return (
-      <main className="container">
-        <div className="card">
-          <div>
-            <Link href={`/u/${profile.username}`}>@{profile.username}</Link>
-          </div>
-          <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
-            Book not found (or private).
-          </div>
-        </div>
-      </main>
-    );
+    return <PublicBookAccessFallback username={profile.username} bookId={book.id} />;
   }
 
   const effectiveTitle = (book.title_override ?? "").trim() || book.edition?.title || "(untitled)";
