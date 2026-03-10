@@ -9,4 +9,3 @@ export function getServerSupabase() {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });
 }
-

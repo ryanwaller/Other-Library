@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
+import { getPublicEnvOptional } from "../../../../../lib/env";
 import { bookIdSlug } from "../../../../../lib/slug";
 import { formatDateShort } from "../../../../../lib/formatDate";
 import { formatMusicTrackLine, musicDisplayGenres, MUSIC_CONTRIBUTOR_ROLES, parseMusicMetadata, type MusicMetadata } from "../../../../../lib/music";
@@ -20,6 +23,28 @@ import AlsoOwnedBy from "../../AlsoOwnedBy";
 import PublicRelatedItemsSection from "./PublicRelatedItemsSection";
 
 export const dynamic = "force-dynamic";
+
+async function getRequestSupabase() {
+  const env = getPublicEnvOptional();
+  if (!env) return null;
+  const cookieStore = await cookies();
+  return createServerClient(env.url, env.anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          for (const cookie of cookiesToSet) {
+            cookieStore.set(cookie.name, cookie.value, cookie.options);
+          }
+        } catch {
+          // no-op in read-only render paths
+        }
+      }
+    }
+  });
+}
 
 function musicRoleLabel(role: string): string {
   if (role === "featured artist") return "Featured artist";
@@ -126,7 +151,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const { username, idSlug } = await params;
   const usernameNorm = (username ?? "").trim().toLowerCase();
   const bookId = parseBookId(idSlug);
-  const supabase = getServerSupabase();
+  const supabase = await getRequestSupabase();
 
   if (!bookId) {
     return (
