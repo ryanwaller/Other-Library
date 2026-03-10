@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
+import { getSupabaseAdmin } from "../../../../../lib/supabaseAdmin";
 import { bookIdSlug } from "../../../../../lib/slug";
 import { MUSIC_CONTRIBUTOR_ROLES, parseMusicMetadata, type MusicMetadata } from "../../../../../lib/music";
 
@@ -184,14 +185,16 @@ export default async function PublicRelatedItemsSection({
   book: PublicBookLike;
 }) {
   const supabase = getServerSupabase();
-  if (!supabase) return null;
+  const admin = getSupabaseAdmin();
+  const db = admin ?? supabase;
+  if (!db) return null;
 
   const candidates = deriveCandidates(book);
   if (candidates.length === 0) return null;
 
   const [ownedLibrariesRes, membershipLibrariesRes] = await Promise.all([
-    supabase.from("libraries").select("id").eq("owner_id", profileId),
-    supabase.from("catalog_members").select("catalog_id,accepted_at").eq("user_id", profileId).not("accepted_at", "is", null)
+    db.from("libraries").select("id").eq("owner_id", profileId),
+    db.from("catalog_members").select("catalog_id,accepted_at").eq("user_id", profileId).not("accepted_at", "is", null)
   ]);
 
   const validLibraryIds = Array.from(
@@ -202,7 +205,7 @@ export default async function PublicRelatedItemsSection({
   );
   if (validLibraryIds.length === 0) return null;
 
-  const booksRes = await supabase
+  const booksRes = await db
     .from("user_books")
     .select("id,owner_id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))")
     .eq("owner_id", profileId)
@@ -234,7 +237,7 @@ export default async function PublicRelatedItemsSection({
   );
   const signedMap: Record<string, string> = {};
   if (mediaPaths.length > 0) {
-    const signed = await supabase.storage.from("user-book-media").createSignedUrls(mediaPaths, 60 * 30);
+    const signed = await db.storage.from("user-book-media").createSignedUrls(mediaPaths, 60 * 30);
     for (const row of signed.data ?? []) {
       if (row.path && row.signedUrl) signedMap[row.path] = row.signedUrl;
     }

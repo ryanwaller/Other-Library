@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { Suspense } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { getPublicEnvOptional } from "../../../../../lib/env";
@@ -9,6 +10,7 @@ import { bookIdSlug } from "../../../../../lib/slug";
 import { formatDateShort } from "../../../../../lib/formatDate";
 import { formatMusicTrackLine, musicDisplayGenres, MUSIC_CONTRIBUTOR_ROLES, parseMusicMetadata, type MusicMetadata } from "../../../../../lib/music";
 import { detailFilterHref, type DetailFilterKey } from "../../../../../lib/detailFilters";
+import { getSupabaseAdmin } from "../../../../../lib/supabaseAdmin";
 import AddToLibraryButton from "../../AddToLibraryButton";
 import AddToLibraryProvider from "../../AddToLibraryProvider";
 import BorrowRequestWidget from "../../BorrowRequestWidget";
@@ -204,11 +206,23 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     );
   }
 
+  const signingClient = getSupabaseAdmin() ?? supabase;
+  const [avatarSignedRes, authUserRes, followCountsRes, bookRes] = await Promise.all([
+    profile.avatar_path ? signingClient.storage.from("avatars").createSignedUrl(profile.avatar_path, 60 * 30) : Promise.resolve(null),
+    supabase.auth.getUser(),
+    supabase.rpc("get_follow_counts", { target_username: profile.username }),
+    supabase
+      .from("user_books")
+      .select(
+        "*,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))"
+      )
+      .eq("id", bookId)
+      .maybeSingle()
+  ]);
+
   let followersCount: number | null = null;
   let followingCount: number | null = null;
-  const authUserRes = await supabase.auth.getUser();
   const viewerId = String(authUserRes.data.user?.id ?? "").trim() || null;
-  const followCountsRes = await supabase.rpc("get_follow_counts", { target_username: profile.username });
   if (!followCountsRes.error) {
     const row = Array.isArray(followCountsRes.data) ? ((followCountsRes.data[0] as any) ?? null) : ((followCountsRes.data as any) ?? null);
     followersCount = row && row.followers_count != null ? Number(row.followers_count) : null;
@@ -221,14 +235,6 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     followersCount = followersCountRes.count ?? null;
     followingCount = followingCountRes.count ?? null;
   }
-
-  const bookRes = await supabase
-    .from("user_books")
-    .select(
-      "*,edition:editions(id,isbn13,isbn10,title,authors,publisher,publish_date,description,subjects,cover_url),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))"
-    )
-    .eq("id", bookId)
-    .maybeSingle();
 
   if (bookRes.error) {
     return (
@@ -353,19 +359,26 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     ...(book.media ?? []).map((m) => m.storage_path).filter(Boolean),
     ...(book.cover_crop && book.cover_original_url ? [book.cover_original_url] : [])
   ]));
+  const [signedRes, libRes, copiesRes] = await Promise.all([
+    paths.length > 0 ? signingClient.storage.from("user-book-media").createSignedUrls(paths, 60 * 30) : Promise.resolve(null),
+    Number.isFinite(Number(book.library_id)) && Number(book.library_id) > 0
+      ? supabase.from("libraries").select("name").eq("id", Number(book.library_id)).maybeSingle()
+      : Promise.resolve(null),
+    book.edition?.id
+      ? supabase
+          .from("user_books")
+          .select("id", { count: "exact", head: true })
+          .eq("owner_id", profile.id)
+          .eq("library_id", Number(book.library_id))
+          .eq("edition_id", book.edition.id)
+      : Promise.resolve(null)
+  ]);
   const signedMap: Record<string, string> = {};
-  if (paths.length > 0) {
-    const signedRes = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 30);
-    for (const s of signedRes.data ?? []) {
-      if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;
-    }
+  for (const s of signedRes?.data ?? []) {
+    if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;
   }
 
-  let avatarUrl: string | null = null;
-  if (profile.avatar_path) {
-    const signed = await supabase.storage.from("avatars").createSignedUrl(profile.avatar_path, 60 * 30);
-    avatarUrl = signed.data?.signedUrl ?? null;
-  }
+  const avatarUrl = avatarSignedRes?.data?.signedUrl ?? null;
 
   const coverMedia = (book.media ?? []).find((m) => m.kind === "cover") ?? null;
   const coverUrl: string | null = coverMedia ? (signedMap[coverMedia.storage_path] ?? null) : (book.edition?.cover_url ?? null);
@@ -389,23 +402,12 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const notesText = String(book.notes ?? "").trim();
 
   let catalogName = "Catalog";
-  if (Number.isFinite(Number(book.library_id)) && Number(book.library_id) > 0) {
-    const libRes = await supabase.from("libraries").select("name").eq("id", Number(book.library_id)).maybeSingle();
-    const libName = String((libRes.data as any)?.name ?? "").trim();
-    if (libName) catalogName = libName;
-  }
+  const libName = String((libRes as any)?.data?.name ?? "").trim();
+  if (libName) catalogName = libName;
 
   let copiesCount = 1;
-  if (book.edition?.id) {
-    const copiesRes = await supabase
-      .from("user_books")
-      .select("id", { count: "exact", head: true })
-      .eq("owner_id", profile.id)
-      .eq("library_id", Number(book.library_id))
-      .eq("edition_id", book.edition.id);
-    if (!copiesRes.error && typeof copiesRes.count === "number" && copiesRes.count > 0) {
-      copiesCount = copiesRes.count;
-    }
+  if (copiesRes && !(copiesRes as any).error && typeof (copiesRes as any).count === "number" && (copiesRes as any).count > 0) {
+    copiesCount = (copiesRes as any).count;
   }
   const publicBookPath = `/u/${profile.username}/b/${canonical}`;
 
@@ -848,14 +850,16 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
             {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={book.id} excludeOwnerId={book.owner_id} /> : null}
           </div>
 
-          <div style={{ marginTop: 16 }}>
-            <PublicRelatedItemsSection
-              profileId={profile.id}
-              profileUsername={profile.username}
-              profileVisibility={profile.visibility ?? null}
-              book={book}
-            />
-          </div>
+          <Suspense fallback={null}>
+            <div style={{ marginTop: 16 }}>
+              <PublicRelatedItemsSection
+                profileId={profile.id}
+                profileUsername={profile.username}
+                profileVisibility={profile.visibility ?? null}
+                book={book}
+              />
+            </div>
+          </Suspense>
         </div>
       </AddToLibraryProvider>
     </main>
