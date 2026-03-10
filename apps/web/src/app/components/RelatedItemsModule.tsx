@@ -197,12 +197,20 @@ export default function RelatedItemsModule({
       }
 
       const resolvedEntityIds = new Map<string, string | null>();
-      let ownerRows: RelatedItemRow[] | null = null;
+      let ownerCatalogIds: number[] | null = null;
 
       if (hrefMode === "owner") {
         const res = await fetch("/api/catalog/home?lite=1", { credentials: "include" });
         const payload = res.ok ? await res.json() : null;
-        ownerRows = Array.isArray(payload?.books) ? (payload.books as RelatedItemRow[]) : [];
+        ownerCatalogIds = Array.isArray(payload?.catalogs)
+          ? Array.from(
+              new Set(
+                (payload.catalogs as Array<{ id?: number | null }>)
+                  .map((row) => Number(row?.id))
+                  .filter((id) => Number.isFinite(id) && id > 0)
+              )
+            )
+          : [];
       }
 
       for (const candidate of dedupedCandidates) {
@@ -216,9 +224,9 @@ export default function RelatedItemsModule({
         let matchedRows: RelatedItemRow[] = [];
         let nextSignedMap: Record<string, string> = {};
 
-        if (hrefMode === "owner" && ownerRows) {
-          matchedRows = ownerRows.filter((row) => Number(row.id) !== currentUserBookId && rowMatchesCandidate(row, candidate, entityId));
-        } else {
+        if (hrefMode === "owner" && ownerCatalogIds && ownerCatalogIds.length === 0) continue;
+
+        {
           let query = supabase
             .from("user_books")
             .select(
@@ -228,6 +236,10 @@ export default function RelatedItemsModule({
             .neq("id", currentUserBookId)
             .order("created_at", { ascending: false })
             .limit(64);
+
+          if (hrefMode === "owner" && ownerCatalogIds && ownerCatalogIds.length > 0) {
+            query = query.in("library_id", ownerCatalogIds);
+          }
 
           if (hrefMode === "public") {
             if (publicProfileVisibility === "public") query = query.neq("visibility", "followers_only");
@@ -242,20 +254,18 @@ export default function RelatedItemsModule({
         }
         if (matchedRows.length < 1) continue;
 
-        if (!(hrefMode === "owner" && ownerRows)) {
-          const paths = Array.from(
-            new Set(
-              matchedRows
-                .map((row) => coverStoragePath(row))
-                .filter((value): value is string => Boolean(value))
-            )
-          );
+        const paths = Array.from(
+          new Set(
+            matchedRows
+              .map((row) => coverStoragePath(row))
+              .filter((value): value is string => Boolean(value))
+          )
+        );
 
-          if (paths.length > 0) {
-            const signed = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 30);
-            for (const row of signed.data ?? []) {
-              if (row.path && row.signedUrl) nextSignedMap[row.path] = row.signedUrl;
-            }
+        if (paths.length > 0) {
+          const signed = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 30);
+          for (const row of signed.data ?? []) {
+            if (row.path && row.signedUrl) nextSignedMap[row.path] = row.signedUrl;
           }
         }
 
