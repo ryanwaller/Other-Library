@@ -134,8 +134,6 @@ export default function CoverImage({
           src={src}
           onLoad={handleLoad}
           onError={handleError}
-          loading="lazy"
-          decoding="async"
           style={{
             width: "100%",
             height: isNatural ? "auto" : "100%",
