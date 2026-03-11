@@ -304,6 +304,21 @@ function splitListField(input: string): string[] {
   return out;
 }
 
+function coerceStringArray(input: unknown): string[] | null {
+  if (input == null) return null;
+  if (Array.isArray(input)) {
+    const next = input
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean);
+    return next.length > 0 ? next : [];
+  }
+  if (typeof input === "string") {
+    const next = splitListField(input);
+    return next.length > 0 ? next : [];
+  }
+  return [];
+}
+
 function parseAuthorsInput(input: string): string[] {
   const parts = input
     .split(",")
@@ -1071,9 +1086,20 @@ function AppShell({
     if (typeof requestSeq === "number" && booksRequestSeqRef.current !== requestSeq) return;
     const normalizedRows = (serverRows ?? []).map((r: any) => ({
       ...r,
+      authors_override: coerceStringArray(r?.authors_override),
+      editors_override: coerceStringArray(r?.editors_override),
+      subjects_override: coerceStringArray(r?.subjects_override),
+      designers_override: coerceStringArray(r?.designers_override),
       media: Array.isArray(r?.media) ? r.media : [],
       book_tags: Array.isArray(r?.book_tags) ? r.book_tags : [],
-      edition: r?.edition ?? null
+      book_entities: Array.isArray(r?.book_entities) ? r.book_entities : [],
+      edition: r?.edition
+        ? {
+            ...r.edition,
+            authors: coerceStringArray(r.edition?.authors),
+            subjects: coerceStringArray(r.edition?.subjects)
+          }
+        : null
     }));
     if (typeof requestSeq === "number" && booksRequestSeqRef.current !== requestSeq) return;
     setDebugBooksSource(source);
