@@ -1589,9 +1589,16 @@ function AppShell({
         .select("id")
         .single();
       if (created.error) throw new Error(created.error.message);
+      const createdId = created.data.id as number;
+
+      // Sync entity links (best-effort)
+      try {
+        if (authors.length > 0) await supabase.rpc("set_book_entities", { p_user_book_id: createdId, p_role: "author", p_names: authors });
+        if (publisher) await supabase.rpc("set_book_entities", { p_user_book_id: createdId, p_role: "publisher", p_names: publisher.split(",").map((s) => s.trim()).filter(Boolean) });
+      } catch { /* ignore */ }
 
       await refreshAllBooks();
-      return created.data.id as number;
+      return createdId;
     } catch (e: any) {
       throw new Error(e?.message ?? "Failed to add book");
     }
@@ -1831,6 +1838,21 @@ function AppShell({
                 }
               }
             }
+
+            // Sync entity links for override fields (best-effort)
+            try {
+              const syncRoles: Array<[string, string[]]> = [];
+              const authorsToSync = (updatePayload.authors_override as string[] | undefined) ?? (r.authors.length > 0 ? r.authors : null);
+              if (authorsToSync && authorsToSync.length > 0) syncRoles.push(["author", authorsToSync]);
+              if (updatePayload.designers_override) syncRoles.push(["designer", updatePayload.designers_override as string[]]);
+              if (updatePayload.editors_override) syncRoles.push(["editor", updatePayload.editors_override as string[]]);
+              const publisherToSync = (updatePayload.publisher_override as string | undefined) ?? r.publisher ?? null;
+              if (publisherToSync) syncRoles.push(["publisher", publisherToSync.split(",").map((s: string) => s.trim()).filter(Boolean)]);
+              if (updatePayload.printer_override) syncRoles.push(["printer", (updatePayload.printer_override as string).split(",").map((s: string) => s.trim()).filter(Boolean)]);
+              for (const [role, names] of syncRoles) {
+                await supabase.rpc("set_book_entities", { p_user_book_id: id, p_role: role, p_names: names });
+              }
+            } catch { /* ignore */ }
 
             const rows: Array<{ user_book_id: number; tag_id: number }> = [];
             if (r.category) rows.push({ user_book_id: id, tag_id: await getTagIdCached(r.category, "category") });
