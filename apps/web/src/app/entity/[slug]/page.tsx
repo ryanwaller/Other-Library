@@ -108,6 +108,7 @@ function effectiveSecondaryLine(row: BookRow): string | null {
 
 function editionKey(row: BookRow): string {
   if (row.edition_id) return `eid:${row.edition_id}`;
+  if (isMagazineObject(row.object_type)) return `mag:${row.id}`;
   const isbn = String(row.edition?.isbn13 ?? "").trim();
   if (isbn) return `isbn:${isbn}`;
   const title = effectiveTitle(row).toLowerCase().replace(/\s+/g, " ");

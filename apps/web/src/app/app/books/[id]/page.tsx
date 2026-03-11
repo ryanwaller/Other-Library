@@ -927,7 +927,16 @@ export default function BookDetailPage() {
       const ownRes = await supabase.from("libraries").select("id,name,created_at").eq("owner_id", userId).order("created_at", { ascending: true });
       if (!alive) return;
       if (!ownRes.error) {
-        setLibraries((ownRes.data ?? []) as any);
+        const ownLibraries = (ownRes.data ?? []) as any[];
+        if (book.library_id && !ownLibraries.some((l: any) => l.id === book.library_id)) {
+          const currentRes = await supabase.from("libraries").select("id,name,created_at").eq("id", book.library_id).maybeSingle();
+          if (!alive) return;
+          if (!currentRes.error && currentRes.data) {
+            setLibraries([...ownLibraries, currentRes.data as any]);
+            return;
+          }
+        }
+        setLibraries(ownLibraries);
         return;
       }
       const currentRes = await supabase.from("libraries").select("id,name,created_at").eq("id", book.library_id).maybeSingle();

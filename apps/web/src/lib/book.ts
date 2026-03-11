@@ -59,6 +59,9 @@ export function effectivePublisherFor(b: PublicBook): string {
 export function groupKeyFor(b: PublicBook): string {
   const eId = b.edition?.id ?? null;
   if (eId) return `e:${eId}`;
+  if (isMagazineObject(b.object_type)) {
+    return `mag:${b.id}`;
+  }
   const title = normalizeKeyPart(effectiveTitleFor(b));
   const authors = effectiveAuthorsFor(b)
     .map((a) => normalizeKeyPart(a))
