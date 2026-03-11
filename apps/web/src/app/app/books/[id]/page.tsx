@@ -1115,9 +1115,7 @@ export default function BookDetailPage() {
       setFormPublisher(joinTokenValues(nextFacets.publisher ?? parseAuthorsInput(String(row.publisher_override ?? row.edition?.publisher ?? "").trim())));
       setFormIsbn(
         String(
-          (String((row as any).object_type ?? "").trim() === "magazine"
-            ? (row as any).issn
-            : row.edition?.isbn13 ?? row.edition?.isbn10) ?? ""
+          (row.edition?.isbn13 ?? row.edition?.isbn10) ?? ""
         ).trim()
       );
       setIsbnFormatError(false);
@@ -2213,9 +2211,9 @@ export default function BookDetailPage() {
       const subjects_override = uniqStrings(facetDraft.subject ?? effectiveSubjects);
       const group_label = formGroupLabel.trim() ? formGroupLabel.trim() : null;
       const object_type = formObjectType.trim() ? formObjectType.trim() : null;
-      const manualIsbn = isMusicObject || isMagazineType ? "" : normalizeIsbnInput(formIsbn);
-      const manualIssn = isMagazineType ? normalizeIssn(formMagazine.issn ?? formIsbn) : "";
-      if (!isMusicObject && !isMagazineType && manualIsbn && !/^\d{9}[\dX]$/.test(manualIsbn) && !/^\d{13}$/.test(manualIsbn)) {
+      const manualIsbn = !isMusicObject ? normalizeIsbnInput(formIsbn) : "";
+      const manualIssn = isMagazineType ? normalizeIssn(formMagazine.issn ?? "") : "";
+      if (!isMusicObject && manualIsbn && !/^\d{9}[\dX]$/.test(manualIsbn) && !/^\d{13}$/.test(manualIsbn)) {
         setIsbnFormatError(true);
         setSaveState({ busy: false, error: null, message: null });
         return false;
@@ -4946,18 +4944,17 @@ export default function BookDetailPage() {
                   </div>
                 )}
 
-                {isMagazineType && (editMode || ((effectiveMagazine.issn ?? "").trim() && fieldVisibility.isbn !== false)) && (
-                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.isbn === false ? 0.6 : 1 }}>
+                {isMagazineType && (editMode || ((effectiveMagazine.issn ?? "").trim() && fieldVisibility.issn !== false)) && (
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.issn === false ? 0.6 : 1 }}>
                     <div style={{ minWidth: 110 }} className="text-muted">ISSN</div>
                     <div style={{ flex: "1 1 auto" }}>
                       {editMode ? (
                         <input
                           className="om-inline-control"
-                          value={formMagazine.issn ?? formIsbn}
+                          value={formMagazine.issn ?? ""}
                           onChange={(e) => {
                             const value = e.target.value;
                             setFormMagazine((current) => ({ ...current, issn: value }));
-                            setFormIsbn(value);
                             if (isbnFormatError) setIsbnFormatError(false);
                           }}
                           onKeyDown={(e) => onEnter(e, () => void saveEdits())}
@@ -4970,13 +4967,13 @@ export default function BookDetailPage() {
                     {editMode && (
                       <div style={{ marginLeft: "auto", display: "flex", alignItems: "baseline", gap: "var(--space-sm)" }}>
                         {isbnFormatError ? <div className="text-muted">Invalid format</div> : null}
-                        <FieldVisibilityToggle visible={fieldVisibility.isbn !== false} onChange={() => toggleFieldVisibility("isbn")} />
+                        <FieldVisibilityToggle visible={fieldVisibility.issn !== false} onChange={() => toggleFieldVisibility("issn")} />
                       </div>
                     )}
                   </div>
                 )}
 
-                {!isMusicObject && !isMagazineType && (editMode || ((book?.edition?.isbn13 || book?.edition?.isbn10) && fieldVisibility.isbn !== false)) && (
+                {!isMusicObject && (editMode || ((book?.edition?.isbn13 || book?.edition?.isbn10) && fieldVisibility.isbn !== false)) && (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.isbn === false ? 0.6 : 1 }}>
                     <div style={{ minWidth: 110 }} className="text-muted">ISBN</div>
                     <div style={{ flex: "1 1 auto" }}>

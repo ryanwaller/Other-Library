@@ -679,7 +679,8 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     ["Issue volume", book.issue_volume],
                     ["Issue number", book.issue_number],
                     ["Issue season", book.issue_season ? formatDateShort(String(book.issue_season)) : null],
-                    ["ISSN", book.issn]
+                    ["ISSN", book.issn],
+                    ["ISBN", book.edition?.isbn13 ?? book.edition?.isbn10 ?? null]
                   ].map(([label, value]) =>
                     String(value ?? "").trim() ? (
                       <div key={String(label)} className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
