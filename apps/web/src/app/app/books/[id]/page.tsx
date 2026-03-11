@@ -81,6 +81,7 @@ type UserBookDetail = {
   issue_season?: string | null;
   issue_year?: number | null;
   issn?: string | null;
+  subtitle_override?: string | null;
   decade: string | null;
   pages: number | null;
   title_override: string | null;
@@ -519,6 +520,7 @@ export default function BookDetailPage() {
   const swipeHorizontalLockRef = useRef(false);
   const editSnapshotRef = useRef<{
     formTitle: string;
+    formSubtitle: string;
     formAuthors: string;
     formEditors: string;
     formDesigners: string;
@@ -582,6 +584,7 @@ export default function BookDetailPage() {
   });
 
   const [formTitle, setFormTitle] = useState("");
+  const [formSubtitle, setFormSubtitle] = useState("");
   const [formAuthors, setFormAuthors] = useState("");
   const [formEditors, setFormEditors] = useState("");
   const [formDesigners, setFormDesigners] = useState("");
@@ -991,7 +994,7 @@ export default function BookDetailPage() {
     setCopiesCountState({ busy: false, error: null });
     try {
       const baseNew =
-        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,field_visibility,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,subtitle_override,field_visibility,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
       const baseOld =
         "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,field_visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
 
@@ -1109,6 +1112,7 @@ export default function BookDetailPage() {
       setFacetDraft(nextFacets);
 
       setFormTitle(row.title_override ?? "");
+      setFormSubtitle(String((row as any).subtitle_override ?? "").trim());
       setFormAuthors((nextFacets.author ?? []).join(", "));
       setFormEditors((nextFacets.editor ?? []).join(", "));
       setFormDesigners((nextFacets.designer ?? []).join(", "));
@@ -2113,6 +2117,7 @@ export default function BookDetailPage() {
     setMergeUndoSnapshot(null);
     editSnapshotRef.current = {
       formTitle,
+      formSubtitle,
       formAuthors,
       formEditors,
       formDesigners,
@@ -2154,6 +2159,7 @@ export default function BookDetailPage() {
     const snap = editSnapshotRef.current;
     if (snap) {
       setFormTitle(snap.formTitle);
+      setFormSubtitle(snap.formSubtitle ?? "");
       setFormAuthors(snap.formAuthors);
       setFormEditors(snap.formEditors);
       setFormDesigners(snap.formDesigners);
@@ -2297,7 +2303,9 @@ export default function BookDetailPage() {
         payload.issue_season = formMagazine.issue_season ?? null;
         payload.issue_year = null;
         payload.issn = manualIssn || null;
+        payload.subtitle_override = formSubtitle.trim() || null;
       } else {
+        payload.subtitle_override = null;
         payload.issue_number = null;
         payload.issue_volume = null;
         payload.issue_season = null;
@@ -4107,6 +4115,22 @@ export default function BookDetailPage() {
                   <div>{effectiveTitle}</div>
                 )}
               </div>
+
+              {isMagazineType && (editMode || book?.subtitle_override) ? (
+                <div style={{ marginTop: "var(--space-8)", color: "var(--color-muted)" }}>
+                  {editMode ? (
+                    <input
+                      className="om-inline-control"
+                      value={formSubtitle}
+                      onChange={(e) => setFormSubtitle(e.target.value)}
+                      onKeyDown={(e) => onEnter(e, () => void saveEdits())}
+                      placeholder="Issue subtitle"
+                    />
+                  ) : (
+                    book?.subtitle_override
+                  )}
+                </div>
+              ) : null}
 
               <div style={{ marginTop: "var(--space-14)" }}>
                 {isMusicObject ? (

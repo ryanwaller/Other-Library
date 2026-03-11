@@ -2,6 +2,7 @@ import { formatDateShort } from "./formatDate";
 
 export type MagazineLike = {
   object_type?: string | null;
+  subtitle_override?: string | null;
   issue_number?: string | null;
   issue_volume?: string | null;
   issue_season?: string | null;
@@ -69,11 +70,12 @@ export function formatIssueDisplay(book: MagazineLike | null | undefined): strin
   const year = /^\d{4}$/.test(yearRaw) ? yearRaw : "";
 
   const parts: string[] = [];
-  if (volume) parts.push(`Vol. ${volume}`);
-  if (issueNumber) {
-    const lowered = issueNumber.toLowerCase();
-    const prefixed = /^(issue|no\.?|#)\b/.test(lowered);
-    parts.push(prefixed ? issueNumber : `No. ${issueNumber}`);
+  if (volume && issueNumber) {
+    parts.push(`Vol. ${volume}, Iss. ${issueNumber}`);
+  } else if (volume) {
+    parts.push(`Vol. ${volume}`);
+  } else if (issueNumber) {
+    parts.push(`Issue ${issueNumber}`);
   }
   if (season) parts.push(formatDateShort(season));
   else if (year) parts.push(year);

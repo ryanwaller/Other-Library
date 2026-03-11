@@ -30,8 +30,10 @@ export function effectiveAuthorsFor(b: PublicBook): string[] {
 
 export function effectiveSecondaryLineFor(b: PublicBook): { mode: "authors" | "plain"; values: string[] } {
   if (isMagazineObject(b.object_type)) {
+    const subtitle = String(b.subtitle_override ?? "").trim();
     const issue = formatIssueDisplay(b);
-    return { mode: "plain", values: issue ? [issue] : [] };
+    const values = [subtitle, issue].filter(Boolean);
+    return { mode: "plain", values };
   }
   return { mode: "authors", values: effectiveAuthorsFor(b) };
 }

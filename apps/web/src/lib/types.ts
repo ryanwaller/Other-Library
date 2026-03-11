@@ -6,6 +6,7 @@ export type PublicBook = {
   library_id: number;
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
+  subtitle_override?: string | null;
   authors_override: string[] | null;
   editors_override?: string[] | null;
   subjects_override: string[] | null;
