@@ -25,6 +25,7 @@ import {
   effectiveSubjectsFor, 
   effectivePublisherFor, 
   groupKeyFor,
+  titleSortKeyFor,
   tagsFor
 } from "../../lib/book";
 import {
@@ -3280,7 +3281,10 @@ function AppShell({
       if (sortMode === "custom") return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
       if (sortMode === "latest") return b.latestCreatedAt - a.latestCreatedAt;
       if (sortMode === "earliest") return a.earliestCreatedAt - b.earliestCreatedAt;
-      const cmp = normalizeKeyPart(a.title).localeCompare(normalizeKeyPart(b.title));
+      const cmp = titleSortKeyFor(a.primary).localeCompare(titleSortKeyFor(b.primary), undefined, {
+        numeric: true,
+        sensitivity: "base"
+      });
       return sortMode === "title_asc" ? cmp : -cmp;
     });
 

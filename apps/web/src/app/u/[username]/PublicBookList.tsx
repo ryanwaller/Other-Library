@@ -17,7 +17,8 @@ import {
   effectiveAuthorsFor, 
   effectiveSecondaryLineFor,
   effectivePublisherFor,
-  groupKeyFor 
+  groupKeyFor,
+  titleSortKeyFor
 } from "../../../lib/book";
 
 type SortMode = "latest" | "earliest" | "title_asc" | "title_desc";
@@ -545,9 +546,19 @@ export default function PublicBookList({
     } else if (sortMode === "earliest") {
       groups.sort((a, b) => a.primary.id - b.primary.id);
     } else if (sortMode === "title_asc") {
-      groups.sort((a, b) => a.title.localeCompare(b.title));
+      groups.sort((a, b) =>
+        titleSortKeyFor(a.primary).localeCompare(titleSortKeyFor(b.primary), undefined, {
+          numeric: true,
+          sensitivity: "base"
+        })
+      );
     } else if (sortMode === "title_desc") {
-      groups.sort((a, b) => b.title.localeCompare(a.title));
+      groups.sort((a, b) =>
+        titleSortKeyFor(b.primary).localeCompare(titleSortKeyFor(a.primary), undefined, {
+          numeric: true,
+          sensitivity: "base"
+        })
+      );
     }
 
     return groups;

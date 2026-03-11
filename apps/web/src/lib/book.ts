@@ -11,6 +11,20 @@ export function effectiveTitleFor(b: PublicBook): string {
   return (b.title_override ?? "").trim() || e?.title || "(untitled)";
 }
 
+export function titleSortKeyFor(b: PublicBook): string {
+  const title = normalizeKeyPart(effectiveTitleFor(b));
+  if (!isMagazineObject(b.object_type)) return title;
+
+  const volume = normalizeKeyPart(String(b.issue_volume ?? ""));
+  const issueNumber = normalizeKeyPart(String(b.issue_number ?? ""));
+  const season = normalizeKeyPart(String(b.issue_season ?? ""));
+  const year = normalizeKeyPart(String(b.issue_year ?? ""));
+
+  return [title, volume && `vol ${volume}`, issueNumber && `issue ${issueNumber}`, season, year]
+    .filter(Boolean)
+    .join(" | ");
+}
+
 export function effectiveAuthorsFor(b: PublicBook): string[] {
   if ((b.object_type ?? "").trim() === "music") {
     const music = parseMusicMetadata(b.music_metadata);
