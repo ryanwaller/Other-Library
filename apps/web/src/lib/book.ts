@@ -1,5 +1,6 @@
 import type { PublicBook } from "./types";
 import { parseMusicMetadata } from "./music";
+import { formatIssueDisplay, isMagazineObject } from "./magazine";
 
 export function normalizeKeyPart(input: string): string {
   return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -25,6 +26,14 @@ export function effectiveAuthorsFor(b: PublicBook): string[] {
   const editionAuthors = (b.edition?.authors ?? []).filter(Boolean);
   if (editionAuthors.length > 0) return editionAuthors;
   return editors;
+}
+
+export function effectiveSecondaryLineFor(b: PublicBook): { mode: "authors" | "plain"; values: string[] } {
+  if (isMagazineObject(b.object_type)) {
+    const issue = formatIssueDisplay(b);
+    return { mode: "plain", values: issue ? [issue] : [] };
+  }
+  return { mode: "authors", values: effectiveAuthorsFor(b) };
 }
 
 export function effectiveSubjectsFor(b: PublicBook): string[] {

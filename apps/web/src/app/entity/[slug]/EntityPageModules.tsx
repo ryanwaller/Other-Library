@@ -17,6 +17,7 @@ export type OwnerEntry = {
 export type EntityModuleItem = {
   id: number;
   title: string;
+  secondaryLine?: string | null;
   coverUrl: string | null;
   coverCrop: CoverCrop | null;
   ownerEntries: OwnerEntry[];
@@ -60,6 +61,7 @@ export default function EntityPageModules({ modules }: { modules: ModuleData[] }
             yourCopies.push({
               id: entry.userBookId,
               title: entry.title,
+              secondaryLine: item.secondaryLine ?? null,
               coverUrl: entry.coverUrl,
               coverCrop: entry.coverCrop,
               href: `/app/books/${entry.userBookId}`
@@ -87,6 +89,7 @@ export default function EntityPageModules({ modules }: { modules: ModuleData[] }
         const filteredItems: GridItem[] = mod.items.map((item) => ({
           id: item.id,
           title: item.title,
+          secondaryLine: item.secondaryLine ?? null,
           coverUrl: item.coverUrl,
           coverCrop: item.coverCrop,
           href: item.publicFallbackHref

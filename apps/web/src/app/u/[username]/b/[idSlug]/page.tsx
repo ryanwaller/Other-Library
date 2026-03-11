@@ -9,6 +9,7 @@ import { getPublicEnvOptional } from "../../../../../lib/env";
 import { bookIdSlug } from "../../../../../lib/slug";
 import { formatDateShort } from "../../../../../lib/formatDate";
 import { formatMusicTrackLine, musicDisplayGenres, MUSIC_CONTRIBUTOR_ROLES, parseMusicMetadata, type MusicMetadata } from "../../../../../lib/music";
+import { displayObjectTypeLabel, isMagazineObject } from "../../../../../lib/magazine";
 import { detailFilterHref, type DetailFilterKey } from "../../../../../lib/detailFilters";
 import { getSupabaseAdmin } from "../../../../../lib/supabaseAdmin";
 import AddToLibraryButton from "../../AddToLibraryButton";
@@ -95,6 +96,11 @@ type PublicBookDetail = {
   source_url?: string | null;
   external_source_ids?: Record<string, string | null> | null;
   music_metadata?: MusicMetadata | null;
+  issue_number?: string | null;
+  issue_volume?: string | null;
+  issue_season?: string | null;
+  issue_year?: number | null;
+  issn?: string | null;
   decade: string | null;
   description_override: string | null;
   subjects_override: string[] | null;
@@ -334,6 +340,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
 
   const effectiveTitle = (book.title_override ?? "").trim() || book.edition?.title || "(untitled)";
   const isMusicObject = (book.object_type ?? "").trim() === "music";
+  const isPeriodical = isMagazineObject(book.object_type);
   const music = parseMusicMetadata(book.music_metadata);
   const musicGenres = musicDisplayGenres(music);
   const canonical = bookIdSlug(book.id, effectiveTitle);
@@ -591,9 +598,72 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     </div>
                   ) : null}
                 </>
+              ) : isPeriodical ? (
+                <>
+                  {effectiveEditors.length > 0 ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Editors</div>
+                      <div>{effectiveEditors.join(", ")}</div>
+                    </div>
+                  ) : null}
+                  {effectiveDesigners.length > 0 ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Designers</div>
+                      <div className="om-hanging-value">
+                        {effectiveDesigners.map((name, idx) => {
+                          const entitySlug = entitySlugFor(["designer", "design", "art direction"], name);
+                          return (
+                            <span key={`designer-${name}`}>
+                              <Link href={`/u/${profile.username}?designer=${encodeURIComponent(name)}`}>{name}</Link>
+                              {entitySlug ? <> <Link href={`/entity/${entitySlug}`} className="text-muted" style={{ textDecoration: "none" }}>↗</Link></> : null}
+                              {idx < effectiveDesigners.length - 1 ? <span>, </span> : null}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                  {effectivePublishers.length > 0 ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Publisher</div>
+                      <div>
+                        {effectivePublishers.map((publisher, index) => {
+                          const entitySlug = entitySlugFor(["publisher"], publisher);
+                          return (
+                            <span key={publisher}>
+                              <Link href={`/u/${profile.username}/p/${encodeURIComponent(publisher)}`}>{publisher}</Link>
+                              {entitySlug ? <> <Link href={`/entity/${entitySlug}`} className="text-muted" style={{ textDecoration: "none" }}>↗</Link></> : null}
+                              {index < effectivePublishers.length - 1 ? <span>, </span> : null}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                  {effectivePublishDate ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Publish date</div>
+                      <div>{displayPublishDate}</div>
+                    </div>
+                  ) : null}
+                  {[
+                    ["Issue number", book.issue_number],
+                    ["Issue volume", book.issue_volume],
+                    ["Issue season", book.issue_season],
+                    ["Issue year", book.issue_year != null ? String(book.issue_year) : null],
+                    ["ISSN", book.issn]
+                  ].map(([label, value]) =>
+                    String(value ?? "").trim() ? (
+                      <div key={String(label)} className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">{label}</div>
+                        <div>{String(value)}</div>
+                      </div>
+                    ) : null
+                  )}
+                </>
               ) : null}
 
-              {!isMusicObject && effectiveAuthors.length > 0 ? (
+              {!isMusicObject && !isPeriodical && effectiveAuthors.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Authors
@@ -613,7 +683,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {!isMusicObject && effectiveEditors.length > 0 ? (
+              {!isMusicObject && !isPeriodical && effectiveEditors.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Editors
@@ -622,7 +692,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {!isMusicObject && effectiveDesigners.length > 0 ? (
+              {!isMusicObject && !isPeriodical && effectiveDesigners.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Designers
@@ -642,7 +712,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {!isMusicObject && effectivePrinter ? (
+              {!isMusicObject && !isPeriodical && effectivePrinter ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Printer
@@ -651,7 +721,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {!isMusicObject && effectiveMaterials ? (
+              {!isMusicObject && !isPeriodical && effectiveMaterials ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Materials
@@ -660,7 +730,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {!isMusicObject && effectiveEdition ? (
+              {!isMusicObject && !isPeriodical && effectiveEdition ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Edition
@@ -669,7 +739,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {!isMusicObject && effectivePublishers.length > 0 ? (
+              {!isMusicObject && !isPeriodical && effectivePublishers.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Publisher
@@ -689,7 +759,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {!isMusicObject && effectivePublishDate ? (
+              {!isMusicObject && !isPeriodical && effectivePublishDate ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Publish date
@@ -698,7 +768,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {!isMusicObject && book.pages ? (
+              {!isMusicObject && !isPeriodical && book.pages ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Pages
@@ -721,7 +791,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Object type
                   </div>
-                  <div>{(book.object_type ?? "").trim()}</div>
+                  <div>{displayObjectTypeLabel(book.object_type ?? "")}</div>
                 </div>
               ) : null}
 
@@ -736,7 +806,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {!isMusicObject && subjects.length > 0 ? (
+              {!isMusicObject && !isPeriodical && subjects.length > 0 ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-md)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Subjects
@@ -747,7 +817,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
-              {!isMusicObject && (book.edition?.isbn13 || book.edition?.isbn10) ? (
+              {!isMusicObject && !isPeriodical && (book.edition?.isbn13 || book.edition?.isbn10) ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
                     ISBN

@@ -20,6 +20,11 @@ export type PublicBook = {
   source_url?: string | null;
   external_source_ids?: Record<string, string | null> | null;
   music_metadata?: MusicMetadata | null;
+  issue_number?: string | null;
+  issue_volume?: string | null;
+  issue_season?: string | null;
+  issue_year?: number | null;
+  issn?: string | null;
   publish_date_override?: string | null;
   description_override?: string | null;
   location?: string | null;

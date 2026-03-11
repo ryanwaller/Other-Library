@@ -4,8 +4,10 @@ import { getCurrentUser, getSupabaseAdmin } from "../../../lib/supabaseAdmin";
 export const runtime = "nodejs";
 
 type CsvImportRow = {
+  raw_title?: string | null;
   title: string;
   isbn: string | null;
+  issn: string | null;
   authors: string[];
   publisher: string | null;
   publish_date: string | null;
@@ -15,12 +17,17 @@ type CsvImportRow = {
   notes: string | null;
   group_label: string | null;
   object_type: string | null;
+  issue_number: string | null;
+  issue_volume: string | null;
+  issue_season: string | null;
+  issue_year: number | null;
   copies: number;
 };
 
 function normalizeRow(input: any): CsvImportRow | null {
   const title = String(input?.title ?? "").trim();
   const isbn = String(input?.isbn ?? "").trim() || null;
+  const issn = String(input?.issn ?? "").trim() || null;
   const authors = Array.isArray(input?.authors)
     ? input.authors.map((value: unknown) => String(value ?? "").trim()).filter(Boolean)
     : [];
@@ -33,6 +40,7 @@ function normalizeRow(input: any): CsvImportRow | null {
   return {
     title,
     isbn,
+    issn,
     authors,
     publisher: String(input?.publisher ?? "").trim() || null,
     publish_date: String(input?.publish_date ?? "").trim() || null,
@@ -42,6 +50,10 @@ function normalizeRow(input: any): CsvImportRow | null {
     notes: String(input?.notes ?? "").trim() || null,
     group_label: String(input?.group_label ?? "").trim() || null,
     object_type: String(input?.object_type ?? "").trim() || null,
+    issue_number: String(input?.issue_number ?? "").trim() || null,
+    issue_volume: String(input?.issue_volume ?? "").trim() || null,
+    issue_season: String(input?.issue_season ?? "").trim() || null,
+    issue_year: Number.isFinite(Number(input?.issue_year)) ? Math.floor(Number(input.issue_year)) : null,
     copies
   };
 }

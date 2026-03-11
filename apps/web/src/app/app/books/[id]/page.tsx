@@ -24,6 +24,16 @@ import {
   type MusicContributorRole,
   type MusicMetadata
 } from "../../../../lib/music";
+import {
+  displayObjectTypeLabel,
+  emptyMagazineMetadata,
+  formatIssueDisplay,
+  isMagazineObject,
+  looksLikeIssn,
+  normalizeIssueYear,
+  normalizeIssn,
+  type MagazineMetadata
+} from "../../../../lib/magazine";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
 import RelatedItemsModule, { type RelatedItemsCandidate } from "../../../components/RelatedItemsModule";
 import SignInCard from "../../../components/SignInCard";
@@ -66,6 +76,11 @@ type UserBookDetail = {
   source_url?: string | null;
   external_source_ids?: Record<string, string | null> | null;
   music_metadata?: MusicMetadata | null;
+  issue_number?: string | null;
+  issue_volume?: string | null;
+  issue_season?: string | null;
+  issue_year?: number | null;
+  issn?: string | null;
   decade: string | null;
   pages: number | null;
   title_override: string | null;
@@ -108,7 +123,7 @@ type UserBookDetail = {
 
 type MetadataSearchResult = {
   source: "openlibrary" | "googleBooks" | "discogs";
-  object_type?: "book" | "music" | null;
+  object_type?: "book" | "music" | "magazine" | null;
   source_type?: string | null;
   source_url?: string | null;
   external_source_ids?: Record<string, string | null> | null;
@@ -123,6 +138,11 @@ type MetadataSearchResult = {
   subjects: string[];
   isbn10: string | null;
   isbn13: string | null;
+  issn?: string | null;
+  issue_number?: string | null;
+  issue_volume?: string | null;
+  issue_season?: string | null;
+  issue_year?: number | null;
   cover_url: string | null;
   cover_candidates?: string[];
 };
@@ -144,9 +164,14 @@ type ImportPreview = {
   subjects: string[];
   isbn10: string | null;
   isbn13: string | null;
+  issn?: string | null;
+  issue_number?: string | null;
+  issue_volume?: string | null;
+  issue_season?: string | null;
+  issue_year?: number | null;
   cover_url: string | null;
   cover_candidates: string[];
-  object_type?: "book" | "music" | null;
+  object_type?: "book" | "music" | "magazine" | null;
   source_type?: string | null;
   source_url?: string | null;
   external_source_ids?: Record<string, string | null> | null;
@@ -524,6 +549,7 @@ export default function BookDetailPage() {
     formLibraryId: number | null;
     facetDraft: Record<FacetRole, string[]>;
     formMusic: MusicMetadata;
+    formMagazine: MagazineMetadata;
     formTrimWidth: string;
     formTrimHeight: string;
     formTrimUnit: TrimUnit;
@@ -596,6 +622,7 @@ export default function BookDetailPage() {
   const [formTrimHeight, setFormTrimHeight] = useState<string>("");
   const [formTrimUnit, setFormTrimUnit] = useState<TrimUnit>("in");
   const [formMusic, setFormMusic] = useState<MusicMetadata>(emptyMusicMetadata());
+  const [formMagazine, setFormMagazine] = useState<MagazineMetadata>(emptyMagazineMetadata());
   // Crop-editor-local trim state; syncs to form only when cropTrimUnit is set.
   const [cropTrimWidth, setCropTrimWidth] = useState<string>("");
   const [cropTrimHeight, setCropTrimHeight] = useState<string>("");
@@ -971,9 +998,9 @@ export default function BookDetailPage() {
     setCopiesCountState({ busy: false, error: null });
     try {
       const baseNew =
-        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,source_type,source_url,external_source_ids,music_metadata,field_visibility,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,field_visibility,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
       const baseOld =
-        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,object_type,source_type,source_url,external_source_ids,music_metadata,field_visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,field_visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
 
       const entitiesSelect = ",book_entities:book_entities(role,position,visibility,entity:entities(id,name,slug))";
       const selectNew = baseNew + entitiesSelect;
@@ -1093,7 +1120,13 @@ export default function BookDetailPage() {
       setFormEditors((nextFacets.editor ?? []).join(", "));
       setFormDesigners((nextFacets.designer ?? []).join(", "));
       setFormPublisher(joinTokenValues(nextFacets.publisher ?? parseAuthorsInput(String(row.publisher_override ?? row.edition?.publisher ?? "").trim())));
-      setFormIsbn(String(row.edition?.isbn13 ?? row.edition?.isbn10 ?? "").trim());
+      setFormIsbn(
+        String(
+          (String((row as any).object_type ?? "").trim() === "magazine"
+            ? (row as any).issn
+            : row.edition?.isbn13 ?? row.edition?.isbn10) ?? ""
+        ).trim()
+      );
       setIsbnFormatError(false);
       setFormPrinter(joinTokenValues(nextFacets.printer ?? parseAuthorsInput(String(row.printer_override ?? "").trim())));
       setFormMaterials(joinTokenValues(nextFacets.material ?? parseAuthorsInput(String(row.materials_override ?? "").trim())));
@@ -1103,6 +1136,13 @@ export default function BookDetailPage() {
       setFormGroupLabel(((row as any).group_label ?? "") as any);
       setFormObjectType(String((row as any).object_type ?? "").trim());
       setFormMusic(parseMusicMetadata((row as any).music_metadata) ?? emptyMusicMetadata());
+      setFormMagazine({
+        issue_number: String((row as any).issue_number ?? "").trim() || null,
+        issue_volume: String((row as any).issue_volume ?? "").trim() || null,
+        issue_season: String((row as any).issue_season ?? "").trim() || null,
+        issue_year: typeof (row as any).issue_year === "number" ? (row as any).issue_year : normalizeIssueYear((row as any).issue_year),
+        issn: String((row as any).issn ?? "").trim() || null
+      });
       setFormDecade(String((row as any).decade ?? "").trim());
       setFormPages((row as any).pages ? String((row as any).pages) : "");
       setFormLocation(row.location ?? "");
@@ -1315,12 +1355,21 @@ export default function BookDetailPage() {
   }, [formTitle, book]);
   usePageTitle(initialLoadDone ? effectiveTitle : "Item");
   const isMusicObject = (formObjectType.trim() || String(book?.object_type ?? "").trim()) === "music";
+  const isMagazineType = isMagazineObject(formObjectType.trim() || String(book?.object_type ?? "").trim());
   const effectiveMusic = useMemo(() => ({
     ...emptyMusicMetadata(),
     ...(parseMusicMetadata(book?.music_metadata) ?? emptyMusicMetadata()),
     ...formMusic,
     track_count: formMusic.track_count ?? parseMusicMetadata(book?.music_metadata)?.track_count ?? null
   }), [book?.music_metadata, formMusic]);
+  const effectiveMagazine = useMemo(() => ({
+    ...emptyMagazineMetadata(),
+    issue_number: formMagazine.issue_number ?? (String(book?.issue_number ?? "").trim() || null),
+    issue_volume: formMagazine.issue_volume ?? (String(book?.issue_volume ?? "").trim() || null),
+    issue_season: formMagazine.issue_season ?? (String(book?.issue_season ?? "").trim() || null),
+    issue_year: formMagazine.issue_year ?? normalizeIssueYear(book?.issue_year),
+    issn: formMagazine.issn ?? (String(book?.issn ?? "").trim() || null)
+  }), [book?.issue_number, book?.issue_season, book?.issue_volume, book?.issue_year, book?.issn, formMagazine]);
   const musicGenres = useMemo(() => musicDisplayGenres(effectiveMusic), [effectiveMusic]);
 
   const effectivePublishers = useMemo(() => {
@@ -1443,6 +1492,38 @@ export default function BookDetailPage() {
       return;
     }
 
+    if (normalizedNext === "magazine") {
+      const mappedIssueYear =
+        normalizeIssueYear(formPublishDate) ??
+        normalizeIssueYear(book?.publish_date_override) ??
+        normalizeIssueYear(book?.edition?.publish_date);
+      setFormObjectType("magazine");
+      setFormAuthors("");
+      setFacetDraft((state) => ({
+        ...state,
+        author: [],
+        performer: [],
+        composer: [],
+        producer: [],
+        engineer: [],
+        mastering: [],
+        "featured artist": [],
+        arranger: [],
+        conductor: [],
+        orchestra: [],
+        artwork: [],
+        photography: [],
+        "art direction": []
+      }));
+      setFormMusic(emptyMusicMetadata());
+      setFormMagazine((current) => ({
+        ...current,
+        issue_year: current.issue_year ?? mappedIssueYear,
+        issn: current.issn ?? null
+      }));
+      return;
+    }
+
     if (normalizedNext === "book" && currentType === "music") {
       const mappedAuthor = String(formMusic.primary_artist ?? "").trim();
       const mappedPublisher = String(formMusic.label ?? "").trim();
@@ -1476,6 +1557,12 @@ export default function BookDetailPage() {
         photography: []
       }));
       setFormMusic(emptyMusicMetadata());
+      return;
+    }
+
+    if (normalizedNext === "book" && currentType === "magazine") {
+      setFormObjectType("book");
+      setFormMagazine(emptyMagazineMetadata());
       return;
     }
 
@@ -2065,6 +2152,7 @@ export default function BookDetailPage() {
       formLibraryId,
       facetDraft: JSON.parse(JSON.stringify(facetDraft)),
       formMusic: JSON.parse(JSON.stringify(formMusic)),
+      formMagazine: JSON.parse(JSON.stringify(formMagazine)),
       formTrimWidth,
       formTrimHeight,
       formTrimUnit,
@@ -2106,6 +2194,7 @@ export default function BookDetailPage() {
       setFormLibraryId(snap.formLibraryId);
       if (snap.facetDraft) setFacetDraft(snap.facetDraft);
       setFormMusic(snap.formMusic ?? emptyMusicMetadata());
+      setFormMagazine(snap.formMagazine ?? emptyMagazineMetadata());
       setFormTrimWidth(snap.formTrimWidth);
       setFormTrimHeight(snap.formTrimHeight);
       setFormTrimUnit(snap.formTrimUnit);
@@ -2138,8 +2227,14 @@ export default function BookDetailPage() {
       const subjects_override = uniqStrings(facetDraft.subject ?? effectiveSubjects);
       const group_label = formGroupLabel.trim() ? formGroupLabel.trim() : null;
       const object_type = formObjectType.trim() ? formObjectType.trim() : null;
-      const manualIsbn = isMusicObject ? "" : normalizeIsbnInput(formIsbn);
-      if (!isMusicObject && manualIsbn && !/^\d{9}[\dX]$/.test(manualIsbn) && !/^\d{13}$/.test(manualIsbn)) {
+      const manualIsbn = isMusicObject || isMagazineType ? "" : normalizeIsbnInput(formIsbn);
+      const manualIssn = isMagazineType ? normalizeIssn(formMagazine.issn ?? formIsbn) : "";
+      if (!isMusicObject && !isMagazineType && manualIsbn && !/^\d{9}[\dX]$/.test(manualIsbn) && !/^\d{13}$/.test(manualIsbn)) {
+        setIsbnFormatError(true);
+        setSaveState({ busy: false, error: null, message: null });
+        return false;
+      }
+      if (isMagazineType && manualIssn && !looksLikeIssn(manualIssn)) {
         setIsbnFormatError(true);
         setSaveState({ busy: false, error: null, message: null });
         return false;
@@ -2204,6 +2299,26 @@ export default function BookDetailPage() {
         payload.trim_width = null;
         payload.trim_height = null;
         payload.trim_unit = null;
+      }
+      if (isMagazineType) {
+        payload.authors_override = null;
+        payload.music_metadata = null;
+        payload.edition_override = null;
+        payload.pages = null;
+        payload.trim_width = null;
+        payload.trim_height = null;
+        payload.trim_unit = null;
+        payload.issue_number = formMagazine.issue_number ?? null;
+        payload.issue_volume = formMagazine.issue_volume ?? null;
+        payload.issue_season = formMagazine.issue_season ?? null;
+        payload.issue_year = formMagazine.issue_year ?? null;
+        payload.issn = manualIssn || null;
+      } else {
+        payload.issue_number = null;
+        payload.issue_volume = null;
+        payload.issue_season = null;
+        payload.issue_year = null;
+        payload.issn = null;
       }
       
       let res = await supabase.from("user_books").update(payload).eq("id", book.id);
@@ -2811,8 +2926,14 @@ export default function BookDetailPage() {
         subjects: Array.isArray(edition.subjects) ? edition.subjects.filter(Boolean) : [],
         isbn10: typeof edition.isbn10 === "string" ? edition.isbn10 : null,
         isbn13: typeof edition.isbn13 === "string" ? edition.isbn13 : null,
+        issn: typeof edition.issn === "string" ? edition.issn : null,
+        issue_number: typeof edition.issue_number === "string" ? edition.issue_number : null,
+        issue_volume: typeof edition.issue_volume === "string" ? edition.issue_volume : null,
+        issue_season: typeof edition.issue_season === "string" ? edition.issue_season : null,
+        issue_year: typeof edition.issue_year === "number" ? edition.issue_year : normalizeIssueYear(edition.issue_year),
         cover_url: finalCoverUrl,
         cover_candidates: uniqStrings([finalCoverUrl]),
+        object_type: edition.object_type === "magazine" ? "magazine" : "book",
         trim_width: null,
         trim_height: null,
         trim_unit: null,
@@ -2844,7 +2965,7 @@ export default function BookDetailPage() {
     setImportState({ busy: false, error: null, message: null });
     setLinkState({ busy: false, error: null, message: null });
 
-    if (looksLikeIsbn(value)) {
+    if (looksLikeIsbn(value) || looksLikeIssn(value)) {
       const ok = await previewImportFromIsbn(value);
       if (ok) return;
       if (looksLikeBarcode(value)) {
@@ -2886,9 +3007,14 @@ export default function BookDetailPage() {
     description?: string | null;
     subjects?: string[] | null;
     cover_url?: string | null;
-    object_type?: "book" | "music" | null;
+    object_type?: "book" | "music" | "magazine" | null;
     music_metadata?: MusicMetadata | null;
     contributor_entities?: Partial<Record<MusicContributorRole, string[]>> | null;
+    issn?: string | null;
+    issue_number?: string | null;
+    issue_volume?: string | null;
+    issue_season?: string | null;
+    issue_year?: number | null;
     trim_width?: number | null;
     trim_height?: number | null;
     trim_unit?: TrimUnit | null;
@@ -2901,10 +3027,34 @@ export default function BookDetailPage() {
     const nextAuthors = (input.authors ?? []).map((a) => String(a ?? "").trim()).filter(Boolean);
     const nextSubjects = (input.subjects ?? []).map((s) => String(s ?? "").trim()).filter(Boolean);
     const nextMusic = input.music_metadata ?? null;
+    const nextMagazineYear = normalizeIssueYear(input.issue_year);
     const currentEffectiveTitle = (formTitle.trim() || String(book?.edition?.title ?? "").trim()).trim();
     const currentEffectivePublisher = (formPublisher.trim() || String(book?.edition?.publisher ?? "").trim()).trim();
     const currentEffectivePublishDate = (formPublishDate.trim() || String(book?.edition?.publish_date ?? "").trim()).trim();
     const currentEffectiveDescription = (formDescription.trim() || String(book?.edition?.description ?? "").trim()).trim();
+
+    if (input.object_type === "magazine") {
+      setFormObjectType("magazine");
+      if (nextTitle && !currentEffectiveTitle) setFormTitle(nextTitle);
+      if (nextDescription && !currentEffectiveDescription) setFormDescription(nextDescription);
+      if (nextPublisher && !currentEffectivePublisher) setFormPublisher(nextPublisher);
+      if (nextPublishDate && !currentEffectivePublishDate) setFormPublishDate(nextPublishDate);
+      if (nextSubjects.length > 0) {
+        const mergedSubjects = uniqStrings([...(effectiveSubjects ?? []), ...nextSubjects]);
+        setFacetDraft((s) => ({ ...s, subject: mergedSubjects }));
+      }
+      setFormMagazine((current) => ({
+        issue_number: current.issue_number || input.issue_number || null,
+        issue_volume: current.issue_volume || input.issue_volume || null,
+        issue_season: current.issue_season || input.issue_season || null,
+        issue_year: current.issue_year ?? nextMagazineYear,
+        issn: current.issn || (input.issn ? normalizeIssn(input.issn) : null)
+      }));
+      if (nextCover) setSuggestedCoverUrl(nextCover);
+      setSearchState((s) => ({ ...s, message: "Filled missing fields (not saved)" }));
+      setImportState((s) => ({ ...s, message: "Filled missing fields (not saved)" }));
+      return;
+    }
 
     if (input.object_type === "music") {
       setFormObjectType("music");
@@ -3718,7 +3868,9 @@ export default function BookDetailPage() {
                                 <div className="om-lookup-main">
                                   <div>{title}</div>
                                   <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    {authors || "—"}
+                                    {r.object_type === "magazine"
+                                      ? formatIssueDisplay({ object_type: "magazine", issue_number: r.issue_number, issue_volume: r.issue_volume, issue_season: r.issue_season, issue_year: r.issue_year }) || "—"
+                                      : authors || "—"}
                                   </div>
                                   <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                     {[
@@ -3763,7 +3915,12 @@ export default function BookDetailPage() {
                                             cover_url: hydrated.cover_url,
                                             object_type: hydrated.object_type ?? "book",
                                             music_metadata: hydrated.music_metadata ?? null,
-                                            contributor_entities: hydrated.contributor_entities ?? null
+                                            contributor_entities: hydrated.contributor_entities ?? null,
+                                            issn: hydrated.issn ?? null,
+                                            issue_number: hydrated.issue_number ?? null,
+                                            issue_volume: hydrated.issue_volume ?? null,
+                                            issue_season: hydrated.issue_season ?? null,
+                                            issue_year: hydrated.issue_year ?? null
                                           });
                                         }}
                                         disabled={!r.title && (!r.authors || r.authors.length === 0) && !r.publisher && !r.publish_date}
@@ -3822,7 +3979,9 @@ export default function BookDetailPage() {
                                 <div className="om-lookup-main" style={{ minWidth: 0 }}>
                                   <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(preview.title ?? "").trim() || "—"}</div>
                                   <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    {(preview.authors ?? []).filter(Boolean).join(", ") || "—"}
+                                    {preview.object_type === "magazine"
+                                      ? formatIssueDisplay({ object_type: "magazine", issue_number: preview.issue_number, issue_volume: preview.issue_volume, issue_season: preview.issue_season, issue_year: preview.issue_year }) || "—"
+                                      : (preview.authors ?? []).filter(Boolean).join(", ") || "—"}
                                   </div>
                                   {(preview.editors ?? []).length > 0 ? (
                                     <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -3882,6 +4041,12 @@ export default function BookDetailPage() {
                                               description: preview.description,
                                               subjects: preview.subjects,
                                               cover_url: preview.cover_url,
+                                              object_type: preview.object_type ?? "book",
+                                              issn: preview.issn ?? null,
+                                              issue_number: preview.issue_number ?? null,
+                                              issue_volume: preview.issue_volume ?? null,
+                                              issue_season: preview.issue_season ?? null,
+                                              issue_year: preview.issue_year ?? null,
                                               trim_width: preview.trim_width,
                                               trim_height: preview.trim_height,
                                               trim_unit: preview.trim_unit,
@@ -3954,6 +4119,98 @@ export default function BookDetailPage() {
                     placeholder={effectiveTitle}
                     autoFocus
                   />
+                ) : isMagazineType ? (
+                  <>
+                    <hr className="divider" />
+                    {(editMode || facetView.editor.length > 0) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Editors</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="editor" value={facetDraft.editor} onChange={(next) => { setFacetDraft((s) => ({ ...s, editor: next })); setFormEditors(next.join(", ")); }} placeholder="Add an editor" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="editor" items={facetView.editor} />
+                          )}
+                        </div>
+                        {editMode && <div style={{ width: 32 }} />}
+                      </div>
+                    )}
+
+                    {(editMode || facetView.designer.length > 0) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Designers</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="designer" value={facetDraft.designer} onChange={(next) => { setFacetDraft((s) => ({ ...s, designer: next })); setFormDesigners(next.join(", ")); }} placeholder="Add a designer" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="designer" items={facetView.designer} />
+                          )}
+                        </div>
+                        {editMode && <div style={{ width: 32 }} />}
+                      </div>
+                    )}
+
+                    {(editMode || (facetView.publisher.length > 0 && fieldVisibility.publisher !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.publisher === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Publisher</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="publisher" value={facetDraft.publisher} onChange={(next) => { setFacetDraft((s) => ({ ...s, publisher: next })); setFormPublisher(joinTokenValues(next)); }} placeholder="Add a publisher" disabled={!isOwner || busy || saveState.busy} />
+                          ) : facetView.publisher.length > 0 ? (
+                            <FacetLinks role="publisher" items={facetView.publisher} />
+                          ) : (
+                            effectivePublisher
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.publisher !== false} onChange={() => toggleFieldVisibility("publisher")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(editMode || (displayPublishDate && displayPublishDate !== "—" && fieldVisibility.publish_date !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.publish_date === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Publish date</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="YYYY-MM-DD" />
+                          ) : (
+                            <Link href={detailFilterHref("/app", "publish_date", effectivePublishDate)} style={{ textDecoration: "none" }}>{displayPublishDate}</Link>
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.publish_date !== false} onChange={() => toggleFieldVisibility("publish_date")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {[
+                      ["Issue number", effectiveMagazine.issue_number ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_number: value || null })), "Add issue number", "issue_number"],
+                      ["Issue volume", effectiveMagazine.issue_volume ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_volume: value || null })), "Add volume", "issue_volume"],
+                      ["Issue season", effectiveMagazine.issue_season ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_season: value || null })), "Add season", "issue_season"],
+                      ["Issue year", effectiveMagazine.issue_year != null ? String(effectiveMagazine.issue_year) : "", (value: string) => setFormMagazine((s) => ({ ...s, issue_year: normalizeIssueYear(value) })), "Add year", "issue_year"]
+                    ].map(([label, value, onChange, placeholder, visKey]) => (
+                      editMode || String(value).trim() ? (
+                        <div key={String(visKey)} className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility[String(visKey)] === false ? 0.6 : 1 }}>
+                          <div style={{ minWidth: 110 }} className="text-muted">{String(label)}</div>
+                          <div style={{ flex: "1 1 auto" }}>
+                            {editMode ? (
+                              <input className="om-inline-control" value={String(value)} onChange={(e) => (onChange as (value: string) => void)(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder={String(placeholder)} />
+                            ) : String(value)}
+                          </div>
+                          {editMode && (
+                            <div style={{ marginLeft: "var(--space-sm)" }}>
+                              <FieldVisibilityToggle visible={fieldVisibility[String(visKey)] !== false} onChange={() => toggleFieldVisibility(String(visKey))} />
+                            </div>
+                          )}
+                        </div>
+                      ) : null
+                    ))}
+                  </>
                 ) : (
                   <div>{effectiveTitle}</div>
                 )}
@@ -4515,13 +4772,13 @@ export default function BookDetailPage() {
                       {editMode ? (
                         <select className="om-inline-control" value={formObjectType || "book"} onChange={(e) => handleObjectTypeChange(e.target.value)}>
                           <option value="book">book</option>
-                          <option value="magazine">magazine</option>
+                          <option value="magazine">periodical</option>
                           <option value="ephemera">ephemera</option>
                           <option value="video">video</option>
                           <option value="music">music</option>
                         </select>
                       ) : (
-                        (book?.object_type ?? "").trim()
+                        displayObjectTypeLabel(book?.object_type ?? "")
                       )}
                     </div>
                     {editMode && (
@@ -4560,7 +4817,7 @@ export default function BookDetailPage() {
                   </div>
                 )}
 
-                {!isMusicObject && (editMode || (facetView.subject.length > 0 && fieldVisibility.subjects !== false)) && (
+                {!isMusicObject && !isMagazineType && (editMode || (facetView.subject.length > 0 && fieldVisibility.subjects !== false)) && (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.subjects === false ? 0.6 : 1 }}>
                     <div style={{ minWidth: 110 }} className="text-muted">Subjects</div>
                     <div style={{ flex: "1 1 auto" }}>
@@ -4593,7 +4850,37 @@ export default function BookDetailPage() {
                   </div>
                 )}
 
-                {!isMusicObject && (editMode || ((book?.edition?.isbn13 || book?.edition?.isbn10) && fieldVisibility.isbn !== false)) && (
+                {isMagazineType && (editMode || ((effectiveMagazine.issn ?? "").trim() && fieldVisibility.isbn !== false)) && (
+                  <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.isbn === false ? 0.6 : 1 }}>
+                    <div style={{ minWidth: 110 }} className="text-muted">ISSN</div>
+                    <div style={{ flex: "1 1 auto" }}>
+                      {editMode ? (
+                        <input
+                          className="om-inline-control"
+                          value={formMagazine.issn ?? formIsbn}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setFormMagazine((current) => ({ ...current, issn: value }));
+                            setFormIsbn(value);
+                            if (isbnFormatError) setIsbnFormatError(false);
+                          }}
+                          onKeyDown={(e) => onEnter(e, () => void saveEdits())}
+                          placeholder="Add ISSN"
+                        />
+                      ) : (
+                        <div>{effectiveMagazine.issn}</div>
+                      )}
+                    </div>
+                    {editMode && (
+                      <div style={{ marginLeft: "auto", display: "flex", alignItems: "baseline", gap: "var(--space-sm)" }}>
+                        {isbnFormatError ? <div className="text-muted">Invalid format</div> : null}
+                        <FieldVisibilityToggle visible={fieldVisibility.isbn !== false} onChange={() => toggleFieldVisibility("isbn")} />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!isMusicObject && !isMagazineType && (editMode || ((book?.edition?.isbn13 || book?.edition?.isbn10) && fieldVisibility.isbn !== false)) && (
                   <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.isbn === false ? 0.6 : 1 }}>
                     <div style={{ minWidth: 110 }} className="text-muted">ISBN</div>
                     <div style={{ flex: "1 1 auto" }}>

@@ -26,6 +26,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { motion } from "motion/react";
 import type { CatalogGroup } from "../../../lib/types";
+import { effectiveSecondaryLineFor } from "../../../lib/book";
 import BookCard, { type BookCardViewMode } from "./BookCard";
 
 type DeleteState = { busy: boolean; error: string | null; message: string | null } | undefined;
@@ -91,7 +92,7 @@ function renderCard({
       selected={selected}
       onToggleSelected={onToggleSelected}
       title={group.title}
-      authors={group.filterAuthors}
+      authors={effectiveSecondaryLineFor(group.primary).values}
       isbn13={group.primary.edition?.isbn13 ?? null}
       tags={group.tagNames}
       copiesCount={group.copiesCount}
@@ -103,6 +104,7 @@ function renderCard({
       onDeleteCopy={onDeleteCopy}
       deleteState={deleteState}
       gridCols={effectiveCols}
+      secondaryMode={effectiveSecondaryLineFor(group.primary).mode}
     />
   );
 }

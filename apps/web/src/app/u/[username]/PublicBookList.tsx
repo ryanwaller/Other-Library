@@ -15,6 +15,7 @@ import { detailFilterLabel, type DetailFilterKey } from "../../../lib/detailFilt
 import { 
   effectiveTitleFor, 
   effectiveAuthorsFor, 
+  effectiveSecondaryLineFor,
   effectivePublisherFor,
   groupKeyFor 
 } from "../../../lib/book";
@@ -619,13 +620,16 @@ export default function PublicBookList({
     const e = b.edition;
     const title = effectiveTitleFor(b);
     const authors = effectiveAuthorsFor(b);
+    const secondary = effectiveSecondaryLineFor(b);
 
     const truncatedAuthors =
-      gridCols === 8 && authors.length > 1
-        ? [authors[0], "+ more"]
-        : isMobile && authors.length > 2
-          ? [...authors.slice(0, 2), "+ more"]
-          : authors;
+      secondary.mode === "authors"
+        ? gridCols === 8 && secondary.values.length > 1
+          ? [secondary.values[0], "+ more"]
+          : isMobile && secondary.values.length > 2
+            ? [...secondary.values.slice(0, 2), "+ more"]
+            : secondary.values
+        : secondary.values;
 
     const coverUrl =
       g.copies
@@ -656,7 +660,7 @@ export default function PublicBookList({
               {truncatedAuthors.length > 0
                 ? truncatedAuthors.map((a, idx) => (
                     <span key={a}>
-                      {a === "+ more" ? (
+                      {secondary.mode === "plain" || a === "+ more" ? (
                         <span className="text-muted">{a}</span>
                       ) : (
                         <button 
@@ -702,7 +706,7 @@ export default function PublicBookList({
           {truncatedAuthors.length > 0
             ? truncatedAuthors.map((a, idx) => (
                 <span key={a}>
-                  {a === "+ more" ? (
+                  {secondary.mode === "plain" || a === "+ more" ? (
                     <span className="text-muted">{a}</span>
                   ) : (
                     <button 

@@ -1,11 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import sizeOf from "image-size";
+import { looksLikeIssn, normalizeIssn, parseMagazineTitle } from "../../../lib/magazine";
 
 export const runtime = "nodejs";
 
 type EditionMetadata = {
+  object_type?: "book" | "magazine" | null;
   isbn10?: string | null;
   isbn13?: string | null;
+  issn?: string | null;
   title?: string | null;
   authors?: string[];
   publisher?: string | null;
@@ -13,6 +16,10 @@ type EditionMetadata = {
   description?: string | null;
   subjects?: string[];
   cover_url?: string | null;
+  issue_number?: string | null;
+  issue_volume?: string | null;
+  issue_season?: string | null;
+  issue_year?: number | null;
   raw?: Record<string, unknown>;
   sources?: string[];
 };
@@ -246,6 +253,7 @@ async function googleBooksLookup(isbn: string): Promise<EditionMetadata | null> 
   );
 
   return {
+    object_type: "book",
     title,
     authors,
     publisher,
@@ -254,6 +262,70 @@ async function googleBooksLookup(isbn: string): Promise<EditionMetadata | null> 
     subjects,
     cover_url,
     raw: { googleBooks: item }
+  };
+}
+
+async function googleBooksLookupByIssn(issn: string): Promise<EditionMetadata | null> {
+  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(`issn:${issn}`)}&maxResults=10`;
+  const json = await fetchJson(url);
+  if (!json || typeof json !== "object") return null;
+  const items = Array.isArray((json as any).items) ? (json as any).items : [];
+  const item = items.find((candidate: any) => candidate?.volumeInfo) ?? null;
+  const info = item?.volumeInfo;
+  if (!info || typeof info !== "object") return null;
+
+  const title = typeof info.title === "string" ? info.title : null;
+  const publish_date = parseDateToIso(info.publishedDate);
+  const publishYear = typeof info.publishedDate === "string" && /^\d{4}/.test(info.publishedDate)
+    ? Number(String(info.publishedDate).slice(0, 4))
+    : null;
+  const parsed = parseMagazineTitle(title ?? "");
+  const normalizedIssn = normalizeIssn(issn);
+  return {
+    object_type: "magazine",
+    issn: normalizedIssn,
+    title: parsed.publicationName || title,
+    authors: Array.isArray(info.authors) ? info.authors.filter((a: any) => typeof a === "string") : [],
+    publisher: typeof info.publisher === "string" ? info.publisher : null,
+    publish_date,
+    description: typeof info.description === "string" ? info.description : null,
+    subjects: Array.isArray(info.categories) ? info.categories.filter((c: any) => typeof c === "string") : [],
+    cover_url: normalizeHttpsUrl(info.imageLinks?.thumbnail ?? info.imageLinks?.smallThumbnail ?? null),
+    issue_number: parsed.issueNumber,
+    issue_volume: parsed.issueVolume,
+    issue_season: parsed.issueSeason,
+    issue_year: parsed.issueYear ?? publishYear,
+    raw: { googleBooks: item }
+  };
+}
+
+async function openLibraryLookupByIssn(issn: string): Promise<EditionMetadata | null> {
+  const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(`issn:${issn}`)}&limit=10`;
+  const json = await fetchJson(url);
+  const docs = Array.isArray((json as any)?.docs) ? (json as any).docs : [];
+  const doc = docs.find((candidate: any) => Array.isArray(candidate?.issn) || typeof candidate?.title === "string") ?? null;
+  if (!doc || typeof doc !== "object") return null;
+
+  const title = typeof doc.title === "string" ? doc.title : null;
+  const parsed = parseMagazineTitle(title ?? "");
+  const publishYear = typeof doc.first_publish_year === "number" ? doc.first_publish_year : null;
+  return {
+    object_type: "magazine",
+    issn: normalizeIssn(
+      (Array.isArray(doc.issn) ? String(doc.issn[0] ?? "") : "") || issn
+    ),
+    title: parsed.publicationName || title,
+    authors: Array.isArray(doc.author_name) ? doc.author_name.filter((a: any) => typeof a === "string") : [],
+    publisher: Array.isArray(doc.publisher) ? (doc.publisher.find((p: any) => typeof p === "string") ?? null) : null,
+    publish_date: null,
+    description: null,
+    subjects: Array.isArray(doc.subject) ? doc.subject.filter((s: any) => typeof s === "string").slice(0, 25) : [],
+    cover_url: typeof doc.cover_i === "number" ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg` : null,
+    issue_number: parsed.issueNumber,
+    issue_volume: parsed.issueVolume,
+    issue_season: parsed.issueSeason,
+    issue_year: parsed.issueYear ?? publishYear,
+    raw: { openlibrary: doc }
   };
 }
 
@@ -508,6 +580,42 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const input = (searchParams.get("isbn") ?? "").trim();
   const normalizedIsbn = normalizeIsbn(input);
+  const normalizedIssn = normalizeIssn(input);
+
+  if (looksLikeIssn(input)) {
+    const empty: EditionMetadata = {
+      object_type: "magazine",
+      issn: normalizedIssn,
+      authors: [],
+      subjects: [],
+      sources: [],
+      raw: {}
+    };
+    let merged: EditionMetadata = empty;
+    const [gb, ol] = await Promise.allSettled([
+      googleBooksLookupByIssn(normalizedIssn),
+      openLibraryLookupByIssn(normalizedIssn)
+    ]);
+    const results: Array<[string, EditionMetadata | null]> = [
+      ["googleBooks", gb.status === "fulfilled" ? gb.value : null],
+      ["openlibrary", ol.status === "fulfilled" ? ol.value : null]
+    ];
+    for (const [name, res] of results) {
+      if (!res) continue;
+      merged = mergeMetadata(merged, res, name);
+      merged.issue_number = merged.issue_number ?? res.issue_number ?? null;
+      merged.issue_volume = merged.issue_volume ?? res.issue_volume ?? null;
+      merged.issue_season = merged.issue_season ?? res.issue_season ?? null;
+      merged.issue_year = merged.issue_year ?? res.issue_year ?? null;
+      merged.issn = merged.issn ?? res.issn ?? normalizedIssn;
+      merged.object_type = "magazine";
+    }
+    const bestUrl = chooseBestCoverUrl([merged.cover_url, ...results.map(([, r]) => r?.cover_url)]);
+    merged.cover_url = await validateCoverUrl(bestUrl);
+    merged.authors = merged.authors ?? [];
+    merged.subjects = merged.subjects ?? [];
+    return NextResponse.json({ ok: true, edition: merged });
+  }
 
   // ── ISBN path ────────────────────────────────────────────────────────────
   let isbn10: string | null = null;
@@ -619,7 +727,7 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json(
-    { ok: false, error: "Invalid identifier. Provide a valid ISBN-10, ISBN-13, LCCN, or OCLC number (ocm/ocn/on prefix)." },
+    { ok: false, error: "Invalid identifier. Provide a valid ISBN, ISSN, LCCN, or OCLC number (ocm/ocn/on prefix)." },
     { status: 400 }
   );
 }

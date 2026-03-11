@@ -6,6 +6,7 @@ import CoverImage, { type CoverCrop } from "../../../components/CoverImage";
 export type GridItem = {
   id: number;
   title: string;
+  secondaryLine?: string | null;
   coverUrl: string | null;
   coverCrop: CoverCrop | null;
   href: string | null;
@@ -28,6 +29,11 @@ export default function EntityBookGrid({ items }: { items: GridItem[] }) {
             </div>
             <div style={{ marginTop: "var(--space-sm)" }}>
               <span className="om-book-title">{item.title}</span>
+              {item.secondaryLine ? (
+                <div className="text-muted" style={{ marginTop: "var(--space-4)" }}>
+                  {item.secondaryLine}
+                </div>
+              ) : null}
             </div>
           </>
         );

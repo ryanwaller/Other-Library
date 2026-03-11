@@ -25,7 +25,8 @@ export default function BookCard({
   onDeleteCopy,
   deleteState,
   hideCopyCount,
-  gridCols
+  gridCols,
+  secondaryMode = "authors"
 }: {
   viewMode: BookCardViewMode;
   bulkMode: boolean;
@@ -46,6 +47,7 @@ export default function BookCard({
   hideCopyCount?: boolean;
   showDeleteCopy?: boolean;
   gridCols?: number;
+  secondaryMode?: "authors" | "plain";
 }) {
   const router = useRouter();
 
@@ -86,6 +88,42 @@ export default function BookCard({
     </div>
   );
 
+  function renderSecondaryText() {
+    if (truncatedAuthors.length === 0) return null;
+    if (secondaryMode === "plain") {
+      return (
+        <>
+          {truncatedAuthors.map((author, index) => (
+            <span key={`${author}-${index}`}>
+              <span className="text-muted">{author}</span>
+              {index < truncatedAuthors.length - 1 ? <span>, </span> : null}
+            </span>
+          ))}
+        </>
+      );
+    }
+    return (
+      <>
+        {truncatedAuthors.map((author, index) => (
+          <span key={author}>
+            {author === "+ more" ? (
+              <span className="text-muted">{author}</span>
+            ) : (
+              <Link
+                href={`/app?author=${encodeURIComponent(author)}`}
+                onClick={(e) => openAuthorFilter(e, author)}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                {author}
+              </Link>
+            )}
+            {index < truncatedAuthors.length - 1 ? <span>, </span> : null}
+          </span>
+        ))}
+      </>
+    );
+  }
+
   if (viewMode === "list") {
     return (
       <div className="card" style={{ display: "grid", gridTemplateColumns: bulkMode ? "26px 70px 1fr" : "70px 1fr", gap: "var(--space-md)", alignItems: "start" }}>
@@ -102,25 +140,7 @@ export default function BookCard({
             </Link>
           </div>
           <div className="text-muted" style={{ marginTop: 4 }}>
-            {truncatedAuthors.length > 0 ? (
-              <>
-                {truncatedAuthors.map((a, idx) => (
-                  <span key={a}>
-                    {isMobile && a === "+ more" ? (
-                      <span className="text-muted">{a}</span>
-                    ) : (
-                      <Link
-                        href={`/app?author=${encodeURIComponent(a)}`}
-                        onClick={(e) => openAuthorFilter(e, a)}
-                      >
-                        {a}
-                      </Link>
-                    )}
-                    {idx < truncatedAuthors.length - 1 ? <span>, </span> : null}
-                  </span>
-                ))}
-              </>
-            ) : null}
+            {renderSecondaryText()}
           </div>
         </div>
       </div>
@@ -148,22 +168,7 @@ export default function BookCard({
             </div>
             {authors.length > 0 ? (
               <div className="om-book-secondary">
-                {truncatedAuthors.map((author, index) => (
-                  <span key={author}>
-                    {author === "+ more" ? (
-                      <span className="text-muted">{author}</span>
-                    ) : (
-                      <Link
-                        href={`/app?author=${encodeURIComponent(author)}`}
-                        onClick={(e) => openAuthorFilter(e, author)}
-                        onKeyDown={(e) => e.stopPropagation()}
-                      >
-                        {author}
-                      </Link>
-                    )}
-                    {index < truncatedAuthors.length - 1 ? <span>, </span> : null}
-                  </span>
-                ))}
+                {renderSecondaryText()}
               </div>
             ) : null}
           </div>
@@ -181,22 +186,7 @@ export default function BookCard({
             </div>
             {truncatedAuthors.length > 0 ? (
               <div className="om-book-secondary">
-                {truncatedAuthors.map((author, index) => (
-                  <span key={author}>
-                    {author === "+ more" ? (
-                      <span className="text-muted">{author}</span>
-                    ) : (
-                      <Link
-                        href={`/app?author=${encodeURIComponent(author)}`}
-                        onClick={(e) => openAuthorFilter(e, author)}
-                        onKeyDown={(e) => e.stopPropagation()}
-                      >
-                        {author}
-                      </Link>
-                    )}
-                    {index < truncatedAuthors.length - 1 ? <span>, </span> : null}
-                  </span>
-                ))}
+                {renderSecondaryText()}
               </div>
             ) : null}
           </div>

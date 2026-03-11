@@ -21,6 +21,7 @@ import {
   normalizeKeyPart, 
   effectiveTitleFor, 
   effectiveAuthorsFor, 
+  effectiveSecondaryLineFor,
   effectiveSubjectsFor, 
   effectivePublisherFor, 
   groupKeyFor,
@@ -37,6 +38,7 @@ import {
 import { DECADE_OPTIONS } from "../../lib/decades";
 import { saveBookNavContext } from "../../lib/bookNav";
 import { parseMusicMetadata, type MusicMetadata, type MusicContributorRole } from "../../lib/music";
+import { formatIssueDisplay, looksLikeIssn, normalizeIssueYear, normalizeIssn, parseMagazineTitle } from "../../lib/magazine";
 import { contextFromFilterParams } from "../../lib/pageTitle";
 import { DETAIL_FILTER_KEYS, detailFilterLabel, type DetailFilterKey } from "../../lib/detailFilters";
 import { arrayMove } from "@dnd-kit/sortable";
@@ -78,7 +80,7 @@ function uniqCaseInsensitive(values: string[]): string[] {
 
 type SearchCandidate = {
   source: "openlibrary" | "googleBooks" | "discogs";
-  object_type?: "book" | "music" | null;
+  object_type?: "book" | "music" | "magazine" | null;
   source_type?: string | null;
   source_url?: string | null;
   external_source_ids?: Record<string, string | null> | null;
@@ -93,6 +95,11 @@ type SearchCandidate = {
   subjects: string[];
   isbn10: string | null;
   isbn13: string | null;
+  issn?: string | null;
+  issue_number?: string | null;
+  issue_volume?: string | null;
+  issue_season?: string | null;
+  issue_year?: number | null;
   cover_url: string | null;
   cover_candidates?: string[];
 };
@@ -526,8 +533,13 @@ function AppShell({
     subjects: string[];
     isbn10: string | null;
     isbn13: string | null;
+    issn?: string | null;
+    issue_number?: string | null;
+    issue_volume?: string | null;
+    issue_season?: string | null;
+    issue_year?: number | null;
     cover_url: string | null;
-    object_type?: "book" | "music" | null;
+    object_type?: "book" | "music" | "magazine" | null;
     source_type?: string | null;
     source_url?: string | null;
     external_source_ids?: Record<string, string | null> | null;
@@ -577,8 +589,10 @@ function AppShell({
     }
   }
   type CsvImportRow = {
+    raw_title?: string | null;
     title: string;
     isbn: string | null;
+    issn: string | null;
     authors: string[];
     publisher: string | null;
     publish_date: string | null;
@@ -588,8 +602,14 @@ function AppShell({
     notes: string | null;
     group_label: string | null;
     object_type: string | null;
+    issue_number: string | null;
+    issue_volume: string | null;
+    issue_season: string | null;
+    issue_year: number | null;
+    parse_flagged?: boolean;
     copies: number;
   };
+  type CsvImportKind = "book" | "magazine";
   type CsvImportJob = {
     id: string;
     library_id: number;
@@ -603,6 +623,8 @@ function AppShell({
   };
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [csvRows, setCsvRows] = useState<CsvImportRow[]>([]);
+  const [csvBaseRows, setCsvBaseRows] = useState<CsvImportRow[]>([]);
+  const [csvImportKind, setCsvImportKind] = useState<CsvImportKind>("book");
   const csvInputRef = useRef<HTMLInputElement | null>(null);
   const csvAutoOpenDoneRef = useRef(false);
   const [csvApplyOverrides, setCsvApplyOverrides] = useState(false);
@@ -779,6 +801,11 @@ function AppShell({
       setStagedCsvFilename(null);
     }
   }, [stagedCsvData, stagedCsvFilename]);
+
+  useEffect(() => {
+    if (csvBaseRows.length === 0 || csvJob) return;
+    setCsvRows(buildCsvRowsForKind(csvBaseRows, csvImportKind));
+  }, [csvBaseRows, csvImportKind, csvJob]);
 
   useEffect(() => {
     let alive = true;
@@ -1880,14 +1907,44 @@ function AppShell({
     return created.data.id as number;
   }
 
+  function buildCsvRowsForKind(baseRows: CsvImportRow[], kind: CsvImportKind): CsvImportRow[] {
+    if (kind !== "magazine") {
+      return baseRows.map((row) => ({
+        ...row,
+        title: row.raw_title ?? row.title,
+        object_type: "book",
+        issue_number: null,
+        issue_volume: null,
+        issue_season: null,
+        issue_year: null,
+        parse_flagged: false
+      }));
+    }
+    return baseRows.map((row) => {
+      const parsed = parseMagazineTitle(row.raw_title ?? row.title);
+      return {
+        ...row,
+        title: parsed.publicationName || row.raw_title || row.title,
+        object_type: "magazine",
+        issn: row.issn ? normalizeIssn(row.issn) : null,
+        issue_number: row.issue_number ?? parsed.issueNumber,
+        issue_volume: row.issue_volume ?? parsed.issueVolume,
+        issue_season: row.issue_season ?? parsed.issueSeason,
+        issue_year: row.issue_year ?? parsed.issueYear,
+        parse_flagged: parsed.flagged
+      };
+    });
+  }
+
   function loadCsvText(text: string, filename: string) {
     const objects = parseCsvToObjects(text);
-    const normalized: CsvImportRow[] = objects
+    const normalizedBase: CsvImportRow[] = objects
       .map((o) => {
         const title = (o.title ?? o.Title ?? "").trim();
         const isbn13 = (o.ean_isbn13 ?? o.isbn13 ?? o.ISBN13 ?? "").trim();
         const isbn10 = (o.upc_isbn10 ?? o.isbn10 ?? o.ISBN10 ?? "").trim();
         const isbn = isbn13 || isbn10 || "";
+        const issn = (o.issn ?? o.ISSN ?? "").trim();
         const creators = (o.creators ?? o.creators_name ?? o.author ?? o.authors ?? "").trim();
         const authors = creators ? splitListField(creators) : [];
         const publisher = (o.publisher ?? "").trim() || null;
@@ -1898,12 +1955,18 @@ function AppShell({
         const notes = (o.notes ?? "").trim() || null;
         const group_label = (o.group ?? "").trim() || null;
         const object_type = (o.item_type ?? o.object_type ?? "").trim() || null;
+        const issue_number = (o.issue_number ?? o.issue ?? o["issue number"] ?? "").trim() || null;
+        const issue_volume = (o.issue_volume ?? o.volume ?? o["issue volume"] ?? "").trim() || null;
+        const issue_season = (o.issue_season ?? o.season ?? o["issue season"] ?? "").trim() || null;
+        const issue_year = normalizeIssueYear(o.issue_year ?? o.year ?? o["issue year"] ?? null);
         const copiesRaw = (o.copies ?? "").trim();
         const copiesNum = copiesRaw ? Number(copiesRaw) : 1;
         const copies = Number.isFinite(copiesNum) && copiesNum > 1 ? Math.floor(copiesNum) : 1;
         return {
+          raw_title: title,
           title,
           isbn: isbn ? isbn : null,
+          issn: issn ? normalizeIssn(issn) : null,
           authors,
           publisher,
           publish_date,
@@ -1913,12 +1976,19 @@ function AppShell({
           notes,
           group_label,
           object_type,
+          issue_number,
+          issue_volume,
+          issue_season,
+          issue_year,
           copies
         } as CsvImportRow;
       })
       .filter((r) => Boolean(r.title || r.isbn));
 
+    const normalized = buildCsvRowsForKind(normalizedBase, "book");
     setCsvFileName(filename);
+    setCsvImportKind("book");
+    setCsvBaseRows(normalizedBase);
     setCsvRows(normalized);
     setAddOpen(true);
     if (normalized.length === 0) {
@@ -1961,7 +2031,9 @@ function AppShell({
 
   function clearCsvImport() {
     setCsvFileName(null);
+    setCsvBaseRows([]);
     setCsvRows([]);
+    setCsvImportKind("book");
     setCsvJob(null);
     setCsvImportState({ busy: false, error: null, message: null, done: 0, total: 0 });
   }
@@ -2089,7 +2161,13 @@ function AppShell({
         subjects: Array.isArray(edition.subjects) ? edition.subjects.filter(Boolean) : [],
         isbn10: typeof edition.isbn10 === "string" ? edition.isbn10 : null,
         isbn13: typeof edition.isbn13 === "string" ? edition.isbn13 : null,
+        issn: typeof edition.issn === "string" ? edition.issn : null,
+        issue_number: typeof edition.issue_number === "string" ? edition.issue_number : null,
+        issue_volume: typeof edition.issue_volume === "string" ? edition.issue_volume : null,
+        issue_season: typeof edition.issue_season === "string" ? edition.issue_season : null,
+        issue_year: typeof edition.issue_year === "number" ? edition.issue_year : normalizeIssueYear(edition.issue_year),
         cover_url: finalCoverUrl,
+        object_type: edition.object_type === "magazine" ? "magazine" : "book",
         sources: Array.from(new Set(["isbn", ...((edition.sources ?? []) as any[]).map((s: any) => String(s))])).filter(Boolean)
       });
       setAddState({ busy: false, error: null, message: null });
@@ -2129,7 +2207,7 @@ function AppShell({
     setAddSearchResults([]);
     setAddSearchState({ busy: false, error: null, message: null });
 
-    if (looksLikeIsbn(value)) {
+    if (looksLikeIsbn(value) || looksLikeIssn(value)) {
       const ok = await previewIsbn(value);
       if (ok) return;
       if (looksLikeBarcode(value)) {
@@ -2204,6 +2282,7 @@ function AppShell({
   async function addEditionData(data: {
     isbn10?: string | null;
     isbn13?: string | null;
+    issn?: string | null;
     title?: string | null;
     authors?: string[];
     publisher?: string | null;
@@ -2211,18 +2290,23 @@ function AppShell({
     description?: string | null;
     subjects?: string[];
     cover_url?: string | null;
-    object_type?: "book" | "music" | null;
+    object_type?: "book" | "music" | "magazine" | null;
     source_type?: string | null;
     source_url?: string | null;
     external_source_ids?: Record<string, string | null> | null;
     music_metadata?: MusicMetadata | null;
     contributor_entities?: Partial<Record<MusicContributorRole, string[]>> | null;
+    issue_number?: string | null;
+    issue_volume?: string | null;
+    issue_season?: string | null;
+    issue_year?: number | null;
   }, targetLibraryId?: number | null): Promise<number> {
     if (!supabase) throw new Error("Supabase is not configured");
     const selectedLibraryId = Number(targetLibraryId ?? addLibraryId ?? 0);
     if (!selectedLibraryId) throw new Error("Choose a catalog first");
     persistAddLibrarySelection(selectedLibraryId);
-    const objectType = (data.object_type ?? "book") === "music" ? "music" : "book";
+    const rawObjectType = String(data.object_type ?? "book").trim().toLowerCase();
+    const objectType = rawObjectType === "music" ? "music" : rawObjectType === "magazine" ? "magazine" : "book";
     if (objectType === "music") {
       const musicMetadata = data.music_metadata ?? null;
       const insertPayload: Record<string, unknown> = {
@@ -2272,6 +2356,52 @@ function AppShell({
           await importCoverForBook(createdId, coverUrl);
         } catch {
           // ignore cover import failures for music objects
+        }
+      }
+      await refreshAllBooks();
+      return createdId;
+    }
+    if (objectType === "magazine") {
+      const issueYear =
+        typeof data.issue_year === "number"
+          ? data.issue_year
+          : normalizeIssueYear(data.publish_date?.slice(0, 4) ?? null);
+      const insertPayload: Record<string, unknown> = {
+        owner_id: userId,
+        library_id: selectedLibraryId,
+        edition_id: null,
+        object_type: "magazine",
+        title_override: data.title ?? null,
+        description_override: data.description ?? null,
+        publisher_override: data.publisher ?? null,
+        publish_date_override: data.publish_date ?? null,
+        subjects_override: (data.subjects ?? []).length > 0 ? data.subjects : [],
+        issue_number: data.issue_number ?? null,
+        issue_volume: data.issue_volume ?? null,
+        issue_season: data.issue_season ?? null,
+        issue_year: issueYear,
+        issn: data.issn ? normalizeIssn(data.issn) : null,
+        source_type: data.source_type ?? null,
+        source_url: data.source_url ?? null,
+        external_source_ids: data.external_source_ids ?? null,
+        decade: issueYear ? `${String(issueYear).slice(0, 3)}0s` : null
+      };
+      const created = await supabase.from("user_books").insert(insertPayload).select("id").single();
+      if (created.error) throw new Error(created.error.message);
+      const createdId = created.data.id as number;
+      if (data.publisher) {
+        await supabase.rpc("set_book_entities", {
+          p_user_book_id: createdId,
+          p_role: "publisher",
+          p_names: [data.publisher]
+        });
+      }
+      const coverUrl = (data.cover_url ?? "").trim();
+      if (coverUrl) {
+        try {
+          await importCoverForBook(createdId, coverUrl);
+        } catch {
+          // ignore cover import failures for magazine objects
         }
       }
       await refreshAllBooks();
@@ -3750,6 +3880,104 @@ function AppShell({
                   {csvImportState.error}
                 </div>
               ) : null}
+              {!csvJob ? (
+                <div style={{ marginTop: "var(--space-sm)" }}>
+                  <div className="text-muted" style={{ marginBottom: 4 }}>What are you importing?</div>
+                  <div className="row no-wrap" style={{ gap: "var(--space-sm)", alignItems: "baseline" }}>
+                    <button
+                      type="button"
+                      onClick={() => setCsvImportKind("book")}
+                      disabled={csvImportState.busy}
+                      className={csvImportKind === "book" ? "" : "text-muted"}
+                    >
+                      Books
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCsvImportKind("magazine")}
+                      disabled={csvImportState.busy}
+                      className={csvImportKind === "magazine" ? "" : "text-muted"}
+                    >
+                      Periodicals
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              {!csvJob && csvImportKind === "magazine" && csvRows.length > 0 ? (
+                <div style={{ marginTop: "var(--space-md)", maxHeight: 280, overflow: "auto", paddingRight: "var(--space-xs)" }}>
+                  <div className="text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+                    Review parsed publication name and issue info before import.
+                  </div>
+                  <div style={{ display: "grid", gap: "var(--space-sm)" }}>
+                    {csvRows.map((row, index) => (
+                      <div
+                        key={`${row.raw_title ?? row.title}-${index}`}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 1fr)",
+                          gap: "var(--space-sm)",
+                          paddingTop: "var(--space-sm)",
+                          borderTop: index === 0 ? "none" : "1px solid var(--border-color)"
+                        }}
+                      >
+                        <div>
+                          <input
+                            className="om-inline-control"
+                            value={row.title}
+                            onChange={(e) =>
+                              setCsvRows((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, title: e.target.value, parse_flagged: false } : item))
+                            }
+                            placeholder="Publication name"
+                          />
+                          {row.parse_flagged ? (
+                            <div className="text-muted" style={{ marginTop: 4 }}>
+                              Review title split
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="row" style={{ gap: "var(--space-sm)", flexWrap: "wrap" }}>
+                          <input
+                            className="om-inline-control"
+                            value={row.issue_volume ?? ""}
+                            onChange={(e) =>
+                              setCsvRows((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, issue_volume: e.target.value || null } : item))
+                            }
+                            placeholder="Vol."
+                            style={{ width: 72 }}
+                          />
+                          <input
+                            className="om-inline-control"
+                            value={row.issue_number ?? ""}
+                            onChange={(e) =>
+                              setCsvRows((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, issue_number: e.target.value || null } : item))
+                            }
+                            placeholder="Issue"
+                            style={{ width: 84 }}
+                          />
+                          <input
+                            className="om-inline-control"
+                            value={row.issue_season ?? ""}
+                            onChange={(e) =>
+                              setCsvRows((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, issue_season: e.target.value || null } : item))
+                            }
+                            placeholder="Season"
+                            style={{ width: 96 }}
+                          />
+                          <input
+                            className="om-inline-control"
+                            value={row.issue_year != null ? String(row.issue_year) : ""}
+                            onChange={(e) =>
+                              setCsvRows((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, issue_year: normalizeIssueYear(e.target.value) } : item))
+                            }
+                            placeholder="Year"
+                            style={{ width: 84 }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
             <div className="om-lookup-actions">
               <div className="row no-wrap" style={{ gap: "var(--space-sm)", alignItems: "baseline" }}>
@@ -3819,11 +4047,13 @@ function AppShell({
                 <div className="om-cover-slot" style={{ width: 60, height: "auto" }}><div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} /></div>
               )}
             </div>
-            <div className="om-lookup-main">
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(addUrlPreview.title ?? "").trim() || "—"}</div>
-              <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {(addUrlPreview.authors ?? []).filter(Boolean).join(", ") || "—"}
-              </div>
+              <div className="om-lookup-main">
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(addUrlPreview.title ?? "").trim() || "—"}</div>
+                <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {addUrlPreview.object_type === "magazine"
+                  ? formatIssueDisplay(addUrlPreview) || "—"
+                  : (addUrlPreview.authors ?? []).filter(Boolean).join(", ") || "—"}
+                </div>
               <div className="text-muted" style={{ marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {[addUrlPreview.publisher ?? "", addUrlPreview.publish_date ?? ""].filter(Boolean).join(" · ") || "—"}
               </div>

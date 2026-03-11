@@ -4,6 +4,7 @@ import { getServerSupabase } from "../../../lib/supabaseServer";
 import { getSupabaseAdmin } from "../../../lib/supabaseAdmin";
 import { bookIdSlug } from "../../../lib/slug";
 import type { CoverCrop } from "../../../components/CoverImage";
+import { formatIssueDisplay, isMagazineObject } from "../../../lib/magazine";
 import EntityPageModules, { type ModuleData, type EntityModuleItem, type OwnerEntry } from "./EntityPageModules";
 import EntityLibraryOwners, { type OwnerProfile } from "./EntityLibraryOwners";
 
@@ -17,6 +18,12 @@ type BookRow = {
   created_at: string;
   edition_id: number | null;
   title_override: string | null;
+  object_type: string | null;
+  issue_number: string | null;
+  issue_volume: string | null;
+  issue_season: string | null;
+  issue_year: number | null;
+  issn: string | null;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
   edition: { title: string | null; isbn13: string | null; cover_url: string | null } | null;
@@ -24,7 +31,7 @@ type BookRow = {
 };
 
 const BOOK_SELECT =
-  "id,owner_id,created_at,edition_id,title_override,cover_original_url,cover_crop,edition:editions(title,isbn13,cover_url),media:user_book_media(kind,storage_path)";
+  "id,owner_id,created_at,edition_id,title_override,object_type,issue_number,issue_volume,issue_season,issue_year,issn,cover_original_url,cover_crop,edition:editions(title,isbn13,cover_url),media:user_book_media(kind,storage_path)";
 
 const ROLE_ORDER = [
   "author", "performer", "editor", "publisher", "composer", "producer",
@@ -92,6 +99,11 @@ function roleSummaryLabel(role: string, count: number): string {
 
 function effectiveTitle(row: BookRow): string {
   return String(row.title_override ?? "").trim() || String(row.edition?.title ?? "").trim() || "(untitled)";
+}
+
+function effectiveSecondaryLine(row: BookRow): string | null {
+  if (!isMagazineObject(row.object_type)) return null;
+  return formatIssueDisplay(row) || null;
 }
 
 function editionKey(row: BookRow): string {
@@ -339,54 +351,64 @@ export default async function EntityPage({
 
   // 10. Finalize modules — ownerEntries carry per-copy cover data so the
   //     client can build "Your copies" with the viewer's own covers.
-  const modules: ModuleData[] = roleGroups.map(({ role, groups }) => {
-    const total = groups.length;
-    const displayed = groups.slice(0, 12);
+  const modules: ModuleData[] = roleGroups.flatMap(({ role, groups }) => {
+    const splitByPeriodical = role === "publisher" || role === "editor";
+    const buckets = splitByPeriodical
+      ? [
+          { key: `${role}:default`, heading: roleHeading(role, entity.name), groups: groups.filter(({ rep }) => !isMagazineObject(rep.object_type)) },
+          { key: `${role}:magazine`, heading: role === "publisher" ? `Issues published by ${entity.name}` : `Issues edited by ${entity.name}`, groups: groups.filter(({ rep }) => isMagazineObject(rep.object_type)) }
+        ]
+      : [{ key: role, heading: roleHeading(role, entity.name), groups }];
 
-    const items: EntityModuleItem[] = displayed.map(({ rep, allBooks }) => {
-      const title = effectiveTitle(rep);
+    return buckets
+      .filter((bucket) => bucket.groups.length > 0)
+      .map((bucket) => {
+        const total = bucket.groups.length;
+        const displayed = bucket.groups.slice(0, 12);
 
-      const ownerEntries: OwnerEntry[] = allBooks
-        .map((b): OwnerEntry | null => {
-          // Include any owner whose profile is public, so the viewer can see
-          // their own copies in "Your copies" and others see the fallback link.
-          if (!profileByOwnerId.has(b.owner_id)) return null;
+        const items: EntityModuleItem[] = displayed.map(({ rep, allBooks }) => {
+          const title = effectiveTitle(rep);
+
+          const ownerEntries: OwnerEntry[] = allBooks
+            .map((b): OwnerEntry | null => {
+              if (!profileByOwnerId.has(b.owner_id)) return null;
+              return {
+                ownerId: b.owner_id,
+                userBookId: b.id,
+                coverUrl: coverSrc(b, signedMap),
+                coverCrop: b.cover_crop,
+                title: effectiveTitle(b)
+              };
+            })
+            .filter((e): e is OwnerEntry => e !== null);
+
+          const firstPublic = allBooks.find((b) => profileByOwnerId.has(b.owner_id));
+          const publicFallbackHref = firstPublic
+            ? `/u/${encodeURIComponent(profileByOwnerId.get(firstPublic.owner_id)!)}/b/${bookIdSlug(firstPublic.id, title)}`
+            : null;
+
           return {
-            ownerId: b.owner_id,
-            userBookId: b.id,
-            coverUrl: coverSrc(b, signedMap),
-            coverCrop: b.cover_crop,
-            title: effectiveTitle(b)
+            id: rep.id,
+            title,
+            secondaryLine: effectiveSecondaryLine(rep),
+            coverUrl: coverSrc(rep, signedMap),
+            coverCrop: rep.cover_crop,
+            ownerEntries,
+            publicFallbackHref
           };
-        })
-        .filter((e): e is OwnerEntry => e !== null);
+        });
 
-      // Public fallback: first public owner (allBooks is sorted newest-first)
-      const firstPublic = allBooks.find((b) => profileByOwnerId.has(b.owner_id));
-      const publicFallbackHref = firstPublic
-        ? `/u/${encodeURIComponent(profileByOwnerId.get(firstPublic.owner_id)!)}/b/${bookIdSlug(firstPublic.id, title)}`
-        : null;
-
-      return {
-        id: rep.id,
-        title,
-        coverUrl: coverSrc(rep, signedMap),
-        coverCrop: rep.cover_crop,
-        ownerEntries,
-        publicFallbackHref
-      };
-    });
-
-    return {
-      role,
-      heading: roleHeading(role, entity.name),
-      items,
-      total,
-      viewAllHref:
-        total > 12
-          ? `/facet/${encodeURIComponent(role)}/${encodeURIComponent(entity.slug)}`
-          : null
-    };
+        return {
+          role: bucket.key,
+          heading: bucket.heading,
+          items,
+          total,
+          viewAllHref:
+            total > 12
+              ? `/facet/${encodeURIComponent(role)}/${encodeURIComponent(entity.slug)}`
+              : null
+        };
+      });
   });
 
   // 11. Library section

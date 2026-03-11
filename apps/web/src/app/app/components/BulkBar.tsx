@@ -227,7 +227,7 @@ export default function BulkBar({
                   disabled={!canAct}
                   style={{ textAlign: "left", display: "block", width: "100%" }}
                 >
-                  {ot.charAt(0).toUpperCase() + ot.slice(1)}
+                  {ot === "magazine" ? "Periodical" : ot.charAt(0).toUpperCase() + ot.slice(1)}
                 </button>
               ))}
             </div>

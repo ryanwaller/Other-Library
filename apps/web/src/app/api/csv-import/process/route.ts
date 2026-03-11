@@ -3,9 +3,13 @@ import { getCurrentUser, getSupabaseAdmin } from "../../../../lib/supabaseAdmin"
 
 export const runtime = "nodejs";
 
+type AdminClient = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
+
 type CsvImportRow = {
+  raw_title?: string | null;
   title: string;
   isbn: string | null;
+  issn: string | null;
   authors: string[];
   publisher: string | null;
   publish_date: string | null;
@@ -15,6 +19,10 @@ type CsvImportRow = {
   notes: string | null;
   group_label: string | null;
   object_type: string | null;
+  issue_number: string | null;
+  issue_volume: string | null;
+  issue_season: string | null;
+  issue_year: number | null;
   copies: number;
 };
 
@@ -98,7 +106,7 @@ function normalizeList(values: string[]): string[] {
   return out;
 }
 
-async function getOrCreateTagId(admin: ReturnType<typeof getSupabaseAdmin>, ownerId: string, name: string, kind: "tag" | "category"): Promise<number> {
+async function getOrCreateTagId(admin: AdminClient, ownerId: string, name: string, kind: "tag" | "category"): Promise<number> {
   const normalized = name.trim().replace(/\s+/g, " ");
   const existing = await admin.from("tags").select("id").eq("owner_id", ownerId).eq("name", normalized).eq("kind", kind).maybeSingle();
   if (existing.error) throw new Error(existing.error.message);
@@ -108,7 +116,7 @@ async function getOrCreateTagId(admin: ReturnType<typeof getSupabaseAdmin>, owne
   return inserted.data.id as number;
 }
 
-async function createUserBookByIsbn(admin: ReturnType<typeof getSupabaseAdmin>, req: Request, ownerId: string, libraryId: number, isbnValue: string): Promise<{ id: number; editionAuthors: string[]; editionPublisher: string | null }> {
+async function createUserBookByIsbn(admin: AdminClient, req: Request, ownerId: string, libraryId: number, isbnValue: string): Promise<{ id: number; editionAuthors: string[]; editionPublisher: string | null }> {
   const isbn = isbnValue.trim();
   if (!isbn) throw new Error("Provide an ISBN");
   const res = await fetch(new URL(`/api/isbn?isbn=${encodeURIComponent(isbn)}`, req.url));
@@ -157,20 +165,28 @@ async function createUserBookByIsbn(admin: ReturnType<typeof getSupabaseAdmin>, 
   return { id: created.data.id as number, editionAuthors, editionPublisher };
 }
 
-async function createManualUserBook(admin: ReturnType<typeof getSupabaseAdmin>, ownerId: string, libraryId: number, row: CsvImportRow): Promise<number> {
+async function createManualUserBook(admin: AdminClient, ownerId: string, libraryId: number, row: CsvImportRow): Promise<number> {
   const title = row.title.trim();
   if (!title) throw new Error("Provide a title");
+  const isPeriodical = String(row.object_type ?? "").trim().toLowerCase() === "magazine";
   const created = await admin
     .from("user_books")
     .insert({
       owner_id: ownerId,
       library_id: libraryId,
       edition_id: null,
+      object_type: isPeriodical ? "magazine" : null,
       title_override: title,
-      authors_override: row.authors.length > 0 ? row.authors : null,
+      authors_override: !isPeriodical && row.authors.length > 0 ? row.authors : null,
       publisher_override: row.publisher ?? null,
       publish_date_override: row.publish_date ?? null,
-      description_override: row.description ?? null
+      description_override: row.description ?? null,
+      issue_number: isPeriodical ? row.issue_number ?? null : null,
+      issue_volume: isPeriodical ? row.issue_volume ?? null : null,
+      issue_season: isPeriodical ? row.issue_season ?? null : null,
+      issue_year: isPeriodical ? row.issue_year ?? null : null,
+      issn: isPeriodical ? row.issn ?? null : null,
+      decade: isPeriodical && row.issue_year ? `${Math.floor(row.issue_year / 10) * 10}s` : null
     })
     .select("id")
     .single();
@@ -178,7 +194,7 @@ async function createManualUserBook(admin: ReturnType<typeof getSupabaseAdmin>, 
   return created.data.id as number;
 }
 
-async function adminSetBookEntities(admin: ReturnType<typeof getSupabaseAdmin>, userBookId: number, role: string, names: string[]) {
+async function adminSetBookEntities(admin: AdminClient, userBookId: number, role: string, names: string[]) {
   const cleaned = normalizeList(names);
   if (!cleaned.length) return;
   // Delete existing rows for this role then re-insert
@@ -190,7 +206,7 @@ async function adminSetBookEntities(admin: ReturnType<typeof getSupabaseAdmin>, 
   }
 }
 
-async function processSingleRow(admin: ReturnType<typeof getSupabaseAdmin>, req: Request, job: JobRow, row: CsvImportRow) {
+async function processSingleRow(admin: AdminClient, req: Request, job: JobRow, row: CsvImportRow) {
   const tagIdCache = new Map<string, number>();
   const getTagIdCached = async (name: string, kind: "tag" | "category") => {
     const key = `${kind}:${name.trim().toLowerCase()}`;
@@ -255,7 +271,9 @@ async function processSingleRow(admin: ReturnType<typeof getSupabaseAdmin>, req:
 
     try {
       const syncRoles: Array<[string, string[]]> = [];
-      const authorsToSync = (updatePayload.authors_override as string[] | undefined)
+      const authorsToSync = String(updatePayload.object_type ?? "").trim().toLowerCase() === "magazine"
+        ? null
+        : (updatePayload.authors_override as string[] | undefined)
         ?? (row.authors.length > 0 ? row.authors : null)
         ?? (editionAuthors.length > 0 ? editionAuthors : null);
       if (authorsToSync && authorsToSync.length > 0) syncRoles.push(["author", authorsToSync]);
