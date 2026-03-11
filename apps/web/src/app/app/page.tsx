@@ -4049,11 +4049,6 @@ function AppShell({
         ) : null;
         return (
           <div key={lib.id}>
-            {firstSharedDisplayIndex === idx ? (
-              <div style={{ marginBottom: "var(--space-sm)" }} className="text-muted">
-                Shared with you
-              </div>
-            ) : null}
             <LibraryBlock
               libraryId={lib.id}
               libraryName={lib.name}
