@@ -1498,19 +1498,8 @@ export default function BookDetailPage() {
         normalizeIssueYear(book?.publish_date_override) ??
         normalizeIssueYear(book?.edition?.publish_date);
       setFormObjectType("magazine");
-      setFormAuthors("");
-      setFormMaterials("");
-      setFormPrinter("");
-      setFormEditionOverride("");
-      setFormPages("");
-      setFormTrimWidth("");
-      setFormTrimHeight("");
       setFacetDraft((state) => ({
         ...state,
-        author: [],
-        subject: [],
-        printer: [],
-        material: [],
         performer: [],
         composer: [],
         producer: [],
@@ -4512,6 +4501,20 @@ export default function BookDetailPage() {
                       </div>
                     )}
 
+                    {(editMode || facetView.author.length > 0) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Authors</div>
+                        <div className="om-hanging-value">
+                          {editMode ? (
+                            <EntityTokenField role="author" value={facetDraft.author} onChange={(next) => { setFacetDraft((s) => ({ ...s, author: next })); setFormAuthors(next.join(", ")); }} placeholder="Add an author" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="author" items={facetView.author} />
+                          )}
+                        </div>
+                        {editMode && <div style={{ width: 32 }} />}
+                      </div>
+                    )}
+
                     {(editMode || facetView.designer.length > 0) && (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                         <div style={{ minWidth: 110 }} className="text-muted">Designers</div>
@@ -4520,6 +4523,34 @@ export default function BookDetailPage() {
                             <EntityTokenField role="designer" value={facetDraft.designer} onChange={(next) => { setFacetDraft((s) => ({ ...s, designer: next })); setFormDesigners(next.join(", ")); }} placeholder="Add a designer" disabled={!isOwner || busy || saveState.busy} />
                           ) : (
                             <FacetLinks role="designer" items={facetView.designer} />
+                          )}
+                        </div>
+                        {editMode && <div style={{ width: 32 }} />}
+                      </div>
+                    )}
+
+                    {(editMode || facetView.printer.length > 0) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Printer</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="printer" value={facetDraft.printer} onChange={(next) => { setFacetDraft((s) => ({ ...s, printer: next })); setFormPrinter(joinTokenValues(next)); }} placeholder="Add a printer" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="printer" items={facetView.printer} />
+                          )}
+                        </div>
+                        {editMode && <div style={{ width: 32 }} />}
+                      </div>
+                    )}
+
+                    {(editMode || facetView.material.length > 0) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Materials</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="material" value={facetDraft.material} onChange={(next) => { setFacetDraft((s) => ({ ...s, material: next })); setFormMaterials(joinTokenValues(next)); }} placeholder="Add materials" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="material" items={facetView.material} />
                           )}
                         </div>
                         {editMode && <div style={{ width: 32 }} />}
@@ -4586,6 +4617,75 @@ export default function BookDetailPage() {
                         </div>
                       ) : null
                     ))}
+
+                    {(editMode || (facetView.subject.length > 0 && fieldVisibility.subjects !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.subjects === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Subjects</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="subject" value={facetDraft.subject} onChange={(next) => setFacetDraft((s) => ({ ...s, subject: next }))} placeholder="Add a subject" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <ExpandableContent
+                              items={facetView.subject}
+                              limit={15}
+                              renderVisible={(visibleItems, isExpanded) => (
+                                <>
+                                  <FacetLinks role="subject" items={visibleItems} />
+                                  {!isExpanded && facetView.subject.length > 15 ? " …" : ""}
+                                </>
+                              )}
+                            />
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.subjects !== false} onChange={() => toggleFieldVisibility("subjects")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(editMode || (book?.pages && fieldVisibility.pages !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.pages === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Pages</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formPages} onChange={(e) => setFormPages(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Add page count" />
+                          ) : book?.pages ? String(book.pages) : null}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.pages !== false} onChange={() => toggleFieldVisibility("pages")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(editMode || ((book as any)?.trim_width && (book as any)?.trim_height && fieldVisibility.trim_size !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.trim_size === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Trim size</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <div className="row" style={{ gap: "var(--space-sm)", alignItems: "center" }}>
+                              <input className="om-inline-control" type="number" min={0.01} step={0.01} value={formTrimWidth} onChange={(e) => setFormTrimWidth(e.target.value)} placeholder="W" style={{ width: 72 }} />
+                              <span className="text-muted">×</span>
+                              <input className="om-inline-control" type="number" min={0.01} step={0.01} value={formTrimHeight} onChange={(e) => setFormTrimHeight(e.target.value)} placeholder="H" style={{ width: 72 }} />
+                              <select className="om-inline-control" value={formTrimUnit} onChange={(e) => handleTrimUnitChange(e.target.value as TrimUnit)} style={{ width: "auto", minWidth: 0 }}>
+                                <option value="in">in</option>
+                                <option value="mm">mm</option>
+                              </select>
+                            </div>
+                          ) : (book as any)?.trim_width && (book as any)?.trim_height ? (
+                            `${(book as any).trim_width} × ${(book as any).trim_height} ${(book as any).trim_unit ?? "in"}`
+                          ) : null}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.trim_size !== false} onChange={() => toggleFieldVisibility("trim_size")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>

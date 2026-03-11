@@ -606,6 +606,23 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                       <div>{effectiveEditors.join(", ")}</div>
                     </div>
                   ) : null}
+                  {effectiveAuthors.length > 0 ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Authors</div>
+                      <div className="om-hanging-value">
+                        {effectiveAuthors.map((a, idx) => {
+                          const entitySlug = entitySlugFor(["author"], a);
+                          return (
+                            <span key={a}>
+                              <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                              {entitySlug ? <> <Link href={`/entity/${entitySlug}`} className="text-muted" style={{ textDecoration: "none" }}>↗</Link></> : null}
+                              {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                   {effectiveDesigners.length > 0 ? (
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                       <div style={{ minWidth: 110 }} className="text-muted">Designers</div>
@@ -646,6 +663,18 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                       <div>{displayPublishDate}</div>
                     </div>
                   ) : null}
+                  {effectivePrinter ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Printer</div>
+                      <div>{effectivePrinter}</div>
+                    </div>
+                  ) : null}
+                  {effectiveMaterials ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Materials</div>
+                      <div>{effectiveMaterials}</div>
+                    </div>
+                  ) : null}
                   {[
                     ["Issue number", book.issue_number],
                     ["Issue volume", book.issue_volume],
@@ -660,6 +689,26 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                       </div>
                     ) : null
                   )}
+                  {subjects.length > 0 ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-md)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Subjects</div>
+                      <div style={{ flex: "1 1 auto" }}>
+                        <ExpandableSubjects subjects={subjects} username={profile.username} />
+                      </div>
+                    </div>
+                  ) : null}
+                  {book.pages ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Pages</div>
+                      <div>{book.pages}</div>
+                    </div>
+                  ) : null}
+                  {(book as any)?.trim_width && (book as any)?.trim_height ? (
+                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                      <div style={{ minWidth: 110 }} className="text-muted">Trim size</div>
+                      <div>{`${(book as any).trim_width} × ${(book as any).trim_height} ${(book as any).trim_unit ?? "in"}`}</div>
+                    </div>
+                  ) : null}
                 </>
               ) : null}
 
