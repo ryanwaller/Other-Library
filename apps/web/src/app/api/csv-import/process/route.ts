@@ -222,7 +222,8 @@ async function processSingleRow(admin: AdminClient, req: Request, job: JobRow, r
     let id: number;
     let editionAuthors: string[] = [];
     let editionPublisher: string | null = null;
-    if (row.isbn) {
+    const isPeriodicalRow = String(row.object_type ?? "").trim().toLowerCase() === "magazine";
+    if (row.isbn && !isPeriodicalRow) {
       const result = await createUserBookByIsbn(admin, req, job.owner_id, job.library_id, row.isbn);
       id = result.id;
       editionAuthors = result.editionAuthors;
