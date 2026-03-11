@@ -319,6 +319,26 @@ function coerceStringArray(input: unknown): string[] | null {
   return [];
 }
 
+function normalizeMemberPreviews(input: unknown): Array<{ userId: string; username: string; avatarUrl: string | null }> {
+  if (!Array.isArray(input)) return [];
+  const out: Array<{ userId: string; username: string; avatarUrl: string | null }> = [];
+  for (const row of input) {
+    if (!row || typeof row !== "object") continue;
+    const raw = row as Record<string, unknown>;
+    const userId = String(raw.userId ?? raw.user_id ?? "").trim();
+    const username = String(raw.username ?? "").trim();
+    const avatarValue = raw.avatarUrl ?? raw.avatar_url ?? null;
+    const avatarUrl = typeof avatarValue === "string" && avatarValue.trim() ? avatarValue.trim() : null;
+    if (!userId && !username && !avatarUrl) continue;
+    out.push({
+      userId: userId || username || `member-${out.length}`,
+      username,
+      avatarUrl
+    });
+  }
+  return out;
+}
+
 function parseAuthorsInput(input: string): string[] {
   const parts = input
     .split(",")
@@ -1013,7 +1033,7 @@ function AppShell({
         sort_order: l.sort_order != null && Number.isFinite(Number(l.sort_order)) ? Number(l.sort_order) : null,
         owner_id: l.owner_id ? String(l.owner_id) : null,
         myRole: l.myRole === "editor" ? "editor" : "owner",
-        memberPreviews: Array.isArray(l.memberPreviews) ? l.memberPreviews : []
+        memberPreviews: normalizeMemberPreviews(l.memberPreviews)
       });
     }
     return Array.from(byId.values()).sort((a, b) => {
