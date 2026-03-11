@@ -46,15 +46,17 @@ export default function EntityPageModules({ modules }: { modules: ModuleData[] }
     });
   }, []);
 
-  // Build "Your copies" — deduplicated by userBookId across all modules.
+  // Build "Your copies" — one entry per edition group (item.id), even if you
+  // own multiple copies of the same edition. Links to the first (newest) copy.
   const yourCopies: GridItem[] = [];
   if (userId) {
-    const seenBookIds = new Set<number>();
+    const seenItemIds = new Set<number>();
     for (const mod of modules) {
       for (const item of mod.items) {
+        if (seenItemIds.has(item.id)) continue;
         for (const entry of item.ownerEntries) {
-          if (entry.ownerId === userId && !seenBookIds.has(entry.userBookId)) {
-            seenBookIds.add(entry.userBookId);
+          if (entry.ownerId === userId) {
+            seenItemIds.add(item.id);
             yourCopies.push({
               id: entry.userBookId,
               title: entry.title,
@@ -62,6 +64,7 @@ export default function EntityPageModules({ modules }: { modules: ModuleData[] }
               coverCrop: entry.coverCrop,
               href: `/app/books/${entry.userBookId}`
             });
+            break;
           }
         }
       }
