@@ -202,7 +202,7 @@ function toDisplayCoverUrl(mediaUrlsByPath: Record<string, string>, client: any,
   return publicUrl ?? null;
 }
 
-const HOMEPAGE_CACHE_KEY = "om_homepage_home_cache_v1";
+const HOMEPAGE_CACHE_KEY = "om_homepage_home_cache_v2";
 const HOMEPAGE_CACHE_TTL_MS = 120_000;
 
 function loadHomepageCache(): CatalogHomeCachePayload | null {
@@ -225,6 +225,16 @@ function saveHomepageCache(payload: CatalogHomeCachePayload) {
     window.localStorage.setItem(HOMEPAGE_CACHE_KEY, JSON.stringify(payload));
   } catch {
     // ignore cache write failures
+  }
+}
+
+function clearHomepageCache() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(HOMEPAGE_CACHE_KEY);
+    window.localStorage.removeItem("om_homepage_home_cache_v1");
+  } catch {
+    // ignore cache clear failures
   }
 }
 
@@ -1051,29 +1061,34 @@ function AppShell({
 
   async function hydrateFromHomepageCache(cached: CatalogHomeCachePayload, requestSeq?: number) {
     if (!cached) return;
-    const cachedList = normalizeLibrariesDeterministically(cached.libraries);
-    if (cachedList.length === 0 && cached.books.length === 0) return;
-    setLibraries(cachedList);
-    setDebugLibrariesSource("libs:cache");
-    setBooksLoading(false);
-    applyLibrarySelection(cachedList);
-    if (!sharedRevealDoneRef.current) {
-      setShowSharedLibraries(false);
-      if (typeof window !== "undefined") {
-        window.requestAnimationFrame(() => {
+    try {
+      const cachedList = normalizeLibrariesDeterministically(cached.libraries);
+      if (cachedList.length === 0 && cached.books.length === 0) return;
+      setLibraries(cachedList);
+      setDebugLibrariesSource("libs:cache");
+      setBooksLoading(false);
+      applyLibrarySelection(cachedList);
+      if (!sharedRevealDoneRef.current) {
+        setShowSharedLibraries(false);
+        if (typeof window !== "undefined") {
+          window.requestAnimationFrame(() => {
+            setShowSharedLibraries(true);
+            sharedRevealDoneRef.current = true;
+          });
+        } else {
           setShowSharedLibraries(true);
           sharedRevealDoneRef.current = true;
-        });
+        }
       } else {
         setShowSharedLibraries(true);
-        sharedRevealDoneRef.current = true;
       }
-    } else {
-      setShowSharedLibraries(true);
-    }
-    if (Array.isArray(cached.books) && cached.books.length > 0) {
-      setDebugBooksSource("books:cache");
-      await applyBooksFromServer(cached.books, "books:cache", requestSeq);
+      if (Array.isArray(cached.books) && cached.books.length > 0) {
+        setDebugBooksSource("books:cache");
+        await applyBooksFromServer(cached.books, "books:cache", requestSeq);
+      }
+    } catch (err) {
+      console.error("homepage_cache_hydrate_failed", err);
+      clearHomepageCache();
     }
   }
 
