@@ -20,6 +20,7 @@ import {
   MUSIC_FORMAT_OPTIONS,
   MUSIC_RELEASE_TYPE_OPTIONS,
   MUSIC_SPEED_OPTIONS,
+  normalizeMusicFormat,
   parseMusicMetadata,
   type MusicContributorRole,
   type MusicMetadata
@@ -374,6 +375,23 @@ function musicRoleLabel(role: string): string {
 
 function musicValueHref(value: string, key: DetailFilterKey = "q"): string {
   return detailFilterHref("/app", key, value);
+}
+
+function forcedMusicTrimPreset(format: string | null | undefined): { width: string; height: string; unit: TrimUnit } | null {
+  const normalized = normalizeMusicFormat(format);
+  if (normalized === "LP" || normalized === '12"') {
+    return { width: "12", height: "12", unit: "in" };
+  }
+  if (normalized === '10"') {
+    return { width: "10", height: "10", unit: "in" };
+  }
+  if (normalized === '7"') {
+    return { width: "7", height: "7", unit: "in" };
+  }
+  if (normalized === "CD") {
+    return { width: "120", height: "120", unit: "mm" };
+  }
+  return null;
 }
 
 function FieldVisibilityToggle(props: { 
@@ -1366,6 +1384,7 @@ export default function BookDetailPage() {
     issn: formMagazine.issn ?? (String(book?.issn ?? "").trim() || null)
   }), [book?.issue_number, book?.issue_season, book?.issue_volume, book?.issue_year, book?.issn, formMagazine]);
   const musicGenres = useMemo(() => musicDisplayGenres(effectiveMusic), [effectiveMusic]);
+  const forcedMusicTrim = useMemo(() => forcedMusicTrimPreset(effectiveMusic.format), [effectiveMusic.format]);
 
   const effectivePublishers = useMemo(() => {
     if (isMusicObject) {
@@ -1432,6 +1451,17 @@ export default function BookDetailPage() {
     if (override !== null && override !== undefined) return (override ?? []).filter(Boolean);
     return (book?.edition?.subjects ?? []).filter(Boolean);
   }, [facetDraft.subject, book]);
+
+  useEffect(() => {
+    if (!isMusicObject || !forcedMusicTrim) return;
+    const { width, height, unit } = forcedMusicTrim;
+    setFormTrimWidth((current) => (current === width ? current : width));
+    setFormTrimHeight((current) => (current === height ? current : height));
+    setFormTrimUnit((current) => (current === unit ? current : unit));
+    setCropTrimWidth((current) => (current === width ? current : width));
+    setCropTrimHeight((current) => (current === height ? current : height));
+    setCropTrimUnit((current) => (current === unit ? current : unit));
+  }, [forcedMusicTrim, isMusicObject]);
 
   function handleObjectTypeChange(nextType: string) {
     const normalizedNext = nextType.trim() || "book";
@@ -2237,11 +2267,12 @@ export default function BookDetailPage() {
         setSaveState({ busy: false, error: "Pages must be a number.", message: "Save failed" });
         return false;
       }
-      const trimWRaw = parseFloat(formTrimWidth);
-      const trimHRaw = parseFloat(formTrimHeight);
+      const forcedTrim = isMusicObject ? forcedMusicTrimPreset(formMusic.format) : null;
+      const trimWRaw = parseFloat(forcedTrim?.width ?? formTrimWidth);
+      const trimHRaw = parseFloat(forcedTrim?.height ?? formTrimHeight);
       const trim_width = Number.isFinite(trimWRaw) && trimWRaw > 0 ? trimWRaw : null;
       const trim_height = Number.isFinite(trimHRaw) && trimHRaw > 0 ? trimHRaw : null;
-      const trim_unit = trim_width !== null && trim_height !== null ? (formTrimUnit || "in") : null;
+      const trim_unit = trim_width !== null && trim_height !== null ? ((forcedTrim?.unit ?? formTrimUnit) || "in") : null;
 
       const standardVisibility: Record<string, boolean> = {};
       for (const [k, v] of Object.entries(fieldVisibility)) {
@@ -2286,9 +2317,6 @@ export default function BookDetailPage() {
         payload.edition_override = null;
         payload.publish_date_override = null;
         payload.pages = null;
-        payload.trim_width = null;
-        payload.trim_height = null;
-        payload.trim_unit = null;
       }
       if (isMagazineType) {
         payload.authors_override = null;
