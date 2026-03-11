@@ -336,12 +336,7 @@ const ENTITY_PAGE_ROLES = new Set([
   "arranger", "composer", "conductor",
 ]);
 
-function facetHref(role: string, name: string, slug?: string, entityId?: string): string {
-  // Real entity IDs are UUIDs (no colon); synthetic supplement IDs are "role:slug".
-  const isRealEntity = entityId != null && !entityId.includes(":");
-  if (ENTITY_PAGE_ROLES.has(role) && slug && isRealEntity) {
-    return `/entity/${encodeURIComponent(slug)}`;
-  }
+function facetHref(role: string, name: string, slug?: string): string {
   const filterKey = roleToDetailFilterKey(role);
   if (!filterKey && slug) {
     return `/facet/${encodeURIComponent(role)}/${encodeURIComponent(slug)}`;
@@ -390,17 +385,20 @@ function FacetLinks(props: { role: FacetRole; items: EntityRef[] }) {
   const { role, items } = props;
   return (
     <span>
-      {items.map((e, idx) => (
-        <Fragment key={e.id}>
-          <Link
-            href={facetHref(role, e.name, e.slug, e.id)}
-            style={{ textDecoration: "none" }}
-          >
-            {e.name}
-          </Link>
-          {idx < items.length - 1 ? ", " : ""}
-        </Fragment>
-      ))}
+      {items.map((e, idx) => {
+        const isRealEntity = e.id && !e.id.includes(":");
+        return (
+          <Fragment key={e.id}>
+            <Link href={facetHref(role, e.name, e.slug)} style={{ textDecoration: "none" }}>
+              {e.name}
+            </Link>
+            {ENTITY_PAGE_ROLES.has(role) && isRealEntity && e.slug ? (
+              <> <Link href={`/entity/${encodeURIComponent(e.slug)}`} className="text-muted" style={{ textDecoration: "none" }}>↗</Link></>
+            ) : null}
+            {idx < items.length - 1 ? ", " : ""}
+          </Fragment>
+        );
+      })}
     </span>
   );
 }
