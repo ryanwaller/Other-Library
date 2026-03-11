@@ -678,8 +678,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   {[
                     ["Issue volume", book.issue_volume],
                     ["Issue number", book.issue_number],
-                    ["Issue season", book.issue_season],
-                    ["Issue year", book.issue_year != null ? String(book.issue_year) : null],
+                    ["Issue season", book.issue_season ? formatDateShort(String(book.issue_season)) : null],
                     ["ISSN", book.issn]
                   ].map(([label, value]) =>
                     String(value ?? "").trim() ? (

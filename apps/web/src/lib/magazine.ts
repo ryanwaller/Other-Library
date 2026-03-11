@@ -1,3 +1,5 @@
+import { formatDateShort } from "./formatDate";
+
 export type MagazineLike = {
   object_type?: string | null;
   issue_number?: string | null;
@@ -73,8 +75,7 @@ export function formatIssueDisplay(book: MagazineLike | null | undefined): strin
     const prefixed = /^(issue|no\.?|#)\b/.test(lowered);
     parts.push(prefixed ? issueNumber : `No. ${issueNumber}`);
   }
-  if (season && year) parts.push(`${season} ${year}`);
-  else if (season) parts.push(season);
+  if (season) parts.push(formatDateShort(season));
   else if (year) parts.push(year);
 
   return parts.join(", ");

@@ -7,7 +7,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
 import { isValidTrimSize, convertTrimUnit, formatTrimRatio, type TrimUnit } from "../../../../lib/trimSize";
 import { bookIdSlug } from "../../../../lib/slug";
-import { formatDateShort } from "../../../../lib/formatDate";
+import { formatDateShort, normalizeFlexiblePublishDate } from "../../../../lib/formatDate";
 import { DECADE_OPTIONS } from "../../../../lib/decades";
 import { loadBookNavContext, type BookNavContext } from "../../../../lib/bookNav";
 import { detailFilterHref, roleToDetailFilterKey, type DetailFilterKey } from "../../../../lib/detailFilters";
@@ -346,13 +346,6 @@ function isbn10ToIsbn13Local(isbn10: string): string | null {
   }
   const check = (10 - (sum % 10)) % 10;
   return `${core}${check}`;
-}
-
-function normalizePublishDateForStorage(input: string): string | null {
-  const trimmed = String(input ?? "").trim();
-  if (!trimmed) return null;
-  if (/^\d{4}$/.test(trimmed)) return `${trimmed}-01-01`;
-  return trimmed;
 }
 
 const ENTITY_PAGE_ROLES = new Set([
@@ -1493,10 +1486,6 @@ export default function BookDetailPage() {
     }
 
     if (normalizedNext === "magazine") {
-      const mappedIssueYear =
-        normalizeIssueYear(formPublishDate) ??
-        normalizeIssueYear(book?.publish_date_override) ??
-        normalizeIssueYear(book?.edition?.publish_date);
       setFormObjectType("magazine");
       setFacetDraft((state) => ({
         ...state,
@@ -1516,7 +1505,6 @@ export default function BookDetailPage() {
       setFormMusic(emptyMusicMetadata());
       setFormMagazine((current) => ({
         ...current,
-        issue_year: current.issue_year ?? mappedIssueYear,
         issn: current.issn ?? null
       }));
       return;
@@ -2273,7 +2261,7 @@ export default function BookDetailPage() {
         printer_override: printer_override || null,
         materials_override: materials_override || null,
         edition_override: formEditionOverride.trim() ? formEditionOverride.trim() : null,
-        publish_date_override: normalizePublishDateForStorage(formPublishDate),
+        publish_date_override: normalizeFlexiblePublishDate(formPublishDate),
         description_override: formDescription.trim() ? formDescription.trim() : null,
         subjects_override: subjects_override.length > 0 ? subjects_override : [],
         location: formLocation.trim() ? formLocation.trim() : null,
@@ -2309,7 +2297,7 @@ export default function BookDetailPage() {
         payload.issue_number = formMagazine.issue_number ?? null;
         payload.issue_volume = formMagazine.issue_volume ?? null;
         payload.issue_season = formMagazine.issue_season ?? null;
-        payload.issue_year = formMagazine.issue_year ?? null;
+        payload.issue_year = null;
         payload.issn = manualIssn || null;
       } else {
         payload.issue_number = null;
@@ -3207,7 +3195,7 @@ export default function BookDetailPage() {
           title: formTitle.trim() || book.title_override || book.edition?.title || null,
           authors: effectiveAuthors,
           publisher: joinTokenValues(effectivePublishers) || null,
-          publish_date: normalizePublishDateForStorage(formPublishDate) ?? normalizePublishDateForStorage(String(book.edition?.publish_date ?? "").trim()),
+          publish_date: normalizeFlexiblePublishDate(formPublishDate) ?? normalizeFlexiblePublishDate(String(book.edition?.publish_date ?? "").trim()),
           description: formDescription.trim() || book.description_override || book.edition?.description || null,
           subjects: effectiveSubjects,
           cover_url: book.edition?.cover_url ?? null,
@@ -3257,8 +3245,8 @@ export default function BookDetailPage() {
       // Additive linking: preserve existing effective values via overrides so nothing is "lost" when edition_id changes.
       const currentTitle = (formTitle.trim() ? formTitle.trim() : String(book.edition?.title ?? "").trim()) || null;
       const currentPublisher = (formPublisher.trim() ? formPublisher.trim() : String(book.edition?.publisher ?? "").trim()) || null;
-    const currentPublishDate =
-      normalizePublishDateForStorage(formPublishDate) ?? normalizePublishDateForStorage(String(book.edition?.publish_date ?? "").trim());
+      const currentPublishDate =
+      normalizeFlexiblePublishDate(formPublishDate) ?? normalizeFlexiblePublishDate(String(book.edition?.publish_date ?? "").trim());
       const currentDescription = (formDescription.trim() ? formDescription.trim() : String(book.edition?.description ?? "").trim()) || null;
 
       const currentAuthors = (effectiveAuthors ?? []).map((a) => String(a ?? "").trim()).filter(Boolean);
@@ -4582,7 +4570,7 @@ export default function BookDetailPage() {
                         <div style={{ minWidth: 110 }} className="text-muted">Publish date</div>
                         <div style={{ flex: "1 1 auto" }}>
                           {editMode ? (
-                            <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="YYYY-MM-DD" />
+                            <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Month / year or full date" />
                           ) : (
                             <Link href={detailFilterHref("/app", "publish_date", effectivePublishDate)} style={{ textDecoration: "none" }}>{displayPublishDate}</Link>
                           )}
@@ -4598,8 +4586,7 @@ export default function BookDetailPage() {
                     {[
                       ["Issue volume", effectiveMagazine.issue_volume ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_volume: value || null })), "Add volume", "issue_volume"],
                       ["Issue number", effectiveMagazine.issue_number ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_number: value || null })), "Add issue number", "issue_number"],
-                      ["Issue season", effectiveMagazine.issue_season ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_season: value || null })), "Add season", "issue_season"],
-                      ["Issue year", effectiveMagazine.issue_year != null ? String(effectiveMagazine.issue_year) : "", (value: string) => setFormMagazine((s) => ({ ...s, issue_year: normalizeIssueYear(value) })), "Add year", "issue_year"]
+                      ["Issue season", effectiveMagazine.issue_season ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_season: value || null })), "Add month / year", "issue_season"]
                     ].map(([label, value, onChange, placeholder, visKey]) => (
                       editMode || String(value).trim() ? (
                         <div key={String(visKey)} className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility[String(visKey)] === false ? 0.6 : 1 }}>
