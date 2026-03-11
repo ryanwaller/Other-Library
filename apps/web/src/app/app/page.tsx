@@ -869,7 +869,7 @@ function AppShell({
   }, [isMobile]);
 
   const searchParamsKey = searchParams.toString();
-  const addMode = addInputFocused || Boolean(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message);
+  const addMode = addOpen || addInputFocused || csvRows.length > 0 || Boolean(csvJob || addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message);
   const controlsPinnedOpen = sortOpen || bulkMode || searchOpen || addMode;
   const controlsFixed = controlsDocked;
 
@@ -2099,6 +2099,10 @@ function AppShell({
     cancelAddPreview();
     setAddInput("");
     setAddInputFocused(false);
+    setAddOpen(false);
+    if (csvRows.length > 0 || csvJob) {
+      clearCsvImport();
+    }
     (document.activeElement as HTMLElement)?.blur();
   }
 
