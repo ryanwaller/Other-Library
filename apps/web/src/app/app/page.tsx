@@ -869,8 +869,10 @@ function AppShell({
   }, [isMobile]);
 
   const searchParamsKey = searchParams.toString();
-  const addMode = addOpen || addInputFocused || csvRows.length > 0 || Boolean(csvJob || addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message);
-  const controlsPinnedOpen = sortOpen || bulkMode || searchOpen || addMode;
+  const csvMode = addOpen || csvRows.length > 0 || Boolean(csvJob);
+  const addMode = addInputFocused || Boolean(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message);
+  const showAddControls = csvMode || addMode;
+  const controlsPinnedOpen = sortOpen || bulkMode || searchOpen || showAddControls;
   const controlsFixed = controlsDocked;
 
   // Re-measure the band height whenever its content can change size.
@@ -3353,7 +3355,7 @@ function AppShell({
                   isMobile={isMobile}
                 />
               </div>
-              {addMode && (
+              {showAddControls && (
                 <div className="row" style={{ gap: "var(--space-10)", flex: "0 0 auto", alignItems: "center" }}>
                   {(addInput.trim() || addInputFocused) && (
                     <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
@@ -3365,7 +3367,7 @@ function AppShell({
                 </div>
               )}
             </div>
-            {!addMode && <div className="row" style={{ width: "100%", margin: 0, gap: "var(--space-md)", alignItems: "baseline", flexWrap: "nowrap" }}>
+            {!showAddControls && <div className="row" style={{ width: "100%", margin: 0, gap: "var(--space-md)", alignItems: "baseline", flexWrap: "nowrap" }}>
               <button onClick={() => { const next = !bulkMode; if (next) { setAddOpen(false); setSortOpen(false); setSearchOpen(false); setReorderMode(true); } else { exitEditMode(); } setBulkMode(next); }}>
                 {bulkMode ? "Done" : "Edit"}
               </button>
@@ -3486,31 +3488,31 @@ function AppShell({
                   />
                 </div>
                 <div className="row" style={{ gap: "var(--space-10)", flex: "0 0 auto" }}>
-                  {addMode && (addInput.trim() || addInputFocused) && (
+                  {showAddControls && (addInput.trim() || addInputFocused) && (
                     <button onClick={() => smartAddOrSearch()} disabled={addState.busy || !addInput.trim()}>
                       {addState.busy ? "…" : "Go"}
                     </button>
                   )}
-                  {addMode && (
+                  {showAddControls && (
                     <button type="button" className="text-muted" onClick={handleAddManually} disabled={addState.busy} style={{ padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>Add manually</button>
                   )}
-                  {addMode && (
+                  {showAddControls && (
                     <button type="button" className="text-muted" onClick={cancelAddMode} disabled={addState.busy} style={{ padding: 0, border: 0, background: "none", font: "inherit", cursor: "pointer", whiteSpace: "nowrap" }}>Cancel</button>
                   )}
                 </div>
-                {!addMode && <button onClick={() => { const next = !bulkMode; if (next) { setAddOpen(false); setSortOpen(false); setSearchOpen(false); setReorderMode(true); } else { exitEditMode(); } setBulkMode(next); }}>
+                {!showAddControls && <button onClick={() => { const next = !bulkMode; if (next) { setAddOpen(false); setSortOpen(false); setSearchOpen(false); setReorderMode(true); } else { exitEditMode(); } setBulkMode(next); }}>
                   {bulkMode ? "Done" : "Edit"}
                 </button>}
-                {!addMode && <button type="button" className={sortOpen ? "text-primary" : "text-muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !sortOpen; setSortOpen(next); if (next) { setSearchOpen(false); } }}>
+                {!showAddControls && <button type="button" className={sortOpen ? "text-primary" : "text-muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !sortOpen; setSortOpen(next); if (next) { setSearchOpen(false); } }}>
                   View by
                 </button>}
               </div>
-              {!addMode && <button type="button" className={searchOpen ? "text-primary" : "text-muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !searchOpen; setSearchOpen(next); if (next) { setSortOpen(false); } }}>
+              {!showAddControls && <button type="button" className={searchOpen ? "text-primary" : "text-muted"} onClick={() => { if (bulkMode) exitEditMode(); const next = !searchOpen; setSearchOpen(next); if (next) { setSortOpen(false); } }}>
                 Search
               </button>}
             </div>
 
-            {!isMobile && !addMode && searchOpen && (
+            {!isMobile && !showAddControls && searchOpen && (
               <div className="row" style={{ width: "100%", marginTop: "var(--space-sm)", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap", position: "relative", zIndex: 9, paddingBottom: "var(--space-xs)" }}>
                 <input
                   className="om-inline-search-input"
