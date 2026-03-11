@@ -395,6 +395,23 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     ])
   ) as Record<(typeof MUSIC_CONTRIBUTOR_ROLES)[number], Array<{ name: string; slug: string }>>;
 
+  // Build role+name → entity slug lookup for secondary entity page links
+  const entitySlugByRoleAndName = new Map<string, string>();
+  for (const row of book.book_entities ?? []) {
+    const role = String(row?.role ?? "").trim();
+    const name = String(row?.entity?.name ?? "").trim();
+    const slug = String(row?.entity?.slug ?? "").trim();
+    if (role && name && slug) {
+      entitySlugByRoleAndName.set(`${role}\0${name.toLowerCase()}`, slug);
+    }
+  }
+  function entitySlugFor(roles: string[], name: string): string | null {
+    for (const role of roles) {
+      const s = entitySlugByRoleAndName.get(`${role}\0${name.toLowerCase()}`);
+      if (s) return s;
+    }
+    return null;
+  }
 
   const signedMap: Record<string, string> = {};
   for (const s of signedRes?.data ?? []) {
@@ -471,6 +488,9 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                         <Link href={publicMusicFilterHref(profile.username, effectiveAuthors[0] ?? "", "author")}>
                           {effectiveAuthors[0]}
                         </Link>
+                        {entitySlugFor(["author", "performer"], effectiveAuthors[0] ?? "") ? (
+                          <> <Link href={`/entity/${entitySlugFor(["author", "performer"], effectiveAuthors[0] ?? "")}`} className="text-muted" style={{ textDecoration: "none" }}>↗</Link></>
+                        ) : null}
                       </div>
                     </div>
                   ) : null}
@@ -482,6 +502,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                           {contributorMap[role].map((row, idx) => (
                             <span key={`${role}-${row.slug}`}>
                               <Link href={publicMusicFilterHref(profile.username, row.name)}>{row.name}</Link>
+                              {row.slug ? <> <Link href={`/entity/${row.slug}`} className="text-muted" style={{ textDecoration: "none" }}>↗</Link></> : null}
                               {idx < contributorMap[role].length - 1 ? <span>, </span> : null}
                             </span>
                           ))}
@@ -578,12 +599,16 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     Authors
                   </div>
                   <div className="om-hanging-value">
-                    {effectiveAuthors.map((a, idx) => (
-                      <span key={a}>
-                        <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
-                        {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
-                      </span>
-                    ))}
+                    {effectiveAuthors.map((a, idx) => {
+                      const entitySlug = entitySlugFor(["author"], a);
+                      return (
+                        <span key={a}>
+                          <Link href={`/u/${profile.username}/a/${encodeURIComponent(a)}`}>{a}</Link>
+                          {entitySlug ? <> <Link href={`/entity/${entitySlug}`} className="text-muted" style={{ textDecoration: "none" }}>↗</Link></> : null}
+                          {idx < effectiveAuthors.length - 1 ? <span>, </span> : null}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               ) : null}
@@ -603,12 +628,16 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     Designers
                   </div>
                   <div className="om-hanging-value">
-                    {effectiveDesigners.map((name, idx) => (
-                      <span key={`designer-${name}`}>
-                        <Link href={`/u/${profile.username}?designer=${encodeURIComponent(name)}`}>{name}</Link>
-                        {idx < effectiveDesigners.length - 1 ? <span>, </span> : null}
-                      </span>
-                    ))}
+                    {effectiveDesigners.map((name, idx) => {
+                      const entitySlug = entitySlugFor(["designer", "design", "art direction"], name);
+                      return (
+                        <span key={`designer-${name}`}>
+                          <Link href={`/u/${profile.username}?designer=${encodeURIComponent(name)}`}>{name}</Link>
+                          {entitySlug ? <> <Link href={`/entity/${entitySlug}`} className="text-muted" style={{ textDecoration: "none" }}>↗</Link></> : null}
+                          {idx < effectiveDesigners.length - 1 ? <span>, </span> : null}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               ) : null}
@@ -646,12 +675,16 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                     Publisher
                   </div>
                   <div>
-                    {effectivePublishers.map((publisher, index) => (
-                      <span key={publisher}>
-                        <Link href={`/u/${profile.username}/p/${encodeURIComponent(publisher)}`}>{publisher}</Link>
-                        {index < effectivePublishers.length - 1 ? <span>, </span> : null}
-                      </span>
-                    ))}
+                    {effectivePublishers.map((publisher, index) => {
+                      const entitySlug = entitySlugFor(["publisher"], publisher);
+                      return (
+                        <span key={publisher}>
+                          <Link href={`/u/${profile.username}/p/${encodeURIComponent(publisher)}`}>{publisher}</Link>
+                          {entitySlug ? <> <Link href={`/entity/${entitySlug}`} className="text-muted" style={{ textDecoration: "none" }}>↗</Link></> : null}
+                          {index < effectivePublishers.length - 1 ? <span>, </span> : null}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               ) : null}
