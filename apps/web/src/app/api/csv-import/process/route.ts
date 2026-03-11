@@ -108,7 +108,7 @@ async function getOrCreateTagId(admin: ReturnType<typeof getSupabaseAdmin>, owne
   return inserted.data.id as number;
 }
 
-async function createUserBookByIsbn(admin: ReturnType<typeof getSupabaseAdmin>, req: Request, ownerId: string, libraryId: number, isbnValue: string): Promise<number> {
+async function createUserBookByIsbn(admin: ReturnType<typeof getSupabaseAdmin>, req: Request, ownerId: string, libraryId: number, isbnValue: string): Promise<{ id: number; editionAuthors: string[]; editionPublisher: string | null }> {
   const isbn = isbnValue.trim();
   if (!isbn) throw new Error("Provide an ISBN");
   const res = await fetch(new URL(`/api/isbn?isbn=${encodeURIComponent(isbn)}`, req.url));
@@ -118,19 +118,24 @@ async function createUserBookByIsbn(admin: ReturnType<typeof getSupabaseAdmin>, 
   const isbn13 = String(edition.isbn13 ?? "").trim();
   if (!isbn13) throw new Error("No ISBN-13 returned by resolver");
 
-  const existing = await admin.from("editions").select("id").eq("isbn13", isbn13).maybeSingle();
+  const existing = await admin.from("editions").select("id,authors,publisher").eq("isbn13", isbn13).maybeSingle();
   if (existing.error) throw new Error(existing.error.message);
 
   let editionId = existing.data?.id as number | undefined;
+  let editionAuthors: string[] = (existing.data?.authors as string[] | null) ?? [];
+  let editionPublisher: string | null = (existing.data?.publisher as string | null) ?? null;
+
   if (!editionId) {
+    editionAuthors = (edition.authors as string[] | null) ?? [];
+    editionPublisher = (edition.publisher as string | null) ?? null;
     const inserted = await admin
       .from("editions")
       .insert({
         isbn10: edition.isbn10 ?? null,
         isbn13,
         title: edition.title ?? null,
-        authors: edition.authors ?? [],
-        publisher: edition.publisher ?? null,
+        authors: editionAuthors,
+        publisher: editionPublisher,
         publish_date: edition.publish_date ?? null,
         description: edition.description ?? null,
         subjects: edition.subjects ?? [],
@@ -149,7 +154,7 @@ async function createUserBookByIsbn(admin: ReturnType<typeof getSupabaseAdmin>, 
     .select("id")
     .single();
   if (created.error) throw new Error(created.error.message);
-  return created.data.id as number;
+  return { id: created.data.id as number, editionAuthors, editionPublisher };
 }
 
 async function createManualUserBook(admin: ReturnType<typeof getSupabaseAdmin>, ownerId: string, libraryId: number, row: CsvImportRow): Promise<number> {
@@ -173,6 +178,18 @@ async function createManualUserBook(admin: ReturnType<typeof getSupabaseAdmin>, 
   return created.data.id as number;
 }
 
+async function adminSetBookEntities(admin: ReturnType<typeof getSupabaseAdmin>, userBookId: number, role: string, names: string[]) {
+  const cleaned = normalizeList(names);
+  if (!cleaned.length) return;
+  // Delete existing rows for this role then re-insert
+  await admin.from("book_entities").delete().eq("user_book_id", userBookId).eq("role", role);
+  for (let i = 0; i < cleaned.length; i++) {
+    const res = await admin.rpc("ensure_entity", { name: cleaned[i] });
+    if (res.error) continue;
+    await admin.from("book_entities").insert({ user_book_id: userBookId, entity_id: res.data, role, position: i + 1 }).select();
+  }
+}
+
 async function processSingleRow(admin: ReturnType<typeof getSupabaseAdmin>, req: Request, job: JobRow, row: CsvImportRow) {
   const tagIdCache = new Map<string, number>();
   const getTagIdCached = async (name: string, kind: "tag" | "category") => {
@@ -186,7 +203,17 @@ async function processSingleRow(admin: ReturnType<typeof getSupabaseAdmin>, req:
 
   const copies = Math.max(1, Math.floor(Number(row.copies) || 1));
   for (let c = 0; c < copies; c += 1) {
-    const id = row.isbn ? await createUserBookByIsbn(admin, req, job.owner_id, job.library_id, row.isbn) : await createManualUserBook(admin, job.owner_id, job.library_id, row);
+    let id: number;
+    let editionAuthors: string[] = [];
+    let editionPublisher: string | null = null;
+    if (row.isbn) {
+      const result = await createUserBookByIsbn(admin, req, job.owner_id, job.library_id, row.isbn);
+      id = result.id;
+      editionAuthors = result.editionAuthors;
+      editionPublisher = result.editionPublisher;
+    } else {
+      id = await createManualUserBook(admin, job.owner_id, job.library_id, row);
+    }
     const { data: parsed, remainingNotes } = parseStructuredNotes(row.notes);
     const updatePayload: Record<string, any> = { notes: remainingNotes };
     if (!remainingNotes && row.notes) updatePayload.notes = null;
@@ -228,15 +255,17 @@ async function processSingleRow(admin: ReturnType<typeof getSupabaseAdmin>, req:
 
     try {
       const syncRoles: Array<[string, string[]]> = [];
-      const authorsToSync = (updatePayload.authors_override as string[] | undefined) ?? (row.authors.length > 0 ? row.authors : null);
+      const authorsToSync = (updatePayload.authors_override as string[] | undefined)
+        ?? (row.authors.length > 0 ? row.authors : null)
+        ?? (editionAuthors.length > 0 ? editionAuthors : null);
       if (authorsToSync && authorsToSync.length > 0) syncRoles.push(["author", authorsToSync]);
       if (updatePayload.designers_override) syncRoles.push(["designer", updatePayload.designers_override as string[]]);
       if (updatePayload.editors_override) syncRoles.push(["editor", updatePayload.editors_override as string[]]);
-      const publisherToSync = (updatePayload.publisher_override as string | undefined) ?? row.publisher ?? null;
+      const publisherToSync = (updatePayload.publisher_override as string | undefined) ?? row.publisher ?? editionPublisher ?? null;
       if (publisherToSync) syncRoles.push(["publisher", publisherToSync.split(",").map((s) => s.trim()).filter(Boolean)]);
       if (updatePayload.printer_override) syncRoles.push(["printer", String(updatePayload.printer_override).split(",").map((s) => s.trim()).filter(Boolean)]);
       for (const [role, names] of syncRoles) {
-        await admin.rpc("set_book_entities", { p_user_book_id: id, p_role: role, p_names: names });
+        await adminSetBookEntities(admin, id, role, names);
       }
     } catch {
       // best effort
