@@ -330,7 +330,18 @@ function normalizePublishDateForStorage(input: string): string | null {
   return trimmed;
 }
 
-function facetHref(role: string, name: string, slug?: string): string {
+const ENTITY_PAGE_ROLES = new Set([
+  "author", "designer", "editor", "publisher", "printer",
+  "photographer", "photography", "performer", "producer",
+  "arranger", "composer", "conductor",
+]);
+
+function facetHref(role: string, name: string, slug?: string, entityId?: string): string {
+  // Real entity IDs are UUIDs (no colon); synthetic supplement IDs are "role:slug".
+  const isRealEntity = entityId != null && !entityId.includes(":");
+  if (ENTITY_PAGE_ROLES.has(role) && slug && isRealEntity) {
+    return `/entity/${encodeURIComponent(slug)}`;
+  }
   const filterKey = roleToDetailFilterKey(role);
   if (!filterKey && slug) {
     return `/facet/${encodeURIComponent(role)}/${encodeURIComponent(slug)}`;
@@ -381,8 +392,8 @@ function FacetLinks(props: { role: FacetRole; items: EntityRef[] }) {
     <span>
       {items.map((e, idx) => (
         <Fragment key={e.id}>
-          <Link 
-            href={facetHref(role, e.name, e.slug)}
+          <Link
+            href={facetHref(role, e.name, e.slug, e.id)}
             style={{ textDecoration: "none" }}
           >
             {e.name}
