@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState, useRef, useEffect, type CSSProperties } from "react";
 
 export type CoverCrop = {
   // Legacy fields (react-easy-crop)
@@ -38,6 +38,7 @@ export default function CoverImage({
 }) {
 
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
+  const imgRef = useRef<HTMLImageElement>(null);
   const slotClassName = [className, src && status !== "error" ? "om-cover-slot-has-image" : null].filter(Boolean).join(" ");
 
   if (!src || status === "error") {
@@ -110,6 +111,21 @@ export default function CoverImage({
     setStatus("error");
   };
 
+  // If the image loaded from cache before React hydrated, onLoad already fired
+  // and was missed. Check img.complete after mount to catch this race.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img || status !== "loading") return;
+    if (img.complete) {
+      if (img.naturalWidth >= 10) {
+        handleLoad({ currentTarget: img } as React.SyntheticEvent<HTMLImageElement>);
+      } else {
+        setStatus("error");
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const isNatural = objectFit === "contain";
 
   return (
@@ -130,6 +146,7 @@ export default function CoverImage({
       }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
+          ref={imgRef}
           alt={alt}
           src={src}
           onLoad={handleLoad}
