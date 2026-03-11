@@ -1,5 +1,6 @@
 "use client";
 
+import JSZip from "jszip";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState, useRef } from "react";
@@ -63,6 +64,37 @@ function humanizeUsernameError(message: string): string {
 
 function safeFileName(name: string): string {
   return name.trim().replace(/[^\w.\-]+/g, "_").slice(0, 120) || "image";
+}
+
+function inferExtension(path: string, fallback = "jpg"): string {
+  const cleaned = String(path ?? "").split("?")[0]?.split("#")[0] ?? "";
+  const ext = cleaned.includes(".") ? cleaned.split(".").pop() ?? "" : "";
+  const normalized = ext.trim().toLowerCase();
+  if (!normalized || normalized.length > 6) return fallback;
+  return normalized;
+}
+
+function exportMediaKey(storagePath: string, fallback: string): string {
+  const cleaned = String(storagePath ?? "").split("?")[0]?.split("#")[0] ?? "";
+  const base = cleaned.split("/").pop() ?? "";
+  const stem = base.replace(/\.[^.]+$/, "").trim();
+  return safeFileName(stem || fallback);
+}
+
+function buildExportMediaFileName(
+  itemId: number,
+  kind: "cover" | "image" | "original",
+  mediaKey: number | string,
+  storagePath: string
+): string {
+  const ext = inferExtension(storagePath);
+  return safeFileName(`item-${itemId}-${kind}-${mediaKey}.${ext}`);
+}
+
+async function fetchBlobFromUrl(url: string): Promise<Blob> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to download image (${res.status})`);
+  return await res.blob();
 }
 
 function clamp(n: number, min: number, max: number): number {
@@ -798,9 +830,11 @@ function SettingsPageContent() {
           trim_width,
           trim_height,
           trim_unit,
+          cover_original_url,
           music_metadata,
           edition:editions(id, isbn10, isbn13, title, authors, publisher, publish_date, description, subjects),
-          book_entities:book_entities(role, entity:entities(name))
+          book_entities:book_entities(role, entity:entities(name)),
+          media:user_book_media(id, kind, storage_path, caption, created_at)
         `)
         .in("library_id", Array.from(exportSelection));
 
@@ -810,19 +844,50 @@ function SettingsPageContent() {
         return;
       }
 
-      setExportState({ busy: true, error: null, message: "Generating CSV…" });
+      setExportState({ busy: true, error: null, message: "Preparing export…" });
+
+      const allPaths = Array.from(
+        new Set(
+          data.flatMap((item: any) => {
+            const mediaPaths = ((item.media as any[]) ?? [])
+              .map((entry) => String(entry?.storage_path ?? "").trim())
+              .filter(Boolean);
+            const originalPath = String(item.cover_original_url ?? "").trim();
+            return originalPath ? [...mediaPaths, originalPath] : mediaPaths;
+          })
+        )
+      );
+
+      const signedByPath: Record<string, string> = {};
+      for (let i = 0; i < allPaths.length; i += 100) {
+        const batch = allPaths.slice(i, i + 100);
+        if (batch.length === 0) continue;
+        const signed = await supabase.storage.from("user-book-media").createSignedUrls(batch, 60 * 15);
+        if (signed.error) throw signed.error;
+        batch.forEach((path, idx) => {
+          const url = signed.data?.[idx]?.signedUrl;
+          if (url) signedByPath[path] = url;
+        });
+      }
 
       const headers = [
         "ID", "Catalog ID", "Type", "Title", "Authors", "Publisher", "Published", "ISBN10", "ISBN13", 
         "Description", "Subjects", "Location", "Shelf", "Notes", "Decade", "Pages", 
         "Trim Width", "Trim Height", "Trim Unit",
-        "Music Artist", "Music Label", "Music Format", "Music Release Type", "Music Track Count"
+        "Music Artist", "Music Label", "Music Format", "Music Release Type", "Music Track Count",
+        "Cover Files", "Image Files", "Original Cover File"
       ];
+
+      const zip = new JSZip();
+      const imagesFolder = zip.folder("images");
+      if (!imagesFolder) throw new Error("Failed to initialize export archive");
+      let downloadedImages = 0;
 
       const rows = data.map(item => {
         const edition = item.edition as any;
         const music = item.music_metadata as any;
         const entities = (item.book_entities as any[]) ?? [];
+        const media = (item.media as any[]) ?? [];
         
         const getFacet = (role: string) => {
           const fromEntities = entities.filter(e => e.role === role).map(e => e.entity?.name).filter(Boolean);
@@ -836,6 +901,27 @@ function SettingsPageContent() {
         const authors = getFacet("author");
         const subjects = getFacet("subject");
         const publisher = getFacet("publisher");
+        const coverFiles: string[] = [];
+        const imageFiles: string[] = [];
+
+        media.forEach((entry, index) => {
+          const storagePath = String(entry?.storage_path ?? "").trim();
+          if (!storagePath) return;
+          const mediaKey = entry.id ?? exportMediaKey(storagePath, `${entry.kind ?? "image"}-${index + 1}`);
+          const filename = `images/${buildExportMediaFileName(
+            Number(item.id),
+            entry.kind === "cover" ? "cover" : "image",
+            mediaKey,
+            storagePath
+          )}`;
+          if (entry.kind === "cover") coverFiles.push(filename);
+          else imageFiles.push(filename);
+        });
+
+        const originalCoverPath = String(item.cover_original_url ?? "").trim();
+        const originalCoverFile = originalCoverPath
+          ? `images/${buildExportMediaFileName(Number(item.id), "original", "orig", originalCoverPath)}`
+          : "";
 
         return [
           item.id,
@@ -861,17 +947,64 @@ function SettingsPageContent() {
           music?.label ?? "",
           music?.format ?? "",
           music?.release_type ?? "",
-          music?.track_count ?? ""
+          music?.track_count ?? "",
+          coverFiles.join("|"),
+          imageFiles.join("|"),
+          originalCoverFile
         ].map(val => {
           const str = String(val ?? "").replace(/"/g, '""');
           return `"${str}"`;
         }).join(",");
       });
 
+      const exportMedia: Array<{ path: string; filename: string }> = [];
+      data.forEach((item: any) => {
+        ((item.media as any[]) ?? []).forEach((entry, index) => {
+          const path = String(entry?.storage_path ?? "").trim();
+          if (!path) return;
+          exportMedia.push({
+            path,
+            filename: `images/${buildExportMediaFileName(
+              Number(item.id),
+              entry.kind === "cover" ? "cover" : "image",
+              entry.id ?? exportMediaKey(path, `${entry.kind ?? "image"}-${index + 1}`),
+              path
+            )}`
+          });
+        });
+        const originalCoverPath = String(item.cover_original_url ?? "").trim();
+        if (originalCoverPath) {
+          exportMedia.push({
+            path: originalCoverPath,
+            filename: `images/${buildExportMediaFileName(Number(item.id), "original", "orig", originalCoverPath)}`
+          });
+        }
+      });
+
+      const uniqueAssets = exportMedia.filter(
+        (asset, index, arr) => arr.findIndex((candidate) => candidate.filename === asset.filename) === index
+      );
+      const exportedFileNames = new Set<string>();
+      for (let i = 0; i < uniqueAssets.length; i += 1) {
+        const asset = uniqueAssets[i];
+        if (!asset || exportedFileNames.has(asset.filename)) continue;
+        exportedFileNames.add(asset.filename);
+        const signedUrl = signedByPath[asset.path];
+        if (!signedUrl) continue;
+        setExportState({
+          busy: true,
+          error: null,
+          message: `Downloading images… ${downloadedImages + 1}/${uniqueAssets.length}`
+        });
+        const blob = await fetchBlobFromUrl(signedUrl);
+        imagesFolder.file(asset.filename.replace(/^images\//, ""), blob);
+        downloadedImages += 1;
+      }
+
+      setExportState({ busy: true, error: null, message: "Generating ZIP…" });
       const csvContent = [headers.join(","), ...rows].join("\n");
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      
+      zip.file("items.csv", csvContent);
+
       let catalogPart = "catalogs";
       if (exportSelection.size === 1) {
         const selectedId = Array.from(exportSelection)[0];
@@ -881,7 +1014,9 @@ function SettingsPageContent() {
         }
       }
       const datePart = new Date().toISOString().split('T')[0];
-      const filename = `${profile?.username || "library"}_${catalogPart}_${datePart}.csv`;
+      const filename = `${profile?.username || "library"}_${catalogPart}_${datePart}.zip`;
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
 
       const link = document.createElement("a");
       link.setAttribute("href", url);
@@ -889,8 +1024,13 @@ function SettingsPageContent() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       
-      setExportState({ busy: false, error: null, message: `Exported ${data.length} items.` });
+      setExportState({
+        busy: false,
+        error: null,
+        message: `Exported ${data.length} items${downloadedImages > 0 ? ` and ${downloadedImages} images` : ""}.`
+      });
       window.setTimeout(() => setExportState(s => ({ ...s, message: null })), 3000);
     } catch (e: any) {
       setExportState({ busy: false, error: e?.message ?? "Export failed", message: null });
@@ -1275,7 +1415,7 @@ function SettingsPageContent() {
                 <div style={{ width: 120 }} className="text-muted">Export</div>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
                   <div className="text-muted" style={{ marginBottom: "var(--space-md)" }}>
-                    Select catalogs to export as CSV:
+                    Select catalogs to export as a ZIP with CSV and images:
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
                     {libraries.map(lib => (
@@ -1300,7 +1440,7 @@ function SettingsPageContent() {
                       onClick={handleExport} 
                       disabled={exportState.busy || exportSelection.size === 0}
                     >
-                      {exportState.busy ? "Exporting…" : "Download CSV"}
+                      {exportState.busy ? "Exporting…" : "Download ZIP"}
                     </button>
                     {exportState.message && <span className="text-muted">{exportState.message}</span>}
                     {exportState.error && <span style={{ color: "var(--text-error)" }}>{exportState.error}</span>}
