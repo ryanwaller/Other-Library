@@ -1499,9 +1499,18 @@ export default function BookDetailPage() {
         normalizeIssueYear(book?.edition?.publish_date);
       setFormObjectType("magazine");
       setFormAuthors("");
+      setFormMaterials("");
+      setFormPrinter("");
+      setFormEditionOverride("");
+      setFormPages("");
+      setFormTrimWidth("");
+      setFormTrimHeight("");
       setFacetDraft((state) => ({
         ...state,
         author: [],
+        subject: [],
+        printer: [],
+        material: [],
         performer: [],
         composer: [],
         producer: [],
@@ -4119,98 +4128,6 @@ export default function BookDetailPage() {
                     placeholder={effectiveTitle}
                     autoFocus
                   />
-                ) : isMagazineType ? (
-                  <>
-                    <hr className="divider" />
-                    {(editMode || facetView.editor.length > 0) && (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Editors</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <EntityTokenField role="editor" value={facetDraft.editor} onChange={(next) => { setFacetDraft((s) => ({ ...s, editor: next })); setFormEditors(next.join(", ")); }} placeholder="Add an editor" disabled={!isOwner || busy || saveState.busy} />
-                          ) : (
-                            <FacetLinks role="editor" items={facetView.editor} />
-                          )}
-                        </div>
-                        {editMode && <div style={{ width: 32 }} />}
-                      </div>
-                    )}
-
-                    {(editMode || facetView.designer.length > 0) && (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Designers</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <EntityTokenField role="designer" value={facetDraft.designer} onChange={(next) => { setFacetDraft((s) => ({ ...s, designer: next })); setFormDesigners(next.join(", ")); }} placeholder="Add a designer" disabled={!isOwner || busy || saveState.busy} />
-                          ) : (
-                            <FacetLinks role="designer" items={facetView.designer} />
-                          )}
-                        </div>
-                        {editMode && <div style={{ width: 32 }} />}
-                      </div>
-                    )}
-
-                    {(editMode || (facetView.publisher.length > 0 && fieldVisibility.publisher !== false)) && (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.publisher === false ? 0.6 : 1 }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Publisher</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <EntityTokenField role="publisher" value={facetDraft.publisher} onChange={(next) => { setFacetDraft((s) => ({ ...s, publisher: next })); setFormPublisher(joinTokenValues(next)); }} placeholder="Add a publisher" disabled={!isOwner || busy || saveState.busy} />
-                          ) : facetView.publisher.length > 0 ? (
-                            <FacetLinks role="publisher" items={facetView.publisher} />
-                          ) : (
-                            effectivePublisher
-                          )}
-                        </div>
-                        {editMode && (
-                          <div style={{ marginLeft: "var(--space-sm)" }}>
-                            <FieldVisibilityToggle visible={fieldVisibility.publisher !== false} onChange={() => toggleFieldVisibility("publisher")} />
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {(editMode || (displayPublishDate && displayPublishDate !== "—" && fieldVisibility.publish_date !== false)) && (
-                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.publish_date === false ? 0.6 : 1 }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Publish date</div>
-                        <div style={{ flex: "1 1 auto" }}>
-                          {editMode ? (
-                            <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="YYYY-MM-DD" />
-                          ) : (
-                            <Link href={detailFilterHref("/app", "publish_date", effectivePublishDate)} style={{ textDecoration: "none" }}>{displayPublishDate}</Link>
-                          )}
-                        </div>
-                        {editMode && (
-                          <div style={{ marginLeft: "var(--space-sm)" }}>
-                            <FieldVisibilityToggle visible={fieldVisibility.publish_date !== false} onChange={() => toggleFieldVisibility("publish_date")} />
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {[
-                      ["Issue number", effectiveMagazine.issue_number ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_number: value || null })), "Add issue number", "issue_number"],
-                      ["Issue volume", effectiveMagazine.issue_volume ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_volume: value || null })), "Add volume", "issue_volume"],
-                      ["Issue season", effectiveMagazine.issue_season ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_season: value || null })), "Add season", "issue_season"],
-                      ["Issue year", effectiveMagazine.issue_year != null ? String(effectiveMagazine.issue_year) : "", (value: string) => setFormMagazine((s) => ({ ...s, issue_year: normalizeIssueYear(value) })), "Add year", "issue_year"]
-                    ].map(([label, value, onChange, placeholder, visKey]) => (
-                      editMode || String(value).trim() ? (
-                        <div key={String(visKey)} className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility[String(visKey)] === false ? 0.6 : 1 }}>
-                          <div style={{ minWidth: 110 }} className="text-muted">{String(label)}</div>
-                          <div style={{ flex: "1 1 auto" }}>
-                            {editMode ? (
-                              <input className="om-inline-control" value={String(value)} onChange={(e) => (onChange as (value: string) => void)(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder={String(placeholder)} />
-                            ) : String(value)}
-                          </div>
-                          {editMode && (
-                            <div style={{ marginLeft: "var(--space-sm)" }}>
-                              <FieldVisibilityToggle visible={fieldVisibility[String(visKey)] !== false} onChange={() => toggleFieldVisibility(String(visKey))} />
-                            </div>
-                          )}
-                        </div>
-                      ) : null
-                    ))}
-                  </>
                 ) : (
                   <div>{effectiveTitle}</div>
                 )}
@@ -4577,6 +4494,98 @@ export default function BookDetailPage() {
                         )}
                       </div>
                     )}
+                  </>
+                ) : isMagazineType ? (
+                  <>
+                    <hr className="divider" />
+                    {(editMode || facetView.editor.length > 0) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Editors</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="editor" value={facetDraft.editor} onChange={(next) => { setFacetDraft((s) => ({ ...s, editor: next })); setFormEditors(next.join(", ")); }} placeholder="Add an editor" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="editor" items={facetView.editor} />
+                          )}
+                        </div>
+                        {editMode && <div style={{ width: 32 }} />}
+                      </div>
+                    )}
+
+                    {(editMode || facetView.designer.length > 0) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Designers</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="designer" value={facetDraft.designer} onChange={(next) => { setFacetDraft((s) => ({ ...s, designer: next })); setFormDesigners(next.join(", ")); }} placeholder="Add a designer" disabled={!isOwner || busy || saveState.busy} />
+                          ) : (
+                            <FacetLinks role="designer" items={facetView.designer} />
+                          )}
+                        </div>
+                        {editMode && <div style={{ width: 32 }} />}
+                      </div>
+                    )}
+
+                    {(editMode || (facetView.publisher.length > 0 && fieldVisibility.publisher !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.publisher === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Publisher</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <EntityTokenField role="publisher" value={facetDraft.publisher} onChange={(next) => { setFacetDraft((s) => ({ ...s, publisher: next })); setFormPublisher(joinTokenValues(next)); }} placeholder="Add a publisher" disabled={!isOwner || busy || saveState.busy} />
+                          ) : facetView.publisher.length > 0 ? (
+                            <FacetLinks role="publisher" items={facetView.publisher} />
+                          ) : (
+                            effectivePublisher
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.publisher !== false} onChange={() => toggleFieldVisibility("publisher")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(editMode || (displayPublishDate && displayPublishDate !== "—" && fieldVisibility.publish_date !== false)) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.publish_date === false ? 0.6 : 1 }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Publish date</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="YYYY-MM-DD" />
+                          ) : (
+                            <Link href={detailFilterHref("/app", "publish_date", effectivePublishDate)} style={{ textDecoration: "none" }}>{displayPublishDate}</Link>
+                          )}
+                        </div>
+                        {editMode && (
+                          <div style={{ marginLeft: "var(--space-sm)" }}>
+                            <FieldVisibilityToggle visible={fieldVisibility.publish_date !== false} onChange={() => toggleFieldVisibility("publish_date")} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {[
+                      ["Issue number", effectiveMagazine.issue_number ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_number: value || null })), "Add issue number", "issue_number"],
+                      ["Issue volume", effectiveMagazine.issue_volume ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_volume: value || null })), "Add volume", "issue_volume"],
+                      ["Issue season", effectiveMagazine.issue_season ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_season: value || null })), "Add season", "issue_season"],
+                      ["Issue year", effectiveMagazine.issue_year != null ? String(effectiveMagazine.issue_year) : "", (value: string) => setFormMagazine((s) => ({ ...s, issue_year: normalizeIssueYear(value) })), "Add year", "issue_year"]
+                    ].map(([label, value, onChange, placeholder, visKey]) => (
+                      editMode || String(value).trim() ? (
+                        <div key={String(visKey)} className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility[String(visKey)] === false ? 0.6 : 1 }}>
+                          <div style={{ minWidth: 110 }} className="text-muted">{String(label)}</div>
+                          <div style={{ flex: "1 1 auto" }}>
+                            {editMode ? (
+                              <input className="om-inline-control" value={String(value)} onChange={(e) => (onChange as (value: string) => void)(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder={String(placeholder)} />
+                            ) : String(value)}
+                          </div>
+                          {editMode && (
+                            <div style={{ marginLeft: "var(--space-sm)" }}>
+                              <FieldVisibilityToggle visible={fieldVisibility[String(visKey)] !== false} onChange={() => toggleFieldVisibility(String(visKey))} />
+                            </div>
+                          )}
+                        </div>
+                      ) : null
+                    ))}
                   </>
                 ) : (
                   <>
