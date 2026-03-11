@@ -3579,6 +3579,65 @@ function AppShell({
           {addState.message || addSearchState.message}
         </div>
       )}
+      {csvRows.length > 0 && (
+        <div className="om-lookup-item" style={{ marginBottom: "var(--space-sm)" }}>
+          <div className="om-lookup-row" style={{ alignItems: "baseline" }}>
+            <div className="om-lookup-main">
+              <div>{csvFileName ?? "CSV import"}</div>
+              <div className="text-muted" style={{ marginTop: 4 }}>
+                {csvRows.length} row{csvRows.length === 1 ? "" : "s"} ready
+              </div>
+              {csvImportState.message ? (
+                <div className="text-muted" style={{ marginTop: 4 }}>
+                  {csvImportState.message}
+                </div>
+              ) : null}
+              {csvImportState.error ? (
+                <div className="text-muted" style={{ marginTop: 4 }}>
+                  {csvImportState.error}
+                </div>
+              ) : null}
+            </div>
+            <div className="om-lookup-actions">
+              <div className="row no-wrap" style={{ gap: "var(--space-sm)", alignItems: "baseline" }}>
+                {renderLibraries.length > 1 ? (
+                  <>
+                    <span className="text-muted">Add to</span>
+                    <select
+                      value={String(addLibraryId ?? renderLibraries[0]?.id ?? "")}
+                      onChange={(e) => {
+                        const nextId = Number(e.target.value);
+                        setAddLibraryId(nextId);
+                        persistAddLibrarySelection(nextId);
+                      }}
+                      disabled={csvImportState.busy}
+                    >
+                      {renderLibraries.map((l) => (
+                        <option key={l.id} value={String(l.id)}>{l.name}</option>
+                      ))}
+                    </select>
+                  </>
+                ) : null}
+                <label className="row no-wrap text-muted" style={{ gap: "var(--space-xs)", alignItems: "baseline", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={csvApplyOverrides}
+                    onChange={(e) => setCsvApplyOverrides(e.target.checked)}
+                    disabled={csvImportState.busy}
+                  />
+                  Override
+                </label>
+                <button onClick={() => void importCsvRows()} disabled={csvImportState.busy}>
+                  {csvImportState.busy ? "…" : "Import"}
+                </button>
+                <button className="text-muted" onClick={clearCsvImport} disabled={csvImportState.busy}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {addUrlPreview && (
         <div className="om-lookup-item" style={{ marginBottom: "var(--space-sm)" }}>
           <div className="om-lookup-row">
