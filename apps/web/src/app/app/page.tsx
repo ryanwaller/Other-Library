@@ -10,6 +10,7 @@ import BulkBar from "./components/BulkBar";
 import LibraryBlock from "./components/LibraryBlock";
 import HomepageSkeleton from "./components/HomepageSkeleton";
 import SortableCatalogGrid from "./components/SortableCatalogGrid";
+import CatalogRenderBoundary from "./components/CatalogRenderBoundary";
 import { useBookScanner } from "../../hooks/useBookScanner";
 import usePageTitle from "../../hooks/usePageTitle";
 import dynamic from "next/dynamic";
@@ -4105,26 +4106,28 @@ function AppShell({
               isMobile={isMobile}
               searchQuery={searchQuery}
               renderBooks={(limit, effectiveViewMode) => (
-                <SortableCatalogGrid
-                  libraryId={lib.id}
-                  groups={groups}
-                  limit={limit}
-                  effectiveViewMode={effectiveViewMode}
-                  effectiveCols={effectiveCols}
-                  showBookSkeleton={showBookSkeleton}
-                  isRearranging={rearrangingLibraryId === lib.id}
-                  bulkMode={bulkMode}
-                  viewMode={viewMode}
-                  bulkSelectedKeys={bulkSelectedKeys}
-                  deleteStateByBookId={deleteStateByBookId}
-                  onToggleSelected={toggleBulkKey}
-                  onDeleteCopy={deleteEntry}
-                  onStoreBookNavContext={storeBookNavContext}
-                  onReorderStart={beginItemReorder}
-                  onReorderPreview={previewItemReorder}
-                  onReorderCommit={commitItemReorder}
-                  onReorderCancel={cancelItemReorder}
-                />
+                <CatalogRenderBoundary libraryName={lib.name}>
+                  <SortableCatalogGrid
+                    libraryId={lib.id}
+                    groups={groups}
+                    limit={limit}
+                    effectiveViewMode={effectiveViewMode}
+                    effectiveCols={effectiveCols}
+                    showBookSkeleton={showBookSkeleton}
+                    isRearranging={rearrangingLibraryId === lib.id}
+                    bulkMode={bulkMode}
+                    viewMode={viewMode}
+                    bulkSelectedKeys={bulkSelectedKeys}
+                    deleteStateByBookId={deleteStateByBookId}
+                    onToggleSelected={toggleBulkKey}
+                    onDeleteCopy={deleteEntry}
+                    onStoreBookNavContext={storeBookNavContext}
+                    onReorderStart={beginItemReorder}
+                    onReorderPreview={previewItemReorder}
+                    onReorderCommit={commitItemReorder}
+                    onReorderCancel={cancelItemReorder}
+                  />
+                </CatalogRenderBoundary>
               )}
             />
             {idx < displayLibraries.length - 1 && <hr className="om-hr" />}
