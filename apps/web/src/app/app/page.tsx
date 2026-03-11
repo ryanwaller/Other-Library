@@ -544,11 +544,24 @@ function AppShell({
     object_type: string | null;
     copies: number;
   };
+  type CsvImportJob = {
+    id: string;
+    library_id: number;
+    status: "pending" | "running" | "completed" | "failed" | "cancelled";
+    total_rows: number;
+    processed_rows: number;
+    success_rows: number;
+    failed_rows: number;
+    last_error: string | null;
+    apply_overrides: boolean;
+  };
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [csvRows, setCsvRows] = useState<CsvImportRow[]>([]);
   const csvInputRef = useRef<HTMLInputElement | null>(null);
   const csvAutoOpenDoneRef = useRef(false);
   const [csvApplyOverrides, setCsvApplyOverrides] = useState(false);
+  const [csvJob, setCsvJob] = useState<CsvImportJob | null>(null);
+  const csvJobTickRef = useRef(false);
   const [csvImportState, setCsvImportState] = useState<{ busy: boolean; error: string | null; message: string | null; done: number; total: number }>({
     busy: false,
     error: null,
@@ -722,9 +735,98 @@ function AppShell({
   }, [stagedCsvData, stagedCsvFilename]);
 
   useEffect(() => {
+    let alive = true;
+    if (!supabase || !userId) return;
+    (async () => {
+      try {
+        const job = await fetchCsvImportJob("active=1");
+        if (!alive || !job) return;
+        setCsvJob(job);
+        setCsvImportState({
+          busy: job.status === "pending" || job.status === "running",
+          error: job.status === "failed" ? (job.last_error ?? "Import failed") : null,
+          message:
+            job.status === "completed"
+              ? `Imported ${job.success_rows} / ${job.total_rows}.`
+              : `Importing… ${job.processed_rows}/${job.total_rows}`,
+          done: job.processed_rows,
+          total: job.total_rows
+        });
+        setAddLibraryId((prev) => prev ?? job.library_id);
+      } catch {
+        // ignore active job lookup failures
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [supabase, userId]);
+
+  useEffect(() => {
     if (!openAddPanel) return;
     setAddOpen(true);
   }, [openAddPanel]);
+
+  useEffect(() => {
+    if (!csvJob) return;
+    if (csvJob.status !== "pending" && csvJob.status !== "running") return;
+    if (!supabase || !userId) return;
+    let cancelled = false;
+
+    const tick = async () => {
+      if (csvJobTickRef.current) return;
+      csvJobTickRef.current = true;
+      try {
+        const headers = await withAuthHeaders();
+        const processRes = await fetch("/api/csv-import/process", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ job_id: csvJob.id })
+        });
+        const processJson = await processRes.json().catch(() => ({}));
+        if (!processRes.ok) throw new Error(processJson?.error ?? "CSV import failed");
+        const nextJob = (processJson?.job ?? null) as CsvImportJob | null;
+        if (!cancelled && nextJob) {
+          setCsvJob(nextJob);
+          setCsvImportState({
+            busy: nextJob.status === "pending" || nextJob.status === "running",
+            error: nextJob.status === "failed" ? (nextJob.last_error ?? "Import failed") : null,
+            message:
+              nextJob.status === "completed"
+                ? nextJob.failed_rows > 0
+                  ? `Imported ${nextJob.success_rows} / ${nextJob.total_rows}. ${nextJob.failed_rows} skipped.`
+                  : `Imported all ${nextJob.total_rows} rows.`
+                : `Importing… ${nextJob.processed_rows}/${nextJob.total_rows}`,
+            done: nextJob.processed_rows,
+            total: nextJob.total_rows
+          });
+          if (nextJob.status === "completed") {
+            void refreshAllBooks();
+            setCsvFileName(null);
+            setCsvRows([]);
+          }
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setCsvImportState((s) => ({ ...s, busy: false, error: e?.message ?? "Import failed", message: "Import failed" }));
+          setCsvJob((prev) => (prev ? { ...prev, status: "failed", last_error: e?.message ?? "Import failed" } : prev));
+        }
+      } finally {
+        csvJobTickRef.current = false;
+        if (!cancelled) {
+          const nextDelay = 800;
+          window.setTimeout(() => {
+            if (!cancelled) void tick();
+          }, nextDelay);
+        }
+      }
+    };
+
+    void tick();
+    return () => {
+      cancelled = true;
+    };
+  }, [csvJob?.id, csvJob?.status, supabase, userId]);
 
   useEffect(() => {
     if (!openCsvPicker || !initialLoadDone) return;
@@ -1549,9 +1651,18 @@ function AppShell({
         .select("id")
         .single();
       if (created.error) throw new Error(created.error.message);
+      const createdId = created.data.id as number;
+
+      // Sync entity links from edition metadata (best-effort)
+      try {
+        const editionAuthors = (edition.authors ?? []).filter(Boolean);
+        if (editionAuthors.length > 0) await supabase.rpc("set_book_entities", { p_user_book_id: createdId, p_role: "author", p_names: editionAuthors });
+        const editionPublisher = (edition.publisher ?? "").trim();
+        if (editionPublisher) await supabase.rpc("set_book_entities", { p_user_book_id: createdId, p_role: "publisher", p_names: [editionPublisher] });
+      } catch { /* ignore */ }
 
       await refreshAllBooks();
-      return created.data.id as number;
+      return createdId;
     } catch (e: any) {
       throw new Error(e?.message ?? "Failed to add book");
     }
@@ -1665,7 +1776,17 @@ function AppShell({
 
     const created = await supabase.from("user_books").insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId }).select("id").single();
     if (created.error) throw new Error(created.error.message);
-    return created.data.id as number;
+    const createdId = created.data.id as number;
+
+    // Sync entity links from edition metadata (best-effort)
+    try {
+      const editionAuthors = (edition.authors ?? []).filter(Boolean);
+      if (editionAuthors.length > 0) await supabase.rpc("set_book_entities", { p_user_book_id: createdId, p_role: "author", p_names: editionAuthors });
+      const editionPublisher = (edition.publisher ?? "").trim();
+      if (editionPublisher) await supabase.rpc("set_book_entities", { p_user_book_id: createdId, p_role: "publisher", p_names: [editionPublisher] });
+    } catch { /* ignore */ }
+
+    return createdId;
   }
 
   async function createManualUserBookNoRefresh(row: {
@@ -1746,9 +1867,29 @@ function AppShell({
     loadCsvText(text, file.name);
   }
 
+  async function withAuthHeaders(): Promise<HeadersInit> {
+    if (!supabase) throw new Error("Supabase is not configured");
+    const sessionRes = await supabase.auth.getSession();
+    const token = sessionRes.data.session?.access_token ?? null;
+    if (!token) throw new Error("Not signed in");
+    return {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json"
+    };
+  }
+
+  async function fetchCsvImportJob(query: string): Promise<CsvImportJob | null> {
+    const headers = await withAuthHeaders();
+    const res = await fetch(`/api/csv-import?${query}`, { headers });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.error ?? "CSV import status failed");
+    return (json?.job ?? null) as CsvImportJob | null;
+  }
+
   function clearCsvImport() {
     setCsvFileName(null);
     setCsvRows([]);
+    setCsvJob(null);
     setCsvImportState({ busy: false, error: null, message: null, done: 0, total: 0 });
   }
 
@@ -1759,133 +1900,33 @@ function AppShell({
       setCsvImportState({ busy: false, error: "Choose a catalog first", message: "Choose a catalog first", done: 0, total: csvRows.length });
       return;
     }
-
-    setCsvImportState({ busy: true, error: null, message: `Importing…`, done: 0, total: csvRows.length });
-    const tagIdCache = new Map<string, number>();
-    const getTagIdCached = async (name: string, kind: "tag" | "category") => {
-      const normalized = name.trim().replace(/\s+/g, " ");
-      const key = `${kind}:${normalized.toLowerCase()}`;
-      const cached = tagIdCache.get(key);
-      if (cached) return cached;
-      const id = await getOrCreateTagId(normalized, kind);
-      tagIdCache.set(key, id);
-      return id;
-    };
-
-    let done = 0;
-    let successCount = 0;
-    let skipCount = 0;
-
     try {
-      for (const r of csvRows) {
-        try {
-          const copies = Math.max(1, Math.floor(Number(r.copies) || 1));
-          for (let c = 0; c < copies; c += 1) {
-            const id = r.isbn ? await createUserBookByIsbnNoRefresh(r.isbn) : await createManualUserBookNoRefresh(r);
-
-            const { data: parsed, remainingNotes } = parseStructuredNotes(r.notes);
-            const updatePayload: any = {
-              notes: remainingNotes
-            };
-            if (!remainingNotes && r.notes) updatePayload.notes = null;
-
-            if (r.group_label) updatePayload.group_label = r.group_label;
-            updatePayload.object_type = r.object_type || parsed.object_type || null;
-
-            if (parsed.subjects_override) {
-              updatePayload.subjects_override = Array.from(new Set(parsed.subjects_override.split(",").map((s) => s.trim()).filter(Boolean)));
-            }
-            if (parsed.designers_override) {
-              updatePayload.designers_override = Array.from(new Set(parsed.designers_override.split(",").map((s) => s.trim()).filter(Boolean)));
-            }
-            if (parsed.editors_override) {
-              updatePayload.editors_override = Array.from(new Set(parsed.editors_override.split(",").map((s) => s.trim()).filter(Boolean)));
-            }
-            if (parsed.publisher_override && !r.publisher) {
-              updatePayload.publisher_override = parsed.publisher_override;
-            }
-            if (parsed.printer_override) {
-              updatePayload.printer_override = parsed.printer_override;
-            }
-            if (parsed.materials_override) {
-              updatePayload.materials_override = parsed.materials_override;
-            }
-            if (parsed.decade) {
-              updatePayload.decade = parsed.decade;
-            }
-            if (parsed.pages) {
-              const p = Number(parsed.pages);
-              if (Number.isFinite(p)) updatePayload.pages = Math.max(1, Math.floor(p));
-            }
-
-            if (csvApplyOverrides && r.isbn) {
-              if (r.title) updatePayload.title_override = r.title;
-              if (r.authors.length > 0) updatePayload.authors_override = r.authors;
-              if (r.publisher) updatePayload.publisher_override = r.publisher;
-              if (r.publish_date) updatePayload.publish_date_override = r.publish_date;
-              if (r.description) updatePayload.description_override = r.description;
-            }
-            if (Object.keys(updatePayload).length > 0) {
-              let up = await supabase.from("user_books").update(updatePayload).eq("id", id);
-              if (up.error) {
-                const msg = (up.error.message ?? "").toLowerCase();
-                if (msg.includes("trim_width") || msg.includes("group_label")) {
-                  delete updatePayload.decade;
-                  delete updatePayload.pages;
-                  delete updatePayload.group_label;
-                  delete updatePayload.object_type;
-                  up = await supabase.from("user_books").update(updatePayload).eq("id", id);
-                }
-              }
-            }
-
-            // Sync entity links for override fields (best-effort)
-            try {
-              const syncRoles: Array<[string, string[]]> = [];
-              const authorsToSync = (updatePayload.authors_override as string[] | undefined) ?? (r.authors.length > 0 ? r.authors : null);
-              if (authorsToSync && authorsToSync.length > 0) syncRoles.push(["author", authorsToSync]);
-              if (updatePayload.designers_override) syncRoles.push(["designer", updatePayload.designers_override as string[]]);
-              if (updatePayload.editors_override) syncRoles.push(["editor", updatePayload.editors_override as string[]]);
-              const publisherToSync = (updatePayload.publisher_override as string | undefined) ?? r.publisher ?? null;
-              if (publisherToSync) syncRoles.push(["publisher", publisherToSync.split(",").map((s: string) => s.trim()).filter(Boolean)]);
-              if (updatePayload.printer_override) syncRoles.push(["printer", (updatePayload.printer_override as string).split(",").map((s: string) => s.trim()).filter(Boolean)]);
-              for (const [role, names] of syncRoles) {
-                await supabase.rpc("set_book_entities", { p_user_book_id: id, p_role: role, p_names: names });
-              }
-            } catch { /* ignore */ }
-
-            const rows: Array<{ user_book_id: number; tag_id: number }> = [];
-            if (r.category) rows.push({ user_book_id: id, tag_id: await getTagIdCached(r.category, "category") });
-            for (const t of r.tags) rows.push({ user_book_id: id, tag_id: await getTagIdCached(t, "tag") });
-            if (rows.length > 0) {
-              const upTags = await supabase.from("user_book_tags").upsert(rows as any, { onConflict: "user_book_id,tag_id" });
-              if (upTags.error) {
-                // ignore; tags optional
-              }
-            }
-          }
-          successCount += 1;
-        } catch (e: any) {
-          console.error("CSV import row failed:", e, r);
-          skipCount += 1;
-        }
-        done += 1;
-        setCsvImportState((s) => ({ ...s, done, message: `Importing… ${done}/${csvRows.length}` }));
-        await new Promise(res => setTimeout(res, 20));
-      }
-
-      await refreshAllBooks();
-      
-      const finalMsg = skipCount > 0 
-        ? `Imported ${successCount} / ${csvRows.length}. ${skipCount} skipped.`
-        : `Imported all ${csvRows.length} rows.`;
-
-      setCsvImportState({ busy: false, error: null, message: finalMsg, done: csvRows.length, total: csvRows.length });
-      window.setTimeout(() => setCsvImportState((s) => ({ ...s, message: null })), 5000);
-      setCsvFileName(null);
+      const headers = await withAuthHeaders();
+      setCsvImportState({ busy: true, error: null, message: "Queueing import…", done: 0, total: csvRows.length });
+      const res = await fetch("/api/csv-import", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          library_id: addLibraryId,
+          apply_overrides: csvApplyOverrides,
+          rows: csvRows
+        })
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok || !json?.job) throw new Error(json?.error ?? "Import failed");
+      const job = json.job as CsvImportJob;
+      setCsvJob(job);
+      setCsvImportState({
+        busy: true,
+        error: null,
+        message: `Importing… ${job.processed_rows}/${job.total_rows}`,
+        done: job.processed_rows,
+        total: job.total_rows
+      });
       setCsvRows([]);
+      setCsvFileName(null);
     } catch (e: any) {
-      setCsvImportState({ busy: false, error: e?.message ?? "Import failed", message: "Import failed", done, total: csvRows.length });
+      setCsvImportState({ busy: false, error: e?.message ?? "Import failed", message: "Import failed", done: 0, total: csvRows.length });
     }
   }
 
@@ -3579,13 +3620,15 @@ function AppShell({
           {addState.message || addSearchState.message}
         </div>
       )}
-      {csvRows.length > 0 && (
+      {(csvRows.length > 0 || csvJob) && (
         <div className="om-lookup-item" style={{ marginBottom: "var(--space-sm)" }}>
           <div className="om-lookup-row" style={{ alignItems: "baseline" }}>
             <div className="om-lookup-main">
               <div>{csvFileName ?? "CSV import"}</div>
               <div className="text-muted" style={{ marginTop: 4 }}>
-                {csvRows.length} row{csvRows.length === 1 ? "" : "s"} ready
+                {csvJob
+                  ? `${csvJob.processed_rows}/${csvJob.total_rows} row${csvJob.total_rows === 1 ? "" : "s"} processed`
+                  : `${csvRows.length} row${csvRows.length === 1 ? "" : "s"} ready`}
               </div>
               {csvImportState.message ? (
                 <div className="text-muted" style={{ marginTop: 4 }}>
@@ -3600,7 +3643,7 @@ function AppShell({
             </div>
             <div className="om-lookup-actions">
               <div className="row no-wrap" style={{ gap: "var(--space-sm)", alignItems: "baseline" }}>
-                {renderLibraries.length > 1 ? (
+                {!csvJob && renderLibraries.length > 1 ? (
                   <>
                     <span className="text-muted">Add to</span>
                     <select
@@ -3618,21 +3661,31 @@ function AppShell({
                     </select>
                   </>
                 ) : null}
-                <label className="row no-wrap text-muted" style={{ gap: "var(--space-xs)", alignItems: "baseline", cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={csvApplyOverrides}
-                    onChange={(e) => setCsvApplyOverrides(e.target.checked)}
-                    disabled={csvImportState.busy}
-                  />
-                  Override
-                </label>
-                <button onClick={() => void importCsvRows()} disabled={csvImportState.busy}>
-                  {csvImportState.busy ? "…" : "Import"}
-                </button>
-                <button className="text-muted" onClick={clearCsvImport} disabled={csvImportState.busy}>
-                  Cancel
-                </button>
+                {!csvJob ? (
+                  <>
+                    <label className="row no-wrap text-muted" style={{ gap: "var(--space-xs)", alignItems: "baseline", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={csvApplyOverrides}
+                        onChange={(e) => setCsvApplyOverrides(e.target.checked)}
+                        disabled={csvImportState.busy}
+                      />
+                      Override
+                    </label>
+                    <button onClick={() => void importCsvRows()} disabled={csvImportState.busy}>
+                      {csvImportState.busy ? "…" : "Import"}
+                    </button>
+                    <button className="text-muted" onClick={clearCsvImport} disabled={csvImportState.busy}>
+                      Cancel
+                    </button>
+                  </>
+                ) : csvJob.status === "completed" || csvJob.status === "failed" ? (
+                  <button className="text-muted" onClick={clearCsvImport}>
+                    Dismiss
+                  </button>
+                ) : (
+                  <span className="text-muted">Importing…</span>
+                )}
               </div>
             </div>
           </div>
