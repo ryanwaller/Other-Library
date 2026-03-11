@@ -2696,6 +2696,22 @@ function AppShell({
     }
   }
 
+  async function bulkChangeObjectType(objectType: string | null) {
+    if (!supabase) return;
+    if (!bulkSelectedGroups.length) return;
+    setBulkState({ busy: true, error: null, message: "Applying…" });
+    try {
+      const ids = Array.from(new Set(bulkSelectedGroups.flatMap((g) => g.copies.map((c) => c.id))));
+      const { error } = await supabase.from("user_books").update({ object_type: objectType }).in("id", ids);
+      if (error) throw new Error(error.message);
+      await refreshAllBooks();
+      setBulkState({ busy: false, error: null, message: "Applied" });
+      window.setTimeout(() => setBulkState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setBulkState({ busy: false, error: e?.message ?? "Apply failed", message: "Apply failed" });
+    }
+  }
+
   const deleteEntry = useCallback(async function deleteEntry(userBookId: number) {
     if (!supabase) return;
     if (!window.confirm("Delete this entry?")) return;
@@ -3702,6 +3718,7 @@ function AppShell({
             onBulkAssignCategory={bulkAssignCategory}
             onBulkMoveSelected={bulkMoveSelected}
             onBulkCopySelected={bulkCopySelected}
+            onBulkChangeObjectType={bulkChangeObjectType}
             onAnyMenuOpen={() => { closeTagMenu(); closeCategoryMenu(); }}
           />
         </div>

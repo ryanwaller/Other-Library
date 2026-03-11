@@ -19,6 +19,7 @@ export default function BulkBar({
   onBulkAssignCategory,
   onBulkMoveSelected,
   onBulkCopySelected,
+  onBulkChangeObjectType,
   onAnyMenuOpen
 }: {
   bulkMode: boolean;
@@ -34,6 +35,7 @@ export default function BulkBar({
   onBulkAssignCategory: () => void;
   onBulkMoveSelected: (libraryId: number) => void;
   onBulkCopySelected: (libraryId: number) => void;
+  onBulkChangeObjectType: (objectType: string | null) => void;
   onAnyMenuOpen?: () => void;
 }) {
   const canAct = useMemo(() => selectedGroupsCount > 0 && !bulkState.busy, [selectedGroupsCount, bulkState.busy]);
@@ -208,6 +210,26 @@ export default function BulkBar({
                   onBulkAssignCategory();
                 }}
               />
+            </div>
+            <div className="text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+              Object type
+            </div>
+            <div style={{ marginBottom: "var(--space-md)" }}>
+              {(["book", "music"] as const).map((ot) => (
+                <button
+                  key={ot}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    close(moreRef);
+                    onBulkChangeObjectType(ot);
+                  }}
+                  disabled={!canAct}
+                  style={{ textAlign: "left", display: "block", width: "100%" }}
+                >
+                  {ot.charAt(0).toUpperCase() + ot.slice(1)}
+                </button>
+              ))}
             </div>
             <button
               type="button"
