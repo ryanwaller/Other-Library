@@ -41,14 +41,6 @@ export default function CoverImage({
   const imgRef = useRef<HTMLImageElement>(null);
   const slotClassName = [className, src && status !== "error" ? "om-cover-slot-has-image" : null].filter(Boolean).join(" ");
 
-  if (!src || status === "error") {
-    return (
-      <div style={{ ...style, display: "flex", alignItems: "center", justifyContent: "center" }} className={className}>
-        <div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
-      </div>
-    );
-  }
-
   const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
     if (img.naturalWidth < 10 && img.naturalHeight < 10) {
@@ -125,6 +117,14 @@ export default function CoverImage({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (!src || status === "error") {
+    return (
+      <div style={{ ...style, display: "flex", alignItems: "center", justifyContent: "center" }} className={className}>
+        <div className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
+      </div>
+    );
+  }
 
   const isNatural = objectFit === "contain";
 
