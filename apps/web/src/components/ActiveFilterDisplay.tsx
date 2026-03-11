@@ -6,6 +6,7 @@ export type FilterPair = {
   label: string;
   value: string;
   key: string;
+  entityHref?: string;
   onClear?: () => void;
   clearHref?: string;
 };
@@ -30,7 +31,17 @@ export default function ActiveFilterDisplay({ pairs, onClearAll, clearAllHref }:
         {pairs.map((p, idx) => (
           <span key={`${p.label}:${p.value}:${idx}`} className="row" style={{ gap: "var(--space-md)", alignItems: "baseline" }}>
             <span className="text-muted" style={{ marginRight: 2 }}>{p.label}</span>
-            <span style={{ color: "var(--fg)", marginRight: 4 }}>{p.value}</span>
+            <span style={{ color: "var(--fg)", marginRight: 4 }}>
+              {p.value}
+              {p.entityHref ? (
+                <>
+                  {" "}
+                  <Link href={p.entityHref} className="text-muted" style={{ textDecoration: "none" }}>
+                    ↗
+                  </Link>
+                </>
+              ) : null}
+            </span>
             {p.onClear ? (
               <button
                 type="button"

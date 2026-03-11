@@ -41,6 +41,7 @@ import { parseMusicMetadata, type MusicMetadata, type MusicContributorRole } fro
 import { formatIssueDisplay, looksLikeIssn, normalizeIssueYear, normalizeIssn, parseMagazineTitle } from "../../lib/magazine";
 import { contextFromFilterParams } from "../../lib/pageTitle";
 import { DETAIL_FILTER_KEYS, detailFilterLabel, type DetailFilterKey } from "../../lib/detailFilters";
+import { slugify } from "../../lib/slug";
 import { arrayMove } from "@dnd-kit/sortable";
 import { useStickyBand } from "./hooks/useStickyBand";
 
@@ -76,6 +77,12 @@ function uniqCaseInsensitive(values: string[]): string[] {
     out.push(normalized);
   }
   return out;
+}
+
+function entityHrefForName(name: string): string | undefined {
+  const normalized = String(name ?? "").trim();
+  if (!normalized) return undefined;
+  return `/entity/${slugify(normalized)}`;
 }
 
 type SearchCandidate = {
@@ -3514,14 +3521,14 @@ function AppShell({
                 if (activeCategory) pairs.push({ label: "Category", value: activeCategory, key: "category", onClear: () => { setCategoryMode("all"); clearFilter("category"); } });
                 if (activeTag) pairs.push({ label: "Tag", value: activeTag, key: "tag", onClear: () => { setTagMode("all"); clearFilter("tag"); } });
                 if (queryValue) pairs.push({ label: "Search", value: queryValue, key: "q", onClear: () => { setSearchQuery(""); clearFilter("q"); } });
-                if (filterAuthor) pairs.push({ label: "Author", value: filterAuthor, key: "author", onClear: () => clearFilter("author") });
+                if (filterAuthor) pairs.push({ label: "Author", value: filterAuthor, key: "author", entityHref: entityHrefForName(filterAuthor), onClear: () => clearFilter("author") });
                 if (filterEditor) pairs.push({ label: "Editor", value: filterEditor, key: "editor", onClear: () => clearFilter("editor") });
                 if (filterDesigner) pairs.push({ label: "Designer", value: filterDesigner, key: "designer", onClear: () => clearFilter("designer") });
                 if (filterSubject) pairs.push({ label: "Subject", value: filterSubject, key: "subject", onClear: () => clearFilter("subject") });
                 if (filterPublisher) pairs.push({ label: "Publisher", value: filterPublisher, key: "publisher", onClear: () => clearFilter("publisher") });
                 if (filterMaterial) pairs.push({ label: "Material", value: filterMaterial, key: "material", onClear: () => clearFilter("material") });
                 if (filterPrinter) pairs.push({ label: "Printer", value: filterPrinter, key: "printer", onClear: () => clearFilter("printer") });
-                if (filterPerformer) pairs.push({ label: "Performer", value: filterPerformer, key: "performer", onClear: () => clearFilter("performer") });
+                if (filterPerformer) pairs.push({ label: "Performer", value: filterPerformer, key: "performer", entityHref: entityHrefForName(filterPerformer), onClear: () => clearFilter("performer") });
                 if (filterComposer) pairs.push({ label: "Composer", value: filterComposer, key: "composer", onClear: () => clearFilter("composer") });
                 if (filterProducer) pairs.push({ label: "Producer", value: filterProducer, key: "producer", onClear: () => clearFilter("producer") });
                 if (filterEngineer) pairs.push({ label: "Engineer", value: filterEngineer, key: "engineer", onClear: () => clearFilter("engineer") });
