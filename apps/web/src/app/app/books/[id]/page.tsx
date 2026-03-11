@@ -4596,8 +4596,8 @@ export default function BookDetailPage() {
                     )}
 
                     {[
-                      ["Issue number", effectiveMagazine.issue_number ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_number: value || null })), "Add issue number", "issue_number"],
                       ["Issue volume", effectiveMagazine.issue_volume ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_volume: value || null })), "Add volume", "issue_volume"],
+                      ["Issue number", effectiveMagazine.issue_number ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_number: value || null })), "Add issue number", "issue_number"],
                       ["Issue season", effectiveMagazine.issue_season ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_season: value || null })), "Add season", "issue_season"],
                       ["Issue year", effectiveMagazine.issue_year != null ? String(effectiveMagazine.issue_year) : "", (value: string) => setFormMagazine((s) => ({ ...s, issue_year: normalizeIssueYear(value) })), "Add year", "issue_year"]
                     ].map(([label, value, onChange, placeholder, visKey]) => (
