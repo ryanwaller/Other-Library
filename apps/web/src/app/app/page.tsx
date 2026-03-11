@@ -702,6 +702,26 @@ function AppShell({
   }, []);
 
   useEffect(() => {
+    if (!stagedCsvData || !stagedCsvFilename) return;
+    try {
+      loadCsvText(stagedCsvData, stagedCsvFilename);
+    } catch (err: any) {
+      setCsvImportState({
+        busy: false,
+        error: err?.message ?? "CSV load failed",
+        message: "CSV load failed",
+        done: 0,
+        total: 0
+      });
+    } finally {
+      window.sessionStorage.removeItem("om_staged_csv_data");
+      window.sessionStorage.removeItem("om_staged_csv_filename");
+      setStagedCsvData(null);
+      setStagedCsvFilename(null);
+    }
+  }, [stagedCsvData, stagedCsvFilename]);
+
+  useEffect(() => {
     if (!openAddPanel) return;
     setAddOpen(true);
   }, [openAddPanel]);
@@ -1670,8 +1690,7 @@ function AppShell({
     return created.data.id as number;
   }
 
-  async function loadCsvFile(file: File) {
-    const text = await file.text();
+  function loadCsvText(text: string, filename: string) {
     const objects = parseCsvToObjects(text);
     const normalized: CsvImportRow[] = objects
       .map((o) => {
@@ -1709,10 +1728,15 @@ function AppShell({
       })
       .filter((r) => Boolean(r.title || r.isbn));
 
-    setCsvFileName(file.name);
+    setCsvFileName(filename);
     setCsvRows(normalized);
     setCsvImportState({ busy: false, error: null, message: `Loaded ${normalized.length} row(s)`, done: 0, total: normalized.length });
     window.setTimeout(() => setCsvImportState((s) => ({ ...s, message: null })), 1500);
+  }
+
+  async function loadCsvFile(file: File) {
+    const text = await file.text();
+    loadCsvText(text, file.name);
   }
 
   function clearCsvImport() {
