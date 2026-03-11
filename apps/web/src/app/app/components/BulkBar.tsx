@@ -215,7 +215,7 @@ export default function BulkBar({
               Object type
             </div>
             <div style={{ marginBottom: "var(--space-md)" }}>
-              {(["book", "music"] as const).map((ot) => (
+              {(["book", "magazine", "ephemera", "video", "music"] as const).map((ot) => (
                 <button
                   key={ot}
                   type="button"
