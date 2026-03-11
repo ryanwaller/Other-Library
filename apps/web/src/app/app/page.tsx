@@ -2842,35 +2842,36 @@ function AppShell({
   const filteredItems = useMemo(() => items, [items]);
 
   const displayGroups = useMemo(() => {
-    const profileVis = profile?.visibility === "public" ? "public" : "followers_only";
-    const activeTag = (filterTag ?? tagMode ?? "all").trim();
-    const tag = activeTag === "all" ? "" : activeTag.toLowerCase();
-    const author = (filterAuthor ?? "").trim().toLowerCase();
-    const subject = (filterSubject ?? "").trim().toLowerCase();
-    const publisher = (filterPublisher ?? "").trim().toLowerCase();
-    const designer = (filterDesigner ?? "").trim().toLowerCase();
-    const groupVal = (filterGroup ?? "").trim().toLowerCase();
-    const decadeVal = (filterDecade ?? "").trim().toLowerCase();
-    const activeCategoryMode = (filterCategory ?? categoryMode) || "all";
-    const categoryTag = (activeCategoryMode === "all" ? "" : String(activeCategoryMode)).trim().toLowerCase();
-    const q = searchQuery.trim().toLowerCase();
-    const publishDate = (searchParams.get("publish_date") ?? "").trim().toLowerCase();
-    const releaseDate = (searchParams.get("release_date") ?? "").trim().toLowerCase();
-    const originalReleaseYear = (searchParams.get("original_release_year") ?? "").trim().toLowerCase();
-    const formatVal = (searchParams.get("format") ?? "").trim().toLowerCase();
-    const releaseType = (searchParams.get("release_type") ?? "").trim().toLowerCase();
-    const pressing = (searchParams.get("pressing") ?? "").trim().toLowerCase();
-    const catalogNumber = (searchParams.get("catalog_number") ?? "").trim().toLowerCase();
-    const barcode = (searchParams.get("barcode") ?? "").trim().toLowerCase();
-    const country = (searchParams.get("country") ?? "").trim().toLowerCase();
-    const discogsId = (searchParams.get("discogs_id") ?? "").trim().toLowerCase();
-    const musicbrainzId = (searchParams.get("musicbrainz_id") ?? "").trim().toLowerCase();
-    const speed = (searchParams.get("speed") ?? "").trim().toLowerCase();
-    const channels = (searchParams.get("channels") ?? "").trim().toLowerCase();
-    const discCount = (searchParams.get("disc_count") ?? "").trim().toLowerCase();
-    const limitedEdition = (searchParams.get("limited_edition") ?? "").trim().toLowerCase();
-    const reissue = (searchParams.get("reissue") ?? "").trim().toLowerCase();
-    const entityRoleFilters = [
+    try {
+      const profileVis = profile?.visibility === "public" ? "public" : "followers_only";
+      const activeTag = (filterTag ?? tagMode ?? "all").trim();
+      const tag = activeTag === "all" ? "" : activeTag.toLowerCase();
+      const author = (filterAuthor ?? "").trim().toLowerCase();
+      const subject = (filterSubject ?? "").trim().toLowerCase();
+      const publisher = (filterPublisher ?? "").trim().toLowerCase();
+      const designer = (filterDesigner ?? "").trim().toLowerCase();
+      const groupVal = (filterGroup ?? "").trim().toLowerCase();
+      const decadeVal = (filterDecade ?? "").trim().toLowerCase();
+      const activeCategoryMode = (filterCategory ?? categoryMode) || "all";
+      const categoryTag = (activeCategoryMode === "all" ? "" : String(activeCategoryMode)).trim().toLowerCase();
+      const q = searchQuery.trim().toLowerCase();
+      const publishDate = (searchParams.get("publish_date") ?? "").trim().toLowerCase();
+      const releaseDate = (searchParams.get("release_date") ?? "").trim().toLowerCase();
+      const originalReleaseYear = (searchParams.get("original_release_year") ?? "").trim().toLowerCase();
+      const formatVal = (searchParams.get("format") ?? "").trim().toLowerCase();
+      const releaseType = (searchParams.get("release_type") ?? "").trim().toLowerCase();
+      const pressing = (searchParams.get("pressing") ?? "").trim().toLowerCase();
+      const catalogNumber = (searchParams.get("catalog_number") ?? "").trim().toLowerCase();
+      const barcode = (searchParams.get("barcode") ?? "").trim().toLowerCase();
+      const country = (searchParams.get("country") ?? "").trim().toLowerCase();
+      const discogsId = (searchParams.get("discogs_id") ?? "").trim().toLowerCase();
+      const musicbrainzId = (searchParams.get("musicbrainz_id") ?? "").trim().toLowerCase();
+      const speed = (searchParams.get("speed") ?? "").trim().toLowerCase();
+      const channels = (searchParams.get("channels") ?? "").trim().toLowerCase();
+      const discCount = (searchParams.get("disc_count") ?? "").trim().toLowerCase();
+      const limitedEdition = (searchParams.get("limited_edition") ?? "").trim().toLowerCase();
+      const reissue = (searchParams.get("reissue") ?? "").trim().toLowerCase();
+      const entityRoleFilters = [
       ["performer", "performer"],
       ["composer", "composer"],
       ["producer", "producer"],
@@ -2885,92 +2886,103 @@ function AppShell({
       ["design", "design"],
       ["photography", "photography"],
       ["printer", "printer"]
-    ] as const;
+      ] as const;
 
-    const byKey = new Map<string, CatalogItem[]>();
-    for (const it of filteredItems) {
-      const key = `${it.library_id}:${groupKeyFor(it)}`;
-      const cur = byKey.get(key);
-      if (!cur) byKey.set(key, [it]);
-      else cur.push(it);
-    }
-
-    let groups: CatalogGroup[] = Array.from(byKey.entries()).map(([key, copies]) => {
-      const sorted = copies.slice().sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
-      const primary = sorted.slice().sort((a, b) => {
-        const score = (c: CatalogItem): number => {
-          let s = 0;
-          if ((c.media ?? []).some((m) => m.kind === "cover")) s += 1000;
-          if (c.edition?.cover_url) s += 150;
-          return s;
-        };
-        return score(b) - score(a);
-      })[0]!;
-      const title = effectiveTitleFor(primary);
-
-      const tagSet = new Set<string>();
-      const categorySet = new Set<string>();
-      const authorsSet = new Set<string>();
-      const subjectsSet = new Set<string>();
-      const publishersSet = new Set<string>();
-      const designersSet = new Set<string>();
-      const groupsSet = new Set<string>();
-      const decadesSet = new Set<string>();
-      const visSet = new Set<string>();
-      const effVisSet = new Set<string>();
-      let latest = -Infinity;
-      let earliest = Infinity;
-      for (const c of sorted) {
-        for (const t of tagsFor(c)) {
-          if (t.kind === "category") categorySet.add(t.name);
-          else tagSet.add(t.name);
-        }
-        for (const a of effectiveAuthorsFor(c)) authorsSet.add(a);
-        for (const s of effectiveSubjectsFor(c)) subjectsSet.add(s);
-        const p = effectivePublisherFor(c);
-        if (p) publishersSet.add(p);
-        for (const d of (c.designers_override ?? [])) if (d) designersSet.add(d);
-        for (const row of c.book_entities ?? []) {
-          const role = String(row?.role ?? "").trim().toLowerCase();
-          if (role !== "designer" && role !== "design") continue;
-          const name = String(row?.entity?.name ?? "").trim();
-          if (name) designersSet.add(name);
-        }
-        if (c.group_label) groupsSet.add(c.group_label);
-        if (c.decade) decadesSet.add(c.decade);
-
-        visSet.add(c.visibility);
-        const eff = (c.visibility === "inherit" || !c.visibility ? profileVis : c.visibility) as string;
-        effVisSet.add(eff);
-        const ts = Date.parse(c.created_at);
-        if (Number.isFinite(ts)) {
-          latest = Math.max(latest, ts);
-          earliest = Math.min(earliest, ts);
+      const byKey = new Map<string, CatalogItem[]>();
+      for (const it of filteredItems) {
+        try {
+          const libraryId = Number((it as any)?.library_id);
+          if (!Number.isFinite(libraryId) || libraryId <= 0) continue;
+          const key = `${libraryId}:${groupKeyFor(it)}`;
+          const cur = byKey.get(key);
+          if (!cur) byKey.set(key, [it]);
+          else cur.push(it);
+        } catch {
+          continue;
         }
       }
 
-      return {
-        key,
-        libraryId: primary.library_id,
-        primary,
-        copies: sorted,
-        copiesCount: sorted.length,
-        tagNames: Array.from(tagSet.values()).sort((a, b) => a.localeCompare(b)),
-        categoryNames: Array.from(categorySet.values()).sort((a, b) => a.localeCompare(b)),
-        filterAuthors: Array.from(authorsSet.values()),
-        filterSubjects: Array.from(subjectsSet.values()),
-        filterPublishers: Array.from(publishersSet.values()),
-        filterDesigners: Array.from(designersSet.values()),
-        filterGroups: Array.from(groupsSet.values()),
-        filterDecades: Array.from(decadesSet.values()),
-        title,
-        visibility: visSet.size === 1 ? (primary.visibility as any) : "mixed",
-        effectiveVisibility: effVisSet.size === 1 ? ((Array.from(effVisSet.values())[0] as string) === "public" ? "public" : "followers_only") : "mixed",
-        latestCreatedAt: Number.isFinite(latest) ? latest : Date.now(),
-        earliestCreatedAt: Number.isFinite(earliest) ? earliest : Date.now(),
-        sortOrder: sorted.reduce((min, c) => Math.min(min, (c as any).sort_order ?? 0), Infinity)
-      };
-    });
+      let groups: CatalogGroup[] = Array.from(byKey.entries()).flatMap(([key, copies]) => {
+        try {
+          const sorted = copies.slice().sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+          const primary = sorted.slice().sort((a, b) => {
+            const score = (c: CatalogItem): number => {
+              let s = 0;
+              if ((c.media ?? []).some((m) => m.kind === "cover")) s += 1000;
+              if (c.edition?.cover_url) s += 150;
+              return s;
+            };
+            return score(b) - score(a);
+          })[0];
+          if (!primary) return [];
+          const title = effectiveTitleFor(primary);
+
+          const tagSet = new Set<string>();
+          const categorySet = new Set<string>();
+          const authorsSet = new Set<string>();
+          const subjectsSet = new Set<string>();
+          const publishersSet = new Set<string>();
+          const designersSet = new Set<string>();
+          const groupsSet = new Set<string>();
+          const decadesSet = new Set<string>();
+          const visSet = new Set<string>();
+          const effVisSet = new Set<string>();
+          let latest = -Infinity;
+          let earliest = Infinity;
+          for (const c of sorted) {
+            for (const t of tagsFor(c)) {
+              if (t.kind === "category") categorySet.add(t.name);
+              else tagSet.add(t.name);
+            }
+            for (const a of effectiveAuthorsFor(c)) authorsSet.add(a);
+            for (const s of effectiveSubjectsFor(c)) subjectsSet.add(s);
+            const p = effectivePublisherFor(c);
+            if (p) publishersSet.add(p);
+            for (const d of (c.designers_override ?? [])) if (d) designersSet.add(d);
+            for (const row of c.book_entities ?? []) {
+              const role = String(row?.role ?? "").trim().toLowerCase();
+              if (role !== "designer" && role !== "design") continue;
+              const name = String(row?.entity?.name ?? "").trim();
+              if (name) designersSet.add(name);
+            }
+            if (c.group_label) groupsSet.add(c.group_label);
+            if (c.decade) decadesSet.add(c.decade);
+
+            visSet.add(c.visibility);
+            const eff = (c.visibility === "inherit" || !c.visibility ? profileVis : c.visibility) as string;
+            effVisSet.add(eff);
+            const ts = Date.parse(c.created_at);
+            if (Number.isFinite(ts)) {
+              latest = Math.max(latest, ts);
+              earliest = Math.min(earliest, ts);
+            }
+          }
+
+          return [{
+            key,
+            libraryId: primary.library_id,
+            primary,
+            copies: sorted,
+            copiesCount: sorted.length,
+            tagNames: Array.from(tagSet.values()).sort((a, b) => a.localeCompare(b)),
+            categoryNames: Array.from(categorySet.values()).sort((a, b) => a.localeCompare(b)),
+            filterAuthors: Array.from(authorsSet.values()),
+            filterSubjects: Array.from(subjectsSet.values()),
+            filterPublishers: Array.from(publishersSet.values()),
+            filterDesigners: Array.from(designersSet.values()),
+            filterGroups: Array.from(groupsSet.values()),
+            filterDecades: Array.from(decadesSet.values()),
+            title,
+            visibility: visSet.size === 1 ? (primary.visibility as any) : "mixed",
+            effectiveVisibility: effVisSet.size === 1 ? ((Array.from(effVisSet.values())[0] as string) === "public" ? "public" : "followers_only") : "mixed",
+            latestCreatedAt: Number.isFinite(latest) ? latest : Date.now(),
+            earliestCreatedAt: Number.isFinite(earliest) ? earliest : Date.now(),
+            sortOrder: sorted.reduce((min, c) => Math.min(min, (c as any).sort_order ?? 0), Infinity)
+          }];
+        } catch {
+          return [];
+        }
+      });
 
     if (tag) groups = groups.filter((g) => g.tagNames.some((t) => t.toLowerCase() === tag));
     if (author) groups = groups.filter((g) => g.filterAuthors.some((a) => a.toLowerCase() === author));
@@ -3103,7 +3115,11 @@ function AppShell({
       return sortMode === "title_asc" ? cmp : -cmp;
     });
 
-    return groups;
+      return groups;
+    } catch (err) {
+      console.error("displayGroups_failed", err);
+      return [];
+    }
   }, [filteredItems, filterTag, tagMode, filterAuthor, filterSubject, filterPublisher, filterDesigner, filterGroup, filterDecade, filterCategory, categoryMode, visibilityMode, sortMode, searchQuery, profile?.visibility, searchParams]);
 
   const bulkSelectedGroups = useMemo(() => displayGroups.filter((g) => bulkSelectedKeys[g.key]), [displayGroups, bulkSelectedKeys]);
