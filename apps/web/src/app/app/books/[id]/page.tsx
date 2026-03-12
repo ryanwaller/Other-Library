@@ -1277,7 +1277,8 @@ export default function BookDetailPage() {
         // Try server-side signing first (admin client bypasses RLS — works even when
         // the storage path prefix doesn't match the current owner's UUID).
         try {
-          const apiRes = await fetch(`/api/books/${row.id}/media-urls`);
+          const token = session?.access_token ?? null;
+          const apiRes = await fetch(`/api/books/${row.id}/media-urls`, token ? { headers: { authorization: `Bearer ${token}` } } : undefined);
           if (apiRes.ok) {
             const json = await apiRes.json();
             if (json?.paths && typeof json.paths === "object") next = json.paths;
@@ -5545,6 +5546,8 @@ export default function BookDetailPage() {
               ) : null}
 
               {imageMedia.length > 0 ? (
+                <>
+                <div className="text-muted" style={{ marginTop: "var(--space-lg)" }}>Additional images</div>
                 <div className="om-images-grid" style={{ marginTop: "var(--space-10)" }}>
                   {imageMedia.map((m, idx) => {
                     const url = mediaUrlsByPath[m.storage_path];
@@ -5576,6 +5579,7 @@ export default function BookDetailPage() {
                     );
                   })}
                 </div>
+                </>
               ) : editMode ? (
                 <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
                   No images yet.
