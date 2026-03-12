@@ -73,6 +73,15 @@ export default function EntityPageModules({ modules }: { modules: ModuleData[] }
     }
   }
 
+  yourCopies.sort((a, b) => {
+    const titleCmp = a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: "base" });
+    if (titleCmp !== 0) return titleCmp;
+    return String(a.secondaryLine ?? "").localeCompare(String(b.secondaryLine ?? ""), undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  });
+
   return (
     <>
       {yourCopies.length > 0 && (
