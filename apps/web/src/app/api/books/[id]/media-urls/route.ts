@@ -46,13 +46,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     const signedMap: Record<string, string> = {};
     if (paths.length > 0) {
       const signed = await admin.storage.from("user-book-media").createSignedUrls(paths, 60 * 60);
-      console.log("[media-urls] paths:", paths, "signed.error:", signed.error, "signed.data count:", signed.data?.length);
       for (const s of signed.data ?? []) {
         if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;
       }
+      console.log(`[mu] book=${bookId} paths=${paths.length} signedCount=${Object.keys(signedMap).length} err=${signed.error?.message ?? "none"}`);
     }
-
-    console.log("[media-urls] returning keys:", Object.keys(signedMap));
     return NextResponse.json({ ok: true, paths: signedMap });
   } catch (err) {
     const e = toApiError(err);
