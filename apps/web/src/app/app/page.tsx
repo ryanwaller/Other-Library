@@ -4362,7 +4362,7 @@ function AppShell({
                     effectiveViewMode={effectiveViewMode}
                     effectiveCols={effectiveCols}
                     showBookSkeleton={showBookSkeleton}
-                    isRearranging={bulkMode}
+                    isRearranging={reorderMode}
                     bulkMode={bulkMode}
                     viewMode={viewMode}
                     bulkSelectedKeys={bulkSelectedKeys}

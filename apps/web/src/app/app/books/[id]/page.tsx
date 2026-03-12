@@ -1034,9 +1034,10 @@ export default function BookDetailPage() {
     return () => { alive = false; };
   }, [formLibraryId, userId]);
 
-  async function refresh() {
+  async function refresh(options?: { preserveDraft?: boolean }) {
     if (!supabase) return;
     if (!Number.isFinite(bookId) || bookId <= 0) return;
+    const preserveDraft = options?.preserveDraft === true;
     setBusy(true);
     setError(null);
     setCoverOriginalSrc(null);
@@ -1162,61 +1163,62 @@ export default function BookDetailPage() {
           }
         }
       }
-      setFieldVisibility(nextVisibility);
+      if (!preserveDraft) {
+        setFieldVisibility(nextVisibility);
+        setFacetDraft(nextFacets);
 
-      setFacetDraft(nextFacets);
-
-      setFormTitle(row.title_override ?? "");
-      setFormSubtitle(String((row as any).subtitle_override ?? "").trim());
-      setFormAuthors((nextFacets.author ?? []).join(", "));
-      setFormEditors((nextFacets.editor ?? []).join(", "));
-      setFormDesigners((nextFacets.designer ?? []).join(", "));
-      setFormPublisher(joinTokenValues(nextFacets.publisher ?? parseAuthorsInput(String(row.publisher_override ?? row.edition?.publisher ?? "").trim())));
-      setFormIsbn(
-        String(
-          (row.edition?.isbn13 ?? row.edition?.isbn10) ?? ""
-        ).trim()
-      );
-      setIsbnFormatError(false);
-      setFormPrinter(joinTokenValues(nextFacets.printer ?? parseAuthorsInput(String(row.printer_override ?? "").trim())));
-      setFormMaterials(joinTokenValues(nextFacets.material ?? parseAuthorsInput(String(row.materials_override ?? "").trim())));
-      setFormEditionOverride(row.edition_override ?? "");
-      setFormPublishDate(row.publish_date_override ?? row.edition?.publish_date ?? "");
-      setFormDescription(row.description_override ?? row.edition?.description ?? "");
-      setFormGroupLabel(((row as any).group_label ?? "") as any);
-      setFormObjectType(String((row as any).object_type ?? "").trim());
-      setFormMusic(parseMusicMetadata((row as any).music_metadata) ?? emptyMusicMetadata());
-      setFormMagazine({
-        issue_number: String((row as any).issue_number ?? "").trim() || null,
-        issue_volume: String((row as any).issue_volume ?? "").trim() || null,
-        issue_season: String((row as any).issue_season ?? "").trim() || null,
-        issue_year: typeof (row as any).issue_year === "number" ? (row as any).issue_year : normalizeIssueYear((row as any).issue_year),
-        issn: String((row as any).issn ?? "").trim() || null
-      });
-      setFormDecade(String((row as any).decade ?? "").trim());
-      setFormPages((row as any).pages ? String((row as any).pages) : "");
-      setFormLocation(row.location ?? "");
-      setFormShelf(row.shelf ?? "");
-      setFormNotes(row.notes ?? "");
-      const loadedTrimW = row.trim_width != null ? String(row.trim_width) : "";
-      const loadedTrimH = row.trim_height != null ? String(row.trim_height) : "";
-      const loadedTrimU: TrimUnit = (row.trim_unit as TrimUnit | null) === "mm" ? "mm" : "in";
-      setFormTrimWidth(loadedTrimW);
-      setFormTrimHeight(loadedTrimH);
-      setFormTrimUnit(loadedTrimU);
-      setCropTrimWidth(loadedTrimW);
-      setCropTrimHeight(loadedTrimH);
-      // Crop unit: prefer book's stored unit; fall back to localStorage; fall back to "ratio".
-      let initCropUnit: TrimUnit | "ratio" = "ratio";
-      if (row.trim_unit === "in" || row.trim_unit === "mm") {
-        initCropUnit = row.trim_unit;
-      } else {
-        try {
-          const stored = localStorage.getItem("om_trimUnit");
-          if (stored === "in" || stored === "mm") initCropUnit = stored;
-        } catch { /* ignore */ }
+        setFormTitle(row.title_override ?? "");
+        setFormSubtitle(String((row as any).subtitle_override ?? "").trim());
+        setFormAuthors((nextFacets.author ?? []).join(", "));
+        setFormEditors((nextFacets.editor ?? []).join(", "));
+        setFormDesigners((nextFacets.designer ?? []).join(", "));
+        setFormPublisher(joinTokenValues(nextFacets.publisher ?? parseAuthorsInput(String(row.publisher_override ?? row.edition?.publisher ?? "").trim())));
+        setFormIsbn(
+          String(
+            (row.edition?.isbn13 ?? row.edition?.isbn10) ?? ""
+          ).trim()
+        );
+        setIsbnFormatError(false);
+        setFormPrinter(joinTokenValues(nextFacets.printer ?? parseAuthorsInput(String(row.printer_override ?? "").trim())));
+        setFormMaterials(joinTokenValues(nextFacets.material ?? parseAuthorsInput(String(row.materials_override ?? "").trim())));
+        setFormEditionOverride(row.edition_override ?? "");
+        setFormPublishDate(row.publish_date_override ?? row.edition?.publish_date ?? "");
+        setFormDescription(row.description_override ?? row.edition?.description ?? "");
+        setFormGroupLabel(((row as any).group_label ?? "") as any);
+        setFormObjectType(String((row as any).object_type ?? "").trim());
+        setFormMusic(parseMusicMetadata((row as any).music_metadata) ?? emptyMusicMetadata());
+        setFormMagazine({
+          issue_number: String((row as any).issue_number ?? "").trim() || null,
+          issue_volume: String((row as any).issue_volume ?? "").trim() || null,
+          issue_season: String((row as any).issue_season ?? "").trim() || null,
+          issue_year: typeof (row as any).issue_year === "number" ? (row as any).issue_year : normalizeIssueYear((row as any).issue_year),
+          issn: String((row as any).issn ?? "").trim() || null
+        });
+        setFormDecade(String((row as any).decade ?? "").trim());
+        setFormPages((row as any).pages ? String((row as any).pages) : "");
+        setFormLocation(row.location ?? "");
+        setFormShelf(row.shelf ?? "");
+        setFormNotes(row.notes ?? "");
+        const loadedTrimW = row.trim_width != null ? String(row.trim_width) : "";
+        const loadedTrimH = row.trim_height != null ? String(row.trim_height) : "";
+        const loadedTrimU: TrimUnit = (row.trim_unit as TrimUnit | null) === "mm" ? "mm" : "in";
+        setFormTrimWidth(loadedTrimW);
+        setFormTrimHeight(loadedTrimH);
+        setFormTrimUnit(loadedTrimU);
+        setCropTrimWidth(loadedTrimW);
+        setCropTrimHeight(loadedTrimH);
+        // Crop unit: prefer book's stored unit; fall back to localStorage; fall back to "ratio".
+        let initCropUnit: TrimUnit | "ratio" = "ratio";
+        if (row.trim_unit === "in" || row.trim_unit === "mm") {
+          initCropUnit = row.trim_unit;
+        } else {
+          try {
+            const stored = localStorage.getItem("om_trimUnit");
+            if (stored === "in" || stored === "mm") initCropUnit = stored;
+          } catch { /* ignore */ }
+        }
+        setCropTrimUnit(initCropUnit);
       }
-      setCropTrimUnit(initCropUnit);
       setFormVisibility(row.visibility);
       setFormStatus(row.status);
       setFormLibraryId((row as any).library_id ?? null);
@@ -1410,7 +1412,7 @@ export default function BookDetailPage() {
 
   useEffect(() => {
     (async () => {
-      await refresh();
+      await refresh({ preserveDraft: editMode });
       setInitialLoadDone(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2785,7 +2787,7 @@ export default function BookDetailPage() {
       setCoverOperationBusy(false);
       return;
     }
-    await refresh();
+    await refresh({ preserveDraft: editMode });
     setCoverOperationBusy(false);
   }
 
@@ -2809,7 +2811,7 @@ export default function BookDetailPage() {
       setImagesState((s) => ({ ...s, error: del.error?.message ?? "Delete failed", message: "Delete failed" }));
       return;
     }
-    await refresh();
+    await refresh({ preserveDraft: editMode });
   }
 
   function selectPendingImages(files: FileList | null) {
@@ -2852,7 +2854,7 @@ export default function BookDetailPage() {
       setImagesState({ busy: true, done, total: pendingImages.length, error: lastError, message: `Uploading ${done}/${pendingImages.length}…` });
     }
 
-    await refresh();
+    await refresh({ preserveDraft: editMode });
     clearPendingImages();
     setImagesState({
       busy: false,
@@ -3397,7 +3399,7 @@ export default function BookDetailPage() {
       const upd = await supabase.from("user_books").update(updates).eq("id", book.id);
       if (upd.error) throw new Error(upd.error.message);
 
-      await refresh();
+      await refresh({ preserveDraft: editMode });
 
       const hintedCover = String(coverUrlHint ?? "").trim();
       const resolvedCover = hintedCover || String(edition.cover_url ?? "").trim();
@@ -4194,7 +4196,7 @@ export default function BookDetailPage() {
               setCoverToolsOpen={setCoverToolsOpen}
               coverExpanded={coverExpanded}
               setCoverExpanded={setCoverExpanded}
-              refresh={refresh}
+              refresh={() => refresh({ preserveDraft: editMode })}
               setSuggestedCoverUrl={setSuggestedCoverUrl}
               onOptimisticCoverDelete={onOptimisticCoverDelete}
               onTouchStart={handleCoverTouchStart}
