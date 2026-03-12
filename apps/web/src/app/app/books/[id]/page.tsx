@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, Fragment, type Keybo
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../../../lib/supabaseClient";
 import { isValidTrimSize, convertTrimUnit, formatTrimRatio, type TrimUnit } from "../../../../lib/trimSize";
-import { bookIdSlug } from "../../../../lib/slug";
+import { bookIdSlug, slugify } from "../../../../lib/slug";
 import { formatDateShort, normalizeFlexiblePublishDate } from "../../../../lib/formatDate";
 import { DECADE_OPTIONS } from "../../../../lib/decades";
 import { loadBookNavContext, type BookNavContext } from "../../../../lib/bookNav";
@@ -4586,7 +4586,9 @@ export default function BookDetailPage() {
                               placeholder="Publication title (e.g. The New Yorker)"
                             />
                           ) : (
-                            (formGroupLabel ?? "").trim()
+                            <a href={`/group/${slugify((formGroupLabel ?? "").trim())}`} style={{ textDecoration: "none", color: "inherit" }}>
+                              {(formGroupLabel ?? "").trim()}
+                            </a>
                           )}
                         </div>
                         {editMode && <div style={{ width: 32 }} />}

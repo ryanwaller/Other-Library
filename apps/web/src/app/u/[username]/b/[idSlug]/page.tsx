@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { getPublicEnvOptional } from "../../../../../lib/env";
-import { bookIdSlug } from "../../../../../lib/slug";
+import { bookIdSlug, slugify } from "../../../../../lib/slug";
 import { formatDateShort } from "../../../../../lib/formatDate";
 import { formatMusicTrackLine, musicDisplayGenres, MUSIC_CONTRIBUTOR_ROLES, parseMusicMetadata, type MusicMetadata } from "../../../../../lib/music";
 import { displayObjectTypeLabel, isMagazineObject } from "../../../../../lib/magazine";
@@ -838,7 +838,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Group
                   </div>
-                  <div>{(book.group_label ?? "").trim()}</div>
+                  <div><a href={`/group/${slugify((book.group_label ?? "").trim())}`} style={{ textDecoration: "none", color: "inherit" }}>{(book.group_label ?? "").trim()}</a></div>
                 </div>
               ) : null}
 
