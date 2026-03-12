@@ -15,6 +15,7 @@ type BookLike = {
   issue_volume: string | null;
   issue_season: string | null;
   issue_year: number | null;
+  group_label: string | null;
   authors_override: string[] | null;
   designers_override: string[] | null;
   music_metadata?: MusicMetadata | null;
@@ -84,6 +85,10 @@ function rowMatchesCandidate(row: BookLike, candidate: Candidate): boolean {
     return uniqueNames([...(row.authors_override ?? []), ...((row.edition?.authors ?? []) as string[])]).some((name) => normalizeName(name) === target);
   }
 
+  if (candidate.role === "group") {
+    return normalizeName(row.group_label) === target;
+  }
+
   if (candidate.role === "designer") {
     const entityNames = (row.book_entities ?? [])
       .filter((entry) => {
@@ -148,6 +153,12 @@ function deriveCandidates(book: BookLike): Candidate[] {
     push({ role: "designer", name, heading: `Other items designed by ${name}`, mediaScope: "all" });
   }
 
+  const objectType = String(book.object_type ?? "").trim().toLowerCase();
+  const groupLabel = String(book.group_label ?? "").trim();
+  if (objectType === "magazine" && groupLabel) {
+    push({ role: "group", name: groupLabel, heading: `Other issues of ${groupLabel}`, mediaScope: "all" });
+  }
+
   return candidates;
 }
 
@@ -178,7 +189,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
     const currentRes = await admin
       .from("user_books")
-      .select("id,owner_id,library_id,visibility,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))")
+      .select("id,owner_id,library_id,visibility,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,group_label,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))")
       .eq("id", bookId)
       .maybeSingle();
     if (currentRes.error) throw new Error(currentRes.error.message);
@@ -192,7 +203,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       return NextResponse.json({ ok: true, heading: null, rows: [] });
     }
 
-    const BOOK_SELECT = "id,owner_id,library_id,visibility,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))";
+    const BOOK_SELECT = "id,owner_id,library_id,visibility,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,group_label,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))";
 
     function dedupeByGroup(matches: BookLike[]): BookLike[] {
       const byGroup = new Map<string, BookLike[]>();
@@ -231,6 +242,18 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
           .neq("id", bookId)
           .order("created_at", { ascending: false })
           .limit(500);
+        if (booksRes.error) continue;
+        fetchedRows = (booksRes.data ?? []) as unknown as BookLike[];
+      } else if (candidate.role === "group") {
+        // Group: query directly by group_label
+        const booksRes = await admin
+          .from("user_books")
+          .select(BOOK_SELECT)
+          .in("library_id", allowedCatalogIds)
+          .eq("group_label", candidate.name)
+          .neq("id", bookId)
+          .order("issue_year", { ascending: true })
+          .limit(200);
         if (booksRes.error) continue;
         fetchedRows = (booksRes.data ?? []) as unknown as BookLike[];
       } else {

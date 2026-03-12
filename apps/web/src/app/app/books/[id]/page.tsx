@@ -1949,8 +1949,18 @@ export default function BookDetailPage() {
       });
     }
 
+    const groupLabel = (formGroupLabel ?? "").trim();
+    if (isMagazineType && groupLabel) {
+      pushCandidate({
+        role: "group",
+        name: groupLabel,
+        heading: `Other issues of ${groupLabel}`,
+        mediaScope: "all"
+      });
+    }
+
     return out;
-  }, [book]);
+  }, [book, formGroupLabel, isMagazineType]);
 
   // Used by metadata panel to decide whether to show the computed display value.
   const trimSizeValid = useMemo(
@@ -4587,7 +4597,7 @@ export default function BookDetailPage() {
                             />
                           ) : (
                             <a href={`/group/${slugify((formGroupLabel ?? "").trim())}`} style={{ textDecoration: "none", color: "inherit" }}>
-                              {(formGroupLabel ?? "").trim()}
+                              {(formGroupLabel ?? "").trim()} →
                             </a>
                           )}
                         </div>
@@ -5549,7 +5559,7 @@ export default function BookDetailPage() {
 
               {imageMedia.length > 0 ? (
                 <>
-                <div className="text-muted" style={{ marginTop: "var(--space-lg)" }}>Additional images</div>
+                <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>Additional images</div>
                 <div className="om-images-grid" style={{ marginTop: "var(--space-10)" }}>
                   {imageMedia.map((m, idx) => {
                     const url = mediaUrlsByPath[m.storage_path];

@@ -30,7 +30,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     } | null;
 
     if (!book) return NextResponse.json({ error: "not_found" }, { status: 404 });
-    if (book.owner_id !== current.id) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
     const origStoragePath =
       typeof book.cover_original_url === "string" && book.cover_original_url && !isRemoteUrl(book.cover_original_url)

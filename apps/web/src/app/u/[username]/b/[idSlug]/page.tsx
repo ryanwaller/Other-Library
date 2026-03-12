@@ -838,7 +838,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Group
                   </div>
-                  <div><a href={`/group/${slugify((book.group_label ?? "").trim())}`} style={{ textDecoration: "none", color: "inherit" }}>{(book.group_label ?? "").trim()}</a></div>
+                  <div><a href={`/group/${slugify((book.group_label ?? "").trim())}`} style={{ textDecoration: "none", color: "inherit" }}>{(book.group_label ?? "").trim()} →</a></div>
                 </div>
               ) : null}
 
