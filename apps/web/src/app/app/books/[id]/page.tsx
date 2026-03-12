@@ -232,6 +232,32 @@ function uniqStrings(values: Array<string | null | undefined>): string[] {
   return out;
 }
 
+function applyPeriodicalIdentityFilters<T extends { eq: Function; is: Function }>(
+  query: T,
+  identity: {
+    issue_number?: string | null;
+    issue_volume?: string | null;
+    issue_season?: string | null;
+    publish_date_override?: string | null;
+  }
+): T {
+  const issueNumber = String(identity.issue_number ?? "").trim();
+  const issueVolume = String(identity.issue_volume ?? "").trim();
+  const issueSeason = String(identity.issue_season ?? "").trim();
+  const publishDate = String(identity.publish_date_override ?? "").trim();
+
+  if (issueVolume) query = query.eq("issue_volume", issueVolume);
+  else query = query.is("issue_volume", null);
+  if (issueNumber) query = query.eq("issue_number", issueNumber);
+  else query = query.is("issue_number", null);
+  if (issueSeason) query = query.eq("issue_season", issueSeason);
+  else query = query.is("issue_season", null);
+  if (publishDate) query = query.eq("publish_date_override", publishDate);
+  else query = query.is("publish_date_override", null);
+
+  return query;
+}
+
 async function getOrCreateOwnedTagId(ownerId: string, name: string, kind: "tag" | "category"): Promise<number> {
   if (!supabase) throw new Error("Not signed in");
   const normalized = name.trim().replace(/\s+/g, " ");
@@ -1253,6 +1279,7 @@ export default function BookDetailPage() {
         setCopiesCountState({ busy: true, error: null });
         try {
           const countWithinLibrary = userId && ownerId === userId ? ((row as any).library_id as number | null) : null;
+          const isRowPeriodical = isMagazineObject(String((row as any).object_type ?? "").trim());
           if (row.edition?.id) {
             let q = supabase
               .from("user_books")
@@ -1260,6 +1287,14 @@ export default function BookDetailPage() {
               .eq("owner_id", ownerId)
               .eq("edition_id", row.edition.id);
             if (countWithinLibrary) q = q.eq("library_id", countWithinLibrary);
+            if (isRowPeriodical) {
+              q = applyPeriodicalIdentityFilters(q, {
+                issue_number: (row as any).issue_number,
+                issue_volume: (row as any).issue_volume,
+                issue_season: (row as any).issue_season,
+                publish_date_override: (row as any).publish_date_override
+              });
+            }
             const countRes = await q;
             if (countRes.error) throw new Error(countRes.error.message);
             setCopiesCount(countRes.count ?? 0);
@@ -1269,8 +1304,18 @@ export default function BookDetailPage() {
             if (countWithinLibrary) q = q.eq("library_id", countWithinLibrary);
             if (row.title_override) q = q.eq("title_override", row.title_override);
             else q = q.is("title_override", null);
-            if (row.authors_override && row.authors_override.length > 0) q = q.eq("authors_override", row.authors_override);
-            else q = q.is("authors_override", null);
+            if (isRowPeriodical) {
+              q = applyPeriodicalIdentityFilters(q, {
+                issue_number: (row as any).issue_number,
+                issue_volume: (row as any).issue_volume,
+                issue_season: (row as any).issue_season,
+                publish_date_override: (row as any).publish_date_override
+              });
+            } else if (row.authors_override && row.authors_override.length > 0) {
+              q = q.eq("authors_override", row.authors_override);
+            } else {
+              q = q.is("authors_override", null);
+            }
             const countRes = await q;
             if ((countRes as any).error) throw new Error((countRes as any).error.message);
             setCopiesCount((countRes as any).count ?? 0);
@@ -2597,6 +2642,10 @@ export default function BookDetailPage() {
     const matchedSubjects = uniqStrings(facetDraft.subject ?? effectiveSubjects);
     const matchedGroup = (formGroupLabel ?? "").trim() || null;
     const matchedObjectType = (formObjectType ?? "").trim() || null;
+    const isCurrentPeriodical = isMagazineObject(matchedObjectType || String(book.object_type ?? "").trim());
+    const matchedIssueNumber = String(formMagazine.issue_number ?? "").trim() || null;
+    const matchedIssueVolume = String(formMagazine.issue_volume ?? "").trim() || null;
+    const matchedIssueSeason = String(formMagazine.issue_season ?? "").trim() || null;
     const matchedDecade = (formDecade ?? "").trim() || null;
     const matchedPages = (() => {
       const raw = (formPages ?? "").trim();
@@ -2611,12 +2660,30 @@ export default function BookDetailPage() {
       let q = supabase.from("user_books").select("id,created_at").eq("owner_id", userId).eq("library_id", libId);
       if (book.edition?.id) {
         q = q.eq("edition_id", book.edition.id);
+        if (isCurrentPeriodical) {
+          q = applyPeriodicalIdentityFilters(q, {
+            issue_number: matchedIssueNumber,
+            issue_volume: matchedIssueVolume,
+            issue_season: matchedIssueSeason,
+            publish_date_override: matchedPublishDate
+          });
+        }
       } else {
         q = q.is("edition_id", null);
         if (matchedTitle) q = q.eq("title_override", matchedTitle);
         else q = q.is("title_override", null);
-        if (matchedAuthors.length > 0) q = q.eq("authors_override", matchedAuthors);
-        else q = q.is("authors_override", null);
+        if (isCurrentPeriodical) {
+          q = applyPeriodicalIdentityFilters(q, {
+            issue_number: matchedIssueNumber,
+            issue_volume: matchedIssueVolume,
+            issue_season: matchedIssueSeason,
+            publish_date_override: matchedPublishDate
+          });
+        } else if (matchedAuthors.length > 0) {
+          q = q.eq("authors_override", matchedAuthors);
+        } else {
+          q = q.is("authors_override", null);
+        }
       }
 
       const existing = await q.order("created_at", { ascending: false }).limit(200);
