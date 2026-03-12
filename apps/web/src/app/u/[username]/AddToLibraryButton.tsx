@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { useAddToLibraryContext } from "./AddToLibraryProvider";
+
+type Catalog = { id: number; name: string };
 
 type AddToLibraryButtonProps = {
   editionId: number | null;
@@ -21,7 +23,18 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
   const [createdId, setCreatedId] = useState<number | null>(null);
   const [count, setCount] = useState<number>(0);
   const [latestId, setLatestId] = useState<number | null>(null);
-  const [defaultLibraryId, setDefaultLibraryId] = useState<number | null>(null);
+
+  // Catalog picker state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [catalogs, setCatalogs] = useState<Catalog[]>([]);
+  const [catalogsLoaded, setCatalogsLoaded] = useState(false);
+  const [catalogsWithEdition, setCatalogsWithEdition] = useState<Set<number>>(new Set());
+  const [newCatalogMode, setNewCatalogMode] = useState(false);
+  const [newCatalogName, setNewCatalogName] = useState("");
+  const [newCatalogBusy, setNewCatalogBusy] = useState(false);
+  const [addedToCatalogName, setAddedToCatalogName] = useState<string | null>(null);
+
+  const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -29,79 +42,6 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSessionUserId(newSession?.user?.id ?? null));
     return () => sub.subscription.unsubscribe();
   }, []);
-
-  async function ensureDefaultLibraryId(opts?: { forceFresh?: boolean }): Promise<number | null> {
-    const forceFresh = opts?.forceFresh === true;
-    if (!supabase || !sessionUserId) {
-      setDefaultLibraryId(null);
-      return null;
-    }
-
-    const seen = new Set<number>();
-    const candidateIds: number[] = [];
-    if (!forceFresh && Number.isFinite(defaultLibraryId as number) && (defaultLibraryId as number) > 0) {
-      candidateIds.push(defaultLibraryId as number);
-      seen.add(defaultLibraryId as number);
-    }
-    if (!forceFresh) {
-      try {
-        const raw = typeof window !== "undefined" ? window.localStorage.getItem("om_currentLibraryId") : null;
-        const parsed = raw ? Number(raw) : NaN;
-        if (Number.isFinite(parsed) && parsed > 0 && !seen.has(parsed)) {
-          candidateIds.push(parsed);
-          seen.add(parsed);
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    for (const candidateId of candidateIds) {
-      const preferred = await supabase.from("libraries").select("id").eq("id", candidateId).eq("owner_id", sessionUserId).maybeSingle();
-      if (!preferred.error && preferred.data) {
-        setDefaultLibraryId(candidateId);
-        try {
-          window.localStorage.setItem("om_currentLibraryId", String(candidateId));
-        } catch {
-          // ignore
-        }
-        return candidateId;
-      }
-    }
-
-    // Fallback: first library owned by this user.
-    const libs = await supabase.from("libraries").select("id").eq("owner_id", sessionUserId).order("created_at", { ascending: true }).limit(1);
-    if (libs.error) return null;
-    const id = (libs.data?.[0] as any)?.id as number | undefined;
-    if (id) {
-      setDefaultLibraryId(id);
-      try {
-        window.localStorage.setItem("om_currentLibraryId", String(id));
-      } catch {
-        // ignore
-      }
-      return id;
-    }
-
-    // If none exist yet, create a default library and retry once.
-    const created = await supabase.from("libraries").insert({ owner_id: sessionUserId, name: "Your catalog" }).select("id").single();
-    if (created.error) return null;
-    const createdLibraryId = (created.data as any)?.id as number | undefined;
-    if (createdLibraryId) {
-      setDefaultLibraryId(createdLibraryId);
-      try {
-        window.localStorage.setItem("om_currentLibraryId", String(createdLibraryId));
-      } catch {
-        // ignore
-      }
-      return createdLibraryId;
-    }
-    return null;
-  }
-
-  async function refreshDefaultLibrary() {
-    await ensureDefaultLibraryId();
-  }
 
   const isSelf = useMemo(() => {
     if (!sessionUserId) return false;
@@ -145,41 +85,58 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionUserId, editionId, ctx]);
 
+  // Close picker on outside click
   useEffect(() => {
-    refreshDefaultLibrary();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionUserId]);
-
-  async function add() {
-    if (!supabase || !sessionUserId) return;
-    const targetLibraryId = await ensureDefaultLibraryId();
-    if (!targetLibraryId) {
-      setError("No catalog selected");
-      return;
+    if (!pickerOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+        setNewCatalogMode(false);
+        setNewCatalogName("");
+      }
     }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [pickerOpen]);
+
+  async function loadCatalogs(): Promise<Catalog[]> {
+    if (!supabase || !sessionUserId) return [];
+    const res = await supabase
+      .from("libraries")
+      .select("id,name")
+      .eq("owner_id", sessionUserId)
+      .order("created_at", { ascending: true });
+    if (res.error) return [];
+    const loaded = (res.data ?? []).map((r: any) => ({ id: Number(r.id), name: String(r.name ?? "") }));
+    setCatalogs(loaded);
+    setCatalogsLoaded(true);
+    return loaded;
+  }
+
+  async function loadCatalogsWithEdition(loadedCatalogs: Catalog[]) {
+    if (!supabase || !sessionUserId || !editionId || loadedCatalogs.length === 0) return;
+    const res = await supabase
+      .from("user_books")
+      .select("library_id")
+      .eq("owner_id", sessionUserId)
+      .eq("edition_id", editionId);
+    if (res.error) return;
+    const ids = new Set<number>((res.data ?? []).map((r: any) => Number(r.library_id)));
+    setCatalogsWithEdition(ids);
+  }
+
+  async function addToLibrary(libraryId: number, catalogName: string) {
+    if (!supabase || !sessionUserId) return;
     setBusy(true);
     setError(null);
     try {
-      const payload: any = { owner_id: sessionUserId, library_id: targetLibraryId, edition_id: editionId };
+      const payload: any = { owner_id: sessionUserId, library_id: libraryId, edition_id: editionId };
       if (!editionId) {
         payload.edition_id = null;
         payload.title_override = titleFallback.trim() ? titleFallback.trim() : null;
         payload.authors_override = (authorsFallback ?? []).filter(Boolean).length > 0 ? (authorsFallback ?? []).filter(Boolean) : null;
       }
-
-      let ins = await supabase.from("user_books").insert(payload).select("id").single();
-      if (ins.error) {
-        const isLibraryFk =
-          ((ins.error as any)?.code === "23503" || (ins.error as any)?.code === "P2003") &&
-          String((ins.error as any)?.message ?? "").includes("user_books_library_id_fkey");
-        if (isLibraryFk) {
-          const freshLibraryId = await ensureDefaultLibraryId({ forceFresh: true });
-          if (freshLibraryId) {
-            payload.library_id = freshLibraryId;
-            ins = await supabase.from("user_books").insert(payload).select("id").single();
-          }
-        }
-      }
+      const ins = await supabase.from("user_books").insert(payload).select("id").single();
       if (ins.error) throw new Error(ins.error.message);
       const id = (ins.data as any)?.id as number | undefined;
       if (!id) throw new Error("Add failed");
@@ -188,11 +145,58 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
         ctx?.bump(editionId, id);
         setCount((c) => c + 1);
         setLatestId(id);
+        setCatalogsWithEdition((prev) => new Set([...prev, libraryId]));
       }
+      setAddedToCatalogName(catalogName);
+      setTimeout(() => setAddedToCatalogName(null), 3000);
     } catch (e: any) {
       setError(e?.message ?? "Add failed");
     } finally {
       setBusy(false);
+      setPickerOpen(false);
+      setNewCatalogMode(false);
+      setNewCatalogName("");
+    }
+  }
+
+  async function handleAddClick() {
+    if (!supabase || !sessionUserId) return;
+    setError(null);
+    setAddedToCatalogName(null);
+
+    let loaded = catalogs;
+    if (!catalogsLoaded) {
+      loaded = await loadCatalogs();
+      await loadCatalogsWithEdition(loaded);
+    }
+
+    // Single catalog → add directly, no picker
+    if (loaded.length === 1) {
+      await addToLibrary(loaded[0]!.id, loaded[0]!.name);
+      return;
+    }
+
+    setPickerOpen(true);
+  }
+
+  async function handleCreateCatalog() {
+    const name = newCatalogName.trim();
+    if (!name || !supabase || !sessionUserId) return;
+    setNewCatalogBusy(true);
+    try {
+      const res = await supabase
+        .from("libraries")
+        .insert({ owner_id: sessionUserId, name })
+        .select("id")
+        .single();
+      if (res.error) throw new Error(res.error.message);
+      const newId = (res.data as any)?.id as number;
+      const newCatalog: Catalog = { id: newId, name };
+      setCatalogs((prev) => [...prev, newCatalog]);
+      await addToLibrary(newId, name);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to create catalog");
+      setNewCatalogBusy(false);
     }
   }
 
@@ -220,6 +224,7 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
       if (del.error) throw new Error(del.error.message);
       setCount((c) => Math.max(0, c - 1));
       setCreatedId(null);
+      setAddedToCatalogName(null);
       await ctx?.refresh(editionId);
       await refreshExisting();
     } catch (e: any) {
@@ -235,6 +240,21 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
   const idToOpen = latestId ?? createdId;
   const label = compact ? "＋" : "＋ Add";
 
+  const picker = pickerOpen ? (
+    <CatalogPickerDropdown
+      catalogs={catalogs}
+      catalogsWithEdition={catalogsWithEdition}
+      newCatalogMode={newCatalogMode}
+      newCatalogName={newCatalogName}
+      newCatalogBusy={newCatalogBusy}
+      busy={busy}
+      onSelect={(cat) => addToLibrary(cat.id, cat.name)}
+      onNewCatalogMode={() => setNewCatalogMode(true)}
+      onNewCatalogNameChange={setNewCatalogName}
+      onCreateCatalog={handleCreateCatalog}
+    />
+  ) : null;
+
   return (
     <span className="row" style={{ gap: "var(--space-8)", flexWrap: "nowrap", alignItems: "center", minHeight: 24 }}>
       {editionId && count > 0 ? (
@@ -247,16 +267,137 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
           <button onClick={removeOne} disabled={busy} title="Remove one copy">
             {busy ? (compact ? "…" : "Removing…") : compact ? "－" : "Remove copy"}
           </button>
-          <button onClick={add} disabled={busy} title="Add another copy">
-            {busy ? (compact ? "…" : "Adding…") : compact ? "＋" : "Add copy"}
-          </button>
+          <div ref={pickerRef} style={{ position: "relative", display: "inline-block" }}>
+            <button onClick={handleAddClick} disabled={busy} title="Add another copy">
+              {busy ? (compact ? "…" : "Adding…") : compact ? "＋" : "Add copy"}
+            </button>
+            {picker}
+          </div>
         </>
       ) : (
-        <button onClick={add} disabled={busy}>
-          {busy ? (compact ? "…" : "Adding…") : label}
-        </button>
+        <div ref={pickerRef} style={{ position: "relative", display: "inline-block" }}>
+          <button onClick={handleAddClick} disabled={busy}>
+            {busy ? (compact ? "…" : "Adding…") : label}
+          </button>
+          {picker}
+        </div>
       )}
-      {error ? <span className="text-muted">{error}</span> : null}
+      {addedToCatalogName ? (
+        <span className="text-muted">Added to {addedToCatalogName}</span>
+      ) : error ? (
+        <span className="text-muted">{error}</span>
+      ) : null}
     </span>
+  );
+}
+
+function CatalogPickerDropdown({
+  catalogs,
+  catalogsWithEdition,
+  newCatalogMode,
+  newCatalogName,
+  newCatalogBusy,
+  busy,
+  onSelect,
+  onNewCatalogMode,
+  onNewCatalogNameChange,
+  onCreateCatalog,
+}: {
+  catalogs: Catalog[];
+  catalogsWithEdition: Set<number>;
+  newCatalogMode: boolean;
+  newCatalogName: string;
+  newCatalogBusy: boolean;
+  busy: boolean;
+  onSelect: (cat: Catalog) => void;
+  onNewCatalogMode: () => void;
+  onNewCatalogNameChange: (v: string) => void;
+  onCreateCatalog: () => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: "calc(100% + 4px)",
+        right: 0,
+        zIndex: 200,
+        minWidth: 200,
+        background: "var(--bg)",
+        border: "1px solid var(--border)",
+        fontSize: "inherit",
+      }}
+    >
+      {catalogs.length === 0 ? (
+        <div className="text-muted" style={{ padding: "8px 12px" }}>
+          No catalogs
+        </div>
+      ) : (
+        catalogs.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => onSelect(cat)}
+            disabled={busy}
+            style={{
+              display: "flex",
+              width: "100%",
+              textAlign: "left",
+              padding: "8px 12px",
+              border: "none",
+              borderBottom: "1px solid var(--border)",
+              background: "transparent",
+              cursor: busy ? "default" : "pointer",
+              gap: "var(--space-8)",
+              alignItems: "baseline",
+            }}
+          >
+            <span style={{ flex: 1 }}>{cat.name}</span>
+            {catalogsWithEdition.has(cat.id) ? (
+              <span className="text-muted" style={{ fontSize: "0.85em" }}>✓</span>
+            ) : null}
+          </button>
+        ))
+      )}
+
+      <div style={{ borderTop: "1px solid var(--border)" }}>
+        {newCatalogMode ? (
+          <div style={{ padding: "8px 12px", display: "flex", gap: "var(--space-8)", alignItems: "baseline" }}>
+            <input
+              autoFocus
+              value={newCatalogName}
+              onChange={(e) => onNewCatalogNameChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); onCreateCatalog(); }
+                if (e.key === "Escape") { e.preventDefault(); onNewCatalogNameChange(""); }
+              }}
+              placeholder="Catalog name"
+              disabled={newCatalogBusy}
+              style={{ flex: 1, minWidth: 0 }}
+            />
+            <button
+              onClick={onCreateCatalog}
+              disabled={newCatalogBusy || !newCatalogName.trim()}
+            >
+              {newCatalogBusy ? "…" : "Add"}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onNewCatalogMode}
+            className="text-muted"
+            style={{
+              display: "block",
+              width: "100%",
+              textAlign: "left",
+              padding: "8px 12px",
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+            }}
+          >
+            Add to new catalog
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
