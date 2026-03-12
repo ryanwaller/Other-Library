@@ -188,7 +188,15 @@ export default function LibraryBlock({
                     type="button"
                     onClick={() => onToggleMembersEditor?.(libraryId)}
                     className={membersEditorOpen ? "text-primary" : "text-muted"}
-                    style={{ border: "none", background: "transparent", padding: 0, textDecoration: "underline", cursor: "pointer" }}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      padding: 0,
+                      textDecoration: "underline",
+                      cursor: "pointer",
+                      flexShrink: 0,
+                      whiteSpace: "nowrap"
+                    }}
                   >
                     {(memberPreviews ?? []).length > 0 ? "Edit Members" : "Add members"}
                   </button>
