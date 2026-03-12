@@ -603,7 +603,18 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   {effectiveEditors.length > 0 ? (
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                       <div style={{ minWidth: 110 }} className="text-muted">Editors</div>
-                      <div>{effectiveEditors.join(", ")}</div>
+                      <div>
+                        {effectiveEditors.map((name, idx) => {
+                          const entitySlug = entitySlugFor(["editor"], name);
+                          return (
+                            <span key={`editor-${name}`}>
+                              {name}
+                              {entitySlug ? <> <Link href={`/entity/${entitySlug}`} className="text-muted" style={{ textDecoration: "none" }}>↗</Link></> : null}
+                              {idx < effectiveEditors.length - 1 ? <span>, </span> : null}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
                   ) : null}
                   {effectiveAuthors.length > 0 ? (
@@ -737,7 +748,18 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Editors
                   </div>
-                  <div>{effectiveEditors.join(", ")}</div>
+                  <div>
+                    {effectiveEditors.map((name, idx) => {
+                      const entitySlug = entitySlugFor(["editor"], name);
+                      return (
+                        <span key={`editor-${name}`}>
+                          {name}
+                          {entitySlug ? <> <Link href={`/entity/${entitySlug}`} className="text-muted" style={{ textDecoration: "none" }}>↗</Link></> : null}
+                          {idx < effectiveEditors.length - 1 ? <span>, </span> : null}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : null}
 
@@ -838,7 +860,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Group
                   </div>
-                  <div><a href={`/group/${slugify((book.group_label ?? "").trim())}`} style={{ textDecoration: "none" }}>{(book.group_label ?? "").trim()} →</a></div>
+                  <div><a href={`/group/${slugify((book.group_label ?? "").trim())}`} style={{ textDecoration: "none" }}>{(book.group_label ?? "").trim()} ↗</a></div>
                 </div>
               ) : null}
 

@@ -1277,7 +1277,8 @@ export default function BookDetailPage() {
         // Try server-side signing first (admin client bypasses RLS — works even when
         // the storage path prefix doesn't match the current owner's UUID).
         try {
-          const token = session?.access_token ?? null;
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token ?? null;
           const apiRes = await fetch(`/api/books/${row.id}/media-urls`, token ? { headers: { authorization: `Bearer ${token}` } } : undefined);
           if (apiRes.ok) {
             const json = await apiRes.json();
@@ -4597,7 +4598,7 @@ export default function BookDetailPage() {
                             />
                           ) : (
                             <a href={`/group/${slugify((formGroupLabel ?? "").trim())}`} style={{ textDecoration: "none" }}>
-                              {(formGroupLabel ?? "").trim()} →
+                              {(formGroupLabel ?? "").trim()} ↗
                             </a>
                           )}
                         </div>
