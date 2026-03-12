@@ -73,6 +73,15 @@ function roleHeading(role: string, name: string): string {
   }
 }
 
+function roleHeadingForGroups(role: string, name: string, groups: Array<{ rep: BookRow }>): string {
+  if (role.toLowerCase() !== "author") return roleHeading(role, name);
+  const hasPeriodicals = groups.some(({ rep }) => isMagazineObject(rep.object_type));
+  const hasNonPeriodicals = groups.some(({ rep }) => !isMagazineObject(rep.object_type));
+  if (hasPeriodicals && hasNonPeriodicals) return `Items by ${name}`;
+  if (hasPeriodicals) return `Issues by ${name}`;
+  return `Books by ${name}`;
+}
+
 function roleSummaryLabel(role: string, count: number): string {
   const item = count === 1 ? "item" : "items";
   const book = count === 1 ? "book" : "books";
@@ -359,7 +368,7 @@ export default async function EntityPage({
           { key: `${role}:default`, heading: roleHeading(role, entity.name), groups: groups.filter(({ rep }) => !isMagazineObject(rep.object_type)) },
           { key: `${role}:magazine`, heading: role === "publisher" ? `Issues published by ${entity.name}` : `Issues edited by ${entity.name}`, groups: groups.filter(({ rep }) => isMagazineObject(rep.object_type)) }
         ]
-      : [{ key: role, heading: roleHeading(role, entity.name), groups }];
+      : [{ key: role, heading: roleHeadingForGroups(role, entity.name, groups), groups }];
 
     return buckets
       .filter((bucket) => bucket.groups.length > 0)
