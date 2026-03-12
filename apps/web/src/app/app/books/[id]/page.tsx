@@ -749,14 +749,14 @@ export default function BookDetailPage() {
     if (lightboxIndex === null) return;
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key === "Escape") setLightboxIndex(null);
-      if (e.key === "ArrowLeft") setLightboxIndex(prev => (prev !== null && prev > 0 ? prev - 1 : imageMedia.length - 1));
+      if (e.key === "ArrowLeft") setLightboxIndex(prev => (prev !== null && prev > 0 ? prev - 1 : lightboxItems.length - 1));
       if (e.key === "ArrowRight") {
-        setLightboxIndex(prev => (prev !== null && prev < imageMedia.length - 1 ? prev + 1 : 0));
+        setLightboxIndex(prev => (prev !== null && prev < lightboxItems.length - 1 ? prev + 1 : 0));
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [lightboxIndex, imageMedia.length]);
+  }, [lightboxIndex, lightboxItems.length]);
 
   useEffect(() => {
     return () => {
@@ -1929,6 +1929,14 @@ export default function BookDetailPage() {
 
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
   const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : suggestedCoverUrl ?? book?.edition?.cover_url ?? null;
+  const lightboxItems = useMemo(
+    () => [
+      ...(coverUrl ? [{ id: "cover", url: coverOriginalSrc ?? coverUrl }] : []),
+      ...imageMedia.map((m) => ({ id: `image-${m.id}`, url: mediaUrlsByPath[m.storage_path] ?? "" })),
+    ].filter((item) => item.url),
+    [coverOriginalSrc, coverUrl, imageMedia, mediaUrlsByPath]
+  );
+  const lightboxCoverOffset = coverUrl ? 1 : 0;
 
   // Used by metadata panel to decide whether to show the computed display value.
   const trimSizeValid = useMemo(
@@ -4151,6 +4159,7 @@ export default function BookDetailPage() {
               onTouchMove={handleCoverTouchMove}
               onTouchEnd={handleCoverTouchEnd}
               onTouchCancel={handleCoverTouchCancel}
+              onCoverClick={() => setLightboxIndex(0)}
             />
 
             <div style={{ alignSelf: "start" }}>
@@ -5510,7 +5519,7 @@ export default function BookDetailPage() {
                       <div key={m.id}>
                         {url ? (
                           <div 
-                            onClick={() => setLightboxIndex(idx)}
+                            onClick={() => setLightboxIndex(idx + lightboxCoverOffset)}
                             className="om-cover-slot" 
                             style={{ width: "100%", height: isNarrow ? 140 : 180, padding: 0, cursor: "pointer" }}
                           >
@@ -5561,7 +5570,7 @@ export default function BookDetailPage() {
         </div>
       )}
 
-      {lightboxIndex !== null && imageMedia[lightboxIndex] && (
+      {lightboxIndex !== null && lightboxItems[lightboxIndex] && (
         <div
           style={{
             position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
@@ -5585,7 +5594,7 @@ export default function BookDetailPage() {
                 Prev
               </button>
             )}
-            {(lightboxIndex ?? 0) < imageMedia.length - 1 && (
+            {(lightboxIndex ?? 0) < lightboxItems.length - 1 && (
               <button
                 style={{ color: "#fff" }}
                 onClick={() => setLightboxIndex(prev => prev !== null ? prev + 1 : 0)}
@@ -5603,7 +5612,7 @@ export default function BookDetailPage() {
 
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={mediaUrlsByPath[imageMedia[lightboxIndex]!.storage_path]}
+            src={lightboxItems[lightboxIndex]!.url}
             alt=""
             style={{ maxWidth: "calc(100% - 64px)", maxHeight: "calc(100% - 64px)", objectFit: "contain" }}
             onClick={(e) => e.stopPropagation()}

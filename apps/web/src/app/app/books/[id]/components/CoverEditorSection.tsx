@@ -104,6 +104,7 @@ type CoverEditorSectionProps = {
   onTouchMove: React.TouchEventHandler<HTMLDivElement>;
   onTouchEnd: React.TouchEventHandler<HTMLDivElement>;
   onTouchCancel: React.TouchEventHandler<HTMLDivElement>;
+  onCoverClick?: () => void;
 };
 
 const CoverEditorSection = forwardRef<CoverEditorSectionHandle, CoverEditorSectionProps>(
@@ -136,6 +137,7 @@ const CoverEditorSection = forwardRef<CoverEditorSectionHandle, CoverEditorSecti
     onTouchMove,
     onTouchEnd,
     onTouchCancel,
+    onCoverClick,
   }, ref) {
     const [pendingCover, setPendingCover] = useState<File | null>(null);
     const [coverEditorSrc, setCoverEditorSrc] = useState<string | null>(null);
@@ -328,8 +330,10 @@ const CoverEditorSection = forwardRef<CoverEditorSectionHandle, CoverEditorSecti
             touchAction: "pan-y",
             filter: coverEditorSrc
               ? `brightness(${editorState.brightness}) contrast(${editorState.contrast})`
-              : undefined
+              : undefined,
+            cursor: !coverEditorSrc && coverUrl && !coverToolsOpen ? "pointer" : undefined
           }}
+          onClick={!coverEditorSrc && coverUrl && !coverToolsOpen ? onCoverClick : undefined}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
