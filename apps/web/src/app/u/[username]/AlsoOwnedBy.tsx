@@ -51,9 +51,11 @@ export default function AlsoOwnedBy({
         for (const r of data) {
           if (!r?.owner_id) continue;
           if (excludeOwnerId && r.owner_id === excludeOwnerId) continue;
-          // Exclude books explicitly marked followers-only or from private profiles.
+          // Exclude books explicitly marked followers-only.
+          // If a book is explicitly public, show it even if the owner's profile is followers_only.
+          // If a book inherits profile visibility and the profile is followers_only, hide it.
           if (r.visibility === "followers_only") continue;
-          if (r.owner?.visibility === "followers_only") continue;
+          if (r.visibility === "inherit" && r.owner?.visibility === "followers_only") continue;
           const cur = byOwner.get(r.owner_id);
           if (!cur) {
             byOwner.set(r.owner_id, { row: r, copies: 1 });
