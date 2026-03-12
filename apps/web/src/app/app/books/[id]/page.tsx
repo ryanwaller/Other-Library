@@ -2255,7 +2255,7 @@ export default function BookDetailPage() {
       const printer_override = joinTokenValues(printerNames);
       const materials_override = joinTokenValues(materialNames);
       const subjects_override = uniqStrings(facetDraft.subject ?? effectiveSubjects);
-      const group_label = formGroupLabel.trim() ? formGroupLabel.trim() : null;
+      let group_label = formGroupLabel.trim() ? formGroupLabel.trim() : null;
       const object_type = formObjectType.trim() ? formObjectType.trim() : null;
       const manualIsbn = !isMusicObject ? normalizeIsbnInput(formIsbn) : "";
       const manualIssn = isMagazineType ? normalizeIssn(formMagazine.issn ?? "") : "";
@@ -2329,6 +2329,21 @@ export default function BookDetailPage() {
         payload.pages = null;
       }
       if (isMagazineType) {
+        const libraryId = formLibraryId ?? (book as any).library_id ?? null;
+        const periodicalTitle = title_override || String(book.title_override ?? book.edition?.title ?? "").trim() || null;
+        if (!group_label && libraryId && periodicalTitle) {
+          const sameTitleCountRes = await supabase
+            .from("user_books")
+            .select("id", { count: "exact", head: true })
+            .eq("library_id", libraryId)
+            .eq("object_type", "magazine")
+            .eq("title_override", periodicalTitle);
+          if (sameTitleCountRes.error) throw new Error(sameTitleCountRes.error.message);
+          if ((sameTitleCountRes.count ?? 0) > 1) {
+            group_label = periodicalTitle;
+            payload.group_label = periodicalTitle;
+          }
+        }
         payload.authors_override = null;
         payload.music_metadata = null;
         payload.edition_override = null;
