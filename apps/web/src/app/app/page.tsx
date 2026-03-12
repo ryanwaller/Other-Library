@@ -4203,18 +4203,17 @@ function AppShell({
       )}
 
       {displayLibraries.map((lib, idx) => {
-        try {
-          const groups = displayGroupsByLibraryId[lib.id] ?? [];
-          const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
-          const showBookSkeleton = booksLoading && groups.length === 0;
-          const memberState = membersByCatalogId[lib.id] ?? { busy: false, error: null, members: [], inviteInput: "", inviteBusy: false };
-          const acceptedMembers = Array.isArray(memberState.members) ? memberState.members.filter((m) => m.accepted_at) : [];
-          const pendingMembers = Array.isArray(memberState.members) ? memberState.members.filter((m) => !m.accepted_at) : [];
-          const selfMember = acceptedMembers.find((m) => m.user_id === userId) ?? pendingMembers.find((m) => m.user_id === userId) ?? null;
-          const iAmOwner = (selfMember?.role ?? lib.myRole) === "owner";
-          const showEditMembersAction = bulkMode && iAmOwner;
-          const showMembersEditor = bulkMode && iAmOwner && membersEditorCatalogId === lib.id;
-          const membersPanel = showMembersEditor ? (
+        const groups = displayGroupsByLibraryId[lib.id] ?? [];
+        const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
+        const showBookSkeleton = booksLoading && groups.length === 0;
+        const memberState = membersByCatalogId[lib.id] ?? { busy: false, error: null, members: [], inviteInput: "", inviteBusy: false };
+        const acceptedMembers = Array.isArray(memberState.members) ? memberState.members.filter((m) => m.accepted_at) : [];
+        const pendingMembers = Array.isArray(memberState.members) ? memberState.members.filter((m) => !m.accepted_at) : [];
+        const selfMember = acceptedMembers.find((m) => m.user_id === userId) ?? pendingMembers.find((m) => m.user_id === userId) ?? null;
+        const iAmOwner = (selfMember?.role ?? lib.myRole) === "owner";
+        const showEditMembersAction = bulkMode && iAmOwner;
+        const showMembersEditor = bulkMode && iAmOwner && membersEditorCatalogId === lib.id;
+        const membersPanel = showMembersEditor ? (
           <div style={{ marginTop: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
             <div className="text-muted">Members</div>
 
@@ -4311,7 +4310,8 @@ function AppShell({
           </div>
           ) : null;
           return (
-            <div key={lib.id}>
+            <CatalogRenderBoundary key={lib.id} libraryName={lib.name}>
+              <div>
               <LibraryBlock
                 libraryId={lib.id}
                 libraryName={lib.name}
@@ -4357,41 +4357,32 @@ function AppShell({
                 isMobile={isMobile}
                 searchQuery={searchQuery}
                 renderBooks={(limit, effectiveViewMode) => (
-                  <CatalogRenderBoundary libraryName={lib.name}>
-                    <SortableCatalogGrid
-                      libraryId={lib.id}
-                      groups={groups}
-                      limit={limit}
-                      effectiveViewMode={effectiveViewMode}
-                      effectiveCols={effectiveCols}
-                      showBookSkeleton={showBookSkeleton}
-                      isRearranging={bulkMode}
-                      bulkMode={bulkMode}
-                      viewMode={viewMode}
-                      bulkSelectedKeys={bulkSelectedKeys}
-                      deleteStateByBookId={deleteStateByBookId}
-                      onToggleSelected={toggleBulkKey}
-                      onDeleteCopy={deleteEntry}
-                      onStoreBookNavContext={storeBookNavContext}
-                      onReorderStart={beginItemReorder}
-                      onReorderPreview={previewItemReorder}
-                      onReorderCommit={commitItemReorder}
-                      onReorderCancel={cancelItemReorder}
-                    />
-                  </CatalogRenderBoundary>
+                  <SortableCatalogGrid
+                    libraryId={lib.id}
+                    groups={groups}
+                    limit={limit}
+                    effectiveViewMode={effectiveViewMode}
+                    effectiveCols={effectiveCols}
+                    showBookSkeleton={showBookSkeleton}
+                    isRearranging={bulkMode}
+                    bulkMode={bulkMode}
+                    viewMode={viewMode}
+                    bulkSelectedKeys={bulkSelectedKeys}
+                    deleteStateByBookId={deleteStateByBookId}
+                    onToggleSelected={toggleBulkKey}
+                    onDeleteCopy={deleteEntry}
+                    onStoreBookNavContext={storeBookNavContext}
+                    onReorderStart={beginItemReorder}
+                    onReorderPreview={previewItemReorder}
+                    onReorderCommit={commitItemReorder}
+                    onReorderCancel={cancelItemReorder}
+                  />
                 )}
               />
               {idx < displayLibraries.length - 1 && <hr className="om-hr" />}
-            </div>
+              </div>
+            </CatalogRenderBoundary>
           );
-        } catch (error) {
-          console.error("homepage_catalog_render_failed", { libraryId: lib.id, error });
-          return (
-            <div key={lib.id} className="text-muted" style={{ marginTop: idx === 0 ? 0 : "var(--space-14)" }}>
-              Could not render this catalog.
-            </div>
-          );
-        }
       })}
 
       <div style={{ marginTop: 24 }} className="card">
