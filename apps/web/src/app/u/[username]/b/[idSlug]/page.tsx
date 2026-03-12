@@ -826,6 +826,13 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                 </div>
               ) : null}
 
+              {!isMusicObject && !isPeriodical && (book as any)?.trim_width && (book as any)?.trim_height ? (
+                <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
+                  <div style={{ minWidth: 110 }} className="text-muted">Trim size</div>
+                  <div>{`${(book as any).trim_width} × ${(book as any).trim_height} ${(book as any).trim_unit ?? "in"}`}</div>
+                </div>
+              ) : null}
+
               {(book.group_label ?? "").trim() ? (
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
                   <div style={{ minWidth: 110 }} className="text-muted">
