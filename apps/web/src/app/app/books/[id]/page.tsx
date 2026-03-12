@@ -1273,10 +1273,24 @@ export default function BookDetailPage() {
         ])
       );
       if (paths.length > 0) {
-        const signedRes = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 60);
-        const next: Record<string, string> = {};
-        for (const s of signedRes.data ?? []) {
-          if (s.path && s.signedUrl) next[s.path] = s.signedUrl;
+        let next: Record<string, string> = {};
+        // Try server-side signing first (admin client bypasses RLS — works even when
+        // the storage path prefix doesn't match the current owner's UUID).
+        try {
+          const apiRes = await fetch(`/api/books/${row.id}/media-urls`);
+          if (apiRes.ok) {
+            const json = await apiRes.json();
+            if (json?.paths && typeof json.paths === "object") next = json.paths;
+          }
+        } catch {
+          // fall through to client-side signing
+        }
+        // Client-side fallback
+        if (Object.keys(next).length === 0) {
+          const signedRes = await supabase.storage.from("user-book-media").createSignedUrls(paths, 60 * 60);
+          for (const s of signedRes.data ?? []) {
+            if (s.path && s.signedUrl) next[s.path] = s.signedUrl;
+          }
         }
         setMediaUrlsByPath(next);
         if (origStoragePath && next[origStoragePath]) {
@@ -4558,6 +4572,26 @@ export default function BookDetailPage() {
                 ) : isMagazineType ? (
                   <>
                     <hr className="divider" />
+                    {(editMode || (formGroupLabel ?? "").trim()) && (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">Group</div>
+                        <div style={{ flex: "1 1 auto" }}>
+                          {editMode ? (
+                            <input
+                              className="om-inline-control"
+                              value={formGroupLabel}
+                              onChange={(e) => setFormGroupLabel(e.target.value)}
+                              onKeyDown={(e) => onEnter(e, () => void saveEdits())}
+                              placeholder="Publication title (e.g. The New Yorker)"
+                            />
+                          ) : (
+                            (formGroupLabel ?? "").trim()
+                          )}
+                        </div>
+                        {editMode && <div style={{ width: 32 }} />}
+                      </div>
+                    )}
+
                     {(editMode || facetView.editor.length > 0) && (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
                         <div style={{ minWidth: 110 }} className="text-muted">Editors</div>

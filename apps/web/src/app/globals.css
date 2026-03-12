@@ -1257,7 +1257,7 @@ a.text-muted:hover {
 .om-images-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
 }
 
 .om-related-items-grid {
