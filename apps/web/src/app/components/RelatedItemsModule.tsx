@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CoverCrop } from "../../components/CoverImage";
 import CoverImage from "../../components/CoverImage";
 import { parseMusicMetadata } from "../../lib/music";
+import { formatIssueDisplay, isMagazineObject } from "../../lib/magazine";
 import { bookIdSlug } from "../../lib/slug";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -24,6 +25,11 @@ type RelatedItemRow = {
   visibility: "inherit" | "followers_only" | "public";
   object_type: string | null;
   title_override: string | null;
+  subtitle_override?: string | null;
+  issue_number?: string | null;
+  issue_volume?: string | null;
+  issue_season?: string | null;
+  issue_year?: number | null;
   authors_override?: string[] | null;
   designers_override?: string[] | null;
   music_metadata?: unknown;
@@ -44,6 +50,14 @@ function isRemoteUrl(input: string | null | undefined): boolean {
 
 function effectiveTitle(row: RelatedItemRow): string {
   return String(row.title_override ?? "").trim() || String(row.edition?.title ?? "").trim() || "(untitled)";
+}
+
+function effectiveSecondaryLine(row: RelatedItemRow): string | null {
+  if (!isMagazineObject(row.object_type)) return null;
+  const subtitle = String(row.subtitle_override ?? "").trim();
+  const issue = formatIssueDisplay(row) || null;
+  if (subtitle && issue) return `${subtitle}, ${issue}`;
+  return subtitle || issue || null;
 }
 
 function coverStoragePath(row: RelatedItemRow): string | null {
@@ -234,7 +248,7 @@ export default function RelatedItemsModule({
         let nextSignedMap: Record<string, string> = {};
 
         {
-          const BOOK_SELECT = "id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,cover_url,authors),media:user_book_media(kind,storage_path),book_entities(role,entity_id,entity:entities(id,name))";
+          const BOOK_SELECT = "id,library_id,visibility,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,cover_url,authors),media:user_book_media(kind,storage_path),book_entities(role,entity_id,entity:entities(id,name))";
 
           let candidateBookIds: number[] | null = null;
           if (entityId) {
@@ -336,6 +350,7 @@ export default function RelatedItemsModule({
         <div className="om-related-items-grid" style={{ marginTop: "var(--space-14)" }}>
           {visibleRows.map((row) => {
             const title = effectiveTitle(row);
+            const secondaryLine = effectiveSecondaryLine(row);
             const href =
               hrefMode === "public" && username
                 ? `/u/${encodeURIComponent(username)}/b/${bookIdSlug(row.id, title)}`
@@ -352,6 +367,9 @@ export default function RelatedItemsModule({
                   <Link href={href} style={{ color: "inherit", textDecoration: "none" }}>
                     <span className="om-book-title">{title}</span>
                   </Link>
+                  {secondaryLine ? (
+                    <div className="text-muted" style={{ marginTop: "var(--space-xs)" }}>{secondaryLine}</div>
+                  ) : null}
                 </div>
               </div>
             );

@@ -10,6 +10,11 @@ type BookLike = {
   visibility: "inherit" | "followers_only" | "public";
   object_type: string | null;
   title_override: string | null;
+  subtitle_override: string | null;
+  issue_number: string | null;
+  issue_volume: string | null;
+  issue_season: string | null;
+  issue_year: number | null;
   authors_override: string[] | null;
   designers_override: string[] | null;
   music_metadata?: MusicMetadata | null;
@@ -173,7 +178,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
     const currentRes = await admin
       .from("user_books")
-      .select("id,owner_id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))")
+      .select("id,owner_id,library_id,visibility,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))")
       .eq("id", bookId)
       .maybeSingle();
     if (currentRes.error) throw new Error(currentRes.error.message);
@@ -187,7 +192,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       return NextResponse.json({ ok: true, heading: null, rows: [] });
     }
 
-    const BOOK_SELECT = "id,owner_id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))";
+    const BOOK_SELECT = "id,owner_id,library_id,visibility,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))";
 
     function dedupeByGroup(matches: BookLike[]): BookLike[] {
       const byGroup = new Map<string, BookLike[]>();

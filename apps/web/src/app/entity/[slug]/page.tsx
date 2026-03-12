@@ -19,6 +19,7 @@ type BookRow = {
   created_at: string;
   edition_id: number | null;
   title_override: string | null;
+  subtitle_override: string | null;
   object_type: string | null;
   issue_number: string | null;
   issue_volume: string | null;
@@ -32,7 +33,7 @@ type BookRow = {
 };
 
 const BOOK_SELECT =
-  "id,owner_id,library_id,created_at,edition_id,title_override,object_type,issue_number,issue_volume,issue_season,issue_year,issn,cover_original_url,cover_crop,edition:editions(title,isbn13,cover_url),media:user_book_media(kind,storage_path)";
+  "id,owner_id,library_id,created_at,edition_id,title_override,subtitle_override,object_type,issue_number,issue_volume,issue_season,issue_year,issn,cover_original_url,cover_crop,edition:editions(title,isbn13,cover_url),media:user_book_media(kind,storage_path)";
 
 const ROLE_ORDER = [
   "author", "performer", "editor", "publisher", "composer", "producer",
@@ -125,7 +126,10 @@ function effectiveTitle(row: BookRow): string {
 
 function effectiveSecondaryLine(row: BookRow): string | null {
   if (!isMagazineObject(row.object_type)) return null;
-  return formatIssueDisplay(row) || null;
+  const subtitle = String(row.subtitle_override ?? "").trim();
+  const issue = formatIssueDisplay(row) || null;
+  if (subtitle && issue) return `${subtitle}, ${issue}`;
+  return subtitle || issue || null;
 }
 
 function titleSortKey(row: BookRow): string {

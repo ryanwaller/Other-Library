@@ -3,6 +3,7 @@ import { getServerSupabase } from "../../../../../lib/supabaseServer";
 import { getSupabaseAdmin } from "../../../../../lib/supabaseAdmin";
 import { bookIdSlug } from "../../../../../lib/slug";
 import { MUSIC_CONTRIBUTOR_ROLES, parseMusicMetadata, type MusicMetadata } from "../../../../../lib/music";
+import { formatIssueDisplay, isMagazineObject } from "../../../../../lib/magazine";
 import PublicRelatedItemsGrid from "./PublicRelatedItemsGrid";
 
 type PublicBookLike = {
@@ -12,6 +13,11 @@ type PublicBookLike = {
   visibility: "inherit" | "followers_only" | "public";
   object_type: string | null;
   title_override: string | null;
+  subtitle_override?: string | null;
+  issue_number?: string | null;
+  issue_volume?: string | null;
+  issue_season?: string | null;
+  issue_year?: number | null;
   authors_override: string[] | null;
   designers_override: string[] | null;
   music_metadata?: MusicMetadata | null;
@@ -58,6 +64,14 @@ function isRemoteUrl(input: string | null | undefined): boolean {
 
 function effectiveTitle(row: PublicBookLike): string {
   return String(row.title_override ?? "").trim() || String(row.edition?.title ?? "").trim() || "(untitled)";
+}
+
+function effectiveSecondaryLine(row: PublicBookLike): string | null {
+  if (!isMagazineObject(row.object_type)) return null;
+  const subtitle = String(row.subtitle_override ?? "").trim();
+  const issue = formatIssueDisplay(row) || null;
+  if (subtitle && issue) return `${subtitle}, ${issue}`;
+  return subtitle || issue || null;
 }
 
 function coverStoragePath(row: PublicBookLike): string | null {
@@ -204,7 +218,7 @@ export default async function PublicRelatedItemsSection({
 
   const booksRes = await db
     .from("user_books")
-    .select("id,owner_id,library_id,visibility,object_type,title_override,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))")
+    .select("id,owner_id,library_id,visibility,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,authors_override,designers_override,music_metadata,cover_original_url,cover_crop,edition:editions(id,title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))")
     .eq("owner_id", profileId)
     .in("library_id", validLibraryIds)
     .neq("id", book.id)
@@ -246,6 +260,7 @@ export default async function PublicRelatedItemsSection({
       id: row.id,
       href: `/u/${encodeURIComponent(profileUsername)}/b/${bookIdSlug(row.id, title)}`,
       title,
+      secondaryLine: effectiveSecondaryLine(row),
       coverUrl: coverSrc(row, signedMap),
       coverCrop: row.cover_crop
     };

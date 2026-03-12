@@ -8,6 +8,7 @@ export type PublicRelatedItemRow = {
   id: number;
   href: string;
   title: string;
+  secondaryLine?: string | null;
   coverUrl: string | null;
   coverCrop: CoverCrop | null;
 };
@@ -40,6 +41,9 @@ export default function PublicRelatedItemsGrid({
                 <Link href={row.href} style={{ color: "inherit", textDecoration: "none" }}>
                   <span className="om-book-title">{row.title}</span>
                 </Link>
+                {row.secondaryLine ? (
+                  <div className="text-muted" style={{ marginTop: "var(--space-xs)" }}>{row.secondaryLine}</div>
+                ) : null}
               </div>
             </div>
           ))}
