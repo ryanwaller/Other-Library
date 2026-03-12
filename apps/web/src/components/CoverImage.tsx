@@ -118,6 +118,15 @@ export default function CoverImage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Reset to "loading" whenever src changes so a previously-errored component
+  // gives the new URL a fresh attempt instead of staying stuck in "error".
+  const prevSrcRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!src || src === prevSrcRef.current) return;
+    prevSrcRef.current = src;
+    setStatus("loading");
+  }, [src]);
+
   if (!src || status === "error") {
     return (
       <div style={{ ...style, display: "flex", alignItems: "center", justifyContent: "center" }} className={className}>
