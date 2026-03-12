@@ -115,6 +115,18 @@ function effectiveSecondaryLine(row: BookRow): string | null {
   return formatIssueDisplay(row) || null;
 }
 
+function titleSortKey(row: BookRow): string {
+  const title = effectiveTitle(row).trim().toLowerCase().replace(/\s+/g, " ");
+  if (!isMagazineObject(row.object_type)) return title;
+  const volume = String(row.issue_volume ?? "").trim().toLowerCase();
+  const issueNumber = String(row.issue_number ?? "").trim().toLowerCase();
+  const season = String(row.issue_season ?? "").trim().toLowerCase();
+  const year = String(row.issue_year ?? "").trim().toLowerCase();
+  return [title, volume && `vol ${volume}`, issueNumber && `issue ${issueNumber}`, season, year]
+    .filter(Boolean)
+    .join(" | ");
+}
+
 function editionKey(row: BookRow): string {
   if (row.edition_id) return `eid:${row.edition_id}`;
   if (isMagazineObject(row.object_type)) return `mag:${row.id}`;
@@ -294,12 +306,12 @@ export default async function EntityPage({
     (a, b) => roleSortIndex(a[0]) - roleSortIndex(b[0])
   );
 
-  // 7. Group books by edition within each role (newest-first within each group)
+  // 7. Group books by edition within each role, then sort modules alphabetically
   type EditionGroup = { rep: BookRow; allBooks: BookRow[] };
 
   const roleGroups = sortedRoles.map(([role, booksMap]) => {
-    const sorted = Array.from(booksMap.values()).sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    const sorted = Array.from(booksMap.values()).sort((a, b) =>
+      titleSortKey(a).localeCompare(titleSortKey(b), undefined, { numeric: true, sensitivity: "base" })
     );
     const byEd = new Map<string, BookRow[]>();
     for (const book of sorted) {
@@ -307,10 +319,14 @@ export default async function EntityPage({
       if (!byEd.has(key)) byEd.set(key, []);
       byEd.get(key)!.push(book);
     }
-    const groups: EditionGroup[] = Array.from(byEd.values()).map((books) => ({
-      rep: books[0],
-      allBooks: books
-    }));
+    const groups: EditionGroup[] = Array.from(byEd.values())
+      .map((books) => ({
+        rep: books[0],
+        allBooks: books
+      }))
+      .sort((a, b) =>
+        titleSortKey(a.rep).localeCompare(titleSortKey(b.rep), undefined, { numeric: true, sensitivity: "base" })
+      );
     return { role, groups };
   });
 

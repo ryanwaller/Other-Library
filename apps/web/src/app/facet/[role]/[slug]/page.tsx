@@ -57,6 +57,22 @@ function labelForRole(role: FacetRole): string {
   return facetLabelForRole(role);
 }
 
+function effectiveTitle(row: FacetBook): string {
+  return String(row.title_override ?? "").trim() || String(row.edition?.title ?? "").trim() || "(untitled)";
+}
+
+function titleSortKey(row: FacetBook): string {
+  const title = effectiveTitle(row).trim().toLowerCase().replace(/\s+/g, " ");
+  if ((String(row.object_type ?? "").trim().toLowerCase()) !== "magazine") return title;
+  const volume = String(row.issue_volume ?? "").trim().toLowerCase();
+  const issueNumber = String(row.issue_number ?? "").trim().toLowerCase();
+  const season = String(row.issue_season ?? "").trim().toLowerCase();
+  const year = String(row.issue_year ?? "").trim().toLowerCase();
+  return [title, volume && `vol ${volume}`, issueNumber && `issue ${issueNumber}`, season, year]
+    .filter(Boolean)
+    .join(" | ");
+}
+
 export async function generateMetadata({
   params
 }: {
@@ -212,7 +228,9 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
       libraryId,
       name: libraryId > 0 ? libraryNameById[libraryId] ?? `Catalog ${libraryId}` : "Unassigned",
       sortOrder: libraryId > 0 ? librarySortById[libraryId] ?? 0 : 999999,
-      rows
+      rows: rows.sort((a, b) =>
+        titleSortKey(a).localeCompare(titleSortKey(b), undefined, { numeric: true, sensitivity: "base" })
+      )
     }))
     .sort((a, b) => {
       if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
