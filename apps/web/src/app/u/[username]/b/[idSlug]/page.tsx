@@ -608,7 +608,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   ) : null}
                   {effectiveAuthors.length > 0 ? (
                     <div className="row om-row-baseline" style={{ marginTop: "var(--space-sm)" }}>
-                      <div style={{ minWidth: 110 }} className="text-muted">Authors</div>
+                      <div style={{ minWidth: 110 }} className="text-muted">Contributors</div>
                       <div className="om-hanging-value">
                         {effectiveAuthors.map((a, idx) => {
                           const entitySlug = entitySlugFor(["author"], a);

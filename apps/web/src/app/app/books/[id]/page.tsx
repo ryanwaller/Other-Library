@@ -4550,10 +4550,10 @@ export default function BookDetailPage() {
 
                     {(editMode || facetView.author.length > 0) && (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Authors</div>
+                        <div style={{ minWidth: 110 }} className="text-muted">Contributors</div>
                         <div className="om-hanging-value">
                           {editMode ? (
-                            <EntityTokenField role="author" value={facetDraft.author} onChange={(next) => { setFacetDraft((s) => ({ ...s, author: next })); setFormAuthors(next.join(", ")); }} placeholder="Add an author" disabled={!isOwner || busy || saveState.busy} />
+                            <EntityTokenField role="author" value={facetDraft.author} onChange={(next) => { setFacetDraft((s) => ({ ...s, author: next })); setFormAuthors(next.join(", ")); }} placeholder="Add a contributor" disabled={!isOwner || busy || saveState.busy} />
                           ) : (
                             <FacetLinks role="author" items={facetView.author} />
                           )}
@@ -4738,10 +4738,10 @@ export default function BookDetailPage() {
                     {editMode || facetView.author.length > 0 ? <hr className="divider" /> : null}
                     {(editMode || facetView.author.length > 0) && (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                        <div style={{ minWidth: 110 }} className="text-muted">Authors</div>
+                        <div style={{ minWidth: 110 }} className="text-muted">Contributors</div>
                         <div className="om-hanging-value">
                           {editMode ? (
-                            <EntityTokenField role="author" value={facetDraft.author} onChange={(next) => { setFacetDraft((s) => ({ ...s, author: next })); setFormAuthors(next.join(", ")); }} placeholder="Add an author" disabled={!isOwner || busy || saveState.busy} />
+                            <EntityTokenField role="author" value={facetDraft.author} onChange={(next) => { setFacetDraft((s) => ({ ...s, author: next })); setFormAuthors(next.join(", ")); }} placeholder="Add a contributor" disabled={!isOwner || busy || saveState.busy} />
                           ) : (
                             <FacetLinks role="author" items={facetView.author} />
                           )}
