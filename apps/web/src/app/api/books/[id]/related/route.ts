@@ -227,6 +227,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       });
     }
 
+    console.log(`[rel] book=${bookId} candidates=${candidates.length} allowed=[${allowedCatalogIds.join(",")}]`);
+
     let heading: string | null = null;
     let matchedRows: BookLike[] = [];
 
@@ -297,6 +299,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       break;
     }
 
+    console.log(`[rel] done book=${bookId} heading="${heading ?? "null"}" rows=${matchedRows.length}`);
     if (!heading || matchedRows.length < 1) {
       return NextResponse.json({ ok: true, heading: null, rows: [] });
     }

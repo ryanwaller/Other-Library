@@ -49,7 +49,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       for (const s of signed.data ?? []) {
         if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;
       }
-      console.log(`[mu] book=${bookId} paths=${paths.length} signedCount=${Object.keys(signedMap).length} err=${signed.error?.message ?? "none"}`);
+      console.log(`[mu] ${Object.keys(signedMap).length}/${paths.length} book=${bookId} err=${signed.error?.message ?? "none"}`);
     }
     return NextResponse.json({ ok: true, paths: signedMap });
   } catch (err) {
