@@ -739,6 +739,17 @@ export default function BookDetailPage() {
 
   const imageMedia = useMemo(() => (book?.media ?? []).filter((m) => m.kind === "image") ?? [], [book]);
 
+  const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
+  const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : suggestedCoverUrl ?? book?.edition?.cover_url ?? null;
+  const lightboxItems = useMemo(
+    () => [
+      ...(coverUrl ? [{ id: "cover", url: coverOriginalSrc ?? coverUrl }] : []),
+      ...imageMedia.map((m) => ({ id: `image-${m.id}`, url: mediaUrlsByPath[m.storage_path] ?? "" })),
+    ].filter((item) => item.url),
+    [coverOriginalSrc, coverUrl, imageMedia, mediaUrlsByPath]
+  );
+  const lightboxCoverOffset = coverUrl ? 1 : 0;
+
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const swipeBlockedRef = useRef(false);
@@ -797,7 +808,6 @@ export default function BookDetailPage() {
   }, []);
 
   const controlsFixed = controlsDocked;
-  const controlsPinnedOpen = editMode || findMoreOpen;
 
   // Re-measure the band height whenever its content can change size.
   useEffect(() => {
@@ -1926,17 +1936,6 @@ export default function BookDetailPage() {
 
     return out;
   }, [book]);
-
-  const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
-  const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : suggestedCoverUrl ?? book?.edition?.cover_url ?? null;
-  const lightboxItems = useMemo(
-    () => [
-      ...(coverUrl ? [{ id: "cover", url: coverOriginalSrc ?? coverUrl }] : []),
-      ...imageMedia.map((m) => ({ id: `image-${m.id}`, url: mediaUrlsByPath[m.storage_path] ?? "" })),
-    ].filter((item) => item.url),
-    [coverOriginalSrc, coverUrl, imageMedia, mediaUrlsByPath]
-  );
-  const lightboxCoverOffset = coverUrl ? 1 : 0;
 
   // Used by metadata panel to decide whether to show the computed display value.
   const trimSizeValid = useMemo(
