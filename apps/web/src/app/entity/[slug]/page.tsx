@@ -87,13 +87,18 @@ function roleSummaryLabel(role: string, count: number): string {
   const item = count === 1 ? "item" : "items";
   const book = count === 1 ? "book" : "books";
   const record = count === 1 ? "record" : "records";
+  const issue = count === 1 ? "issue" : "issues";
   switch (role.toLowerCase()) {
     case "author": return `Authored ${count} ${book}`;
-    case "editor": return `Edited ${count} ${item}`;
+    case "editor":
+    case "editor:default": return `Edited ${count} ${book}`;
+    case "editor:magazine": return `Edited ${count} ${issue}`;
     case "designer":
     case "design": return `Designed ${count} ${item}`;
     case "art direction": return `Art direction on ${count} ${item}`;
-    case "publisher": return `Published ${count} ${item}`;
+    case "publisher":
+    case "publisher:default": return `Published ${count} ${item}`;
+    case "publisher:magazine": return `Published ${count} ${issue}`;
     case "printer": return `Printed ${count} ${item}`;
     case "performer": return `Performed ${count} ${record}`;
     case "composer": return `Composed ${count} ${record}`;
@@ -105,6 +110,10 @@ function roleSummaryLabel(role: string, count: number): string {
     case "conductor": return `Conducted ${count} ${record}`;
     default: return `${count} ${item} (${role})`;
   }
+}
+
+function roleToSectionId(role: string): string {
+  return "section-" + role.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 function effectiveTitle(row: BookRow): string {
@@ -436,6 +445,7 @@ export default async function EntityPage({
 
         return {
           role: bucket.key,
+          sectionId: roleToSectionId(bucket.key),
           heading: bucket.heading,
           items,
           hiddenOwnerItems,
@@ -457,25 +467,27 @@ export default async function EntityPage({
     }))
     .sort((a, b) => a.username.localeCompare(b.username));
 
-  // 12. Summary line
-  const summaryParts: string[] = modules
-    .map((mod) => roleSummaryLabel(mod.role, mod.total))
-    .filter(Boolean);
-  if (ownersForClient.length > 0) {
-    const n = ownersForClient.length;
-    summaryParts.push(`In ${n} ${n === 1 ? "library" : "libraries"}`);
-  }
+  // 12. Summary links
+  const summaryLinks = [
+    ...modules.map((mod) => ({
+      label: roleSummaryLabel(mod.role, mod.total),
+      href: `#${mod.sectionId}`
+    })),
+    ...(ownersForClient.length > 0 ? [{
+      label: `In ${ownersForClient.length} ${ownersForClient.length === 1 ? "library" : "libraries"}`,
+      href: "#section-libraries"
+    }] : [])
+  ];
 
   return (
     <main className="container">
       <div>{entity.name}</div>
-      {summaryParts.length > 0 && (
-        <div
-          className="text-muted"
-          style={{ marginTop: "var(--space-sm)", display: "flex", flexWrap: "wrap", gap: "var(--space-lg)" }}
-        >
-          {summaryParts.map((part) => (
-            <span key={part}>{part}</span>
+      {summaryLinks.length > 0 && (
+        <div className="entity-summary-stats text-muted" style={{ marginTop: "var(--space-sm)" }}>
+          {summaryLinks.map(({ label, href }) => (
+            <a key={href} href={href} className="text-muted">
+              {label}
+            </a>
           ))}
         </div>
       )}
@@ -483,7 +495,7 @@ export default async function EntityPage({
       <EntityPageModules modules={modules} />
 
       {ownersForClient.length > 0 && (
-        <div style={{ marginTop: "var(--space-xl)" }}>
+        <div id="section-libraries" style={{ marginTop: "var(--space-xl)" }}>
           <hr className="divider" />
           <EntityLibraryOwners owners={ownersForClient} />
         </div>

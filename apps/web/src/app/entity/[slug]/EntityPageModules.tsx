@@ -33,6 +33,7 @@ export type HiddenOwnerItem = {
 
 export type ModuleData = {
   role: string;
+  sectionId: string;
   heading: string;
   items: EntityModuleItem[];
   hiddenOwnerItems: HiddenOwnerItem[];
@@ -142,7 +143,7 @@ export default function EntityPageModules({ modules }: { modules: ModuleData[] }
         if (filteredItems.length === 0) return null;
 
         return (
-          <div key={mod.role} style={{ marginTop: "var(--space-xl)" }}>
+          <div key={mod.role} id={mod.sectionId} style={{ marginTop: "var(--space-xl)" }}>
             <hr className="divider" />
             <div style={{ marginTop: "var(--space-lg)" }}>
               <div
