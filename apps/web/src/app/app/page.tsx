@@ -761,13 +761,13 @@ function AppShell({
 
   const [reorderMode, setReorderMode] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const addMode = addInputFocused || Boolean(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message);
+  const controlsPinnedOpen = sortOpen || bulkMode || searchOpen || addMode;
 
   // Sticky band — scroll-driven docked/visible state lives in a shared hook so
   // the scroll listener only re-renders this component when truly necessary.
-  // controlsPinnedOpen is inlined here (same computation as line ~744 below).
   const { controlsDocked, controlsVisible, controlsBandHeight, controlsBandRef, measureControlsBand } = useStickyBand({
-    controlsPinnedOpen: sortOpen || bulkMode || searchOpen ||
-      (addInputFocused || Boolean(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message)),
+    controlsPinnedOpen,
     isMobile,
   });
   const autoReducedGridColsRef = useRef<4 | 8 | null>(null);
@@ -950,8 +950,6 @@ function AppShell({
   }, [isMobile]);
 
   const searchParamsKey = searchParams.toString();
-  const addMode = addInputFocused || Boolean(addUrlPreview || addSearchResults.length > 0 || addSearchState.message || addState.message);
-  const controlsPinnedOpen = sortOpen || bulkMode || searchOpen || addMode;
   const controlsFixed = controlsDocked;
 
   // Re-measure the band height whenever its content can change size.
