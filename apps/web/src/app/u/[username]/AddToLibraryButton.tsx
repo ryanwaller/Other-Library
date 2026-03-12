@@ -32,7 +32,6 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
   const [newCatalogMode, setNewCatalogMode] = useState(false);
   const [newCatalogName, setNewCatalogName] = useState("");
   const [newCatalogBusy, setNewCatalogBusy] = useState(false);
-  const [addedToCatalogName, setAddedToCatalogName] = useState<string | null>(null);
 
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -147,8 +146,6 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
         setLatestId(id);
         setCatalogsWithEdition((prev) => new Set([...prev, libraryId]));
       }
-      setAddedToCatalogName(catalogName);
-      setTimeout(() => setAddedToCatalogName(null), 3000);
     } catch (e: any) {
       setError(e?.message ?? "Add failed");
     } finally {
@@ -162,7 +159,6 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
   async function handleAddClick() {
     if (!supabase || !sessionUserId) return;
     setError(null);
-    setAddedToCatalogName(null);
 
     let loaded = catalogs;
     if (!catalogsLoaded) {
@@ -224,7 +220,6 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
       if (del.error) throw new Error(del.error.message);
       setCount((c) => Math.max(0, c - 1));
       setCreatedId(null);
-      setAddedToCatalogName(null);
       await ctx?.refresh(editionId);
       await refreshExisting();
     } catch (e: any) {
@@ -282,11 +277,7 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
           {picker}
         </div>
       )}
-      {addedToCatalogName ? (
-        <span className="text-muted">Added to {addedToCatalogName}</span>
-      ) : error ? (
-        <span className="text-muted">{error}</span>
-      ) : null}
+      {error ? <span className="text-muted">{error}</span> : null}
     </span>
   );
 }
