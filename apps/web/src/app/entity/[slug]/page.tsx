@@ -5,7 +5,7 @@ import { getSupabaseAdmin } from "../../../lib/supabaseAdmin";
 import { bookIdSlug } from "../../../lib/slug";
 import type { CoverCrop } from "../../../components/CoverImage";
 import { formatIssueDisplay, isMagazineObject } from "../../../lib/magazine";
-import EntityPageModules, { type ModuleData, type EntityModuleItem, type OwnerEntry } from "./EntityPageModules";
+import EntityPageModules, { type ModuleData, type EntityModuleItem, type OwnerEntry, type HiddenOwnerItem } from "./EntityPageModules";
 import EntityLibraryOwners, { type OwnerProfile } from "./EntityLibraryOwners";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +15,7 @@ type EntityRow = { id: string; name: string; slug: string };
 type BookRow = {
   id: number;
   owner_id: string;
+  library_id: number | null;
   created_at: string;
   edition_id: number | null;
   title_override: string | null;
@@ -31,7 +32,7 @@ type BookRow = {
 };
 
 const BOOK_SELECT =
-  "id,owner_id,created_at,edition_id,title_override,object_type,issue_number,issue_volume,issue_season,issue_year,issn,cover_original_url,cover_crop,edition:editions(title,isbn13,cover_url),media:user_book_media(kind,storage_path)";
+  "id,owner_id,library_id,created_at,edition_id,title_override,object_type,issue_number,issue_volume,issue_season,issue_year,issn,cover_original_url,cover_crop,edition:editions(title,isbn13,cover_url),media:user_book_media(kind,storage_path)";
 
 const ROLE_ORDER = [
   "author", "performer", "editor", "publisher", "composer", "producer",
@@ -391,15 +392,15 @@ export default async function EntityPage({
       .map((bucket) => {
         const total = bucket.groups.length;
         const displayed = bucket.groups.slice(0, 12);
+        const hidden = bucket.groups.slice(12);
 
-        const items: EntityModuleItem[] = displayed.map(({ rep, allBooks }) => {
-          const title = effectiveTitle(rep);
-
-          const ownerEntries: OwnerEntry[] = allBooks
+        const buildOwnerEntries = (allBooks: BookRow[]): OwnerEntry[] =>
+          allBooks
             .map((b): OwnerEntry | null => {
               if (!profileByOwnerId.has(b.owner_id)) return null;
               return {
                 ownerId: b.owner_id,
+                libraryId: b.library_id ?? null,
                 userBookId: b.id,
                 coverUrl: coverSrc(b, signedMap),
                 coverCrop: b.cover_crop,
@@ -408,6 +409,9 @@ export default async function EntityPage({
             })
             .filter((e): e is OwnerEntry => e !== null);
 
+        const items: EntityModuleItem[] = displayed.map(({ rep, allBooks }) => {
+          const title = effectiveTitle(rep);
+          const ownerEntries = buildOwnerEntries(allBooks);
           const firstPublic = allBooks.find((b) => profileByOwnerId.has(b.owner_id));
           const publicFallbackHref = firstPublic
             ? `/u/${encodeURIComponent(profileByOwnerId.get(firstPublic.owner_id)!)}/b/${bookIdSlug(firstPublic.id, title)}`
@@ -424,10 +428,17 @@ export default async function EntityPage({
           };
         });
 
+        const hiddenOwnerItems: HiddenOwnerItem[] = hidden.map(({ rep, allBooks }) => ({
+          id: rep.id,
+          secondaryLine: effectiveSecondaryLine(rep),
+          ownerEntries: buildOwnerEntries(allBooks)
+        }));
+
         return {
           role: bucket.key,
           heading: bucket.heading,
           items,
+          hiddenOwnerItems,
           total,
           viewAllHref:
             total > 12

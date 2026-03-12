@@ -8,6 +8,7 @@ import EntityBookGrid, { type GridItem } from "./EntityBookGrid";
 
 export type OwnerEntry = {
   ownerId: string;
+  libraryId: number | null;
   userBookId: number;
   coverUrl: string | null;
   coverCrop: CoverCrop | null;
@@ -24,10 +25,17 @@ export type EntityModuleItem = {
   publicFallbackHref: string | null;
 };
 
+export type HiddenOwnerItem = {
+  id: number;
+  secondaryLine: string | null;
+  ownerEntries: OwnerEntry[];
+};
+
 export type ModuleData = {
   role: string;
   heading: string;
   items: EntityModuleItem[];
+  hiddenOwnerItems: HiddenOwnerItem[];
   total: number;
   viewAllHref: string | null;
 };
@@ -35,6 +43,7 @@ export type ModuleData = {
 export default function EntityPageModules({ modules }: { modules: ModuleData[] }) {
   // undefined = session not yet resolved
   const [userId, setUserId] = useState<string | null | undefined>(undefined);
+  const [myCatalogIds, setMyCatalogIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (!supabase) {
@@ -43,32 +52,58 @@ export default function EntityPageModules({ modules }: { modules: ModuleData[] }
     }
     // getSession reads from localStorage — no network request.
     supabase.auth.getSession().then(({ data }) => {
-      setUserId(data.session?.user?.id ?? null);
+      const uid = data.session?.user?.id ?? null;
+      setUserId(uid);
+      if (uid) {
+        supabase!
+          .from("catalog_members")
+          .select("catalog_id")
+          .eq("user_id", uid)
+          .not("accepted_at", "is", null)
+          .then(({ data: memberData }) => {
+            setMyCatalogIds(new Set((memberData ?? []).map((m: any) => m.catalog_id as number)));
+          });
+      }
     });
   }, []);
 
-  // Build "Your copies" — one entry per edition group (item.id), even if you
-  // own multiple copies of the same edition. Links to the first (newest) copy.
+  // Build "Your copies" — includes books you directly own OR books in catalogs
+  // you're a member of (e.g. shared organizational catalogs).
+  // Checks both displayed items AND hidden groups (beyond the first 12 shown).
   const yourCopies: GridItem[] = [];
   if (userId) {
     const seenItemIds = new Set<number>();
+
+    const tryAddEntry = (
+      itemId: number,
+      secondaryLine: string | null | undefined,
+      entries: OwnerEntry[]
+    ) => {
+      if (seenItemIds.has(itemId)) return;
+      for (const entry of entries) {
+        const isOwner = entry.ownerId === userId;
+        const inMyCatalog = entry.libraryId !== null && myCatalogIds.has(entry.libraryId);
+        if (isOwner || inMyCatalog) {
+          seenItemIds.add(itemId);
+          yourCopies.push({
+            id: entry.userBookId,
+            title: entry.title,
+            secondaryLine: secondaryLine ?? null,
+            coverUrl: entry.coverUrl,
+            coverCrop: entry.coverCrop,
+            href: `/app/books/${entry.userBookId}`
+          });
+          break;
+        }
+      }
+    };
+
     for (const mod of modules) {
       for (const item of mod.items) {
-        if (seenItemIds.has(item.id)) continue;
-        for (const entry of item.ownerEntries) {
-          if (entry.ownerId === userId) {
-            seenItemIds.add(item.id);
-            yourCopies.push({
-              id: entry.userBookId,
-              title: entry.title,
-              secondaryLine: item.secondaryLine ?? null,
-              coverUrl: entry.coverUrl,
-              coverCrop: entry.coverCrop,
-              href: `/app/books/${entry.userBookId}`
-            });
-            break;
-          }
-        }
+        tryAddEntry(item.id, item.secondaryLine, item.ownerEntries);
+      }
+      for (const hidden of mod.hiddenOwnerItems) {
+        tryAddEntry(hidden.id, hidden.secondaryLine, hidden.ownerEntries);
       }
     }
   }
