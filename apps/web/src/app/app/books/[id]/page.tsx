@@ -4596,7 +4596,7 @@ export default function BookDetailPage() {
                               placeholder="Publication title (e.g. The New Yorker)"
                             />
                           ) : (
-                            <a href={`/group/${slugify((formGroupLabel ?? "").trim())}`} style={{ textDecoration: "none", color: "inherit" }}>
+                            <a href={`/group/${slugify((formGroupLabel ?? "").trim())}`} style={{ textDecoration: "none" }}>
                               {(formGroupLabel ?? "").trim()} →
                             </a>
                           )}
