@@ -4,19 +4,33 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import CoverImage, { type CoverCrop } from "../../../../components/CoverImage";
 import PagedBookList from "../../../app/components/PagedBookList";
+import type { MusicMetadata } from "../../../../lib/music";
+import { effectiveSecondaryLineFor } from "../../../../lib/book";
 
 type FacetBook = {
   id: number;
   owner_id: string;
   library_id: number | null;
   created_at: string;
+  object_type?: string | null;
   title_override: string | null;
+  subtitle_override?: string | null;
   authors_override: string[] | null;
+  editors_override?: string[] | null;
+  issue_number?: string | null;
+  issue_volume?: string | null;
+  issue_season?: string | null;
+  issue_year?: number | null;
+  music_metadata?: MusicMetadata | null;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
   edition: {
     title: string | null;
     authors: string[] | null;
+    subjects?: string[] | null;
+    publisher?: string | null;
+    publish_date?: string | null;
+    description?: string | null;
     cover_url: string | null;
   } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
@@ -50,10 +64,7 @@ export default function FacetBookList({
       }}
       renderItem={(book) => {
         const title = String((book.title_override ?? "").trim() || book.edition?.title || "(untitled)");
-        const authors =
-          (book.authors_override ?? []).filter(Boolean).length > 0
-            ? (book.authors_override ?? []).filter(Boolean)
-            : (book.edition?.authors ?? []).filter(Boolean);
+        const secondary = effectiveSecondaryLineFor(book);
         const coverMedia = (book.media ?? []).find((m) => m.kind === "cover");
         const coverUrl = coverMedia ? signedByPath[coverMedia.storage_path] : book.edition?.cover_url ?? null;
         const cropData = book.cover_crop ?? null;
@@ -69,7 +80,7 @@ export default function FacetBookList({
                 {title}
               </div>
             </Link>
-            {authors.length > 0 ? <div className="om-book-secondary">{authors.join(", ")}</div> : null}
+            {secondary.values.length > 0 ? <div className="om-book-secondary">{secondary.values.join(", ")}</div> : null}
           </div>
         );
       }}

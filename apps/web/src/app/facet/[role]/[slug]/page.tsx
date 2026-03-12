@@ -17,13 +17,25 @@ type FacetBook = {
   owner_id: string;
   library_id: number | null;
   created_at: string;
+  object_type?: string | null;
   title_override: string | null;
+  subtitle_override?: string | null;
   authors_override: string[] | null;
+  editors_override?: string[] | null;
+  issue_number?: string | null;
+  issue_volume?: string | null;
+  issue_season?: string | null;
+  issue_year?: number | null;
+  music_metadata?: Record<string, unknown> | null;
   cover_original_url: string | null;
   cover_crop: CoverCrop | null;
   edition: {
     title: string | null;
     authors: string[] | null;
+    subjects?: string[] | null;
+    publisher?: string | null;
+    publish_date?: string | null;
+    description?: string | null;
     cover_url: string | null;
   } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
@@ -134,7 +146,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
   if (bookIds.length > 0) {
     const booksRes = await supabase
       .from("user_books")
-      .select("id,owner_id,library_id,created_at,title_override,authors_override,cover_original_url,cover_crop,edition:editions(title,authors,cover_url),media:user_book_media(kind,storage_path)")
+      .select("id,owner_id,library_id,created_at,object_type,title_override,subtitle_override,authors_override,editors_override,issue_number,issue_volume,issue_season,issue_year,music_metadata,cover_original_url,cover_crop,edition:editions(title,authors,subjects,publisher,publish_date,description,cover_url),media:user_book_media(kind,storage_path)")
       .in("id", bookIds)
       .order("created_at", { ascending: false })
       .limit(1000);
