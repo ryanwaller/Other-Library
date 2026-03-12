@@ -46,69 +46,72 @@ function roleSortIndex(role: string): number {
   return idx === -1 ? 999 : idx;
 }
 
-function roleHeading(role: string, name: string): string {
-  switch (role.toLowerCase()) {
-    case "author": return `Books by ${name}`;
-    case "editor": return `Edited by ${name}`;
+function objectTypeNoun(objectType: string | null, count: number): string {
+  switch (objectType) {
+    case "magazine": return count === 1 ? "magazine" : "magazines";
+    case "music": return count === 1 ? "record" : "records";
+    case "book": return count === 1 ? "book" : "books";
+    default: return count === 1 ? "item" : "items";
+  }
+}
+
+function formatEntityStat(role: string, objectType: string | null, count: number): string {
+  const base = role.split(":")[0].toLowerCase();
+  const noun = objectTypeNoun(objectType, count);
+  switch (base) {
+    case "author": return `Authored ${count} ${noun}`;
+    case "designer":
+    case "design": return `Designed ${count} ${noun}`;
+    case "editor": return `Edited ${count} ${noun}`;
+    case "publisher": return `Published ${count} ${noun}`;
+    case "printer": return `Printed ${count} ${noun}`;
+    case "photographer": return `Photographed ${count} ${noun}`;
+    case "performer": return `Performed on ${count} ${noun}`;
+    case "producer": return `Produced ${count} ${noun}`;
+    case "arranger": return `Arranged ${count} ${noun}`;
+    case "composer": return `Composed ${count} ${noun}`;
+    case "conductor": return `Conducted ${count} ${noun}`;
+    case "art direction": return `Art direction on ${count} ${noun}`;
+    case "mastering": return `Mastering on ${count} ${noun}`;
+    case "engineer": return `Engineered ${count} ${noun}`;
+    case "featured artist": return `Featured on ${count} ${noun}`;
+    default: {
+      const cap = base.charAt(0).toUpperCase() + base.slice(1);
+      return `${cap} on ${count} ${noun}`;
+    }
+  }
+}
+
+function roleHeadingForRole(role: string, name: string): string {
+  const base = role.split(":")[0].toLowerCase();
+  switch (base) {
+    case "author": return `Authored by ${name}`;
     case "designer":
     case "design": return `Designed by ${name}`;
+    case "editor": return `Edited by ${name}`;
     case "publisher": return `Published by ${name}`;
     case "printer": return `Printed by ${name}`;
+    case "photographer": return `Photographed by ${name}`;
+    case "performer": return `Performed by ${name}`;
+    case "producer": return `Produced by ${name}`;
+    case "arranger": return `Arranged by ${name}`;
+    case "composer": return `Composed by ${name}`;
+    case "conductor": return `Conducted by ${name}`;
+    case "art direction": return `Art direction by ${name}`;
+    case "mastering": return `Mastering by ${name}`;
+    case "engineer": return `Engineered by ${name}`;
+    case "featured artist": return `Featuring ${name}`;
     case "subject": return `About ${name}`;
     case "tag": return `Tagged "${name}"`;
     case "category": return `In ${name}`;
     case "material": return `Items using ${name}`;
-    case "performer": return `Records by ${name}`;
-    case "composer": return `Composed by ${name}`;
-    case "producer": return `Produced by ${name}`;
-    case "engineer": return `Engineered by ${name}`;
-    case "mastering": return `Mastering by ${name}`;
-    case "featured artist": return `Featuring ${name}`;
-    case "arranger": return `Arranged by ${name}`;
-    case "conductor": return `Conducted by ${name}`;
-    case "orchestra": return `Orchestra: ${name}`;
-    case "art direction": return `Art direction by ${name}`;
     case "artwork": return `Artwork by ${name}`;
     case "photography": return `Photography by ${name}`;
-    default: return `${name} — ${role}`;
-  }
-}
-
-function roleHeadingForGroups(role: string, name: string, groups: Array<{ rep: BookRow }>): string {
-  if (role.toLowerCase() !== "author") return roleHeading(role, name);
-  const hasPeriodicals = groups.some(({ rep }) => isMagazineObject(rep.object_type));
-  const hasNonPeriodicals = groups.some(({ rep }) => !isMagazineObject(rep.object_type));
-  if (hasPeriodicals && hasNonPeriodicals) return `Items by ${name}`;
-  if (hasPeriodicals) return `Issues by ${name}`;
-  return `Books by ${name}`;
-}
-
-function roleSummaryLabel(role: string, count: number): string {
-  const item = count === 1 ? "item" : "items";
-  const book = count === 1 ? "book" : "books";
-  const record = count === 1 ? "record" : "records";
-  const issue = count === 1 ? "issue" : "issues";
-  switch (role.toLowerCase()) {
-    case "author": return `Authored ${count} ${book}`;
-    case "editor":
-    case "editor:default": return `Edited ${count} ${book}`;
-    case "editor:magazine": return `Edited ${count} ${issue}`;
-    case "designer":
-    case "design": return `Designed ${count} ${item}`;
-    case "art direction": return `Art direction on ${count} ${item}`;
-    case "publisher":
-    case "publisher:default": return `Published ${count} ${item}`;
-    case "publisher:magazine": return `Published ${count} ${issue}`;
-    case "printer": return `Printed ${count} ${item}`;
-    case "performer": return `Performed ${count} ${record}`;
-    case "composer": return `Composed ${count} ${record}`;
-    case "producer": return `Produced ${count} ${record}`;
-    case "engineer": return `Engineered ${count} ${record}`;
-    case "mastering": return `Mastering on ${count} ${record}`;
-    case "featured artist": return `Featured on ${count} ${record}`;
-    case "arranger": return `Arranged ${count} ${record}`;
-    case "conductor": return `Conducted ${count} ${record}`;
-    default: return `${count} ${item} (${role})`;
+    case "orchestra": return `Orchestra: ${name}`;
+    default: {
+      const cap = base.charAt(0).toUpperCase() + base.slice(1);
+      return `${cap} by ${name}`;
+    }
   }
 }
 
@@ -391,15 +394,29 @@ export default async function EntityPage({
     const splitByPeriodical = role === "publisher" || role === "editor";
     const buckets = splitByPeriodical
       ? [
-          { key: `${role}:default`, heading: roleHeading(role, entity.name), groups: groups.filter(({ rep }) => !isMagazineObject(rep.object_type)) },
-          { key: `${role}:magazine`, heading: role === "publisher" ? `Issues published by ${entity.name}` : `Issues edited by ${entity.name}`, groups: groups.filter(({ rep }) => isMagazineObject(rep.object_type)) }
+          { key: `${role}:default`, groups: groups.filter(({ rep }) => !isMagazineObject(rep.object_type)) },
+          { key: `${role}:magazine`, groups: groups.filter(({ rep }) => isMagazineObject(rep.object_type)) }
         ]
-      : [{ key: role, heading: roleHeadingForGroups(role, entity.name, groups), groups }];
+      : [{ key: role, groups }];
 
     return buckets
       .filter((bucket) => bucket.groups.length > 0)
       .map((bucket) => {
         const total = bucket.groups.length;
+
+        // Determine dominant object type for human-readable stat labels.
+        const repObjectTypes = new Set(
+          bucket.groups.map(({ rep }) => {
+            const ot = (rep.object_type ?? "").trim().toLowerCase();
+            if (ot === "magazine") return "magazine";
+            if (ot === "music") return "music";
+            return "book";
+          })
+        );
+        const bucketObjectType: string | null = repObjectTypes.size === 1
+          ? (repObjectTypes.values().next().value as string)
+          : null;
+
         const displayed = bucket.groups.slice(0, 12);
         const hidden = bucket.groups.slice(12);
 
@@ -446,7 +463,8 @@ export default async function EntityPage({
         return {
           role: bucket.key,
           sectionId: roleToSectionId(bucket.key),
-          heading: bucket.heading,
+          heading: roleHeadingForRole(bucket.key, entity.name),
+          objectType: bucketObjectType,
           items,
           hiddenOwnerItems,
           total,
@@ -470,7 +488,7 @@ export default async function EntityPage({
   // 12. Summary links
   const summaryLinks = [
     ...modules.map((mod) => ({
-      label: roleSummaryLabel(mod.role, mod.total),
+      label: formatEntityStat(mod.role, mod.objectType, mod.total),
       href: `#${mod.sectionId}`
     })),
     ...(ownersForClient.length > 0 ? [{

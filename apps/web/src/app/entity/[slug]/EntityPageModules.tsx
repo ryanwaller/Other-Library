@@ -35,6 +35,7 @@ export type ModuleData = {
   role: string;
   sectionId: string;
   heading: string;
+  objectType: string | null;
   items: EntityModuleItem[];
   hiddenOwnerItems: HiddenOwnerItem[];
   total: number;
