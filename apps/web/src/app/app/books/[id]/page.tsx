@@ -254,6 +254,13 @@ function toProxyImageUrl(url: string): string {
   return `/api/image-proxy?url=${encodeURIComponent(raw)}`;
 }
 
+function toResolvedExternalImageUrl(url: string | null | undefined): string | null {
+  const raw = String(url ?? "").trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return toProxyImageUrl(raw);
+  return raw;
+}
+
 function toFullSizeImageUrl(url: string): string {
   let raw = (url ?? "").trim();
   if (!raw) return "";
@@ -740,7 +747,17 @@ export default function BookDetailPage() {
   const imageMedia = useMemo(() => (book?.media ?? []).filter((m) => m.kind === "image") ?? [], [book]);
 
   const coverMedia = useMemo(() => (book?.media ?? []).find((m) => m.kind === "cover") ?? null, [book]);
-  const coverUrl = coverMedia ? mediaUrlsByPath[coverMedia.storage_path] : suggestedCoverUrl ?? book?.edition?.cover_url ?? null;
+  const resolvedCoverOriginalUrl = useMemo(() => {
+    const raw = String(book?.cover_original_url ?? "").trim();
+    if (!raw) return null;
+    return mediaUrlsByPath[raw] ?? toResolvedExternalImageUrl(raw);
+  }, [book?.cover_original_url, mediaUrlsByPath]);
+  const coverUrl =
+    (coverMedia ? (mediaUrlsByPath[coverMedia.storage_path] ?? null) : null)
+    ?? resolvedCoverOriginalUrl
+    ?? suggestedCoverUrl
+    ?? book?.edition?.cover_url
+    ?? null;
   const lightboxItems = useMemo(
     () => [
       ...(coverUrl ? [{ id: "cover", url: coverOriginalSrc ?? coverUrl }] : []),

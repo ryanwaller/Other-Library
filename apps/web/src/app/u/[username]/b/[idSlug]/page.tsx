@@ -28,6 +28,67 @@ import PublicBookAccessFallback from "./PublicBookAccessFallback";
 
 export const dynamic = "force-dynamic";
 
+function isStoragePath(value: string): boolean {
+  const v = value.trim();
+  if (!v) return false;
+  return !/^https?:\/\//i.test(v) && !/^data:/i.test(v);
+}
+
+function normalizeStoragePath(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const withoutLeadingSlash = trimmed.replace(/^\/+/, "");
+  return isStoragePath(withoutLeadingSlash) ? withoutLeadingSlash : null;
+}
+
+function withoutStoragePathPrefix(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const marker = "user-book-media/";
+  if (trimmed.startsWith("public/") && trimmed.includes(marker)) {
+    const idx = trimmed.indexOf(marker);
+    return normalizeStoragePath(trimmed.slice(idx + marker.length));
+  }
+  if (trimmed.includes(`/${marker}`)) {
+    const idx = trimmed.indexOf(`/${marker}`);
+    return normalizeStoragePath(trimmed.slice(idx + `/${marker}`.length));
+  }
+  if (trimmed.includes(marker)) {
+    const idx = trimmed.indexOf(marker);
+    return normalizeStoragePath(trimmed.slice(idx + marker.length));
+  }
+  try {
+    const url = new URL(trimmed);
+    const { pathname } = url;
+    if (pathname.includes(marker)) {
+      const idx = pathname.indexOf(marker);
+      return normalizeStoragePath(pathname.slice(idx + marker.length));
+    }
+  } catch {
+    // ignore URL parse failures
+  }
+  return null;
+}
+
+function toStoragePathCandidate(value: string | null | undefined): string | null {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return null;
+  const normalizedInput = trimmed.startsWith("/") ? trimmed.replace(/^\/+/, "") : trimmed;
+  const bucketPath = withoutStoragePathPrefix(normalizedInput);
+  if (bucketPath) return bucketPath;
+  if (isStoragePath(normalizedInput)) return normalizeStoragePath(normalizedInput);
+  return null;
+}
+
+function toResolvedExternalImageUrl(url: string | null | undefined): string | null {
+  const raw = String(url ?? "").trim();
+  if (!raw) return null;
+  if (!/^https?:\/\//i.test(raw)) return raw;
+  if (/^https:\/\//i.test(raw)) return raw;
+  return `/api/image-proxy?url=${encodeURIComponent(raw)}`;
+}
+
 async function getRequestSupabase() {
   const env = getPublicEnvOptional();
   if (!env) return null;
@@ -264,10 +325,24 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     ? Array.from(new Set([String(profile.id ?? ""), String(viewerId ?? "")].filter(Boolean)))
     : [];
 
-  const paths = Array.from(new Set([
-    ...(book.media ?? []).map((m) => m.storage_path).filter(Boolean),
-    ...(book.cover_crop && book.cover_original_url ? [book.cover_original_url] : [])
-  ]));
+  const rawMediaRefs = Array.from(
+    new Set([
+      ...(book.media ?? []).map((m) => String(m.storage_path ?? "").trim()).filter(Boolean),
+      ...(book.cover_original_url ? [String(book.cover_original_url).trim()] : []),
+    ])
+  );
+  const rawToStorage = new Map<string, string>();
+  const storagePaths = Array.from(
+    new Set(
+      rawMediaRefs
+        .map((raw) => {
+          const storagePath = toStoragePathCandidate(raw);
+          if (storagePath) rawToStorage.set(raw, storagePath);
+          return storagePath;
+        })
+        .filter(Boolean) as string[]
+    )
+  );
 
   // Round trip 2: all post-book queries in parallel — avatar signing, follow counts,
   // catalog membership check (if needed), media signing, library name, copies count.
@@ -291,8 +366,8 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           .in("user_id", membershipRequiredIds)
           .not("accepted_at", "is", null)
       : Promise.resolve(null),
-    paths.length > 0
-      ? signingClient.storage.from("user-book-media").createSignedUrls(paths, 60 * 30)
+    storagePaths.length > 0
+      ? signingClient.storage.from("user-book-media").createSignedUrls(storagePaths, 60 * 30)
       : Promise.resolve(null),
     Number.isFinite(Number(book.library_id)) && Number(book.library_id) > 0
       ? supabase.from("libraries").select("name").eq("id", Number(book.library_id)).maybeSingle()
@@ -424,13 +499,27 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   for (const s of signedRes?.data ?? []) {
     if (s.path && s.signedUrl) signedMap[s.path] = s.signedUrl;
   }
+  for (const raw of rawMediaRefs) {
+    const storagePath = rawToStorage.get(raw);
+    if (storagePath && signedMap[storagePath]) {
+      signedMap[raw] = signedMap[storagePath];
+      continue;
+    }
+    const externalUrl = toResolvedExternalImageUrl(raw);
+    if (externalUrl) signedMap[raw] = externalUrl;
+  }
 
   const avatarUrl = avatarSignedRes?.data?.signedUrl ?? null;
 
   const coverMedia = (book.media ?? []).find((m) => m.kind === "cover") ?? null;
-  const coverUrl: string | null = coverMedia ? (signedMap[coverMedia.storage_path] ?? null) : (book.edition?.cover_url ?? null);
+  const resolvedCoverOriginalUrl = signedMap[String(book.cover_original_url ?? "").trim()] ?? null;
+  const coverUrl: string | null =
+    (coverMedia ? (signedMap[coverMedia.storage_path] ?? null) : null)
+    ?? resolvedCoverOriginalUrl
+    ?? book.edition?.cover_url
+    ?? null;
   const cropData = book.cover_crop ?? null;
-  const coverSrc: string | null = cropData && book.cover_original_url ? (signedMap[book.cover_original_url] ?? coverUrl) : coverUrl;
+  const coverSrc: string | null = cropData && book.cover_original_url ? (resolvedCoverOriginalUrl ?? coverUrl) : coverUrl;
   const images = (book.media ?? []).filter((m) => m.kind === "image");
   const editionId = book.edition?.id ?? null;
 
