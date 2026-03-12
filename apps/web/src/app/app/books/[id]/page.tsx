@@ -28,6 +28,7 @@ import {
 import {
   displayObjectTypeLabel,
   emptyMagazineMetadata,
+  extractYearFromSeason,
   formatIssueDisplay,
   isMagazineObject,
   looksLikeIssn,
@@ -2338,7 +2339,7 @@ export default function BookDetailPage() {
         payload.issue_number = formMagazine.issue_number ?? null;
         payload.issue_volume = formMagazine.issue_volume ?? null;
         payload.issue_season = formMagazine.issue_season ?? null;
-        payload.issue_year = null;
+        payload.issue_year = extractYearFromSeason(formMagazine.issue_season);
         payload.issn = manualIssn || null;
         payload.subtitle_override = formSubtitle.trim() || null;
       } else {
@@ -4645,7 +4646,7 @@ export default function BookDetailPage() {
                     {[
                       ["Issue volume", effectiveMagazine.issue_volume ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_volume: value || null })), "Add volume", "issue_volume"],
                       ["Issue number", effectiveMagazine.issue_number ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_number: value || null })), "Add issue number", "issue_number"],
-                      ["Issue season", effectiveMagazine.issue_season ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_season: value || null })), "Add month / year", "issue_season"]
+                      ["Issue season", effectiveMagazine.issue_season ?? "", (value: string) => setFormMagazine((s) => ({ ...s, issue_season: value || null })), "e.g. Winter 2020, January 2020", "issue_season"]
                     ].map(([label, value, onChange, placeholder, visKey]) => (
                       editMode || String(value).trim() ? (
                         <div key={String(visKey)} className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility[String(visKey)] === false ? 0.6 : 1 }}>

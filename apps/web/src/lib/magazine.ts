@@ -61,6 +61,11 @@ export function looksLikeIssn(input: string): boolean {
   return /^\d{4}-\d{3}[\dX]$/i.test(input.trim()) || /^\d{7}[\dX]$/i.test(input.trim().replace(/[^0-9X]/gi, ""));
 }
 
+export function extractYearFromSeason(season: string | null | undefined): number | null {
+  const match = String(season ?? "").trim().match(/\b((?:19|20)\d{2})\b/);
+  return match ? Number(match[1]) : null;
+}
+
 export function formatIssueDisplay(book: MagazineLike | null | undefined): string {
   if (!book) return "";
   const volume = clean(book.issue_volume);
@@ -77,8 +82,19 @@ export function formatIssueDisplay(book: MagazineLike | null | undefined): strin
   } else if (issueNumber) {
     parts.push(`Issue ${issueNumber}`);
   }
-  if (season) parts.push(formatDateShort(season));
-  else if (year) parts.push(year);
+
+  if (season) {
+    const formatted = formatDateShort(season);
+    // For legacy data stored as season="Winter" + issue_year=2020, append the year
+    // if the season string doesn't already contain it.
+    if (year && !season.includes(year)) {
+      parts.push(`${formatted} ${year}`);
+    } else {
+      parts.push(formatted);
+    }
+  } else if (year) {
+    parts.push(year);
+  }
 
   return parts.join(", ");
 }
