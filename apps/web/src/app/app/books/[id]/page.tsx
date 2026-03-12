@@ -2444,10 +2444,6 @@ export default function BookDetailPage() {
         payload.authors_override = null;
         payload.music_metadata = null;
         payload.edition_override = null;
-        payload.pages = null;
-        payload.trim_width = null;
-        payload.trim_height = null;
-        payload.trim_unit = null;
         payload.issue_number = formMagazine.issue_number ?? null;
         payload.issue_volume = formMagazine.issue_volume ?? null;
         payload.issue_season = formMagazine.issue_season ?? null;
