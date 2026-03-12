@@ -18,8 +18,6 @@ export default function LibraryBlock({
   collapsed,
   reorderMode,
   manageMode,
-  rearrangingLibraryId,
-  onToggleRearrange,
   busy,
   isEditing,
   nameDraft,
@@ -28,6 +26,7 @@ export default function LibraryBlock({
   onSaveName,
   onCancelEdit,
   onDelete,
+  onSelectAll,
   onToggleCollapsed,
   onMoveUp,
   onMoveDown,
@@ -50,8 +49,6 @@ export default function LibraryBlock({
   collapsed: boolean;
   reorderMode: boolean;
   manageMode: boolean;
-  rearrangingLibraryId: number | null;
-  onToggleRearrange: (libraryId: number | null) => void;
   busy: boolean;
   isEditing: boolean;
   nameDraft: string;
@@ -60,6 +57,7 @@ export default function LibraryBlock({
   onSaveName: (libraryId: number, nameDraft: string) => void;
   onCancelEdit: () => void;
   onDelete: (libraryId: number) => void;
+  onSelectAll?: (libraryId: number) => void;
   onToggleCollapsed: (libraryId: number) => void;
   onMoveUp: (libraryId: number) => void;
   onMoveDown: (libraryId: number) => void;
@@ -71,7 +69,6 @@ export default function LibraryBlock({
 }) {
   const hasNameChanges = nameDraft.trim() !== libraryName.trim();
 
-  const isRearrangingThis = rearrangingLibraryId === libraryId;
   const effectiveViewMode = viewMode;
 
   const { limit, loadMore, seeLess, canSeeLess } = usePagination(effectiveViewMode, gridCols, searchQuery);
@@ -236,18 +233,18 @@ export default function LibraryBlock({
             {manageMode ? (
               <>
                 <button
-                  onClick={() => onToggleRearrange(rearrangingLibraryId === libraryId ? null : libraryId)}
-                  disabled={busy}
-                  style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", textDecoration: "underline" }}
-                >
-                  {rearrangingLibraryId === libraryId ? "Done" : "Rearrange"}
-                </button>
-                <button
                   onClick={() => onDelete(libraryId)}
                   disabled={busy}
                   style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", textDecoration: "underline" }}
                 >
-                  Delete
+                  Delete Catalog
+                </button>
+                <button
+                  onClick={() => onSelectAll?.(libraryId)}
+                  disabled={busy}
+                  style={{ padding: "0 0 9px", border: "none", borderBottom: "1px solid transparent", background: "transparent", textDecoration: "underline" }}
+                >
+                  Select All
                 </button>
               </>
             ) : null}

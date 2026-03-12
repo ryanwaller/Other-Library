@@ -3323,9 +3323,17 @@ function AppShell({
     displayGroupsByLibraryIdRef.current = displayGroupsByLibraryId;
   }, [displayGroupsByLibraryId]);
 
-  const beginItemReorder = useCallback(function beginItemReorder(activeKey: string, libraryId: number) {
-    if (rearrangingLibraryIdRef.current !== libraryId) return;
+  const beginItemReorder = useCallback(function beginItemReorder(_activeKey: string, _libraryId: number) {
     setReorderBackupItems((prev) => prev ?? [...itemsRef.current]);
+  }, []);
+
+  const selectAllInLibrary = useCallback(function selectAllInLibrary(libraryId: number) {
+    const groups = displayGroupsByLibraryIdRef.current[libraryId] ?? [];
+    setBulkSelectedKeys((prev) => {
+      const next = { ...prev };
+      for (const g of groups) next[g.key] = true;
+      return next;
+    });
   }, []);
 
   const previewItemReorder = useCallback(function previewItemReorder(activeKey: string, overKey: string, libraryId: number) {
@@ -4321,14 +4329,6 @@ function AppShell({
               bookCount={groups.length}
               index={idx}
               total={displayLibraries.length}
-              rearrangingLibraryId={rearrangingLibraryId}
-              onToggleRearrange={(id) => {
-                setRearrangingLibraryId(id);
-                if (id !== null) {
-                  setSortMode("custom");
-                  window.localStorage.setItem("om_sortMode", "custom");
-                }
-              }}
               busy={libraryState.busy}
               isEditing={editingLibraryId === lib.id}
               nameDraft={libraryNameDraft}
@@ -4339,6 +4339,7 @@ function AppShell({
               onSaveName={saveLibraryName}
               onCancelEdit={cancelEditLibrary}
               onDelete={deleteLibrary}
+              onSelectAll={selectAllInLibrary}
               collapsed={!!collapsedByLibraryId[lib.id]}
               onToggleCollapsed={(id) =>
                 setCollapsedByLibraryId((prev) => {
@@ -4367,7 +4368,7 @@ function AppShell({
                     effectiveViewMode={effectiveViewMode}
                     effectiveCols={effectiveCols}
                     showBookSkeleton={showBookSkeleton}
-                    isRearranging={rearrangingLibraryId === lib.id}
+                    isRearranging={bulkMode}
                     bulkMode={bulkMode}
                     viewMode={viewMode}
                     bulkSelectedKeys={bulkSelectedKeys}
