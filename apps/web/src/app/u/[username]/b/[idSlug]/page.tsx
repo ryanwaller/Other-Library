@@ -117,6 +117,8 @@ function musicRoleLabel(role: string): string {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
+type MemberPreview = { userId: string; username: string; avatarUrl: string | null };
+
 function publicMusicFilterHref(username: string, value: string, key: DetailFilterKey = "q"): string {
   return detailFilterHref(`/u/${username}`, key, value);
 }
@@ -370,7 +372,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
       ? signingClient.storage.from("user-book-media").createSignedUrls(storagePaths, 60 * 30)
       : Promise.resolve(null),
     Number.isFinite(Number(book.library_id)) && Number(book.library_id) > 0
-      ? supabase.from("libraries").select("name").eq("id", Number(book.library_id)).maybeSingle()
+      ? getSupabaseAdmin().from("libraries").select("name").eq("id", Number(book.library_id)).maybeSingle()
       : Promise.resolve(null),
     book.edition?.id
       ? supabase
@@ -540,6 +542,76 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   let catalogName = "Catalog";
   const libName = String((libRes as any)?.data?.name ?? "").trim();
   if (libName) catalogName = libName;
+
+  let memberPreviews: MemberPreview[] = [];
+  if (Number.isFinite(Number(book.library_id)) && Number(book.library_id) > 0) {
+    const admin = getSupabaseAdmin();
+    const membersRes = await admin
+      .from("catalog_members")
+      .select("user_id,accepted_at")
+      .eq("catalog_id", Number(book.library_id))
+      .not("accepted_at", "is", null);
+    if (!membersRes.error) {
+      const memberRows = ((membersRes.data ?? []) as any[])
+        .map((row) => ({
+          userId: String(row.user_id ?? "").trim(),
+          acceptedAt: String(row.accepted_at ?? "").trim(),
+        }))
+        .filter((row) => row.userId && row.userId !== String(profile.id ?? ""));
+      const memberIds = Array.from(new Set(memberRows.map((row) => row.userId)));
+      if (memberIds.length > 0) {
+        const profilesRes = await admin.from("profiles").select("id,username,avatar_path").in("id", memberIds);
+        if (!profilesRes.error) {
+          const profilesById = new Map(
+            ((profilesRes.data ?? []) as any[])
+              .filter((row) => row?.id && row?.username)
+              .map((row) => [String(row.id), { username: String(row.username), avatarPath: row.avatar_path ? String(row.avatar_path) : null }])
+          );
+          const avatarPaths = Array.from(
+            new Set(
+              Array.from(profilesById.values())
+                .map((row) => String(row.avatarPath ?? "").trim())
+                .filter(Boolean)
+            )
+          );
+          const avatarByPath = new Map<string, string>();
+          for (const avatarPath of avatarPaths.filter((value) => /^https?:\/\//i.test(value))) {
+            avatarByPath.set(avatarPath, avatarPath);
+          }
+          const storageAvatarPaths = avatarPaths.filter((value) => !/^https?:\/\//i.test(value));
+          if (storageAvatarPaths.length > 0) {
+            const signedAvatarRes = await admin.storage.from("avatars").createSignedUrls(storageAvatarPaths, 60 * 30);
+            if (!signedAvatarRes.error && Array.isArray(signedAvatarRes.data)) {
+              for (const row of signedAvatarRes.data) {
+                if (row.path && row.signedUrl) avatarByPath.set(row.path, row.signedUrl);
+              }
+            }
+            for (const avatarPath of storageAvatarPaths) {
+              if (avatarByPath.has(avatarPath)) continue;
+              const publicAvatar = admin.storage.from("avatars").getPublicUrl(avatarPath);
+              const fallback = String(publicAvatar.data?.publicUrl ?? "").trim();
+              if (fallback) avatarByPath.set(avatarPath, fallback);
+            }
+          }
+          memberPreviews = memberRows
+            .map((row) => {
+              const profileRow = profilesById.get(row.userId);
+              if (!profileRow) return null;
+              return {
+                userId: row.userId,
+                username: profileRow.username,
+                avatarUrl: profileRow.avatarPath ? avatarByPath.get(profileRow.avatarPath) ?? null : null,
+                acceptedAt: row.acceptedAt,
+              };
+            })
+            .filter(Boolean)
+            .sort((a, b) => Date.parse((a as any).acceptedAt) - Date.parse((b as any).acceptedAt))
+            .slice(0, 10)
+            .map((row: any) => ({ userId: row.userId, username: row.username, avatarUrl: row.avatarUrl }));
+        }
+      }
+    }
+  }
 
   let copiesCount = 1;
   if (copiesRes && !(copiesRes as any).error && typeof (copiesRes as any).count === "number" && (copiesRes as any).count > 0) {
@@ -1010,7 +1082,28 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   <div style={{ minWidth: 110 }} className="text-muted">
                     Catalog
                   </div>
-                  <div>{catalogName}</div>
+                  <div className="row" style={{ alignItems: "center", gap: "var(--space-sm)", minWidth: 0 }}>
+                    <span>{catalogName}</span>
+                    {memberPreviews.length > 0 ? (
+                      <span className="om-member-stack" aria-label="Shared catalog members">
+                        {memberPreviews.slice(0, 6).map((m) => (
+                          <Link key={m.userId} href={`/u/${m.username}`} aria-label={`Open ${m.username}'s profile`} title={m.username}>
+                            {m.avatarUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar om-member-stack-avatar-detail-up" />
+                            ) : (
+                              <span className="om-member-stack-avatar om-member-stack-avatar-detail-up" />
+                            )}
+                          </Link>
+                        ))}
+                        {memberPreviews.length > 6 ? (
+                          <span className="om-member-stack-overflow" title={`${memberPreviews.length - 6} more members`}>
+                            +{memberPreviews.length - 6}
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
