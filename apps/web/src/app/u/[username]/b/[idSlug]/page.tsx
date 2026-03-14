@@ -20,7 +20,6 @@ import { ExpandableSubjects, ExpandableDescription } from "./PublicExpandables";
 import FollowControls from "../../FollowControls";
 import PublicProfileHeader from "../../../../components/PublicProfileHeader";
 import { type CoverCrop } from "../../../../../components/CoverImage";
-import PublicImageGrid from "./PublicImageGrid";
 import PublicBookDetailGrid from "./PublicBookDetailGrid";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
 import PublicRelatedItemsSection from "./PublicRelatedItemsSection";
@@ -635,7 +634,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
         />
 
         <div style={{ marginTop: "var(--space-14)" }} className="card">
-          <PublicBookDetailGrid coverSrc={coverSrc} cropData={cropData} effectiveTitle={effectiveTitle}>
+          <PublicBookDetailGrid coverSrc={coverSrc} cropData={cropData} effectiveTitle={effectiveTitle} images={images} signedMap={signedMap}>
             <div>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
                 <div>{effectiveTitle}</div>
@@ -1225,16 +1224,6 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
               </div>
             </div>
           </PublicBookDetailGrid>
-
-          {images.length > 0 ? (
-            <div style={{ marginTop: 16 }}>
-              <hr className="om-hr" style={{ marginBottom: 16 }} />
-              <div className="text-muted">
-                Images
-              </div>
-              <PublicImageGrid images={images} signedMap={signedMap} />
-            </div>
-          ) : null}
 
           <div style={{ marginTop: 16 }}>
             {editionId ? <AlsoOwnedBy editionId={editionId} excludeUserBookId={book.id} excludeOwnerId={book.owner_id} /> : null}
