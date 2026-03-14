@@ -4785,7 +4785,7 @@ export default function BookDetailPage() {
                           {editMode ? (
                             <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="Month / year or full date" />
                           ) : (
-                            <Link href={detailFilterHref("/app", "publish_date", effectivePublishDate)} style={{ textDecoration: "none" }}>{displayPublishDate}</Link>
+                            displayPublishDate
                           )}
                         </div>
                         {editMode && (
@@ -5019,7 +5019,7 @@ export default function BookDetailPage() {
                           {editMode ? (
                             <input className="om-inline-control" value={formPublishDate} onChange={(e) => setFormPublishDate(e.target.value)} onKeyDown={(e) => onEnter(e, () => void saveEdits())} placeholder="YYYY-MM-DD" />
                           ) : (
-                            <Link href={detailFilterHref("/app", "publish_date", effectivePublishDate)} style={{ textDecoration: "none" }}>{displayPublishDate}</Link>
+                            displayPublishDate
                           )}
                         </div>
                         {editMode && (
