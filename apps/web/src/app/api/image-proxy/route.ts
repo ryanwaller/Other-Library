@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import sharp from "sharp";
 import { fetchWithSafeRedirects, isSafeHttpUrl } from "../../../lib/networkSafety";
 
 export const runtime = "nodejs";
@@ -58,6 +57,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (targetWidth && Number.isFinite(targetWidth) && targetWidth > 0 && targetWidth <= 2000) {
+      const sharp = (await import("sharp")).default;
       const resized = await sharp(Buffer.from(buf))
         .resize({ width: targetWidth, withoutEnlargement: true })
         .webp({ quality: 80 })
