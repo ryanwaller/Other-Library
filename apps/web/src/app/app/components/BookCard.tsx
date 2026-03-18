@@ -76,6 +76,14 @@ export default function BookCard({
     return authors;
   }, [gridCols, authors, isMobile]);
 
+  const effectiveCols = isMobile ? Math.min(gridCols ?? 4, 2) : (gridCols ?? 4);
+  const coverSizes = viewMode === "list"
+    ? "70px"
+    : effectiveCols === 8 ? "calc(12.5vw - 11px)"
+    : effectiveCols === 4 ? "calc(25vw - 9px)"
+    : effectiveCols === 2 ? "calc(50vw - 6px)"
+    : "100vw";
+
   const coverEl = (
     <div className="om-cover-slot" style={{ height: "auto", width: "100%" }}>
       <CoverImage
@@ -84,6 +92,7 @@ export default function BookCard({
         cropData={cropData}
         style={{ display: "block", width: "100%", height: "auto" }}
         objectFit="contain"
+        sizes={coverSizes}
       />
     </div>
   );
@@ -130,7 +139,7 @@ export default function BookCard({
         {bulkMode ? <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" /> : null}
         <Link href={href} style={{ display: "block" }} className="om-book-card-link" onClick={onOpen}>
           <div className="om-cover-slot" style={{ width: 70, height: "auto" }}>
-            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto" }} objectFit="contain" />
+            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto" }} objectFit="contain" sizes={coverSizes} />
           </div>
         </Link>
         <div>

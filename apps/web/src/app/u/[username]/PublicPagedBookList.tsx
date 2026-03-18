@@ -67,7 +67,7 @@ export default function PublicPagedBookList({
           <div key={b.id} className="om-book-card">
             <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
               <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
-                <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
+                <CoverImage alt={title} src={imageSrc} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" sizes={isMobile ? "calc(50vw - 6px)" : "calc(25vw - 9px)"} />
               </div>
             </Link>
             <div style={{ marginTop: "var(--space-8)" }}>
