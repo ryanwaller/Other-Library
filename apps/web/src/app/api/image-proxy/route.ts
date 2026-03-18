@@ -57,18 +57,22 @@ export async function GET(req: NextRequest) {
     }
 
     if (targetWidth && Number.isFinite(targetWidth) && targetWidth > 0 && targetWidth <= 2000) {
-      const sharp = (await import("sharp")).default;
-      const resized = await sharp(Buffer.from(buf))
-        .resize({ width: targetWidth, withoutEnlargement: true })
-        .webp({ quality: 80 })
-        .toBuffer();
-      return new NextResponse(resized, {
-        status: 200,
-        headers: {
-          "content-type": "image/webp",
-          "cache-control": "public, max-age=3600"
-        }
-      });
+      try {
+        const sharp = (await import("sharp")).default;
+        const resized = await sharp(Buffer.from(buf))
+          .resize({ width: targetWidth, withoutEnlargement: true })
+          .webp({ quality: 80 })
+          .toBuffer();
+        return new NextResponse(resized, {
+          status: 200,
+          headers: {
+            "content-type": "image/webp",
+            "cache-control": "public, max-age=3600"
+          }
+        });
+      } catch {
+        // Sharp unavailable — fall through and return original
+      }
     }
 
     return new NextResponse(buf, {
