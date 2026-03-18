@@ -2,6 +2,26 @@
 
 import { useState, useRef, useEffect, type CSSProperties } from "react";
 
+const SRCSET_WIDTHS = [200, 400, 800, 1200];
+
+function makeSizedUrl(src: string, width: number): string {
+  if (src.includes("/storage/v1/object/sign/") || src.includes("/api/image-proxy")) {
+    try {
+      const base = src.includes("/api/image-proxy") ? src : `/api/image-proxy?url=${encodeURIComponent(src)}`;
+      const url = new URL(base, "http://x");
+      url.searchParams.set("width", String(width));
+      return url.pathname + "?" + url.searchParams.toString();
+    } catch {
+      return src;
+    }
+  }
+  return src;
+}
+
+function buildSrcSet(src: string): string {
+  return SRCSET_WIDTHS.map((w) => `${makeSizedUrl(src, w)} ${w}w`).join(", ");
+}
+
 export type CoverCrop = {
   // Legacy fields (react-easy-crop)
   x?: number;
@@ -27,7 +47,8 @@ export default function CoverImage({
   alt,
   style,
   className,
-  objectFit = "cover"
+  objectFit = "cover",
+  sizes
 }: {
   src: string | null;
   cropData: CoverCrop | null | undefined;
@@ -35,6 +56,7 @@ export default function CoverImage({
   style?: CSSProperties;
   className?: string;
   objectFit?: "cover" | "contain";
+  sizes?: string;
 }) {
 
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
@@ -158,6 +180,8 @@ export default function CoverImage({
           ref={imgRef}
           alt={alt}
           src={src}
+          srcSet={sizes ? buildSrcSet(src) : undefined}
+          sizes={sizes}
           onLoad={handleLoad}
           onError={handleError}
           style={{

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import sharp from "sharp";
 import { fetchWithSafeRedirects, isSafeHttpUrl } from "../../../lib/networkSafety";
 
 export const runtime = "nodejs";
@@ -8,6 +9,8 @@ const USER_AGENT = "Other-Library/0.1 (https://other-library.com; contact: hello
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const urlValue = String(searchParams.get("url") ?? "").trim();
+  const widthParam = searchParams.get("width");
+  const targetWidth = widthParam ? parseInt(widthParam, 10) : null;
   if (!urlValue) return NextResponse.json({ ok: false, error: "Provide a url." }, { status: 400 });
 
   let parsed: URL;
@@ -52,6 +55,20 @@ export async function GET(req: NextRequest) {
     const buf = await res.arrayBuffer();
     if (buf.byteLength > MAX) {
       return NextResponse.json({ ok: false, error: "Image too large." }, { status: 400 });
+    }
+
+    if (targetWidth && Number.isFinite(targetWidth) && targetWidth > 0 && targetWidth <= 2000) {
+      const resized = await sharp(Buffer.from(buf))
+        .resize({ width: targetWidth, withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
+      return new NextResponse(resized, {
+        status: 200,
+        headers: {
+          "content-type": "image/webp",
+          "cache-control": "public, max-age=3600"
+        }
+      });
     }
 
     return new NextResponse(buf, {

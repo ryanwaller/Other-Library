@@ -566,6 +566,14 @@ export default function PublicBookList({
 
   const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
 
+  const coverSizes = useMemo(() => {
+    if (viewMode === "list") return "60px";
+    if (effectiveCols === 8) return "calc(12.5vw - 11px)";
+    if (effectiveCols === 4) return "calc(25vw - 9px)";
+    if (effectiveCols === 2) return "calc(50vw - 6px)";
+    return "100vw";
+  }, [viewMode, effectiveCols]);
+
   const containerStyle = useMemo((): React.CSSProperties => {
     if (viewMode === "list") {
       return { display: "flex", flexDirection: "column", gap: "var(--space-8)" };
@@ -662,7 +670,7 @@ export default function PublicBookList({
         <div key={g.key} className="card" style={{ display: "flex", gap: "var(--space-md)", alignItems: "start" }}>
           <Link href={href} style={{ display: "block" }} className="om-book-card-link">
             <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
-              <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
+              <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" sizes={coverSizes} />
             </div>
           </Link>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -699,7 +707,7 @@ export default function PublicBookList({
       <div key={g.key} className="om-book-card" style={{ position: "relative" }}>
         <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
           <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
-            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" />
+            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" sizes={coverSizes} />
           </div>
         </Link>
         <div className="om-cover-add-btn" style={{ position: "absolute", top: 6, right: 6, zIndex: 1 }}>
