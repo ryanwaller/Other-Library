@@ -2,13 +2,15 @@
 
 import { useState, useRef, useEffect, type CSSProperties } from "react";
 
-const SRCSET_WIDTHS = [200, 400, 800, 1200];
+const SRCSET_WIDTHS = [200, 400, 800];
 
 function makeSizedUrl(src: string, width: number): string {
-  if (src.includes("/storage/v1/object/sign/") || src.includes("/api/image-proxy")) {
+  if (src.includes("/storage/v1/object/sign/")) {
+    return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=80`;
+  }
+  if (src.includes("/api/image-proxy")) {
     try {
-      const base = src.includes("/api/image-proxy") ? src : `/api/image-proxy?url=${encodeURIComponent(src)}`;
-      const url = new URL(base, "http://x");
+      const url = new URL(src, "http://x");
       url.searchParams.set("width", String(width));
       return url.pathname + "?" + url.searchParams.toString();
     } catch {
