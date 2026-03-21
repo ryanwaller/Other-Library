@@ -679,6 +679,8 @@ export default async function HomePage() {
             />
           </div>
 
+          <div className="om-explore-divider" aria-hidden="true" />
+
           <aside className="om-explore-rail">
             {(data?.railClusters ?? []).map((cluster) => (
               <ExploreRailModule key={`${cluster.role}-${cluster.slug ?? cluster.name}`} cluster={cluster} />
