@@ -398,7 +398,7 @@ function ExploreModule({
   return (
     <section id={id} style={{ marginTop: "var(--space-xl)" }}>
       <hr className="divider" />
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--space-lg)" }}>
+      <div className="row om-explore-module-header" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--space-lg)" }}>
         <div>{title}</div>
         {href ? (
           <Link href={href} className="text-muted" style={{ textDecoration: "none" }}>
@@ -475,7 +475,7 @@ function ExploreRailModule({
   return (
     <section style={{ marginTop: "var(--space-xl)" }}>
       <hr className="divider" />
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--space-lg)", gap: "var(--space-md)" }}>
+      <div className="row om-explore-module-header" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--space-lg)", gap: "var(--space-md)" }}>
         <div>{heading}</div>
         {cluster.slug ? (
           <Link href={`/entity/${encodeURIComponent(cluster.slug)}`} className="text-muted" style={{ textDecoration: "none" }}>
@@ -510,7 +510,7 @@ export default async function HomePage() {
   const data = await loadExploreData();
 
   return (
-    <main className="container" style={{ paddingBottom: "var(--space-4xl)" }}>
+    <main className="container" style={{ paddingBottom: "calc(var(--space-xl) + var(--space-32) + var(--space-md))" }}>
       <div
         style={{
           display: "grid",

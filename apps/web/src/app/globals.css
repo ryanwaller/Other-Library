@@ -1292,6 +1292,10 @@ a.text-muted:hover {
   padding-bottom: var(--space-4xl);
 }
 
+.om-explore-module-header {
+  min-height: 1lh;
+}
+
 .om-explore-rail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1300,6 +1304,10 @@ a.text-muted:hover {
 
 .om-explore-rail > section:first-child {
   margin-top: 0 !important;
+}
+
+.om-explore-rail > section:first-child .om-explore-module-header {
+  margin-top: var(--space-md) !important;
 }
 
 .om-book-secondary a {
