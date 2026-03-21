@@ -39,11 +39,13 @@ type ExploreBookRow = {
 };
 
 type EntityCluster = {
+  entityId: string;
   role: "author" | "designer" | "publisher" | "performer";
   name: string;
   slug: string | null;
   count: number;
   items: GridItem[];
+  heading?: string | null;
 };
 
 type ExploreUserHeading = {
@@ -54,6 +56,7 @@ type ExploreUserHeading = {
 const EXPLORE_MAIN_MODULE_ITEMS = 4;
 const EXPLORE_RAIL_MODULE_COUNT = 3;
 const EXPLORE_RAIL_ITEMS = 4;
+const EXPLORE_RAIL_SURFACE = "explore_right_rail";
 
 const BOOK_SELECT =
   "id,owner_id,created_at,visibility,group_label,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,authors_override,editors_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))";
@@ -148,6 +151,13 @@ function uniqueById(rows: ExploreBookRow[]): ExploreBookRow[] {
     out.push(row);
   }
   return out;
+}
+
+function railHeading(role: EntityCluster["role"], name: string): string {
+  if (role === "designer") return `Designed by ${name}`;
+  if (role === "author") return `Authored by ${name}`;
+  if (role === "publisher") return `Published by ${name}`;
+  return `Performed by ${name}`;
 }
 
 async function loadExploreData() {
@@ -346,13 +356,78 @@ async function loadExploreData() {
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
     .slice(0, EXPLORE_RAIL_MODULE_COUNT)
     .map((entry) => ({
+      entityId: entry.id,
       role: entry.role,
       name: entry.name,
       slug: entry.slug,
       count: entry.count,
       items: clusterItemsFor(entry.id, entry.role),
+      heading: null,
     }))
     .filter((entry) => entry.items.length > 0);
+
+  const railSlotRes = await db
+    .from("homepage_feature_slots")
+    .select("slot_index,mode,role,title_override,entity:entities(id,name,slug)")
+    .eq("surface", EXPLORE_RAIL_SURFACE)
+    .order("slot_index", { ascending: true });
+
+  const autoQueue = [...railClusters];
+  const usedKeys = new Set<string>();
+  const railBySlot = new Map<number, EntityCluster>();
+
+  const takeNextAuto = () => {
+    while (autoQueue.length > 0) {
+      const next = autoQueue.shift()!;
+      const key = `${next.role}:${next.entityId}`;
+      if (usedKeys.has(key)) continue;
+      usedKeys.add(key);
+      return next;
+    }
+    return null;
+  };
+
+  const slotRows = Array.isArray(railSlotRes.data) ? railSlotRes.data : [];
+  for (const row of slotRows) {
+    const slotIndex = Number(row.slot_index);
+    if (!Number.isFinite(slotIndex) || slotIndex < 1 || slotIndex > EXPLORE_RAIL_MODULE_COUNT) continue;
+    const mode = String((row as any).mode ?? "").trim().toLowerCase();
+    if (mode !== "pinned") continue;
+    const roleValue = String((row as any).role ?? "").trim().toLowerCase();
+    const role =
+      roleValue === "designer" || roleValue === "author" || roleValue === "publisher" || roleValue === "performer"
+        ? (roleValue as EntityCluster["role"])
+        : null;
+    const entity = (row as any).entity;
+    const entityId = String(entity?.id ?? "").trim();
+    const name = String(entity?.name ?? "").trim();
+    const slug = String(entity?.slug ?? "").trim() || null;
+    if (!role || !entityId || !name) continue;
+    const items = clusterItemsFor(entityId, role);
+    if (items.length === 0) continue;
+    const key = `${role}:${entityId}`;
+    usedKeys.add(key);
+    railBySlot.set(slotIndex, {
+      entityId,
+      role,
+      name,
+      slug,
+      count: items.length,
+      items,
+      heading: String((row as any).title_override ?? "").trim() || railHeading(role, name),
+    });
+  }
+
+  const mergedRailClusters: EntityCluster[] = [];
+  for (let slot = 1; slot <= EXPLORE_RAIL_MODULE_COUNT; slot += 1) {
+    const pinned = railBySlot.get(slot);
+    if (pinned) {
+      mergedRailClusters.push(pinned);
+      continue;
+    }
+    const automatic = takeNextAuto();
+    if (automatic) mergedRailClusters.push(automatic);
+  }
 
   const groupCounts = new Map<string, number>();
   for (const row of recentRows) {
@@ -383,7 +458,7 @@ async function loadExploreData() {
     editorItems,
     groupHeading: topGroupLabel ? { label: topGroupLabel, slug: slugify(topGroupLabel) } : null,
     groupItems,
-    railClusters,
+    railClusters: mergedRailClusters,
   };
 }
 
@@ -468,14 +543,7 @@ function ExploreRailModule({
   cluster: EntityCluster;
 }) {
   if (cluster.items.length === 0) return null;
-  const heading =
-    cluster.role === "designer"
-      ? `Designed by ${cluster.name}`
-      : cluster.role === "author"
-        ? `Authored by ${cluster.name}`
-        : cluster.role === "publisher"
-          ? `Published by ${cluster.name}`
-          : `Performed by ${cluster.name}`;
+  const heading = cluster.heading ?? railHeading(cluster.role, cluster.name);
   return (
     <section className="om-explore-module">
       <hr className="divider" />

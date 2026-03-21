@@ -70,7 +70,29 @@ type InvitesResponse = {
   metrics: { total: number; pending: number; used: number; expired: number };
 };
 
-type TabKey = "users" | "waitlist" | "invites" | "feedback";
+type HomepageRailRole = "author" | "designer" | "publisher" | "performer";
+
+type HomepageRailEntity = {
+  id: string;
+  name: string;
+  slug: string | null;
+};
+
+type HomepageRailSlot = {
+  slot_index: number;
+  mode: "automatic" | "pinned";
+  role: HomepageRailRole;
+  entity_id: string | null;
+  title_override: string;
+  entity: HomepageRailEntity | null;
+};
+
+type HomepageRailResponse = {
+  slots: HomepageRailSlot[];
+  migrationRequired?: boolean;
+};
+
+type TabKey = "users" | "waitlist" | "invites" | "feedback" | "homepage";
 
 type MetaPair = { label: string; value: string | number };
 
@@ -104,6 +126,17 @@ function inviteStatus(row: InviteRow): "pending" | "used" | "expired" {
     if (Number.isFinite(expiry.getTime()) && expiry.getTime() < Date.now()) return "expired";
   }
   return "pending";
+}
+
+function defaultHomepageSlots(): HomepageRailSlot[] {
+  return [1, 2, 3].map((slot_index) => ({
+    slot_index,
+    mode: "automatic",
+    role: "designer",
+    entity_id: null,
+    title_override: "",
+    entity: null,
+  }));
 }
 
 function AdminListItem({
@@ -219,6 +252,11 @@ function AdminPageInner() {
   const [invitesData, setInvitesData] = useState<InvitesResponse | null>(null);
   const [feedbackMetrics, setFeedbackMetrics] = useState<FeedbackMetrics>({ new: 0, reviewing: 0, resolved: 0, wont_fix: 0 });
   const [feedbackRefreshToken, setFeedbackRefreshToken] = useState(0);
+  const [homepageSlots, setHomepageSlots] = useState<HomepageRailSlot[]>(defaultHomepageSlots());
+  const [homepageSearchDrafts, setHomepageSearchDrafts] = useState<Record<number, string>>({});
+  const [homepageSearchResults, setHomepageSearchResults] = useState<Record<number, HomepageRailEntity[]>>({});
+  const [homepageSaving, setHomepageSaving] = useState(false);
+  const [homepageNotice, setHomepageNotice] = useState<string | null>(null);
 
   usePageTitle(
     tab === "waitlist"
@@ -227,7 +265,9 @@ function AdminPageInner() {
         ? "Invites"
         : tab === "feedback"
           ? "Feedback"
-          : "Admin"
+          : tab === "homepage"
+            ? "Homepage"
+            : "Admin"
   );
 
   useEffect(() => {
@@ -239,7 +279,7 @@ function AdminPageInner() {
 
   useEffect(() => {
     const raw = String(searchParams.get("tab") ?? "").trim().toLowerCase();
-    if (raw === "users" || raw === "waitlist" || raw === "invites" || raw === "feedback") {
+    if (raw === "users" || raw === "waitlist" || raw === "invites" || raw === "feedback" || raw === "homepage") {
       setTab(raw as TabKey);
     }
   }, [searchParams]);
@@ -354,6 +394,23 @@ function AdminPageInner() {
     }
   }
 
+  async function refreshHomepageRail() {
+    if (!token) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api<HomepageRailResponse>("/api/admin/homepage-rail", { method: "GET", token });
+      setHomepageSlots(Array.isArray(res.slots) && res.slots.length ? res.slots : defaultHomepageSlots());
+      if (res.migrationRequired) setHomepageNotice("Apply migration 0044_homepage_feature_slots.sql to enable saved homepage overrides.");
+    } catch (e: any) {
+      const msg = e?.message ?? "Failed to load homepage rail";
+      if (handleAuthError(msg)) return;
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     setInviteLink(null);
   }, [tab]);
@@ -381,6 +438,12 @@ function AdminPageInner() {
     refreshInvites();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, tab, invitesSearch, invitesStatus, invitesDir, invitesPage, invitesPageSize]);
+
+  useEffect(() => {
+    if (!token || tab !== "homepage") return;
+    refreshHomepageRail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, tab]);
 
   const userTotalPages = usersData ? Math.max(1, Math.ceil(usersData.total / usersData.pageSize)) : 1;
   const waitTotalPages = waitlistData ? Math.max(1, Math.ceil(waitlistData.total / waitlistData.pageSize)) : 1;
@@ -454,6 +517,13 @@ function AdminPageInner() {
         { label: "Won't fix", value: feedbackMetrics.wont_fix }
       ];
     }
+    if (tab === "homepage") {
+      return [
+        { label: "Slots", value: homepageSlots.length },
+        { label: "Pinned", value: homepageSlots.filter((slot) => slot.mode === "pinned" && slot.entity_id).length },
+        { label: "Automatic", value: homepageSlots.filter((slot) => slot.mode === "automatic").length }
+      ];
+    }
     return [
       { label: "Total", value: invitesData?.metrics.total ?? 0 },
       { label: "Pending", value: invitesData?.metrics.pending ?? 0 },
@@ -498,6 +568,7 @@ function AdminPageInner() {
                 if (tab === "waitlist") refreshWaitlist();
                 if (tab === "invites") refreshInvites();
                 if (tab === "feedback") setFeedbackRefreshToken((prev) => prev + 1);
+                if (tab === "homepage") refreshHomepageRail();
               }}
               disabled={busy}
             >
@@ -522,12 +593,19 @@ function AdminPageInner() {
                 type="button" 
                 onClick={() => setTabAndRoute("feedback")} 
                 aria-current={tab === "feedback" ? "page" : undefined}
-                style={{ marginLeft: isMobileViewport ? "auto" : 0 }}
               >
                 Feedback
               </button>
+              <button
+                type="button"
+                onClick={() => setTabAndRoute("homepage")}
+                aria-current={tab === "homepage" ? "page" : undefined}
+                style={{ marginLeft: isMobileViewport ? "auto" : 0 }}
+              >
+                Homepage
+              </button>
             </div>
-            {tab !== "feedback" ? (
+            {tab !== "feedback" && tab !== "homepage" ? (
             <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0, flex: "1 1 auto", marginLeft: isMobileViewport ? 0 : "var(--space-16)", marginTop: isMobileViewport ? "var(--space-sm)" : 0, flexWrap: "nowrap", alignItems: "baseline" }}>
               <input
                 value={inviteEmail}
@@ -590,7 +668,7 @@ function AdminPageInner() {
             </div>
           ) : null}
 
-          {tab !== "feedback" ? (
+          {tab !== "feedback" && tab !== "homepage" ? (
           <div className="row admin-filter-row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)", marginTop: "var(--space-lg)" }}>
             <div className="row admin-filter-left" style={{ gap: "var(--space-8)", alignItems: "center", flex: "1 1 auto", minWidth: 0 }}>
               {tab === "users" ? (
@@ -688,7 +766,7 @@ function AdminPageInner() {
           </div>
           ) : null}
 
-          {searchOpen && tab !== "feedback" ? (
+          {searchOpen && tab !== "feedback" && tab !== "homepage" ? (
             <div className="row admin-search-row" style={{ marginTop: "var(--space-10)", marginBottom: "var(--space-lg)", gap: "var(--space-8)", alignItems: "center", justifyContent: "flex-end" }}>
               {tab === "users" ? (
                 <>
@@ -776,7 +854,185 @@ function AdminPageInner() {
             />
           ) : null}
 
-          {tab !== "feedback" ? (
+          {tab === "homepage" ? (
+            <div className="om-list" style={{ marginTop: "var(--space-lg)" }}>
+              {homepageSlots.map((slot) => {
+                const searchResults = homepageSearchResults[slot.slot_index] ?? [];
+                const searchDraft = homepageSearchDrafts[slot.slot_index] ?? "";
+                return (
+                  <div key={slot.slot_index} className="om-list-row">
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
+                      <div>Right rail slot {slot.slot_index}</div>
+                      {slot.mode === "pinned" && slot.entity ? (
+                        <Link href={slot.entity.slug ? `/entity/${encodeURIComponent(slot.entity.slug)}` : "#"} className="text-muted">
+                          View entity
+                        </Link>
+                      ) : null}
+                    </div>
+                    <div className="row" style={{ marginTop: "var(--space-10)", gap: "var(--space-8)", flexWrap: "wrap" }}>
+                      <select
+                        value={slot.mode}
+                        onChange={(e) => {
+                          const mode = e.target.value as HomepageRailSlot["mode"];
+                          setHomepageNotice(null);
+                          setHomepageSlots((prev) =>
+                            prev.map((row) =>
+                              row.slot_index === slot.slot_index
+                                ? {
+                                    ...row,
+                                    mode,
+                                    entity_id: mode === "automatic" ? null : row.entity_id,
+                                    entity: mode === "automatic" ? null : row.entity,
+                                  }
+                                : row
+                            )
+                          );
+                        }}
+                        className="om-filter-control"
+                      >
+                        <option value="automatic">Automatic</option>
+                        <option value="pinned">Pinned</option>
+                      </select>
+                      <select
+                        value={slot.role}
+                        onChange={(e) => {
+                          const role = e.target.value as HomepageRailRole;
+                          setHomepageNotice(null);
+                          setHomepageSlots((prev) => prev.map((row) => (row.slot_index === slot.slot_index ? { ...row, role } : row)));
+                        }}
+                        className="om-filter-control"
+                        disabled={slot.mode !== "pinned"}
+                      >
+                        <option value="designer">Designer</option>
+                        <option value="author">Author</option>
+                        <option value="publisher">Publisher</option>
+                        <option value="performer">Performer</option>
+                      </select>
+                      <input
+                        value={searchDraft}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setHomepageSearchDrafts((prev) => ({ ...prev, [slot.slot_index]: value }));
+                        }}
+                        placeholder="Search entity"
+                        style={{ minWidth: 200, flex: "1 1 220px" }}
+                        disabled={slot.mode !== "pinned"}
+                        onKeyDown={async (e) => {
+                          if (e.key !== "Enter" || slot.mode !== "pinned" || !searchDraft.trim()) return;
+                          const res = await api<{ entities: HomepageRailEntity[] }>(`/api/admin/homepage-rail?q=${encodeURIComponent(searchDraft.trim())}`, {
+                            method: "GET",
+                            token
+                          });
+                          setHomepageSearchResults((prev) => ({ ...prev, [slot.slot_index]: res.entities ?? [] }));
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={slot.mode !== "pinned" || !searchDraft.trim() || homepageSaving}
+                        onClick={async () => {
+                          setError(null);
+                          try {
+                            const res = await api<{ entities: HomepageRailEntity[] }>(`/api/admin/homepage-rail?q=${encodeURIComponent(searchDraft.trim())}`, {
+                              method: "GET",
+                              token
+                            });
+                            setHomepageSearchResults((prev) => ({ ...prev, [slot.slot_index]: res.entities ?? [] }));
+                          } catch (e: any) {
+                            setError(e?.message ?? "Entity search failed");
+                          }
+                        }}
+                      >
+                        Search
+                      </button>
+                    </div>
+                    {slot.mode === "pinned" ? (
+                      <>
+                        <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
+                          Selected: {slot.entity ? slot.entity.name : "None"}
+                        </div>
+                        <input
+                          value={slot.title_override}
+                          onChange={(e) => {
+                            const title_override = e.target.value;
+                            setHomepageNotice(null);
+                            setHomepageSlots((prev) => prev.map((row) => (row.slot_index === slot.slot_index ? { ...row, title_override } : row)));
+                          }}
+                          placeholder="Optional custom title"
+                          style={{ marginTop: "var(--space-8)", width: "100%" }}
+                        />
+                        {searchResults.length > 0 ? (
+                          <div className="om-list" style={{ marginTop: "var(--space-8)" }}>
+                            {searchResults.map((entity) => (
+                              <div key={entity.id} className="om-list-row">
+                                <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-md)", alignItems: "baseline" }}>
+                                  <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>{entity.name}</div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setHomepageNotice(null);
+                                      setHomepageSlots((prev) =>
+                                        prev.map((row) =>
+                                          row.slot_index === slot.slot_index
+                                            ? { ...row, entity_id: entity.id, entity }
+                                            : row
+                                        )
+                                      );
+                                      setHomepageSearchResults((prev) => ({ ...prev, [slot.slot_index]: [] }));
+                                      setHomepageSearchDrafts((prev) => ({ ...prev, [slot.slot_index]: entity.name }));
+                                    }}
+                                  >
+                                    Select
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </div>
+                );
+              })}
+
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-lg)" }}>
+                <div className="text-muted">{homepageNotice ?? "Automatic slots will fall back to the live recent-feed rail logic."}</div>
+                <button
+                  type="button"
+                  disabled={homepageSaving}
+                  onClick={async () => {
+                    setHomepageSaving(true);
+                    setError(null);
+                    setHomepageNotice(null);
+                    try {
+                      await api("/api/admin/homepage-rail", {
+                        method: "POST",
+                        token,
+                        body: JSON.stringify({
+                          slots: homepageSlots.map((slot) => ({
+                            slot_index: slot.slot_index,
+                            mode: slot.mode,
+                            role: slot.role,
+                            entity_id: slot.entity_id,
+                            title_override: slot.title_override,
+                          })),
+                        }),
+                      });
+                      await refreshHomepageRail();
+                      setHomepageNotice("Saved");
+                    } catch (e: any) {
+                      setError(e?.message === "migration_required" ? "Apply migration 0044_homepage_feature_slots.sql before saving homepage overrides." : (e?.message ?? "Failed to save homepage rail"));
+                    } finally {
+                      setHomepageSaving(false);
+                    }
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {tab !== "feedback" && tab !== "homepage" ? (
           <div className="om-list" style={{ marginTop: searchOpen ? 0 : "var(--space-lg)" }}>
             {tab === "users"
               ? (usersData?.users ?? []).map((u) => {
@@ -1004,7 +1260,7 @@ function AdminPageInner() {
           </div>
           ) : null}
 
-          {tab !== "feedback" ? (
+          {tab !== "feedback" && tab !== "homepage" ? (
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)", marginTop: "var(--space-lg)" }}>
             <div className="text-muted">
               {tab === "users" ? resultLabel(usersData?.page ?? userPage, userTotalPages, usersData?.total ?? 0) : null}
@@ -1058,7 +1314,7 @@ function AdminPageInner() {
           </div>
           ) : null}
 
-          {inviteLink && tab !== "feedback" ? (
+          {inviteLink && tab !== "feedback" && tab !== "homepage" ? (
             <div className="text-muted" style={{ marginTop: "var(--space-8)", wordBreak: "break-all" }}>
               {inviteLink}
             </div>
