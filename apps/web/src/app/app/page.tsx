@@ -1025,7 +1025,7 @@ function AppShell({
         if (migrated) setDesktopGridDensity(migrated);
       }
       if (isMobileGridCols(mobileCols)) setMobileGridCols(Number(mobileCols) as MobileGridCols);
-      else if (legacyGc === "1" || legacyGc === "2") setMobileGridCols(Number(legacyGc) as MobileGridCols);
+      else if (legacyGc === "1" || legacyGc === "2" || legacyGc === "3") setMobileGridCols(Number(legacyGc) as MobileGridCols);
       if (sm === "custom" || sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
       setSearchQuery(q);
     } catch {
@@ -3657,8 +3657,9 @@ function AppShell({
                 {viewMode === "grid" && (
                   isMobile ? (
                     <select className="om-filter-control" value={mobileGridCols} onChange={(e) => setMobileGridCols(Number(e.target.value) as MobileGridCols)}>
-                      <option value={1}>1</option>
-                      <option value={2}>2</option>
+                      <option value={3}>small</option>
+                      <option value={2}>medium</option>
+                      <option value={1}>large</option>
                     </select>
                   ) : (
                     <select className="om-filter-control" value={desktopGridDensity} onChange={(e) => setDesktopGridDensity(e.target.value as DesktopGridDensity)}>
@@ -3791,8 +3792,9 @@ function AppShell({
                 {viewMode === "grid" && (
                   isMobile ? (
                     <select className="om-filter-control" value={mobileGridCols} onChange={(e) => setMobileGridCols(Number(e.target.value) as MobileGridCols)}>
-                      <option value={1}>1</option>
-                      <option value={2}>2</option>
+                      <option value={3}>small</option>
+                      <option value={2}>medium</option>
+                      <option value={1}>large</option>
                     </select>
                   ) : (
                     <select className="om-filter-control" value={desktopGridDensity} onChange={(e) => setDesktopGridDensity(e.target.value as DesktopGridDensity)}>

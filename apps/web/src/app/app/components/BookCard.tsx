@@ -76,12 +76,13 @@ export default function BookCard({
     return authors;
   }, [gridCols, authors, isMobile]);
 
-  const effectiveCols = isMobile ? Math.min(gridCols ?? 2, 2) : (gridCols ?? 6);
+  const effectiveCols = isMobile ? Math.min(gridCols ?? 2, 3) : (gridCols ?? 6);
   const coverSizes = viewMode === "list"
     ? "70px"
     : effectiveCols >= 8 ? "(max-width: 1100px) 26vw, (max-width: 1500px) 19vw, 14vw"
     : effectiveCols >= 6 ? "(max-width: 1100px) 34vw, (max-width: 1500px) 24vw, 18vw"
     : effectiveCols >= 4 ? "(max-width: 1100px) 42vw, (max-width: 1500px) 31vw, 23vw"
+    : effectiveCols === 3 ? "33vw"
     : effectiveCols === 2 ? "50vw"
     : "100vw";
 

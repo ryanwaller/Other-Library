@@ -1,5 +1,5 @@
 export type DesktopGridDensity = "large" | "medium" | "small";
-export type MobileGridCols = 1 | 2;
+export type MobileGridCols = 1 | 2 | 3;
 
 export const DEFAULT_DESKTOP_GRID_DENSITY: DesktopGridDensity = "medium";
 export const DEFAULT_MOBILE_GRID_COLS: MobileGridCols = 2;
@@ -16,7 +16,7 @@ export function isDesktopGridDensity(value: unknown): value is DesktopGridDensit
 }
 
 export function isMobileGridCols(value: unknown): value is MobileGridCols {
-  return value === 1 || value === 2 || value === "1" || value === "2";
+  return value === 1 || value === 2 || value === 3 || value === "1" || value === "2" || value === "3";
 }
 
 export function desktopGridColumnsHint(density: DesktopGridDensity): number {
@@ -39,7 +39,9 @@ export function gridTemplateColumns(isMobile: boolean, mobileGridCols: MobileGri
 
 export function coverSizesForGrid(isMobile: boolean, mobileGridCols: MobileGridCols, desktopGridDensity: DesktopGridDensity): string {
   if (isMobile) {
-    return mobileGridCols === 1 ? "100vw" : "50vw";
+    if (mobileGridCols === 1) return "100vw";
+    if (mobileGridCols === 2) return "50vw";
+    return "33vw";
   }
   if (desktopGridDensity === "large") {
     return "(max-width: 1100px) 42vw, (max-width: 1500px) 31vw, 23vw";

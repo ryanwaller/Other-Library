@@ -1287,9 +1287,19 @@ a.text-muted:hover {
 
 .om-explore-rail {
   grid-column: 2;
-  border-left: 1px solid var(--border);
+  position: relative;
   padding-left: var(--space-xl);
   padding-bottom: var(--space-4xl);
+}
+
+.om-explore-rail::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--space-xl) + var(--space-sm));
+  bottom: 0;
+  left: calc(var(--space-2xl) / -2);
+  width: 1px;
+  background: var(--border);
 }
 
 .om-explore-module + .om-explore-module {
@@ -1727,8 +1737,15 @@ summary::-webkit-details-marker {
   }
 
   .om-explore-rail {
-    border-left: 0;
     padding-left: 0;
+  }
+
+  .om-explore-rail::before {
+    display: none;
+  }
+
+  .om-explore-rail-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .admin-summary-row {

@@ -215,7 +215,7 @@ export default function PublicBookList({
         if (migrated) setDesktopGridDensity(migrated);
       }
       if (isMobileGridCols(mobileCols)) setMobileGridCols(Number(mobileCols) as MobileGridCols);
-      else if (legacyGc === "1" || legacyGc === "2") setMobileGridCols(Number(legacyGc) as MobileGridCols);
+      else if (legacyGc === "1" || legacyGc === "2" || legacyGc === "3") setMobileGridCols(Number(legacyGc) as MobileGridCols);
       if (sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
     } catch {
       // ignore
@@ -852,8 +852,9 @@ export default function PublicBookList({
               >
                 {isMobile ? (
                   <>
-                    <option value={1}>1</option>
-                    <option value={2}>2</option>
+                    <option value={3}>small</option>
+                    <option value={2}>medium</option>
+                    <option value={1}>large</option>
                   </>
                 ) : (
                   <>
