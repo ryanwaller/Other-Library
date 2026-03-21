@@ -127,12 +127,20 @@ export default function PublicBookList({
   const [controlsDocked, setControlsDocked] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [controlsBandHeight, setControlsBandHeight] = useState(0);
+  const [controlsBandFrame, setControlsBandFrame] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
   const controlsFixed = controlsDocked;
   const controlsPinnedOpen = sortOpen;
 
   const measureControlsBand = useCallback(() => {
     if (typeof window === "undefined" || !controlsBandRef.current) return;
     const rect = controlsBandRef.current.getBoundingClientRect();
+    const container = controlsBandRef.current.closest(".container");
+    if (container instanceof HTMLElement) {
+      const containerRect = container.getBoundingClientRect();
+      setControlsBandFrame({ left: containerRect.left, width: containerRect.width });
+    } else {
+      setControlsBandFrame({ left: rect.left, width: rect.width });
+    }
     if (!controlsDocked) controlsBandTopRef.current = rect.top + window.scrollY;
     setControlsBandHeight(rect.height);
   }, [controlsDocked]);
@@ -750,6 +758,11 @@ export default function PublicBookList({
       <div
         ref={controlsBandRef}
         className="om-smart-sticky-band"
+        style={
+          controlsFixed && controlsBandFrame.width > 0
+            ? { left: `${controlsBandFrame.left}px`, width: `${controlsBandFrame.width}px` }
+            : undefined
+        }
         data-docked={controlsDocked ? "true" : "false"}
         data-visible={!controlsDocked || controlsVisible ? "true" : "false"}
         data-fixed={controlsFixed ? "true" : "false"}

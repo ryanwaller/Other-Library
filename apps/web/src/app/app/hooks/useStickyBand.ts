@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type CSSProperties } from "react";
 
 /**
  * Encapsulates the scroll-driven sticky-band state and behavior shared between
@@ -26,6 +26,7 @@ export function useStickyBand({
   const [controlsDocked, setControlsDocked] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [controlsBandHeight, setControlsBandHeight] = useState(0);
+  const [controlsBandFrame, setControlsBandFrame] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
 
   const bandRef = useRef<HTMLDivElement | null>(null);
   const bandTopRef = useRef(0);
@@ -35,11 +36,26 @@ export function useStickyBand({
   const measureBand = useCallback(() => {
     if (typeof window === "undefined" || !bandRef.current) return;
     const rect = bandRef.current.getBoundingClientRect();
+    const container = bandRef.current.closest(".container");
+    if (container instanceof HTMLElement) {
+      const containerRect = container.getBoundingClientRect();
+      setControlsBandFrame({ left: containerRect.left, width: containerRect.width });
+    } else {
+      setControlsBandFrame({ left: rect.left, width: rect.width });
+    }
     if (!controlsDocked) {
       bandTopRef.current = rect.top + window.scrollY;
     }
     setControlsBandHeight(rect.height);
   }, [controlsDocked]);
+
+  const controlsBandFixedStyle = useMemo<CSSProperties | undefined>(() => {
+    if (!controlsDocked || controlsBandFrame.width <= 0) return undefined;
+    return {
+      left: `${controlsBandFrame.left}px`,
+      width: `${controlsBandFrame.width}px`,
+    };
+  }, [controlsDocked, controlsBandFrame.left, controlsBandFrame.width]);
 
   // Re-measure on window resize.
   useEffect(() => {
@@ -116,6 +132,7 @@ export function useStickyBand({
     controlsBandHeight,
     /** Attach to the sticky band's root div. */
     controlsBandRef: bandRef,
+    controlsBandFixedStyle,
     /**
      * Call via requestAnimationFrame whenever the band's content changes height
      * (e.g. when bulkMode, editMode, or sortOpen toggles).

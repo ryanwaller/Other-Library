@@ -638,7 +638,8 @@ button:disabled {
   position: fixed;
   top: 0;
   left: max(var(--page-pad), calc((100vw - var(--container-max)) / 2));
-  right: max(var(--page-pad), calc((100vw - var(--container-max)) / 2));
+  right: auto;
+  width: min(var(--container-max), calc(100vw - (var(--page-pad) * 2)));
   margin-top: 0;
   margin-right: 0;
   margin-left: 0;

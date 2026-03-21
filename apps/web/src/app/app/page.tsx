@@ -779,7 +779,7 @@ function AppShell({
 
   // Sticky band — scroll-driven docked/visible state lives in a shared hook so
   // the scroll listener only re-renders this component when truly necessary.
-  const { controlsDocked, controlsVisible, controlsBandHeight, controlsBandRef, measureControlsBand } = useStickyBand({
+  const { controlsDocked, controlsVisible, controlsBandHeight, controlsBandRef, controlsBandFixedStyle, measureControlsBand } = useStickyBand({
     controlsPinnedOpen,
     isMobile,
   });
@@ -3571,6 +3571,7 @@ function AppShell({
         <div
           ref={controlsBandRef}
           className="om-smart-sticky-band"
+          style={controlsFixed ? controlsBandFixedStyle : undefined}
           data-docked={controlsDocked ? "true" : "false"}
           data-visible={!controlsDocked || controlsVisible ? "true" : "false"}
           data-fixed={controlsFixed ? "true" : "false"}
