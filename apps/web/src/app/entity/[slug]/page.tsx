@@ -366,7 +366,7 @@ export default async function EntityPage({
     }
   }
 
-  // 9. Owner profiles (public only — for library section and fallback hrefs)
+  // 9. Public owner profiles — used for fallback public item links.
   const ownerIds = Array.from(new Set(allCopies.map((b) => b.owner_id).filter(Boolean)));
   let ownerProfiles: Array<{ id: string; username: string; avatar_path: string | null }> = [];
   if (ownerIds.length > 0) {
@@ -380,8 +380,44 @@ export default async function EntityPage({
   }
   const profileByOwnerId = new Map(ownerProfiles.map((p) => [p.id, p.username]));
 
-  // Sign avatar URLs
-  const avatarPaths = ownerProfiles.map((p) => p.avatar_path).filter((p): p is string => Boolean(p));
+  // 10. Library-member profiles — includes shared-catalog members, not just the
+  // original owner who created the catalog.
+  const libraryIds = Array.from(new Set(allCopies.map((b) => Number(b.library_id)).filter((id) => Number.isFinite(id) && id > 0)));
+  let libraryMemberProfiles: Array<{ id: string; username: string; avatar_path: string | null }> = [];
+  const memberIds = new Set<string>();
+  if (libraryIds.length > 0) {
+    const memberRes = await supabase
+      .from("catalog_members")
+      .select("catalog_id,user_id,accepted_at")
+      .in("catalog_id", libraryIds)
+      .not("accepted_at", "is", null);
+
+    for (const row of (memberRes.data ?? []) as Array<{ user_id?: string | null }>) {
+      const userId = String(row?.user_id ?? "").trim();
+      if (userId) memberIds.add(userId);
+    }
+  }
+  const displayUserIds = Array.from(new Set([...ownerIds, ...memberIds]));
+  if (displayUserIds.length > 0) {
+    const profilesRes = await supabase
+      .from("profiles")
+      .select("id,username,avatar_path")
+      .in("id", displayUserIds)
+      .limit(300);
+    if (!profilesRes.error) {
+      libraryMemberProfiles = ((profilesRes.data ?? []) as Array<{ id: string; username: string; avatar_path: string | null }>)
+        .filter((row) => String(row.username ?? "").trim());
+    }
+  }
+
+  // Sign avatar URLs for all profiles shown anywhere on the page.
+  const avatarPaths = Array.from(
+    new Set(
+      [...ownerProfiles, ...libraryMemberProfiles]
+        .map((p) => p.avatar_path)
+        .filter((p): p is string => Boolean(p))
+    )
+  );
   const avatarSignedMap: Record<string, string> = {};
   if (avatarPaths.length > 0) {
     const signed = await signingClient.storage
@@ -392,7 +428,7 @@ export default async function EntityPage({
     }
   }
 
-  // 10. Finalize modules — ownerEntries carry per-copy cover data so the
+  // 11. Finalize modules — ownerEntries carry per-copy cover data so the
   //     client can build "Your copies" with the viewer's own covers.
   const modules: ModuleData[] = roleGroups.flatMap(({ role, groups }) => {
     const splitByPeriodical = role === "publisher" || role === "editor";
@@ -480,8 +516,8 @@ export default async function EntityPage({
       });
   });
 
-  // 11. Library section
-  const ownersForClient: OwnerProfile[] = ownerProfiles
+  // 12. Library section
+  const ownersForClient: OwnerProfile[] = libraryMemberProfiles
     .map((p) => ({
       id: p.id,
       username: p.username,
