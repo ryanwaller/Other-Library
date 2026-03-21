@@ -396,7 +396,7 @@ function ExploreModule({
 }) {
   if (items.length === 0) return null;
   return (
-    <section id={id} style={{ marginTop: "var(--space-xl)" }}>
+    <section id={id} className="om-explore-module">
       <hr className="divider" />
       <div className="row om-explore-module-header" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--space-lg)" }}>
         <div>{title}</div>
@@ -473,7 +473,7 @@ function ExploreRailModule({
           ? `Published by ${cluster.name}`
           : `Performed by ${cluster.name}`;
   return (
-    <section style={{ marginTop: "var(--space-xl)" }}>
+    <section className="om-explore-module">
       <hr className="divider" />
       <div className="row om-explore-module-header" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--space-lg)", gap: "var(--space-md)" }}>
         <div>{heading}</div>
@@ -483,7 +483,7 @@ function ExploreRailModule({
           </Link>
         ) : null}
       </div>
-      <div className="om-explore-rail-grid" style={{ marginTop: "var(--space-md)" }}>
+      <div className="om-explore-rail-grid om-explore-module-content">
         {cluster.items.map((item) => (
           <div key={`${cluster.role}-${cluster.name}-${item.id}`}>
             {item.href ? (
