@@ -1793,13 +1793,14 @@ summary::-webkit-details-marker {
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
     padding-bottom: 2px;
   }
 
   .om-explore-main-grid > * {
     display: block !important;
     scroll-snap-align: start;
+    scroll-snap-stop: always;
   }
 
   .om-explore-main,
@@ -1824,13 +1825,14 @@ summary::-webkit-details-marker {
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
     padding-bottom: 2px;
   }
 
   .om-explore-rail-grid > * {
     display: block !important;
     scroll-snap-align: start;
+    scroll-snap-stop: always;
   }
 
   .om-explore-rail-grid > :nth-child(n + 7) {
