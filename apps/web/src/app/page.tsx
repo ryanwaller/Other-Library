@@ -57,6 +57,7 @@ const EXPLORE_MAIN_MODULE_ITEMS = 4;
 const EXPLORE_RAIL_MODULE_COUNT = 3;
 const EXPLORE_RAIL_ITEMS = 4;
 const EXPLORE_RAIL_SURFACE = "explore_right_rail";
+const EXPLORE_RAIL_ROLE_PRIORITY: Array<EntityCluster["role"]> = ["designer", "author", "publisher", "performer"];
 
 const BOOK_SELECT =
   "id,owner_id,created_at,visibility,group_label,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,authors_override,editors_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))";
@@ -346,7 +347,7 @@ async function loadExploreData() {
       .slice(0, EXPLORE_RAIL_ITEMS);
   }
 
-  const railClusters = [
+  const railCandidates = [
     ...[...designerCounts.values()],
     ...[...authorCounts.values()],
     ...[...publisherCounts.values()],
@@ -354,7 +355,6 @@ async function loadExploreData() {
   ]
     .filter((entry) => entry.count >= 3)
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-    .slice(0, EXPLORE_RAIL_MODULE_COUNT)
     .map((entry) => ({
       entityId: entry.id,
       role: entry.role,
@@ -365,6 +365,25 @@ async function loadExploreData() {
       heading: null,
     }))
     .filter((entry) => entry.items.length > 0);
+
+  const railClusters: EntityCluster[] = [];
+  const seenRailKeys = new Set<string>();
+  for (const role of EXPLORE_RAIL_ROLE_PRIORITY) {
+    const candidate = railCandidates.find((entry) => entry.role === role && !seenRailKeys.has(`${entry.role}:${entry.entityId}`));
+    if (!candidate) continue;
+    railClusters.push(candidate);
+    seenRailKeys.add(`${candidate.role}:${candidate.entityId}`);
+    if (railClusters.length >= EXPLORE_RAIL_MODULE_COUNT) break;
+  }
+  if (railClusters.length < EXPLORE_RAIL_MODULE_COUNT) {
+    for (const candidate of railCandidates) {
+      const key = `${candidate.role}:${candidate.entityId}`;
+      if (seenRailKeys.has(key)) continue;
+      railClusters.push(candidate);
+      seenRailKeys.add(key);
+      if (railClusters.length >= EXPLORE_RAIL_MODULE_COUNT) break;
+    }
+  }
 
   const railSlotRes = await db
     .from("homepage_feature_slots")
