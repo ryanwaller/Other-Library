@@ -97,10 +97,15 @@ type MergeEntity = {
   name: string;
   slug: string | null;
   count: number;
+  rawRoles?: string[];
 };
 
 type EntityMergeResponse = {
-  entities: MergeEntity[];
+  sections: Array<{
+    key: string;
+    label: string;
+    entities: MergeEntity[];
+  }>;
 };
 
 type TabKey = "users" | "waitlist" | "invites" | "feedback" | "homepage" | "entities";
@@ -272,12 +277,11 @@ function AdminPageInner() {
   const [homepageSearchResults, setHomepageSearchResults] = useState<Record<number, HomepageRailEntity[]>>({});
   const [homepageSaving, setHomepageSaving] = useState(false);
   const [homepageNotice, setHomepageNotice] = useState<string | null>(null);
-  const [entityMergeSourceDraft, setEntityMergeSourceDraft] = useState("");
-  const [entityMergeTargetDraft, setEntityMergeTargetDraft] = useState("");
-  const [entityMergeSourceResults, setEntityMergeSourceResults] = useState<MergeEntity[]>([]);
-  const [entityMergeTargetResults, setEntityMergeTargetResults] = useState<MergeEntity[]>([]);
-  const [entityMergeSource, setEntityMergeSource] = useState<MergeEntity | null>(null);
-  const [entityMergeTarget, setEntityMergeTarget] = useState<MergeEntity | null>(null);
+  const [entityMergeQueryDraft, setEntityMergeQueryDraft] = useState("");
+  const [entityMergeQuery, setEntityMergeQuery] = useState("");
+  const [entityMergeSections, setEntityMergeSections] = useState<EntityMergeResponse["sections"]>([]);
+  const [entityMergeSelected, setEntityMergeSelected] = useState<Record<string, MergeEntity>>({});
+  const [entityMergeKeepId, setEntityMergeKeepId] = useState<string | null>(null);
   const [entityMergeBusy, setEntityMergeBusy] = useState(false);
   const [entityMergeNotice, setEntityMergeNotice] = useState<string | null>(null);
 
@@ -436,16 +440,20 @@ function AdminPageInner() {
     }
   }
 
-  async function searchMergeEntities(kind: "source" | "target") {
+  async function refreshEntitySections() {
     if (!token) return;
-    const q = (kind === "source" ? entityMergeSourceDraft : entityMergeTargetDraft).trim();
+    setBusy(true);
     setError(null);
     try {
-      const res = await api<EntityMergeResponse>(`/api/admin/entities/merge?q=${encodeURIComponent(q)}`, { method: "GET", token });
-      if (kind === "source") setEntityMergeSourceResults(res.entities ?? []);
-      else setEntityMergeTargetResults(res.entities ?? []);
+      const res = await api<EntityMergeResponse>(`/api/admin/entities/merge?q=${encodeURIComponent(entityMergeQuery)}`, { method: "GET", token });
+      setEntityMergeSections(res.sections ?? []);
     } catch (e: any) {
-      setError(e?.message ?? "Entity search failed");
+      const msg = e?.message ?? "Entity search failed";
+      if (handleAuthError(msg)) return;
+      setError(msg);
+      setEntityMergeSections([]);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -483,9 +491,19 @@ function AdminPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, tab]);
 
+  useEffect(() => {
+    if (!token || tab !== "entities") return;
+    refreshEntitySections();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, tab, entityMergeQuery]);
+
   const userTotalPages = usersData ? Math.max(1, Math.ceil(usersData.total / usersData.pageSize)) : 1;
   const waitTotalPages = waitlistData ? Math.max(1, Math.ceil(waitlistData.total / waitlistData.pageSize)) : 1;
   const invitesTotalPages = invitesData ? Math.max(1, Math.ceil(invitesData.total / invitesData.pageSize)) : 1;
+  const selectedMergeEntities = useMemo(
+    () => Object.values(entityMergeSelected).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })),
+    [entityMergeSelected]
+  );
 
   useEffect(() => setUserPage((prev) => clampPage(prev, userTotalPages)), [userTotalPages]);
   useEffect(() => setWaitPage((prev) => clampPage(prev, waitTotalPages)), [waitTotalPages]);
@@ -564,8 +582,8 @@ function AdminPageInner() {
     }
     if (tab === "entities") {
       return [
-        { label: "Source", value: entityMergeSource ? entityMergeSource.name : "None" },
-        { label: "Target", value: entityMergeTarget ? entityMergeTarget.name : "None" }
+        { label: "Selected", value: selectedMergeEntities.length },
+        { label: "Keep", value: entityMergeKeepId ? (entityMergeSelected[entityMergeKeepId]?.name ?? "None") : "None" }
       ];
     }
     return [
@@ -574,7 +592,7 @@ function AdminPageInner() {
       { label: "Used", value: invitesData?.metrics.used ?? 0 },
       { label: "Expired", value: invitesData?.metrics.expired ?? 0 }
     ];
-  }, [tab, usersMetrics, waitlistData?.metrics, invitesData?.metrics, feedbackMetrics, homepageSlots, entityMergeSource, entityMergeTarget]);
+  }, [tab, usersMetrics, waitlistData?.metrics, invitesData?.metrics, feedbackMetrics, homepageSlots, selectedMergeEntities.length, entityMergeKeepId, entityMergeSelected]);
 
   function resultLabel(page: number, totalPages: number, total: number): string {
     if (totalPages > 1) return `Results ${total} Page ${page} / ${totalPages}`;
@@ -1132,99 +1150,97 @@ function AdminPageInner() {
               <div className="om-list-row">
                 <div>Merge entities</div>
                 <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
-                  Search across the whole site, pick the duplicate source on the left and the canonical target on the right, then merge.
+                  Browse the full entity list by role, select duplicates, then choose which one to keep.
                 </div>
               </div>
 
-              <div className="row" style={{ gap: "var(--space-lg)", alignItems: "flex-start", flexWrap: "wrap" }}>
-                <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-                  <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>Source entity to remove</div>
-                  <div className="row" style={{ gap: "var(--space-8)", flexWrap: "wrap" }}>
-                    <input
-                      value={entityMergeSourceDraft}
-                      onChange={(e) => setEntityMergeSourceDraft(e.target.value)}
-                      onKeyDown={async (e) => {
-                        if (e.key === "Enter") await searchMergeEntities("source");
-                      }}
-                      placeholder="Search source entity"
-                      style={{ minWidth: 220, flex: "1 1 240px" }}
-                    />
-                    <button type="button" onClick={() => searchMergeEntities("source")} disabled={entityMergeBusy}>
-                      Search
-                    </button>
-                  </div>
-                  <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
-                    Selected: {entityMergeSource ? `${entityMergeSource.name} (${entityMergeSource.count})` : "None"}
-                  </div>
-                  {entityMergeSourceResults.length > 0 ? (
-                    <div className="om-list" style={{ marginTop: "var(--space-8)" }}>
-                      {entityMergeSourceResults.map((entity) => (
-                        <div key={`source-${entity.id}`} className="om-list-row">
-                          <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-md)", alignItems: "baseline" }}>
-                            <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
-                              {entity.name}
-                              <span className="text-muted"> · {entity.count}</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEntityMergeSource(entity);
-                                setEntityMergeSourceDraft(entity.name);
-                                setEntityMergeSourceResults([]);
-                                setEntityMergeNotice(null);
-                              }}
-                            >
-                              Select
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
+              <div className="row" style={{ gap: "var(--space-8)", flexWrap: "wrap", marginTop: "var(--space-lg)" }}>
+                <input
+                  value={entityMergeQueryDraft}
+                  onChange={(e) => setEntityMergeQueryDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setEntityMergeQuery(entityMergeQueryDraft.trim());
+                    }
+                  }}
+                  placeholder="Filter entities"
+                  style={{ minWidth: 260, flex: "1 1 320px" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setEntityMergeQuery(entityMergeQueryDraft.trim())}
+                  disabled={entityMergeBusy}
+                >
+                  Filter
+                </button>
+                {(entityMergeQuery || entityMergeQueryDraft) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEntityMergeQueryDraft("");
+                      setEntityMergeQuery("");
+                    }}
+                    disabled={entityMergeBusy}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
 
-                <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-                  <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>Target entity to keep</div>
-                  <div className="row" style={{ gap: "var(--space-8)", flexWrap: "wrap" }}>
-                    <input
-                      value={entityMergeTargetDraft}
-                      onChange={(e) => setEntityMergeTargetDraft(e.target.value)}
-                      onKeyDown={async (e) => {
-                        if (e.key === "Enter") await searchMergeEntities("target");
-                      }}
-                      placeholder="Search target entity"
-                      style={{ minWidth: 220, flex: "1 1 240px" }}
-                    />
-                    <button type="button" onClick={() => searchMergeEntities("target")} disabled={entityMergeBusy}>
-                      Search
-                    </button>
+              <div className="om-list" style={{ marginTop: "var(--space-lg)" }}>
+                <div className="om-list-row">
+                  <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-md)", flexWrap: "wrap" }}>
+                    <div>
+                      <div>Selected entities</div>
+                      <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
+                        Select at least two, then mark the canonical one to keep.
+                      </div>
+                    </div>
+                    <div className="text-muted">
+                      {selectedMergeEntities.length} selected
+                    </div>
                   </div>
-                  <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
-                    Selected: {entityMergeTarget ? `${entityMergeTarget.name} (${entityMergeTarget.count})` : "None"}
-                  </div>
-                  {entityMergeTargetResults.length > 0 ? (
-                    <div className="om-list" style={{ marginTop: "var(--space-8)" }}>
-                      {entityMergeTargetResults.map((entity) => (
-                        <div key={`target-${entity.id}`} className="om-list-row">
-                          <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-md)", alignItems: "baseline" }}>
-                            <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
-                              {entity.name}
-                              <span className="text-muted"> · {entity.count}</span>
+                  {selectedMergeEntities.length > 0 ? (
+                    <div className="om-list" style={{ marginTop: "var(--space-md)" }}>
+                      {selectedMergeEntities.map((entity) => {
+                        const isKeep = entityMergeKeepId === entity.id;
+                        return (
+                          <div key={`selected-${entity.id}`} className="om-list-row">
+                            <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-md)", alignItems: "center", flexWrap: "wrap" }}>
+                              <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                                {entity.name}
+                                <span className="text-muted"> · {entity.count}</span>
+                                {entity.rawRoles && entity.rawRoles.length > 0 ? (
+                                  <span className="text-muted"> · {entity.rawRoles.join(", ")}</span>
+                                ) : null}
+                              </div>
+                              <div className="row" style={{ gap: "var(--space-8)", alignItems: "center", flexWrap: "wrap" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setEntityMergeKeepId(entity.id)}
+                                  disabled={entityMergeBusy}
+                                >
+                                  {isKeep ? "Keeping" : "Keep this"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEntityMergeSelected((prev) => {
+                                      const next = { ...prev };
+                                      delete next[entity.id];
+                                      return next;
+                                    });
+                                    setEntityMergeKeepId((prev) => (prev === entity.id ? null : prev));
+                                  }}
+                                  disabled={entityMergeBusy}
+                                >
+                                  Remove
+                                </button>
+                              </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEntityMergeTarget(entity);
-                                setEntityMergeTargetDraft(entity.name);
-                                setEntityMergeTargetResults([]);
-                                setEntityMergeNotice(null);
-                              }}
-                            >
-                              Select
-                            </button>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
@@ -1236,30 +1252,31 @@ function AdminPageInner() {
                 </div>
                 <button
                   type="button"
-                  disabled={entityMergeBusy || !entityMergeSource || !entityMergeTarget || entityMergeSource.id === entityMergeTarget.id}
+                  disabled={entityMergeBusy || selectedMergeEntities.length < 2 || !entityMergeKeepId}
                   onClick={async () => {
-                    if (!entityMergeSource || !entityMergeTarget) return;
-                    if (!window.confirm(`Merge “${entityMergeSource.name}” into “${entityMergeTarget.name}”?`)) return;
+                    const keepEntity = entityMergeKeepId ? entityMergeSelected[entityMergeKeepId] : null;
+                    const sourceIds = selectedMergeEntities
+                      .map((entity) => entity.id)
+                      .filter((id) => id !== entityMergeKeepId);
+                    if (!keepEntity || sourceIds.length === 0) return;
+                    if (!window.confirm(`Merge ${sourceIds.length} selected entities into “${keepEntity.name}”?`)) return;
                     setEntityMergeBusy(true);
                     setError(null);
                     setEntityMergeNotice(null);
                     try {
-                      await api("/api/admin/entities/merge", {
+                      const result = await api<{ merged_count?: number; target: { name: string } }>("/api/admin/entities/merge", {
                         method: "POST",
                         token,
                         body: JSON.stringify({
-                          source_entity_id: entityMergeSource.id,
-                          target_entity_id: entityMergeTarget.id,
+                          source_entity_ids: sourceIds,
+                          target_entity_id: keepEntity.id,
                         }),
                       });
-                      setEntityMergeNotice(`Merged ${entityMergeSource.name} into ${entityMergeTarget.name}.`);
-                      setEntityMergeSource(null);
-                      setEntityMergeTarget(null);
-                      setEntityMergeSourceDraft("");
-                      setEntityMergeTargetDraft("");
-                      setEntityMergeSourceResults([]);
-                      setEntityMergeTargetResults([]);
+                      setEntityMergeNotice(`Merged ${result.merged_count ?? sourceIds.length} entities into ${result.target.name}.`);
+                      setEntityMergeSelected({});
+                      setEntityMergeKeepId(null);
                       await refreshHomepageRail();
+                      await refreshEntitySections();
                     } catch (e: any) {
                       setError(e?.message === "migration_required" ? "Apply migration 0045_entity_aliases.sql before merging entities." : (e?.message ?? "Entity merge failed"));
                     } finally {
@@ -1269,6 +1286,77 @@ function AdminPageInner() {
                 >
                   Merge
                 </button>
+              </div>
+
+              <div className="om-list" style={{ marginTop: "var(--space-lg)" }}>
+                {entityMergeSections.length === 0 ? (
+                  <div className="om-list-row text-muted">
+                    {entityMergeQuery ? "No entities matched that filter." : "No entities found."}
+                  </div>
+                ) : null}
+                {entityMergeSections.map((section) => (
+                  <div key={section.key} className="om-list-row">
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-md)", flexWrap: "wrap" }}>
+                      <div>{section.label}</div>
+                      <div className="text-muted">{section.entities.length}</div>
+                    </div>
+                    <div className="om-list" style={{ marginTop: "var(--space-md)" }}>
+                      {section.entities.map((entity) => {
+                        const selected = Boolean(entityMergeSelected[entity.id]);
+                        const keep = entityMergeKeepId === entity.id;
+                        return (
+                          <label key={`${section.key}-${entity.id}`} className="om-list-row" style={{ cursor: "pointer" }}>
+                            <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-md)", flexWrap: "wrap" }}>
+                              <div className="row" style={{ gap: "var(--space-10)", alignItems: "center", minWidth: 0, flex: 1 }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setEntityMergeSelected((prev) => {
+                                      if (checked) return { ...prev, [entity.id]: entity };
+                                      const next = { ...prev };
+                                      delete next[entity.id];
+                                      return next;
+                                    });
+                                    setEntityMergeKeepId((prev) => {
+                                      if (!checked && prev === entity.id) return null;
+                                      if (checked && !prev) return entity.id;
+                                      return prev;
+                                    });
+                                    setEntityMergeNotice(null);
+                                  }}
+                                />
+                                <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                                  {entity.name}
+                                  <span className="text-muted"> · {entity.count}</span>
+                                  {entity.slug ? <span className="text-muted"> · /entity/{entity.slug}</span> : null}
+                                </div>
+                              </div>
+                              <div className="row" style={{ gap: "var(--space-8)", alignItems: "center", flexWrap: "wrap" }}>
+                                {entity.rawRoles && entity.rawRoles.length > 0 ? (
+                                  <span className="text-muted">{entity.rawRoles.join(", ")}</span>
+                                ) : null}
+                                {selected ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      setEntityMergeKeepId(entity.id);
+                                    }}
+                                    disabled={entityMergeBusy}
+                                  >
+                                    {keep ? "Keeping" : "Keep"}
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ) : null}
