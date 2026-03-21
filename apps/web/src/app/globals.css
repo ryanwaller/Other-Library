@@ -1264,7 +1264,7 @@ a.text-muted:hover {
 .om-related-items-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
 }
 
 .om-book-secondary a {
