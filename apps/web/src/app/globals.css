@@ -1288,6 +1288,8 @@ a.text-muted:hover {
   grid-column: 4;
   border-left: 1px solid var(--border);
   padding-left: var(--space-xl);
+  margin-top: var(--space-xl);
+  padding-bottom: var(--space-2xl);
 }
 
 .om-explore-rail-grid {
