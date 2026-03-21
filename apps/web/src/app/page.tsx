@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import CoverImage, { type CoverCrop } from "../components/CoverImage";
 import EntityBookGrid, { type GridItem } from "./entity/[slug]/EntityBookGrid";
+import ExploreColumns from "./ExploreColumns";
 import { effectiveAuthorsFor } from "../lib/book";
 import { formatIssueDisplay, isMagazineObject } from "../lib/magazine";
 import { parseMusicMetadata } from "../lib/music";
@@ -647,8 +648,9 @@ export default async function HomePage() {
   return (
     <main className="container" style={{ paddingBottom: "calc(var(--space-xl) + var(--space-32) + var(--space-md))" }}>
       <div style={{ paddingTop: "var(--space-md)" }}>
-        <div className="om-explore-layout">
-          <div className="om-explore-main">
+        <ExploreColumns
+          main={
+            <>
             <ExploreModule id="recent-additions" title="Recent additions" items={data?.recentItems ?? []} />
             <ExploreModule title="Recent records" items={data?.recentRecords ?? []} />
             <ExploreModule title="Recent periodicals" items={data?.recentPeriodicals ?? []} />
@@ -677,16 +679,16 @@ export default async function HomePage() {
               href={data?.groupHeading ? `/group/${encodeURIComponent(data.groupHeading.slug)}` : null}
               items={data?.groupItems ?? []}
             />
-          </div>
-
-          <div className="om-explore-divider" aria-hidden="true" />
-
-          <aside className="om-explore-rail">
+            </>
+          }
+          rail={
+            <>
             {(data?.railClusters ?? []).map((cluster) => (
               <ExploreRailModule key={`${cluster.role}-${cluster.slug ?? cluster.name}`} cluster={cluster} />
             ))}
-          </aside>
-        </div>
+            </>
+          }
+        />
       </div>
     </main>
   );

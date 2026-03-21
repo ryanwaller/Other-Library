@@ -1285,6 +1285,10 @@ a.text-muted:hover {
   grid-column: 1;
 }
 
+.om-explore-scroll-inner {
+  will-change: transform;
+}
+
 .om-explore-divider {
   grid-column: 2;
   grid-row: 1 / -1;
@@ -1752,6 +1756,11 @@ summary::-webkit-details-marker {
   .om-explore-main,
   .om-explore-rail {
     grid-column: auto;
+  }
+
+  .om-explore-scroll-inner {
+    transform: none !important;
+    will-change: auto;
   }
 
   .om-explore-rail {
