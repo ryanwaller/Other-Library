@@ -108,6 +108,16 @@ function toGridItem(row: ExploreBookRow, usernameByOwnerId: Map<string, string>,
   };
 }
 
+function toRecentGridItem(row: ExploreBookRow, usernameByOwnerId: Map<string, string>, signedMap: Record<string, string>): GridItem | null {
+  const item = toGridItem(row, usernameByOwnerId, signedMap);
+  if (!item) return null;
+  const username = usernameByOwnerId.get(row.owner_id);
+  return {
+    ...item,
+    tertiaryLine: username ? `Added by ${username}` : null,
+  };
+}
+
 function uniqueById(rows: ExploreBookRow[]): ExploreBookRow[] {
   const seen = new Set<number>();
   const out: ExploreBookRow[] = [];
@@ -183,11 +193,6 @@ async function loadExploreData() {
     }
   }
 
-  const recentItems = recentRows
-    .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
-    .filter((item): item is GridItem => Boolean(item))
-    .slice(0, 12);
-
   const recentRecords = recentRows
     .filter((row) => String(row.object_type ?? "").trim().toLowerCase() === "music")
     .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
@@ -236,10 +241,6 @@ async function loadExploreData() {
     }
   }
 
-  const topDesigner = [...designerCounts.values()]
-    .filter((entry) => entry.count >= 4)
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))[0] ?? null;
-
   const topEditor = [...editorCounts.values()]
     .filter((entry) => entry.count >= 4)
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))[0] ?? null;
@@ -274,6 +275,12 @@ async function loadExploreData() {
         .filter((item): item is GridItem => Boolean(item))
         .slice(0, 8)
     : [];
+
+  const recentItems = recentRows
+    .filter((row) => !topOwnerId || row.owner_id !== topOwnerId)
+    .map((row) => toRecentGridItem(row, usernameByOwnerId, signedMap))
+    .filter((item): item is GridItem => Boolean(item))
+    .slice(0, 12);
 
   function clusterItemsFor(entityId: string, role: "author" | "designer" | "publisher" | "performer") {
     return recentRows

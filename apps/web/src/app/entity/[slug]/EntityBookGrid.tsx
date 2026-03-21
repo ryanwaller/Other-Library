@@ -8,6 +8,7 @@ export type GridItem = {
   id: number;
   title: string;
   secondaryLine?: string | null;
+  tertiaryLine?: string | null;
   coverUrl: string | null;
   coverCrop: CoverCrop | null;
   href: string | null;
@@ -36,6 +37,11 @@ export default function EntityBookGrid({ items }: { items: GridItem[] }) {
               {item.secondaryLine ? (
                 <div className="text-muted" style={{ marginTop: "var(--space-4)" }}>
                   {item.secondaryLine}
+                </div>
+              ) : null}
+              {item.tertiaryLine ? (
+                <div className="text-muted" style={{ marginTop: "var(--space-4)" }}>
+                  {item.tertiaryLine}
                 </div>
               ) : null}
             </div>
