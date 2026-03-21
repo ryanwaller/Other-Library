@@ -602,16 +602,9 @@ export default async function HomePage() {
 
   return (
     <main className="container" style={{ paddingBottom: "calc(var(--space-xl) + var(--space-32) + var(--space-md))" }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr)",
-          gap: "var(--space-xl)",
-          paddingTop: "var(--space-md)",
-        }}
-      >
-        <div className="om-explore-layout" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "var(--space-xl)" }}>
-          <div className="om-explore-main" style={{ minWidth: 0 }}>
+      <div style={{ paddingTop: "var(--space-md)" }}>
+        <div className="om-explore-layout">
+          <div className="om-explore-main">
             <ExploreModule id="recent-additions" title="Recent additions" items={data?.recentItems ?? []} />
             <ExploreModule title="Recent records" items={data?.recentRecords ?? []} />
             <ExploreModule title="Recent periodicals" items={data?.recentPeriodicals ?? []} />
@@ -642,7 +635,7 @@ export default async function HomePage() {
             />
           </div>
 
-          <aside className="om-explore-rail" style={{ minWidth: 0 }}>
+          <aside className="om-explore-rail">
             {(data?.railClusters ?? []).map((cluster) => (
               <ExploreRailModule key={`${cluster.role}-${cluster.slug ?? cluster.name}`} cluster={cluster} />
             ))}
