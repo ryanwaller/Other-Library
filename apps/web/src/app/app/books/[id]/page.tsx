@@ -686,6 +686,11 @@ export default function BookDetailPage() {
     error: null,
     message: null
   });
+  const [duplicateState, setDuplicateState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
 
   const [facetDraft, setFacetDraft] = useState<Record<FacetRole, string[]>>({
     author: [],
@@ -2084,6 +2089,198 @@ export default function BookDetailPage() {
       window.setTimeout(() => setShareState({ error: null, message: null }), 1500);
     } catch (e: any) {
       setShareState({ error: e?.message ?? "Copy failed", message: "Copy failed" });
+    }
+  }
+
+  async function duplicateStoredMediaPath(storagePath: string, nextBookId: number, label: string): Promise<string | null> {
+    if (!supabase || !userId) return null;
+    const sourcePath = String(storagePath ?? "").trim();
+    if (!sourcePath) return null;
+    const signed = await supabase.storage.from("user-book-media").createSignedUrl(sourcePath, 60 * 15);
+    if (signed.error || !signed.data?.signedUrl) throw new Error(signed.error?.message ?? "Failed to read existing media");
+    const resp = await fetch(signed.data.signedUrl);
+    if (!resp.ok) throw new Error(`Failed to copy ${label.toLowerCase()}`);
+    const blob = await resp.blob();
+    const ext = extFromContentType(resp.headers.get("content-type"));
+    const base = safeFileName(String(sourcePath.split("/").pop() ?? label).replace(/\.[^.]+$/, ""));
+    const destPath = `${userId}/${nextBookId}/duplicate-${label.toLowerCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${base}.${ext}`;
+    const upload = await supabase.storage.from("user-book-media").upload(destPath, blob, {
+      cacheControl: "31536000",
+      upsert: false,
+      contentType: blob.type || resp.headers.get("content-type") || "application/octet-stream"
+    });
+    if (upload.error) throw new Error(upload.error.message);
+    return destPath;
+  }
+
+  async function duplicateMediaUrl(rawUrl: string | null | undefined, nextBookId: number, label: string): Promise<string | null> {
+    const raw = String(rawUrl ?? "").trim();
+    if (!raw) return null;
+    if (/^https?:\/\//i.test(raw)) return raw;
+    return duplicateStoredMediaPath(raw, nextBookId, label);
+  }
+
+  async function duplicateBook() {
+    if (!supabase || !book || !userId) return;
+    if (!isOwner || duplicateState.busy || busy || saveState.busy) return;
+    setDuplicateState({ busy: true, error: null, message: "Duplicating…" });
+    try {
+      const payload: any = {
+        owner_id: userId,
+        library_id: formLibraryId ?? book.library_id,
+        edition_id: book.edition?.id ?? null,
+        visibility: book.visibility,
+        status: book.status,
+        borrowable_override: book.borrowable_override,
+        borrow_request_scope_override: book.borrow_request_scope_override ?? null,
+        group_label: book.group_label ?? null,
+        object_type: book.object_type ?? null,
+        source_type: book.source_type ?? null,
+        source_url: book.source_url ?? null,
+        external_source_ids: book.external_source_ids ? JSON.parse(JSON.stringify(book.external_source_ids)) : null,
+        music_metadata: book.music_metadata ? JSON.parse(JSON.stringify(book.music_metadata)) : null,
+        issue_number: book.issue_number ?? null,
+        issue_volume: book.issue_volume ?? null,
+        issue_season: book.issue_season ?? null,
+        issue_year: book.issue_year ?? null,
+        issn: book.issn ?? null,
+        subtitle_override: book.subtitle_override ?? null,
+        decade: book.decade ?? null,
+        pages: book.pages ?? null,
+        title_override: book.title_override ?? null,
+        authors_override: Array.isArray(book.authors_override) ? [...book.authors_override] : null,
+        editors_override: Array.isArray(book.editors_override) ? [...book.editors_override] : null,
+        designers_override: Array.isArray(book.designers_override) ? [...book.designers_override] : null,
+        publisher_override: book.publisher_override ?? null,
+        printer_override: book.printer_override ?? null,
+        materials_override: book.materials_override ?? null,
+        edition_override: book.edition_override ?? null,
+        publish_date_override: book.publish_date_override ?? null,
+        description_override: book.description_override ?? null,
+        subjects_override: Array.isArray(book.subjects_override) ? [...book.subjects_override] : [],
+        location: book.location ?? null,
+        shelf: book.shelf ?? null,
+        notes: book.notes ?? null,
+        trim_width: book.trim_width ?? null,
+        trim_height: book.trim_height ?? null,
+        trim_unit: book.trim_unit ?? null,
+        field_visibility: book.field_visibility ? JSON.parse(JSON.stringify(book.field_visibility)) : null,
+        cover_crop: book.cover_crop ? JSON.parse(JSON.stringify(book.cover_crop)) : null,
+        cover_original_url: null
+      };
+
+      let created = await supabase.from("user_books").insert(payload).select("id").single();
+      if (created.error) {
+        delete payload.field_visibility;
+        delete payload.group_label;
+        delete payload.object_type;
+        delete payload.decade;
+        delete payload.pages;
+        delete payload.trim_width;
+        delete payload.trim_height;
+        delete payload.trim_unit;
+        delete payload.cover_crop;
+        delete payload.cover_original_url;
+        created = await supabase.from("user_books").insert(payload).select("id").single();
+      }
+      if (created.error) throw new Error(created.error.message);
+      const nextBookId = Number(created.data.id);
+
+      try {
+        const currentEntityRows = ((book.book_entities ?? []) as Array<{ role: FacetRole; entity: EntityRef | null; visibility?: boolean }>);
+        const visibilityByRoleName = new Map<string, boolean>();
+        for (const row of currentEntityRows) {
+          const roleKey = row.role === ("design" as any) ? "designer" : row.role;
+          const name = String(row.entity?.name ?? "").trim();
+          if (!name) continue;
+          visibilityByRoleName.set(`${roleKey}::${name.toLowerCase()}`, row.visibility !== false);
+        }
+
+        const roles: Array<[FacetRole, string[]]> = [
+          ["author", facetView.author.map((item) => item.name)],
+          ["editor", facetView.editor.map((item) => item.name)],
+          ["designer", facetView.designer.map((item) => item.name)],
+          ["subject", facetView.subject.map((item) => item.name)],
+          ["publisher", facetView.publisher.map((item) => item.name)],
+          ["printer", facetView.printer.map((item) => item.name)],
+          ["material", facetView.material.map((item) => item.name)],
+          ["tag", tags.map((t) => t.name)],
+          ["category", categories.map((t) => t.name)]
+        ];
+
+        if (isMusicObject(String(book.object_type ?? "").trim())) {
+          const music = parseMusicMetadata(book.music_metadata ?? null);
+          const primaryArtist = String(music.primary_artist ?? "").trim();
+          const performerNames = uniqStrings([primaryArtist, ...facetView.performer.map((item) => item.name)]);
+          const labelNames = String(music.label ?? "").trim() ? [String(music.label ?? "").trim()] : [];
+          roles.splice(0, roles.length,
+            ["subject", facetView.subject.map((item) => item.name)],
+            ["tag", tags.map((t) => t.name)],
+            ["category", categories.map((t) => t.name)],
+            ["publisher", labelNames],
+            ["performer", performerNames]
+          );
+          for (const role of MUSIC_CONTRIBUTOR_ROLES) {
+            if (role === "performer") continue;
+            roles.push([role, facetView[role].map((item) => item.name)]);
+          }
+        }
+
+        for (const [role, names] of roles) {
+          const visibilities = names.map((name) => visibilityByRoleName.get(`${role}::${name.toLowerCase()}`) ?? true);
+          const rpc = await supabase.rpc("set_book_entities_v2", {
+            p_user_book_id: nextBookId,
+            p_role: role,
+            p_names: names,
+            p_visibility: visibilities
+          });
+          if (rpc.error) {
+            await supabase.rpc("set_book_entities", { p_user_book_id: nextBookId, p_role: role, p_names: names });
+          }
+        }
+
+        const nextTagRows: Array<{ user_book_id: number; tag_id: number }> = [];
+        for (const name of tags.map((t) => t.name)) {
+          const tagId = await getOrCreateOwnedTagId(book.owner_id, name, "tag");
+          nextTagRows.push({ user_book_id: nextBookId, tag_id: tagId });
+        }
+        for (const name of categories.map((t) => t.name)) {
+          const tagId = await getOrCreateOwnedTagId(book.owner_id, name, "category");
+          nextTagRows.push({ user_book_id: nextBookId, tag_id: tagId });
+        }
+        if (nextTagRows.length > 0) {
+          const upTags = await supabase.from("user_book_tags").upsert(nextTagRows as any, { onConflict: "user_book_id,tag_id" });
+          if (upTags.error) throw new Error(upTags.error.message);
+        }
+      } catch {
+        // ignore relationship sync failures; the duplicated row should still exist
+      }
+
+      try {
+        const nextCoverOriginalUrl = await duplicateMediaUrl(book.cover_original_url, nextBookId, "cover-original");
+        if (nextCoverOriginalUrl !== null) {
+          await supabase.from("user_books").update({ cover_original_url: nextCoverOriginalUrl }).eq("id", nextBookId);
+        }
+      } catch {
+        // ignore cover original copy failure
+      }
+
+      for (const media of book.media ?? []) {
+        const nextStoragePath = await duplicateStoredMediaPath(media.storage_path, nextBookId, media.kind);
+        if (!nextStoragePath) continue;
+        const ins = await supabase.from("user_book_media").insert({
+          user_book_id: nextBookId,
+          kind: media.kind,
+          storage_path: nextStoragePath,
+          caption: media.caption ?? null
+        });
+        if (ins.error) throw new Error(ins.error.message);
+      }
+
+      router.push(`/app/books/${nextBookId}?edit=1`);
+      setDuplicateState({ busy: false, error: null, message: "Duplicated" });
+    } catch (e: any) {
+      setDuplicateState({ busy: false, error: e?.message ?? "Duplicate failed", message: "Duplicate failed" });
     }
   }
 
@@ -3738,7 +3935,10 @@ export default function BookDetailPage() {
                             {saveState.busy ? "Saving..." : (busy ? "Loading..." : "Save")}
                           </button>
                           <button onClick={cancelEditMode} disabled={busy || saveState.busy} className="text-muted">Cancel</button>
-                          <button onClick={() => setDeleteConfirm(true)} disabled={busy || saveState.busy} className="text-muted">Delete</button>
+                          <button onClick={duplicateBook} disabled={busy || saveState.busy || duplicateState.busy} className="text-muted">
+                            {duplicateState.busy ? "Duplicating…" : "Duplicate"}
+                          </button>
+                          <button onClick={() => setDeleteConfirm(true)} disabled={busy || saveState.busy || duplicateState.busy} className="text-muted">Delete</button>
                         </>
                       )
                     ) : (
@@ -3806,17 +4006,21 @@ export default function BookDetailPage() {
                 ) : null}
               </div>
               <div className="text-muted" style={{ marginTop: "var(--space-sm)", textAlign: "right" }}>
-                {mergeState.message
-                  ? mergeState.error
-                    ? `${mergeState.message} (${mergeState.error})`
-                    : mergeState.message
-                  : mergeUndoSnapshot
-                    ? <button onClick={() => void undoMerge()} disabled={mergeState.busy} className="text-muted">Undo merge</button>
-                    : busy
-                        ? ""
-                        : error
-                          ? error
-                          : ""}
+                {duplicateState.message
+                  ? duplicateState.error
+                    ? `${duplicateState.message} (${duplicateState.error})`
+                    : duplicateState.message
+                  : mergeState.message
+                    ? mergeState.error
+                      ? `${mergeState.message} (${mergeState.error})`
+                      : mergeState.message
+                    : mergeUndoSnapshot
+                      ? <button onClick={() => void undoMerge()} disabled={mergeState.busy} className="text-muted">Undo merge</button>
+                      : busy
+                          ? ""
+                          : error
+                            ? error
+                            : ""}
               </div>
               </div>{/* end om-smart-sticky-band */}
 
