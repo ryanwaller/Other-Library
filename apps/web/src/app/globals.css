@@ -1288,7 +1288,7 @@ a.text-muted:hover {
 .om-explore-rail {
   grid-column: 2;
   position: relative;
-  padding-left: var(--space-xl);
+  padding-left: var(--space-lg);
   padding-bottom: var(--space-4xl);
 }
 
@@ -1297,7 +1297,7 @@ a.text-muted:hover {
   position: absolute;
   top: calc(var(--space-xl) + var(--space-sm));
   bottom: 0;
-  left: calc((var(--space-32) + var(--space-xl)) / -2);
+  left: calc(var(--space-32) / -2);
   width: 1px;
   background: var(--border);
 }
