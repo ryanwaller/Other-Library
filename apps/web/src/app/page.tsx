@@ -46,6 +46,11 @@ type EntityCluster = {
   items: GridItem[];
 };
 
+type ExploreUserHeading = {
+  username: string;
+  avatarUrl: string | null;
+};
+
 const BOOK_SELECT =
   "id,owner_id,created_at,visibility,group_label,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,authors_override,editors_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))";
 
@@ -108,13 +113,25 @@ function toGridItem(row: ExploreBookRow, usernameByOwnerId: Map<string, string>,
   };
 }
 
-function toRecentGridItem(row: ExploreBookRow, usernameByOwnerId: Map<string, string>, signedMap: Record<string, string>): GridItem | null {
+function toRecentGridItem(
+  row: ExploreBookRow,
+  usernameByOwnerId: Map<string, string>,
+  avatarUrlByOwnerId: Map<string, string | null>,
+  signedMap: Record<string, string>
+): GridItem | null {
   const item = toGridItem(row, usernameByOwnerId, signedMap);
   if (!item) return null;
   const username = usernameByOwnerId.get(row.owner_id);
   return {
     ...item,
-    tertiaryLine: username ? `Added by ${username}` : null,
+    owner: username
+      ? {
+          username,
+          href: `/u/${encodeURIComponent(username)}`,
+          avatarUrl: avatarUrlByOwnerId.get(row.owner_id) ?? null,
+          prefix: "Added by",
+        }
+      : null,
   };
 }
 
@@ -137,18 +154,18 @@ async function loadExploreData() {
 
   const publicProfilesRes = await db
     .from("profiles")
-    .select("id,username")
+    .select("id,username,avatar_path")
     .eq("visibility", "public")
     .limit(500);
 
-  const publicProfiles = (publicProfilesRes.data ?? []) as Array<{ id: string; username: string }>;
+  const publicProfiles = (publicProfilesRes.data ?? []) as Array<{ id: string; username: string; avatar_path: string | null }>;
   const publicOwnerIds = publicProfiles.map((row) => row.id).filter(Boolean);
   if (publicOwnerIds.length === 0) {
     return {
       recentItems: [] as GridItem[],
       recentRecords: [] as GridItem[],
       recentPeriodicals: [] as GridItem[],
-      recentOwnerHeading: null as { username: string } | null,
+      recentOwnerHeading: null as ExploreUserHeading | null,
       recentOwnerItems: [] as GridItem[],
       editorHeading: null as { name: string; slug: string | null } | null,
       editorItems: [] as GridItem[],
@@ -172,7 +189,7 @@ async function loadExploreData() {
       recentItems: [] as GridItem[],
       recentRecords: [] as GridItem[],
       recentPeriodicals: [] as GridItem[],
-      recentOwnerHeading: null as { username: string } | null,
+      recentOwnerHeading: null as ExploreUserHeading | null,
       recentOwnerItems: [] as GridItem[],
       editorHeading: null as { name: string; slug: string | null } | null,
       editorItems: [] as GridItem[],
@@ -183,6 +200,7 @@ async function loadExploreData() {
   }
 
   const usernameByOwnerId = new Map(publicProfiles.map((row) => [row.id, row.username] as const));
+  const avatarUrlByOwnerId = new Map<string, string | null>();
 
   const mediaPaths = [...new Set(recentRows.map((row) => coverStoragePath(row)).filter((path): path is string => Boolean(path)))];
   const signedMap: Record<string, string> = {};
@@ -193,6 +211,19 @@ async function loadExploreData() {
     }
   }
 
+  const avatarPaths = [...new Set(publicProfiles.map((row) => String(row.avatar_path ?? "").trim()).filter(Boolean))];
+  const avatarSignedMap: Record<string, string> = {};
+  if (avatarPaths.length > 0) {
+    const signedRes = await db.storage.from("avatars").createSignedUrls(avatarPaths, 60 * 30);
+    for (const row of signedRes.data ?? []) {
+      if (row.path && row.signedUrl) avatarSignedMap[row.path] = row.signedUrl;
+    }
+  }
+  for (const profile of publicProfiles) {
+    const avatarPath = String(profile.avatar_path ?? "").trim();
+    avatarUrlByOwnerId.set(profile.id, avatarPath ? avatarSignedMap[avatarPath] ?? null : null);
+  }
+
   const recentRecords = recentRows
     .filter((row) => String(row.object_type ?? "").trim().toLowerCase() === "music")
     .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
@@ -201,7 +232,7 @@ async function loadExploreData() {
 
   const recentPeriodicals = recentRows
     .filter((row) => isMagazineObject(row.object_type))
-    .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
+    .map((row) => toRecentGridItem(row, usernameByOwnerId, avatarUrlByOwnerId, signedMap))
     .filter((item): item is GridItem => Boolean(item))
     .slice(0, 8);
 
@@ -267,7 +298,12 @@ async function loadExploreData() {
       .sort((a, b) => b[1] - a[1])
       .find(([ownerId, count]) => count >= 3 && usernameByOwnerId.has(ownerId))?.[0] ?? null;
 
-  const recentOwnerHeading = topOwnerId ? { username: usernameByOwnerId.get(topOwnerId)! } : null;
+  const recentOwnerHeading = topOwnerId
+    ? {
+        username: usernameByOwnerId.get(topOwnerId)!,
+        avatarUrl: avatarUrlByOwnerId.get(topOwnerId) ?? null,
+      }
+    : null;
   const recentOwnerItems = topOwnerId
     ? recentRows
         .filter((row) => row.owner_id === topOwnerId)
@@ -278,7 +314,7 @@ async function loadExploreData() {
 
   const recentItems = recentRows
     .filter((row) => !topOwnerId || row.owner_id !== topOwnerId)
-    .map((row) => toRecentGridItem(row, usernameByOwnerId, signedMap))
+    .map((row) => toRecentGridItem(row, usernameByOwnerId, avatarUrlByOwnerId, signedMap))
     .filter((item): item is GridItem => Boolean(item))
     .slice(0, 12);
 
@@ -375,6 +411,36 @@ function ExploreModule({
   );
 }
 
+function ExploreUserLink({
+  username,
+  avatarUrl,
+}: {
+  username: string;
+  avatarUrl: string | null;
+}) {
+  return (
+    <Link
+      href={`/u/${encodeURIComponent(username)}`}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "8px",
+        textDecoration: "none",
+        color: "inherit",
+        ["--avatar-size" as any]: "18px",
+      }}
+    >
+      {avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img alt="" src={avatarUrl} className="om-avatar-img" />
+      ) : (
+        <div className="om-avatar-img" style={{ background: "var(--bg-muted)" }} />
+      )}
+      <span>{username}</span>
+    </Link>
+  );
+}
+
 function ExploreRailModule({
   cluster,
 }: {
@@ -442,7 +508,16 @@ export default async function HomePage() {
             <ExploreModule title="Recent records" items={data?.recentRecords ?? []} />
             <ExploreModule title="Recent periodicals" items={data?.recentPeriodicals ?? []} />
             <ExploreModule
-              title={data?.recentOwnerHeading ? <>Recently added by {data.recentOwnerHeading.username}</> : "Recently added by"}
+              title={
+                data?.recentOwnerHeading ? (
+                  <span>
+                    Recently added by{" "}
+                    <ExploreUserLink username={data.recentOwnerHeading.username} avatarUrl={data.recentOwnerHeading.avatarUrl} />
+                  </span>
+                ) : (
+                  "Recently added by"
+                )
+              }
               href={data?.recentOwnerHeading ? `/u/${encodeURIComponent(data.recentOwnerHeading.username)}` : null}
               items={data?.recentOwnerItems ?? []}
             />
