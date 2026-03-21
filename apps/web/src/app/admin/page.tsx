@@ -140,7 +140,7 @@ function inviteStatus(row: InviteRow): "pending" | "used" | "expired" {
 }
 
 function defaultHomepageSlots(): HomepageRailSlot[] {
-  return [1, 2, 3, 4].map((slot_index) => ({
+  return [1, 2, 3].map((slot_index) => ({
     slot_index,
     mode: "automatic",
     role: "designer",
@@ -148,6 +148,10 @@ function defaultHomepageSlots(): HomepageRailSlot[] {
     title_override: "",
     entity: null,
   }));
+}
+
+function resequenceHomepageSlots(slots: HomepageRailSlot[]): HomepageRailSlot[] {
+  return slots.map((slot, idx) => ({ ...slot, slot_index: idx + 1 }));
 }
 
 function AdminListItem({
@@ -915,11 +919,27 @@ function AdminPageInner() {
                   <div key={slot.slot_index} className="om-list-row">
                     <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
                       <div>Right rail slot {slot.slot_index}</div>
-                      {slot.mode === "pinned" && slot.entity ? (
-                        <Link href={slot.entity.slug ? `/entity/${encodeURIComponent(slot.entity.slug)}` : "#"} className="text-muted">
-                          View entity
-                        </Link>
-                      ) : null}
+                      <div className="row" style={{ gap: "var(--space-10)", alignItems: "baseline" }}>
+                        {slot.mode === "pinned" && slot.entity ? (
+                          <Link href={slot.entity.slug ? `/entity/${encodeURIComponent(slot.entity.slug)}` : "#"} className="text-muted">
+                            View entity
+                          </Link>
+                        ) : null}
+                        {homepageSlots.length > 1 ? (
+                          <button
+                            type="button"
+                            className="text-muted"
+                            onClick={() => {
+                              setHomepageNotice(null);
+                              setHomepageSlots((prev) => resequenceHomepageSlots(prev.filter((row) => row.slot_index !== slot.slot_index)));
+                              setHomepageSearchDrafts({});
+                              setHomepageSearchResults({});
+                            }}
+                          >
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="row" style={{ marginTop: "var(--space-10)", gap: "var(--space-8)", flexWrap: "wrap" }}>
                       <select
@@ -1048,38 +1068,61 @@ function AdminPageInner() {
 
               <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-lg)" }}>
                 <div className="text-muted">{homepageNotice ?? "Automatic slots will fall back to the live recent-feed rail logic."}</div>
-                <button
-                  type="button"
-                  disabled={homepageSaving}
-                  onClick={async () => {
-                    setHomepageSaving(true);
-                    setError(null);
-                    setHomepageNotice(null);
-                    try {
-                      await api("/api/admin/homepage-rail", {
-                        method: "POST",
-                        token,
-                        body: JSON.stringify({
-                          slots: homepageSlots.map((slot) => ({
-                            slot_index: slot.slot_index,
-                            mode: slot.mode,
-                            role: slot.role,
-                            entity_id: slot.entity_id,
-                            title_override: slot.title_override,
-                          })),
-                        }),
-                      });
-                      await refreshHomepageRail();
-                      setHomepageNotice("Saved");
-                    } catch (e: any) {
-                      setError(e?.message === "migration_required" ? "Apply migration 0044_homepage_feature_slots.sql before saving homepage overrides." : (e?.message ?? "Failed to save homepage rail"));
-                    } finally {
-                      setHomepageSaving(false);
-                    }
-                  }}
-                >
-                  Save
-                </button>
+                <div className="row" style={{ gap: "var(--space-10)", alignItems: "center" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHomepageNotice(null);
+                      setHomepageSlots((prev) =>
+                        resequenceHomepageSlots([
+                          ...prev,
+                          {
+                            slot_index: prev.length + 1,
+                            mode: "automatic",
+                            role: "designer",
+                            entity_id: null,
+                            title_override: "",
+                            entity: null,
+                          },
+                        ])
+                      );
+                    }}
+                  >
+                    Add slot
+                  </button>
+                  <button
+                    type="button"
+                    disabled={homepageSaving}
+                    onClick={async () => {
+                      setHomepageSaving(true);
+                      setError(null);
+                      setHomepageNotice(null);
+                      try {
+                        await api("/api/admin/homepage-rail", {
+                          method: "POST",
+                          token,
+                          body: JSON.stringify({
+                            slots: homepageSlots.map((slot) => ({
+                              slot_index: slot.slot_index,
+                              mode: slot.mode,
+                              role: slot.role,
+                              entity_id: slot.entity_id,
+                              title_override: slot.title_override,
+                            })),
+                          }),
+                        });
+                        await refreshHomepageRail();
+                        setHomepageNotice("Saved");
+                      } catch (e: any) {
+                        setError(e?.message === "migration_required" ? "Apply migration 0047_homepage_rail_dynamic_slots.sql before saving homepage slot changes." : (e?.message ?? "Failed to save homepage rail"));
+                      } finally {
+                        setHomepageSaving(false);
+                      }
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
             </div>
           ) : null}

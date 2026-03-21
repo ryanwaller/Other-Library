@@ -55,7 +55,7 @@ type ExploreUserHeading = {
 };
 
 const EXPLORE_MAIN_MODULE_ITEMS = 4;
-const EXPLORE_RAIL_MODULE_COUNT = 4;
+const DEFAULT_EXPLORE_RAIL_MODULE_COUNT = 3;
 const EXPLORE_RAIL_ITEMS = 4;
 const EXPLORE_RAIL_SURFACE = "explore_right_rail";
 const EXPLORE_RAIL_ROLE_PRIORITY: Array<EntityCluster["role"]> = ["designer", "author", "publisher", "performer"];
@@ -374,15 +374,15 @@ async function loadExploreData() {
     if (!candidate) continue;
     railClusters.push(candidate);
     seenRailKeys.add(`${candidate.role}:${candidate.entityId}`);
-    if (railClusters.length >= EXPLORE_RAIL_MODULE_COUNT) break;
+    if (railClusters.length >= DEFAULT_EXPLORE_RAIL_MODULE_COUNT) break;
   }
-  if (railClusters.length < EXPLORE_RAIL_MODULE_COUNT) {
+  if (railClusters.length < DEFAULT_EXPLORE_RAIL_MODULE_COUNT) {
     for (const candidate of railCandidates) {
       const key = `${candidate.role}:${candidate.entityId}`;
       if (seenRailKeys.has(key)) continue;
       railClusters.push(candidate);
       seenRailKeys.add(key);
-      if (railClusters.length >= EXPLORE_RAIL_MODULE_COUNT) break;
+      if (railClusters.length >= DEFAULT_EXPLORE_RAIL_MODULE_COUNT) break;
     }
   }
 
@@ -440,10 +440,13 @@ async function loadExploreData() {
     return null;
   };
 
-  const slotRows = Array.isArray(railSlotRes.data) ? railSlotRes.data : [];
+  const slotRows = (Array.isArray(railSlotRes.data) ? railSlotRes.data : [])
+    .filter((row) => Number.isFinite(Number((row as any).slot_index)) && Number((row as any).slot_index) >= 1)
+    .sort((a, b) => Number((a as any).slot_index) - Number((b as any).slot_index));
+  const railSlotCount = slotRows.length > 0 ? slotRows.length : DEFAULT_EXPLORE_RAIL_MODULE_COUNT;
   for (const row of slotRows) {
     const slotIndex = Number(row.slot_index);
-    if (!Number.isFinite(slotIndex) || slotIndex < 1 || slotIndex > EXPLORE_RAIL_MODULE_COUNT) continue;
+    if (!Number.isFinite(slotIndex) || slotIndex < 1 || slotIndex > railSlotCount) continue;
     const mode = String((row as any).mode ?? "").trim().toLowerCase();
     if (mode !== "pinned") continue;
     const roleValue = String((row as any).role ?? "").trim().toLowerCase();
@@ -482,7 +485,7 @@ async function loadExploreData() {
   }
 
   const mergedRailClusters: EntityCluster[] = [];
-  for (let slot = 1; slot <= EXPLORE_RAIL_MODULE_COUNT; slot += 1) {
+  for (let slot = 1; slot <= railSlotCount; slot += 1) {
     const pinned = railBySlot.get(slot);
     if (pinned) {
       mergedRailClusters.push(pinned);

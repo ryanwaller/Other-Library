@@ -4,7 +4,7 @@ import { getSupabaseAdmin, requireAdmin } from "../../../../lib/supabaseAdmin";
 export const runtime = "nodejs";
 
 const SURFACE = "explore_right_rail";
-const MAX_SLOTS = 4;
+const DEFAULT_SLOTS = 3;
 
 type SlotMode = "automatic" | "pinned";
 type SlotRole = "author" | "designer" | "publisher" | "performer";
@@ -20,7 +20,7 @@ function normalizeRole(value: unknown): SlotRole {
 }
 
 function defaultSlots() {
-  return Array.from({ length: MAX_SLOTS }, (_, idx) => ({
+  return Array.from({ length: DEFAULT_SLOTS }, (_, idx) => ({
     slot_index: idx + 1,
     mode: "automatic" as SlotMode,
     role: "designer" as SlotRole,
@@ -60,11 +60,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: res.error.message }, { status: 500 });
     }
 
-    const slots = defaultSlots();
-    for (const row of res.data ?? []) {
-      const idx = Number(row.slot_index) - 1;
-      if (idx < 0 || idx >= slots.length) continue;
-      slots[idx] = {
+    const rows = (res.data ?? [])
+      .map((row) => ({
         slot_index: Number(row.slot_index),
         mode: normalizeMode(row.mode),
         role: normalizeRole(row.role),
@@ -75,10 +72,12 @@ export async function GET(req: Request) {
           name: String((row.entity as any).name ?? ""),
           slug: String((row.entity as any).slug ?? "") || null,
         } : null,
-      };
-    }
+      }))
+      .filter((row) => Number.isFinite(row.slot_index) && row.slot_index >= 1)
+      .sort((a, b) => a.slot_index - b.slot_index)
+      .map((row, idx) => ({ ...row, slot_index: idx + 1 }));
 
-    return NextResponse.json({ slots });
+    return NextResponse.json({ slots: rows.length > 0 ? rows : defaultSlots() });
   } catch (e: any) {
     const msg = e?.message ?? "forbidden";
     const status = msg === "not_authenticated" ? 401 : msg === "forbidden" ? 403 : 400;
@@ -94,13 +93,12 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const inputSlots = Array.isArray(body?.slots) ? body.slots : [];
-    const slots = defaultSlots().map((slot, idx) => {
-      const raw = inputSlots[idx] ?? {};
+    const normalizedSlots = (inputSlots.length > 0 ? inputSlots : defaultSlots()).map((raw, idx) => {
       const mode = normalizeMode(raw.mode);
       const role = normalizeRole(raw.role);
       return {
         surface: SURFACE,
-        slot_index: slot.slot_index,
+        slot_index: idx + 1,
         mode,
         role: mode === "pinned" ? role : null,
         entity_id: mode === "pinned" && raw.entity_id ? String(raw.entity_id) : null,
@@ -114,7 +112,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: del.error.message }, { status: 500 });
     }
 
-    const ins = await admin.from("homepage_feature_slots").insert(slots);
+    const ins = await admin.from("homepage_feature_slots").insert(normalizedSlots);
     if (ins.error) return NextResponse.json({ error: ins.error.message }, { status: 500 });
 
     return NextResponse.json({ ok: true });
