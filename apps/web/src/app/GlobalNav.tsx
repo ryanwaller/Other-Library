@@ -375,6 +375,8 @@ export default function GlobalNav() {
   if (!supabase) return null;
   const adminActive = (pathname ?? "").startsWith("/admin");
   const settingsActive = (pathname ?? "").startsWith("/app/settings");
+  const libraryActive = (pathname ?? "").startsWith("/app");
+  const homeActive = pathname === "/";
 
   return (
     <div className="container">
@@ -382,18 +384,28 @@ export default function GlobalNav() {
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: "var(--space-10)" }}>
           <div>
             <Link
-              href={sessionUserId ? "/app" : "/"}
+              href="/"
               onClick={() => {
-                if (!sessionUserId) return;
+                if (pathname !== "/app") return;
                 window.dispatchEvent(new Event("om:home-reset-filters"));
               }}
-              style={{ textDecoration: "none" }}
+              style={homeActive ? { textDecoration: "underline" } : { textDecoration: "none" }}
             >
               Other Library
             </Link>
           </div>
 
           <div className="row" style={{ gap: "var(--space-md)", alignItems: "center", flexWrap: "wrap" }}>
+            {sessionUserId ? (
+              <Link
+                href="/app"
+                onClick={() => window.dispatchEvent(new Event("om:home-reset-filters"))}
+                style={libraryActive ? { textDecoration: "underline" } : undefined}
+              >
+                Library
+              </Link>
+            ) : null}
+
             {sessionUserId && editInAppHref ? (
               <Link href={editInAppHref} aria-label="Edit this page in the app">
                 Edit in app
@@ -460,7 +472,7 @@ export default function GlobalNav() {
               </Link>
             ) : null}
             {sessionUserId && <button onClick={signOut}>Sign out</button>}
-            {!sessionUserId && authResolved ? <Link href="/">Sign in</Link> : null}
+            {!sessionUserId && authResolved ? <Link href="/?login=1#signin">Sign in</Link> : null}
           </div>
         </div>
       </div>
