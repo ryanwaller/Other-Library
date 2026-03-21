@@ -42,9 +42,9 @@ export default function EntityBookGrid({
             <Link href={item.owner.href} className="om-avatar-link om-explore-avatar-link" aria-label={item.owner.username}>
               {item.owner.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img alt="" src={item.owner.avatarUrl} className="om-avatar-img om-explore-avatar-img" />
+                <img alt="" src={item.owner.avatarUrl} className="om-avatar-img om-explore-avatar-img om-explore-owner-avatar-img" />
               ) : (
-                <div className="om-avatar-img om-explore-avatar-img" style={{ background: "var(--bg-muted)" }} />
+                <div className="om-avatar-img om-explore-avatar-img om-explore-owner-avatar-img" style={{ background: "var(--bg-muted)" }} />
               )}
             </Link>
             <Link href={item.owner.href} className="om-explore-owner-name" style={{ textDecoration: "none", color: "inherit" }}>

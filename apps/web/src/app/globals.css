@@ -1361,6 +1361,10 @@ a.text-muted:hover {
   transform: translateY(1px);
 }
 
+.om-explore-owner-avatar-img {
+  transform: translateY(3px);
+}
+
 .om-explore-main-grid {
   display: grid;
   gap: 14px;
