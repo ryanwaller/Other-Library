@@ -84,7 +84,7 @@ export default function SignInCard({
   return (
     <div className="card">
       <form onSubmit={onSubmit}>
-        <div className="row">
+        <div style={{ display: "grid", gap: "var(--space-4)" }}>
           <div>Email</div>
           <input
             name="email"
@@ -93,9 +93,10 @@ export default function SignInCard({
             data-1p-ignore="true"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            style={{ width: "100%" }}
           />
         </div>
-        <div className="row" style={{ marginTop: "var(--space-8)" }}>
+        <div style={{ display: "grid", gap: "var(--space-4)", marginTop: "var(--space-8)" }}>
           <div>Password</div>
           <input
             type="password"
@@ -105,6 +106,7 @@ export default function SignInCard({
             data-1p-ignore="true"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            style={{ width: "100%" }}
           />
         </div>
         <div className="row" style={{ marginTop: "var(--space-md)" }}>

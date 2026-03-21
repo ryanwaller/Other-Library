@@ -21,16 +21,18 @@ export default function ExploreAuthPanel({ open, standalone = false }: { open: b
   return (
     <section id="signin" style={{ marginTop: standalone ? "var(--space-lg)" : "var(--space-xl)" }}>
       {!standalone ? <hr className="divider" /> : null}
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--space-lg)" }}>
-        <div>Sign in</div>
-        <button type="button" className="text-muted" onClick={() => router.replace("/")}>
-          {standalone ? "Explore" : "Close"}
-        </button>
-      </div>
+      {!standalone ? (
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--space-lg)" }}>
+          <div>Sign in</div>
+          <button type="button" className="text-muted" onClick={() => router.replace("/")}>
+            Close
+          </button>
+        </div>
+      ) : null}
 
-      <div className="row" style={{ alignItems: "flex-start", gap: "var(--space-lg)", marginTop: "var(--space-md)", flexWrap: "wrap" }}>
+      <div className="row" style={{ alignItems: "flex-start", gap: "var(--space-lg)", marginTop: standalone ? 0 : "var(--space-md)", flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 360px", minWidth: 300 }}>
-          <SignInCard note="Existing users can sign in and head straight to the library." redirectTo="/app" />
+          <SignInCard redirectTo="/app" />
         </div>
 
         <div style={{ flex: "1 1 320px", minWidth: 300, display: "grid", gap: "var(--space-md)" }}>
@@ -121,15 +123,14 @@ export default function ExploreAuthPanel({ open, standalone = false }: { open: b
             ) : null}
           </div>
 
-          <div className="text-muted" style={{ paddingLeft: "2px" }}>
-            Private beta. If you already have access, sign in. If not, request access or continue with an invite.
-          </div>
         </div>
       </div>
 
-      <div className="row" style={{ marginTop: "var(--space-md)" }}>
-        <Link href="/">Back to Explore</Link>
-      </div>
+      {standalone ? null : (
+        <div className="row" style={{ marginTop: "var(--space-md)" }}>
+          <Link href="/">Back to Explore</Link>
+        </div>
+      )}
     </section>
   );
 }
