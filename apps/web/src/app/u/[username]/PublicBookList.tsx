@@ -20,6 +20,18 @@ import {
   groupKeyFor,
   titleSortKeyFor
 } from "../../../lib/book";
+import {
+  coverSizesForGrid,
+  DEFAULT_DESKTOP_GRID_DENSITY,
+  DEFAULT_MOBILE_GRID_COLS,
+  gridColumnsHint,
+  gridTemplateColumns,
+  isDesktopGridDensity,
+  isMobileGridCols,
+  legacyGridColsToDesktopDensity,
+  type DesktopGridDensity,
+  type MobileGridCols
+} from "../../../lib/grid";
 
 type SortMode = "latest" | "earliest" | "title_asc" | "title_desc";
 
@@ -82,13 +94,14 @@ export default function PublicBookList({
   initialFilters
 }: Props) {
   const PUBLIC_VIEW_MODE_KEY = "om_public_viewMode";
-  const PUBLIC_GRID_COLS_KEY = "om_public_gridCols";
+  const PUBLIC_DESKTOP_GRID_DENSITY_KEY = "om_public_desktopGridDensity";
+  const PUBLIC_MOBILE_GRID_COLS_KEY = "om_public_mobileGridCols";
   const PUBLIC_SORT_MODE_KEY = "om_public_sortMode";
   const [searchQuery, setSearchQuery] = useState(initialSearch ?? "");
   const [queryFilter, setQueryFilter] = useState(initialSearch ?? "");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [gridCols, setGridCols] = useState<1 | 2 | 4 | 8>(4);
-  const autoReducedGridColsRef = useRef<4 | 8 | null>(null);
+  const [desktopGridDensity, setDesktopGridDensity] = useState<DesktopGridDensity>(DEFAULT_DESKTOP_GRID_DENSITY);
+  const [mobileGridCols, setMobileGridCols] = useState<MobileGridCols>(DEFAULT_MOBILE_GRID_COLS);
   const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [sortOpen, setSortOpen] = useState(false);
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, boolean>>({});
@@ -105,27 +118,6 @@ export default function PublicBookList({
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
-
-  useEffect(() => {
-    if (isMobile) {
-      setGridCols((prev) => {
-        if (prev === 4 || prev === 8) {
-          autoReducedGridColsRef.current = prev;
-          return 2;
-        }
-        return prev;
-      });
-      return;
-    }
-    setGridCols((prev) => {
-      const restore = autoReducedGridColsRef.current;
-      if (restore && (prev === 1 || prev === 2)) {
-        autoReducedGridColsRef.current = null;
-        return restore;
-      }
-      return prev;
-    });
-  }, [isMobile]);
 
   // Sticky band
   const controlsBandRef = useRef<HTMLDivElement | null>(null);
@@ -204,28 +196,34 @@ export default function PublicBookList({
   useEffect(() => {
     try {
       const vm = window.localStorage.getItem(PUBLIC_VIEW_MODE_KEY);
-      const gc = window.localStorage.getItem(PUBLIC_GRID_COLS_KEY);
+      const legacyGc = window.localStorage.getItem("om_public_gridCols");
+      const density = window.localStorage.getItem(PUBLIC_DESKTOP_GRID_DENSITY_KEY);
+      const mobileCols = window.localStorage.getItem(PUBLIC_MOBILE_GRID_COLS_KEY);
       const sm = window.localStorage.getItem(PUBLIC_SORT_MODE_KEY);
       if (vm === "grid" || vm === "list") setViewMode(vm);
-      if (gc === "1" || gc === "2" || gc === "4" || gc === "8") setGridCols(Number(gc) as 1 | 2 | 4 | 8);
+      if (isDesktopGridDensity(density)) setDesktopGridDensity(density);
+      else {
+        const migrated = legacyGridColsToDesktopDensity(legacyGc);
+        if (migrated) setDesktopGridDensity(migrated);
+      }
+      if (isMobileGridCols(mobileCols)) setMobileGridCols(Number(mobileCols) as MobileGridCols);
+      else if (legacyGc === "1" || legacyGc === "2") setMobileGridCols(Number(legacyGc) as MobileGridCols);
       if (sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
     } catch {
       // ignore
     }
-  }, [PUBLIC_GRID_COLS_KEY, PUBLIC_SORT_MODE_KEY, PUBLIC_VIEW_MODE_KEY]);
+  }, [PUBLIC_DESKTOP_GRID_DENSITY_KEY, PUBLIC_MOBILE_GRID_COLS_KEY, PUBLIC_SORT_MODE_KEY, PUBLIC_VIEW_MODE_KEY]);
 
   useEffect(() => {
     try {
       window.localStorage.setItem(PUBLIC_VIEW_MODE_KEY, viewMode);
-      window.localStorage.setItem(
-        PUBLIC_GRID_COLS_KEY,
-        String(isMobile && autoReducedGridColsRef.current ? autoReducedGridColsRef.current : gridCols)
-      );
+      window.localStorage.setItem(PUBLIC_DESKTOP_GRID_DENSITY_KEY, desktopGridDensity);
+      window.localStorage.setItem(PUBLIC_MOBILE_GRID_COLS_KEY, String(mobileGridCols));
       window.localStorage.setItem(PUBLIC_SORT_MODE_KEY, sortMode);
     } catch {
       // ignore
     }
-  }, [PUBLIC_GRID_COLS_KEY, PUBLIC_SORT_MODE_KEY, PUBLIC_VIEW_MODE_KEY, gridCols, isMobile, sortMode, viewMode]);
+  }, [PUBLIC_DESKTOP_GRID_DENSITY_KEY, PUBLIC_MOBILE_GRID_COLS_KEY, PUBLIC_SORT_MODE_KEY, PUBLIC_VIEW_MODE_KEY, desktopGridDensity, mobileGridCols, sortMode, viewMode]);
 
   // Use state for filters so we can clear them instantly
   const [activeFilters, setActiveFilters] = useState(initialFilters);
@@ -564,22 +562,23 @@ export default function PublicBookList({
     return groups;
   }, [mergedAllBooks, activeFilters, searchQuery, sortMode]);
 
-  const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
+  const effectiveCols = gridColumnsHint(isMobile, mobileGridCols, desktopGridDensity);
 
   const coverSizes = useMemo(() => {
     if (viewMode === "list") return "60px";
-    if (effectiveCols === 8) return "calc(12.5vw - 11px)";
-    if (effectiveCols === 4) return "calc(25vw - 9px)";
-    if (effectiveCols === 2) return "calc(50vw - 6px)";
-    return "100vw";
-  }, [viewMode, effectiveCols]);
+    return coverSizesForGrid(isMobile, mobileGridCols, desktopGridDensity);
+  }, [viewMode, isMobile, mobileGridCols, desktopGridDensity]);
 
   const containerStyle = useMemo((): React.CSSProperties => {
     if (viewMode === "list") {
       return { display: "flex", flexDirection: "column", gap: "var(--space-8)" };
     }
-    return { display: "grid", gridTemplateColumns: `repeat(${effectiveCols}, 1fr)`, gap: "var(--space-md)" };
-  }, [viewMode, effectiveCols]);
+    return {
+      display: "grid",
+      gridTemplateColumns: gridTemplateColumns(isMobile, mobileGridCols, desktopGridDensity),
+      gap: "var(--space-md)"
+    };
+  }, [viewMode, isMobile, mobileGridCols, desktopGridDensity]);
 
   const hasActiveFilters = Object.values(activeFilters).some(Boolean);
   const availableCategories = useMemo(
@@ -643,7 +642,7 @@ export default function PublicBookList({
 
     const truncatedAuthors =
       secondary.mode === "authors"
-        ? gridCols === 8 && secondary.values.length > 1
+        ? effectiveCols >= 8 && secondary.values.length > 1
           ? [secondary.values[0], "+ more"]
           : isMobile && secondary.values.length > 2
             ? [...secondary.values.slice(0, 2), "+ more"]
@@ -832,18 +831,22 @@ export default function PublicBookList({
             {viewMode === "grid" && (
               <select
                 className="om-filter-control"
-                value={gridCols}
+                value={isMobile ? String(mobileGridCols) : desktopGridDensity}
                 onChange={(e) => {
-                  autoReducedGridColsRef.current = null;
-                  setGridCols(Number(e.target.value) as 1 | 2 | 4 | 8);
+                  if (isMobile) setMobileGridCols(Number(e.target.value) as MobileGridCols);
+                  else setDesktopGridDensity(e.target.value as DesktopGridDensity);
                 }}
               >
-                {isMobile && <option value={1}>1</option>}
-                <option value={2}>2</option>
-                {!isMobile && (
+                {isMobile ? (
                   <>
-                    <option value={4}>4</option>
-                    <option value={8}>8</option>
+                    <option value={1}>1</option>
+                    <option value={2}>2</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
                   </>
                 )}
               </select>
@@ -943,7 +946,7 @@ export default function PublicBookList({
                   <PagedBookList
                     items={libGroups}
                     viewMode={viewMode}
-                    gridCols={gridCols}
+                    gridCols={effectiveCols}
                     searchQuery={searchQuery}
                     containerStyle={containerStyle}
                     renderItem={renderBook}
@@ -958,7 +961,7 @@ export default function PublicBookList({
         <PagedBookList
           items={filteredGroups}
           viewMode={viewMode}
-          gridCols={gridCols}
+          gridCols={effectiveCols}
           searchQuery={searchQuery}
           containerStyle={containerStyle}
           renderItem={renderBook}

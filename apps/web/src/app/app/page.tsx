@@ -40,6 +40,18 @@ import { DECADE_OPTIONS } from "../../lib/decades";
 import { saveBookNavContext } from "../../lib/bookNav";
 import { parseMusicMetadata, type MusicMetadata, type MusicContributorRole } from "../../lib/music";
 import { formatIssueDisplay, looksLikeIssn, normalizeIssueYear, normalizeIssn, parseMagazineTitle } from "../../lib/magazine";
+import {
+  coverSizesForGrid,
+  DEFAULT_DESKTOP_GRID_DENSITY,
+  DEFAULT_MOBILE_GRID_COLS,
+  gridColumnsHint,
+  gridTemplateColumns,
+  isDesktopGridDensity,
+  isMobileGridCols,
+  legacyGridColsToDesktopDensity,
+  type DesktopGridDensity,
+  type MobileGridCols
+} from "../../lib/grid";
 import { contextFromFilterParams } from "../../lib/pageTitle";
 import { DETAIL_FILTER_KEYS, detailFilterLabel, type DetailFilterKey } from "../../lib/detailFilters";
 import { slugify } from "../../lib/slug";
@@ -655,7 +667,8 @@ function AppShell({
   const [booksLoading, setBooksLoading] = useState(false);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [gridCols, setGridCols] = useState<1 | 2 | 4 | 8>(4);
+  const [desktopGridDensity, setDesktopGridDensity] = useState<DesktopGridDensity>(DEFAULT_DESKTOP_GRID_DENSITY);
+  const [mobileGridCols, setMobileGridCols] = useState<MobileGridCols>(DEFAULT_MOBILE_GRID_COLS);
   const [sortMode, setSortMode] = useState<"custom" | "latest" | "earliest" | "title_asc" | "title_desc">("custom");
   const [categoryMode, setCategoryMode] = useState<string>("all");
   const [visibilityMode, setVisibilityMode] = useState<"all" | "public" | "private">("all");
@@ -770,7 +783,6 @@ function AppShell({
     controlsPinnedOpen,
     isMobile,
   });
-  const autoReducedGridColsRef = useRef<4 | 8 | null>(null);
   const [collapsedByLibraryId, setCollapsedByLibraryId] = useState<Record<number, true | undefined>>({});
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [showInitialSkeleton, setShowInitialSkeleton] = useState(() => {
@@ -928,27 +940,6 @@ function AppShell({
     return () => mq.removeEventListener?.("change", update);
   }, []);
 
-  useEffect(() => {
-    if (isMobile) {
-      setGridCols((prev) => {
-        if (prev === 4 || prev === 8) {
-          autoReducedGridColsRef.current = prev;
-          return 2;
-        }
-        return prev;
-      });
-      return;
-    }
-    setGridCols((prev) => {
-      const restore = autoReducedGridColsRef.current;
-      if (restore && (prev === 1 || prev === 2)) {
-        autoReducedGridColsRef.current = null;
-        return restore;
-      }
-      return prev;
-    });
-  }, [isMobile]);
-
   const searchParamsKey = searchParams.toString();
   const controlsFixed = controlsDocked;
 
@@ -1019,14 +1010,22 @@ function AppShell({
   useEffect(() => {
     try {
       const vm = window.localStorage.getItem("om_viewMode");
-      const gc = window.localStorage.getItem("om_gridCols");
+      const legacyGc = window.localStorage.getItem("om_gridCols");
+      const density = window.localStorage.getItem("om_desktopGridDensity");
+      const mobileCols = window.localStorage.getItem("om_mobileGridCols");
       const sm = window.localStorage.getItem("om_sortMode");
       const q = (searchParams.get("q") ?? "").trim();
       window.localStorage.removeItem("om_categoryMode");
       window.localStorage.removeItem("om_tagMode");
       window.localStorage.removeItem("om_visibilityMode");
       if (vm === "grid" || vm === "list") setViewMode(vm);
-      if (gc === "1" || gc === "2" || gc === "4" || gc === "8") setGridCols(Number(gc) as any);
+      if (isDesktopGridDensity(density)) setDesktopGridDensity(density);
+      else {
+        const migrated = legacyGridColsToDesktopDensity(legacyGc);
+        if (migrated) setDesktopGridDensity(migrated);
+      }
+      if (isMobileGridCols(mobileCols)) setMobileGridCols(Number(mobileCols) as MobileGridCols);
+      else if (legacyGc === "1" || legacyGc === "2") setMobileGridCols(Number(legacyGc) as MobileGridCols);
       if (sm === "custom" || sm === "latest" || sm === "earliest" || sm === "title_asc" || sm === "title_desc") setSortMode(sm);
       setSearchQuery(q);
     } catch {
@@ -1037,12 +1036,13 @@ function AppShell({
   useEffect(() => {
     try {
       window.localStorage.setItem("om_viewMode", viewMode);
-      window.localStorage.setItem("om_gridCols", String(gridCols));
+      window.localStorage.setItem("om_desktopGridDensity", desktopGridDensity);
+      window.localStorage.setItem("om_mobileGridCols", String(mobileGridCols));
       window.localStorage.setItem("om_sortMode", sortMode);
     } catch {
       // ignore
     }
-  }, [viewMode, gridCols, sortMode]);
+  }, [viewMode, desktopGridDensity, mobileGridCols, sortMode]);
 
   useEffect(() => {
     const normalized = (filterCategory ?? "").trim();
@@ -3654,16 +3654,18 @@ function AppShell({
                   <option value="list">list</option>
                 </select>
                 {viewMode === "grid" && (
-                  <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
-                    {isMobile && <option value={1}>1</option>}
-                    <option value={2}>2</option>
-                    {!isMobile && (
-                      <>
-                        <option value={4}>4</option>
-                        <option value={8}>8</option>
-                      </>
-                    )}
-                  </select>
+                  isMobile ? (
+                    <select className="om-filter-control" value={mobileGridCols} onChange={(e) => setMobileGridCols(Number(e.target.value) as MobileGridCols)}>
+                      <option value={1}>1</option>
+                      <option value={2}>2</option>
+                    </select>
+                  ) : (
+                    <select className="om-filter-control" value={desktopGridDensity} onChange={(e) => setDesktopGridDensity(e.target.value as DesktopGridDensity)}>
+                      <option value="small">Small</option>
+                      <option value="medium">Medium</option>
+                      <option value="large">Large</option>
+                    </select>
+                  )
                 )}
 
                 <select className="om-filter-control" value={sortMode} onChange={(e) => {
@@ -3786,16 +3788,18 @@ function AppShell({
                   <option value="list">list</option>
                 </select>
                 {viewMode === "grid" && (
-                  <select className="om-filter-control" value={gridCols} onChange={(e) => setGridCols(Number(e.target.value) as any)}>
-                    {isMobile && <option value={1}>1</option>}
-                    <option value={2}>2</option>
-                    {!isMobile && (
-                      <>
-                        <option value={4}>4</option>
-                        <option value={8}>8</option>
-                      </>
-                    )}
-                  </select>
+                  isMobile ? (
+                    <select className="om-filter-control" value={mobileGridCols} onChange={(e) => setMobileGridCols(Number(e.target.value) as MobileGridCols)}>
+                      <option value={1}>1</option>
+                      <option value={2}>2</option>
+                    </select>
+                  ) : (
+                    <select className="om-filter-control" value={desktopGridDensity} onChange={(e) => setDesktopGridDensity(e.target.value as DesktopGridDensity)}>
+                      <option value="small">Small</option>
+                      <option value="medium">Medium</option>
+                      <option value="large">Large</option>
+                    </select>
+                  )
                 )}
 
                 <select className="om-filter-control" value={sortMode} onChange={(e) => {
@@ -4202,7 +4206,10 @@ function AppShell({
 
       {displayLibraries.map((lib, idx) => {
         const groups = displayGroupsByLibraryId[lib.id] ?? [];
-        const effectiveCols = isMobile ? Math.min(gridCols, 2) : gridCols;
+        const effectiveCols = gridColumnsHint(isMobile, mobileGridCols, desktopGridDensity);
+        const effectiveGridTemplateColumns = viewMode === "grid"
+          ? gridTemplateColumns(isMobile, mobileGridCols, desktopGridDensity)
+          : undefined;
         const showBookSkeleton = booksLoading && groups.length === 0;
         const memberState = membersByCatalogId[lib.id] ?? { busy: false, error: null, members: [], inviteInput: "", inviteBusy: false };
         const acceptedMembers = Array.isArray(memberState.members) ? memberState.members.filter((m) => m.accepted_at) : [];
@@ -4360,7 +4367,8 @@ function AppShell({
                     groups={groups}
                     limit={limit}
                     effectiveViewMode={effectiveViewMode}
-                    effectiveCols={effectiveCols}
+                    gridColumnsHint={effectiveCols}
+                    gridTemplateColumns={effectiveGridTemplateColumns}
                     showBookSkeleton={showBookSkeleton}
                     isRearranging={reorderMode}
                     bulkMode={bulkMode}

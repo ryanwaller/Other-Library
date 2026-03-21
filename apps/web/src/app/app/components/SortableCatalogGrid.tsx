@@ -36,7 +36,8 @@ type SortableCatalogGridProps = {
   groups: CatalogGroup[];
   limit: number;
   effectiveViewMode: BookCardViewMode;
-  effectiveCols: number;
+  gridColumnsHint: number;
+  gridTemplateColumns?: string;
   showBookSkeleton: boolean;
   isRearranging: boolean;
   bulkMode: boolean;
@@ -57,7 +58,7 @@ type SortableCatalogCardProps = {
   libraryId: number;
   viewMode: BookCardViewMode;
   bulkMode: boolean;
-  effectiveCols: number;
+  gridColumnsHint: number;
   selected: boolean;
   deleteState: DeleteState;
   isRearranging: boolean;
@@ -71,7 +72,7 @@ function renderCard({
   group,
   viewMode,
   bulkMode,
-  effectiveCols,
+  gridColumnsHint,
   selected,
   deleteState,
   isRearranging,
@@ -103,7 +104,7 @@ function renderCard({
       cropData={group.primary.cover_crop}
       onDeleteCopy={onDeleteCopy}
       deleteState={deleteState}
-      gridCols={effectiveCols}
+      gridCols={gridColumnsHint}
       secondaryMode={effectiveSecondaryLineFor(group.primary).mode}
     />
   );
@@ -114,7 +115,7 @@ function SortableCatalogCard({
   libraryId,
   viewMode,
   bulkMode,
-  effectiveCols,
+  gridColumnsHint,
   selected,
   deleteState,
   isRearranging,
@@ -142,7 +143,7 @@ function SortableCatalogCard({
     group,
     viewMode,
     bulkMode,
-    effectiveCols,
+    gridColumnsHint,
     selected,
     deleteState,
     isRearranging,
@@ -197,7 +198,8 @@ const SortableCatalogGrid = memo(function SortableCatalogGrid({
   groups,
   limit,
   effectiveViewMode,
-  effectiveCols,
+  gridColumnsHint,
+  gridTemplateColumns,
   showBookSkeleton,
   isRearranging,
   bulkMode,
@@ -237,12 +239,12 @@ const SortableCatalogGrid = memo(function SortableCatalogGrid({
       style={{
         display: effectiveViewMode === "grid" ? "grid" : "flex",
         flexDirection: effectiveViewMode === "list" ? "column" : undefined,
-        gridTemplateColumns: effectiveViewMode === "grid" ? `repeat(${effectiveCols}, minmax(0, 1fr))` : undefined,
+        gridTemplateColumns: effectiveViewMode === "grid" ? gridTemplateColumns ?? `repeat(${gridColumnsHint}, minmax(0, 1fr))` : undefined,
         gap: "var(--space-md)"
       }}
     >
       {showBookSkeleton
-        ? Array.from({ length: Math.min(4, Math.max(1, effectiveCols)) }).map((_, i) => (
+        ? Array.from({ length: Math.min(6, Math.max(1, gridColumnsHint)) }).map((_, i) => (
             <div key={`skeleton-${libraryId}-${i}`} className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
           ))
         : null}
@@ -253,7 +255,7 @@ const SortableCatalogGrid = memo(function SortableCatalogGrid({
           libraryId={libraryId}
           viewMode={viewMode}
           bulkMode={bulkMode}
-          effectiveCols={effectiveCols}
+          gridColumnsHint={gridColumnsHint}
           selected={!!bulkSelectedKeys[group.key]}
           deleteState={deleteStateByBookId[group.primary.id]}
           isRearranging={isRearranging}
@@ -322,7 +324,7 @@ const SortableCatalogGrid = memo(function SortableCatalogGrid({
               group: activeGroup,
               viewMode,
               bulkMode: false,
-              effectiveCols,
+              gridColumnsHint,
               selected: false,
               deleteState: deleteStateByBookId[activeGroup.primary.id],
               isRearranging: false,

@@ -70,18 +70,19 @@ export default function BookCard({
     if (isMobile && authors.length > 2) {
       return [...authors.slice(0, 2), "+ more"];
     }
-    if (gridCols === 8 && authors.length > 1) {
+    if ((gridCols ?? 0) >= 8 && authors.length > 1) {
       return [authors[0], "+ more"];
     }
     return authors;
   }, [gridCols, authors, isMobile]);
 
-  const effectiveCols = isMobile ? Math.min(gridCols ?? 4, 2) : (gridCols ?? 4);
+  const effectiveCols = isMobile ? Math.min(gridCols ?? 2, 2) : (gridCols ?? 6);
   const coverSizes = viewMode === "list"
     ? "70px"
-    : effectiveCols === 8 ? "calc(12.5vw - 11px)"
-    : effectiveCols === 4 ? "calc(25vw - 9px)"
-    : effectiveCols === 2 ? "calc(50vw - 6px)"
+    : effectiveCols >= 8 ? "(max-width: 1100px) 26vw, (max-width: 1500px) 19vw, 14vw"
+    : effectiveCols >= 6 ? "(max-width: 1100px) 34vw, (max-width: 1500px) 24vw, 18vw"
+    : effectiveCols >= 4 ? "(max-width: 1100px) 42vw, (max-width: 1500px) 31vw, 23vw"
+    : effectiveCols === 2 ? "50vw"
     : "100vw";
 
   const coverEl = (
