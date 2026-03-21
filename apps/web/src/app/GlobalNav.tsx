@@ -375,7 +375,6 @@ export default function GlobalNav() {
   if (!supabase) return null;
   const adminActive = (pathname ?? "").startsWith("/admin");
   const settingsActive = (pathname ?? "").startsWith("/app/settings");
-  const libraryActive = (pathname ?? "").startsWith("/app");
   const homeActive = pathname === "/";
 
   return (
@@ -396,22 +395,6 @@ export default function GlobalNav() {
           </div>
 
           <div className="row" style={{ gap: "var(--space-md)", alignItems: "center", flexWrap: "wrap" }}>
-            {sessionUserId ? (
-              libraryActive ? (
-                <Link href="/" style={homeActive ? { textDecoration: "underline" } : undefined}>
-                  Explore
-                </Link>
-              ) : (
-                <Link
-                  href="/app"
-                  onClick={() => window.dispatchEvent(new Event("om:home-reset-filters"))}
-                  style={libraryActive ? { textDecoration: "underline" } : undefined}
-                >
-                  Library
-                </Link>
-              )
-            ) : null}
-
             {sessionUserId && editInAppHref ? (
               <Link href={editInAppHref} aria-label="Edit this page in the app">
                 Edit in app
@@ -453,7 +436,7 @@ export default function GlobalNav() {
             {sessionUserId && (avatarUrl || me?.username) ? (
               <div className="om-avatar-lockup">
                 {avatarUrl ? (
-                  <Link href={me?.username ? `/u/${me.username}` : "/app"} aria-label="Open your public profile" className="om-avatar-link">
+                  <Link href="/app" aria-label="Open your library" className="om-avatar-link">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img alt="" src={avatarUrl} className="om-avatar-img om-avatar-img-nav" />
                   </Link>

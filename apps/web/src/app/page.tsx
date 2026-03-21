@@ -391,6 +391,39 @@ async function loadExploreData() {
     .eq("surface", EXPLORE_RAIL_SURFACE)
     .order("slot_index", { ascending: true });
 
+  const pinnedSlotRows = (Array.isArray(railSlotRes.data) ? railSlotRes.data : []).filter(
+    (row) => String((row as any).mode ?? "").trim().toLowerCase() === "pinned"
+  );
+
+  let allVisibleRows = recentRows;
+  if (pinnedSlotRows.length > 0) {
+    const broadRes = await db
+      .from("user_books")
+      .select(BOOK_SELECT)
+      .in("owner_id", publicOwnerIds)
+      .neq("visibility", "followers_only")
+      .order("created_at", { ascending: false })
+      .limit(2000);
+
+    const broadRows = uniqueById((broadRes.data ?? []) as unknown as ExploreBookRow[]);
+    if (broadRows.length > 0) {
+      const missingMediaPaths = [
+        ...new Set(
+          broadRows
+            .map((row) => coverStoragePath(row))
+            .filter((path): path is string => Boolean(path) && !signedMap[path])
+        ),
+      ];
+      if (missingMediaPaths.length > 0) {
+        const signedRes = await db.storage.from("user-book-media").createSignedUrls(missingMediaPaths, 60 * 30);
+        for (const row of signedRes.data ?? []) {
+          if (row.path && row.signedUrl) signedMap[row.path] = row.signedUrl;
+        }
+      }
+      allVisibleRows = broadRows;
+    }
+  }
+
   const autoQueue = [...railClusters];
   const usedKeys = new Set<string>();
   const railBySlot = new Map<number, EntityCluster>();
@@ -422,7 +455,17 @@ async function loadExploreData() {
     const name = String(entity?.name ?? "").trim();
     const slug = String(entity?.slug ?? "").trim() || null;
     if (!role || !entityId || !name) continue;
-    const items = clusterItemsFor(entityId, role);
+    const items = allVisibleRows
+      .filter((bookRow) =>
+        (bookRow.book_entities ?? []).some((entityRow) => {
+          const entityRole = String(entityRow?.role ?? "").trim().toLowerCase();
+          if (role === "designer") return (entityRole === "designer" || entityRole === "design") && String(entityRow?.entity?.id ?? "") === entityId;
+          return entityRole === role && String(entityRow?.entity?.id ?? "") === entityId;
+        })
+      )
+      .map((bookRow) => toGridItem(bookRow, usernameByOwnerId, signedMap))
+      .filter((item): item is GridItem => Boolean(item))
+      .slice(0, EXPLORE_RAIL_ITEMS);
     if (items.length === 0) continue;
     const key = `${role}:${entityId}`;
     usedKeys.add(key);
