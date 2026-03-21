@@ -3661,9 +3661,9 @@ function AppShell({
                     </select>
                   ) : (
                     <select className="om-filter-control" value={desktopGridDensity} onChange={(e) => setDesktopGridDensity(e.target.value as DesktopGridDensity)}>
-                      <option value="small">Small</option>
-                      <option value="medium">Medium</option>
-                      <option value="large">Large</option>
+                      <option value="small">small</option>
+                      <option value="medium">medium</option>
+                      <option value="large">large</option>
                     </select>
                   )
                 )}
@@ -3795,9 +3795,9 @@ function AppShell({
                     </select>
                   ) : (
                     <select className="om-filter-control" value={desktopGridDensity} onChange={(e) => setDesktopGridDensity(e.target.value as DesktopGridDensity)}>
-                      <option value="small">Small</option>
-                      <option value="medium">Medium</option>
-                      <option value="large">Large</option>
+                      <option value="small">small</option>
+                      <option value="medium">medium</option>
+                      <option value="large">large</option>
                     </select>
                   )
                 )}

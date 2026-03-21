@@ -32,7 +32,7 @@ export function gridTemplateColumns(isMobile: boolean, mobileGridCols: MobileGri
       : desktopGridDensity === "small"
         ? 170
         : 220;
-  return `repeat(auto-fit, minmax(min(100%, ${minWidth}px), 1fr))`;
+  return `repeat(auto-fill, minmax(min(100%, ${minWidth}px), 1fr))`;
 }
 
 export function coverSizesForGrid(isMobile: boolean, mobileGridCols: MobileGridCols, desktopGridDensity: DesktopGridDensity): string {

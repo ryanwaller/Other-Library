@@ -844,9 +844,9 @@ export default function PublicBookList({
                   </>
                 ) : (
                   <>
-                    <option value="small">Small</option>
-                    <option value="medium">Medium</option>
-                    <option value="large">Large</option>
+                    <option value="small">small</option>
+                    <option value="medium">medium</option>
+                    <option value="large">large</option>
                   </>
                 )}
               </select>
