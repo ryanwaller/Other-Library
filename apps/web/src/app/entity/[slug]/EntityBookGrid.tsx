@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import CoverImage, { type CoverCrop } from "../../../components/CoverImage";
+import { RELATED_ITEMS_GRID_MIN_WIDTH } from "../../../lib/grid";
 
 export type GridItem = {
   id: number;
@@ -14,7 +15,10 @@ export type GridItem = {
 
 export default function EntityBookGrid({ items }: { items: GridItem[] }) {
   return (
-    <div className="om-related-items-grid" style={{ marginTop: "var(--space-14)" }}>
+    <div
+      className="om-related-items-grid"
+      style={{ marginTop: "var(--space-14)", ["--om-related-items-grid-min" as any]: `${RELATED_ITEMS_GRID_MIN_WIDTH}px` }}
+    >
       {items.map((item) => {
         const inner = (
           <>

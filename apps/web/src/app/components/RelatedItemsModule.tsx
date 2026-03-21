@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CoverCrop } from "../../components/CoverImage";
 import CoverImage from "../../components/CoverImage";
+import { RELATED_ITEMS_GRID_MIN_WIDTH } from "../../lib/grid";
 import { parseMusicMetadata } from "../../lib/music";
 import { formatIssueDisplay, isMagazineObject } from "../../lib/magazine";
 import { bookIdSlug } from "../../lib/slug";
@@ -347,7 +348,10 @@ export default function RelatedItemsModule({
       <hr className="divider" />
       <div style={{ marginTop: "var(--space-lg)" }}>
         <div>{heading}</div>
-        <div className="om-related-items-grid" style={{ marginTop: "var(--space-14)" }}>
+        <div
+          className="om-related-items-grid"
+          style={{ marginTop: "var(--space-14)", ["--om-related-items-grid-min" as any]: `${RELATED_ITEMS_GRID_MIN_WIDTH}px` }}
+        >
           {visibleRows.map((row) => {
             const title = effectiveTitle(row);
             const secondaryLine = effectiveSecondaryLine(row);

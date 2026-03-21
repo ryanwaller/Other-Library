@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
+import { RELATED_ITEMS_GRID_MIN_WIDTH } from "../../../../../lib/grid";
 
 export type PublicRelatedItemRow = {
   id: number;
@@ -29,7 +30,10 @@ export default function PublicRelatedItemsGrid({
       <hr className="divider" />
       <div style={{ marginTop: "var(--space-lg)" }}>
         <div>{heading}</div>
-        <div className="om-related-items-grid" style={{ marginTop: "var(--space-14)" }}>
+        <div
+          className="om-related-items-grid"
+          style={{ marginTop: "var(--space-14)", ["--om-related-items-grid-min" as any]: `${RELATED_ITEMS_GRID_MIN_WIDTH}px` }}
+        >
           {visibleRows.map((row) => (
             <div key={row.id}>
               <Link href={row.href} style={{ display: "block", textDecoration: "none", color: "inherit" }}>

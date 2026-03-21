@@ -3,6 +3,13 @@ export type MobileGridCols = 1 | 2;
 
 export const DEFAULT_DESKTOP_GRID_DENSITY: DesktopGridDensity = "medium";
 export const DEFAULT_MOBILE_GRID_COLS: MobileGridCols = 2;
+export const DESKTOP_GRID_MIN_WIDTH: Record<DesktopGridDensity, number> = {
+  large: 280,
+  medium: 220,
+  small: 170,
+};
+export const RELATED_ITEMS_GRID_MIN_WIDTH = DESKTOP_GRID_MIN_WIDTH.medium;
+export const IMAGE_MODULE_GRID_MIN_WIDTH = DESKTOP_GRID_MIN_WIDTH.small;
 
 export function isDesktopGridDensity(value: unknown): value is DesktopGridDensity {
   return value === "large" || value === "medium" || value === "small";
@@ -26,12 +33,7 @@ export function gridTemplateColumns(isMobile: boolean, mobileGridCols: MobileGri
   if (isMobile) {
     return `repeat(${mobileGridCols}, minmax(0, 1fr))`;
   }
-  const minWidth =
-    desktopGridDensity === "large"
-      ? 280
-      : desktopGridDensity === "small"
-        ? 170
-        : 220;
+  const minWidth = DESKTOP_GRID_MIN_WIDTH[desktopGridDensity];
   return `repeat(auto-fill, minmax(min(100%, ${minWidth}px), 1fr))`;
 }
 

@@ -1259,13 +1259,13 @@ a.text-muted:hover {
 .om-images-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--om-images-grid-min, 170px)), 1fr));
 }
 
 .om-related-items-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--om-related-items-grid-min, 220px)), 1fr));
 }
 
 .om-book-secondary a {

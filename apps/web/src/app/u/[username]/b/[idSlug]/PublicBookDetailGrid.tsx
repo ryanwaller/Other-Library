@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import CoverImage, { type CoverCrop } from "../../../../../components/CoverImage";
+import { IMAGE_MODULE_GRID_MIN_WIDTH } from "../../../../../lib/grid";
 
 type ImageMedia = {
   id: number;
@@ -86,7 +87,10 @@ export default function PublicBookDetailGrid({
           <div className="text-muted">
             Images
           </div>
-          <div className="om-images-grid" style={{ marginTop: "var(--space-10)" }}>
+          <div
+            className="om-images-grid"
+            style={{ marginTop: "var(--space-10)", ["--om-images-grid-min" as any]: `${IMAGE_MODULE_GRID_MIN_WIDTH}px` }}
+          >
             {images.map((m, idx) => {
               const url = signedMap[m.storage_path];
               return (

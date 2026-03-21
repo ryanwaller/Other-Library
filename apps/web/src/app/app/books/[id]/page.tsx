@@ -11,6 +11,7 @@ import { formatDateShort, normalizeFlexiblePublishDate } from "../../../../lib/f
 import { DECADE_OPTIONS } from "../../../../lib/decades";
 import { loadBookNavContext, type BookNavContext } from "../../../../lib/bookNav";
 import { detailFilterHref, roleToDetailFilterKey, type DetailFilterKey } from "../../../../lib/detailFilters";
+import { IMAGE_MODULE_GRID_MIN_WIDTH } from "../../../../lib/grid";
 import {
   emptyMusicMetadata,
   formatMusicTrackLine,
@@ -5847,7 +5848,10 @@ export default function BookDetailPage() {
               {imageMedia.length > 0 ? (
                 <>
                 <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>Additional images</div>
-                <div className="om-images-grid" style={{ marginTop: "var(--space-10)" }}>
+          <div
+            className="om-images-grid"
+            style={{ marginTop: "var(--space-10)", ["--om-images-grid-min" as any]: `${IMAGE_MODULE_GRID_MIN_WIDTH}px` }}
+          >
                   {imageMedia.map((m, idx) => {
                     const url = mediaUrlsByPath[m.storage_path];
                     return (
