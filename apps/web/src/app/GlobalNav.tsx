@@ -397,13 +397,19 @@ export default function GlobalNav() {
 
           <div className="row" style={{ gap: "var(--space-md)", alignItems: "center", flexWrap: "wrap" }}>
             {sessionUserId ? (
-              <Link
-                href="/app"
-                onClick={() => window.dispatchEvent(new Event("om:home-reset-filters"))}
-                style={libraryActive ? { textDecoration: "underline" } : undefined}
-              >
-                Library
-              </Link>
+              libraryActive ? (
+                <Link href="/" style={homeActive ? { textDecoration: "underline" } : undefined}>
+                  Explore
+                </Link>
+              ) : (
+                <Link
+                  href="/app"
+                  onClick={() => window.dispatchEvent(new Event("om:home-reset-filters"))}
+                  style={libraryActive ? { textDecoration: "underline" } : undefined}
+                >
+                  Library
+                </Link>
+              )
             ) : null}
 
             {sessionUserId && editInAppHref ? (
