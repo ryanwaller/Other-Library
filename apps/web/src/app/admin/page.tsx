@@ -92,7 +92,18 @@ type HomepageRailResponse = {
   migrationRequired?: boolean;
 };
 
-type TabKey = "users" | "waitlist" | "invites" | "feedback" | "homepage";
+type MergeEntity = {
+  id: string;
+  name: string;
+  slug: string | null;
+  count: number;
+};
+
+type EntityMergeResponse = {
+  entities: MergeEntity[];
+};
+
+type TabKey = "users" | "waitlist" | "invites" | "feedback" | "homepage" | "entities";
 
 type MetaPair = { label: string; value: string | number };
 
@@ -257,6 +268,14 @@ function AdminPageInner() {
   const [homepageSearchResults, setHomepageSearchResults] = useState<Record<number, HomepageRailEntity[]>>({});
   const [homepageSaving, setHomepageSaving] = useState(false);
   const [homepageNotice, setHomepageNotice] = useState<string | null>(null);
+  const [entityMergeSourceDraft, setEntityMergeSourceDraft] = useState("");
+  const [entityMergeTargetDraft, setEntityMergeTargetDraft] = useState("");
+  const [entityMergeSourceResults, setEntityMergeSourceResults] = useState<MergeEntity[]>([]);
+  const [entityMergeTargetResults, setEntityMergeTargetResults] = useState<MergeEntity[]>([]);
+  const [entityMergeSource, setEntityMergeSource] = useState<MergeEntity | null>(null);
+  const [entityMergeTarget, setEntityMergeTarget] = useState<MergeEntity | null>(null);
+  const [entityMergeBusy, setEntityMergeBusy] = useState(false);
+  const [entityMergeNotice, setEntityMergeNotice] = useState<string | null>(null);
 
   usePageTitle(
     tab === "waitlist"
@@ -267,6 +286,8 @@ function AdminPageInner() {
           ? "Feedback"
           : tab === "homepage"
             ? "Homepage"
+            : tab === "entities"
+              ? "Entities"
             : "Admin"
   );
 
@@ -279,7 +300,7 @@ function AdminPageInner() {
 
   useEffect(() => {
     const raw = String(searchParams.get("tab") ?? "").trim().toLowerCase();
-    if (raw === "users" || raw === "waitlist" || raw === "invites" || raw === "feedback" || raw === "homepage") {
+    if (raw === "users" || raw === "waitlist" || raw === "invites" || raw === "feedback" || raw === "homepage" || raw === "entities") {
       setTab(raw as TabKey);
     }
   }, [searchParams]);
@@ -411,6 +432,19 @@ function AdminPageInner() {
     }
   }
 
+  async function searchMergeEntities(kind: "source" | "target") {
+    if (!token) return;
+    const q = (kind === "source" ? entityMergeSourceDraft : entityMergeTargetDraft).trim();
+    setError(null);
+    try {
+      const res = await api<EntityMergeResponse>(`/api/admin/entities/merge?q=${encodeURIComponent(q)}`, { method: "GET", token });
+      if (kind === "source") setEntityMergeSourceResults(res.entities ?? []);
+      else setEntityMergeTargetResults(res.entities ?? []);
+    } catch (e: any) {
+      setError(e?.message ?? "Entity search failed");
+    }
+  }
+
   useEffect(() => {
     setInviteLink(null);
   }, [tab]);
@@ -524,13 +558,19 @@ function AdminPageInner() {
         { label: "Automatic", value: homepageSlots.filter((slot) => slot.mode === "automatic").length }
       ];
     }
+    if (tab === "entities") {
+      return [
+        { label: "Source", value: entityMergeSource ? entityMergeSource.name : "None" },
+        { label: "Target", value: entityMergeTarget ? entityMergeTarget.name : "None" }
+      ];
+    }
     return [
       { label: "Total", value: invitesData?.metrics.total ?? 0 },
       { label: "Pending", value: invitesData?.metrics.pending ?? 0 },
       { label: "Used", value: invitesData?.metrics.used ?? 0 },
       { label: "Expired", value: invitesData?.metrics.expired ?? 0 }
     ];
-  }, [tab, usersMetrics, waitlistData?.metrics, invitesData?.metrics, feedbackMetrics]);
+  }, [tab, usersMetrics, waitlistData?.metrics, invitesData?.metrics, feedbackMetrics, homepageSlots, entityMergeSource, entityMergeTarget]);
 
   function resultLabel(page: number, totalPages: number, total: number): string {
     if (totalPages > 1) return `Results ${total} Page ${page} / ${totalPages}`;
@@ -569,6 +609,11 @@ function AdminPageInner() {
                 if (tab === "invites") refreshInvites();
                 if (tab === "feedback") setFeedbackRefreshToken((prev) => prev + 1);
                 if (tab === "homepage") refreshHomepageRail();
+                if (tab === "entities") {
+                  setEntityMergeSourceResults([]);
+                  setEntityMergeTargetResults([]);
+                  setEntityMergeNotice(null);
+                }
               }}
               disabled={busy}
             >
@@ -604,8 +649,15 @@ function AdminPageInner() {
               >
                 Homepage
               </button>
+              <button
+                type="button"
+                onClick={() => setTabAndRoute("entities")}
+                aria-current={tab === "entities" ? "page" : undefined}
+              >
+                Entities
+              </button>
             </div>
-            {tab !== "feedback" && tab !== "homepage" ? (
+            {tab !== "feedback" && tab !== "homepage" && tab !== "entities" ? (
             <div className="row admin-invite-row" style={{ gap: "var(--space-8)", minWidth: 0, flex: "1 1 auto", marginLeft: isMobileViewport ? 0 : "var(--space-16)", marginTop: isMobileViewport ? "var(--space-sm)" : 0, flexWrap: "nowrap", alignItems: "baseline" }}>
               <input
                 value={inviteEmail}
@@ -668,7 +720,7 @@ function AdminPageInner() {
             </div>
           ) : null}
 
-          {tab !== "feedback" && tab !== "homepage" ? (
+          {tab !== "feedback" && tab !== "homepage" && tab !== "entities" ? (
           <div className="row admin-filter-row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)", marginTop: "var(--space-lg)" }}>
             <div className="row admin-filter-left" style={{ gap: "var(--space-8)", alignItems: "center", flex: "1 1 auto", minWidth: 0 }}>
               {tab === "users" ? (
@@ -766,7 +818,7 @@ function AdminPageInner() {
           </div>
           ) : null}
 
-          {searchOpen && tab !== "feedback" && tab !== "homepage" ? (
+          {searchOpen && tab !== "feedback" && tab !== "homepage" && tab !== "entities" ? (
             <div className="row admin-search-row" style={{ marginTop: "var(--space-10)", marginBottom: "var(--space-lg)", gap: "var(--space-8)", alignItems: "center", justifyContent: "flex-end" }}>
               {tab === "users" ? (
                 <>
@@ -1032,7 +1084,153 @@ function AdminPageInner() {
             </div>
           ) : null}
 
-          {tab !== "feedback" && tab !== "homepage" ? (
+          {tab === "entities" ? (
+            <div className="om-list" style={{ marginTop: "var(--space-lg)" }}>
+              <div className="om-list-row">
+                <div>Merge entities</div>
+                <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
+                  Search across the whole site, pick the duplicate source on the left and the canonical target on the right, then merge.
+                </div>
+              </div>
+
+              <div className="row" style={{ gap: "var(--space-lg)", alignItems: "flex-start", flexWrap: "wrap" }}>
+                <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+                  <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>Source entity to remove</div>
+                  <div className="row" style={{ gap: "var(--space-8)", flexWrap: "wrap" }}>
+                    <input
+                      value={entityMergeSourceDraft}
+                      onChange={(e) => setEntityMergeSourceDraft(e.target.value)}
+                      onKeyDown={async (e) => {
+                        if (e.key === "Enter") await searchMergeEntities("source");
+                      }}
+                      placeholder="Search source entity"
+                      style={{ minWidth: 220, flex: "1 1 240px" }}
+                    />
+                    <button type="button" onClick={() => searchMergeEntities("source")} disabled={entityMergeBusy}>
+                      Search
+                    </button>
+                  </div>
+                  <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
+                    Selected: {entityMergeSource ? `${entityMergeSource.name} (${entityMergeSource.count})` : "None"}
+                  </div>
+                  {entityMergeSourceResults.length > 0 ? (
+                    <div className="om-list" style={{ marginTop: "var(--space-8)" }}>
+                      {entityMergeSourceResults.map((entity) => (
+                        <div key={`source-${entity.id}`} className="om-list-row">
+                          <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-md)", alignItems: "baseline" }}>
+                            <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                              {entity.name}
+                              <span className="text-muted"> · {entity.count}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEntityMergeSource(entity);
+                                setEntityMergeSourceDraft(entity.name);
+                                setEntityMergeSourceResults([]);
+                                setEntityMergeNotice(null);
+                              }}
+                            >
+                              Select
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+                  <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>Target entity to keep</div>
+                  <div className="row" style={{ gap: "var(--space-8)", flexWrap: "wrap" }}>
+                    <input
+                      value={entityMergeTargetDraft}
+                      onChange={(e) => setEntityMergeTargetDraft(e.target.value)}
+                      onKeyDown={async (e) => {
+                        if (e.key === "Enter") await searchMergeEntities("target");
+                      }}
+                      placeholder="Search target entity"
+                      style={{ minWidth: 220, flex: "1 1 240px" }}
+                    />
+                    <button type="button" onClick={() => searchMergeEntities("target")} disabled={entityMergeBusy}>
+                      Search
+                    </button>
+                  </div>
+                  <div className="text-muted" style={{ marginTop: "var(--space-8)" }}>
+                    Selected: {entityMergeTarget ? `${entityMergeTarget.name} (${entityMergeTarget.count})` : "None"}
+                  </div>
+                  {entityMergeTargetResults.length > 0 ? (
+                    <div className="om-list" style={{ marginTop: "var(--space-8)" }}>
+                      {entityMergeTargetResults.map((entity) => (
+                        <div key={`target-${entity.id}`} className="om-list-row">
+                          <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-md)", alignItems: "baseline" }}>
+                            <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                              {entity.name}
+                              <span className="text-muted"> · {entity.count}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEntityMergeTarget(entity);
+                                setEntityMergeTargetDraft(entity.name);
+                                setEntityMergeTargetResults([]);
+                                setEntityMergeNotice(null);
+                              }}
+                            >
+                              Select
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-md)", marginTop: "var(--space-lg)" }}>
+                <div className="text-muted">
+                  {entityMergeNotice ?? "Old entity slugs will redirect to the kept entity after merge."}
+                </div>
+                <button
+                  type="button"
+                  disabled={entityMergeBusy || !entityMergeSource || !entityMergeTarget || entityMergeSource.id === entityMergeTarget.id}
+                  onClick={async () => {
+                    if (!entityMergeSource || !entityMergeTarget) return;
+                    if (!window.confirm(`Merge “${entityMergeSource.name}” into “${entityMergeTarget.name}”?`)) return;
+                    setEntityMergeBusy(true);
+                    setError(null);
+                    setEntityMergeNotice(null);
+                    try {
+                      await api("/api/admin/entities/merge", {
+                        method: "POST",
+                        token,
+                        body: JSON.stringify({
+                          source_entity_id: entityMergeSource.id,
+                          target_entity_id: entityMergeTarget.id,
+                        }),
+                      });
+                      setEntityMergeNotice(`Merged ${entityMergeSource.name} into ${entityMergeTarget.name}.`);
+                      setEntityMergeSource(null);
+                      setEntityMergeTarget(null);
+                      setEntityMergeSourceDraft("");
+                      setEntityMergeTargetDraft("");
+                      setEntityMergeSourceResults([]);
+                      setEntityMergeTargetResults([]);
+                      await refreshHomepageRail();
+                    } catch (e: any) {
+                      setError(e?.message === "migration_required" ? "Apply migration 0045_entity_aliases.sql before merging entities." : (e?.message ?? "Entity merge failed"));
+                    } finally {
+                      setEntityMergeBusy(false);
+                    }
+                  }}
+                >
+                  Merge
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {tab !== "feedback" && tab !== "homepage" && tab !== "entities" ? (
           <div className="om-list" style={{ marginTop: searchOpen ? 0 : "var(--space-lg)" }}>
             {tab === "users"
               ? (usersData?.users ?? []).map((u) => {
@@ -1260,7 +1458,7 @@ function AdminPageInner() {
           </div>
           ) : null}
 
-          {tab !== "feedback" && tab !== "homepage" ? (
+          {tab !== "feedback" && tab !== "homepage" && tab !== "entities" ? (
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-10)", marginTop: "var(--space-lg)" }}>
             <div className="text-muted">
               {tab === "users" ? resultLabel(usersData?.page ?? userPage, userTotalPages, usersData?.total ?? 0) : null}
@@ -1314,7 +1512,7 @@ function AdminPageInner() {
           </div>
           ) : null}
 
-          {inviteLink && tab !== "feedback" && tab !== "homepage" ? (
+          {inviteLink && tab !== "feedback" && tab !== "homepage" && tab !== "entities" ? (
             <div className="text-muted" style={{ marginTop: "var(--space-8)", wordBreak: "break-all" }}>
               {inviteLink}
             </div>

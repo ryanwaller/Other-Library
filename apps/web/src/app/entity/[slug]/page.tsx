@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { getServerSupabase } from "../../../lib/supabaseServer";
 import { getSupabaseAdmin } from "../../../lib/supabaseAdmin";
@@ -210,8 +210,19 @@ export default async function EntityPage({
     .select("id,name,slug")
     .eq("slug", slug)
     .maybeSingle();
-  if (entityRes.error || !entityRes.data) notFound();
-  const entity = entityRes.data as EntityRow;
+  if (entityRes.error) notFound();
+  let entity = entityRes.data as EntityRow | null;
+  if (!entity) {
+    const aliasRes = await supabase
+      .from("entity_aliases")
+      .select("entity:entities(id,name,slug)")
+      .eq("slug", slug)
+      .maybeSingle();
+    const aliased = aliasRes.data?.entity as EntityRow | null | undefined;
+    if (aliasRes.error || !aliased?.slug) notFound();
+    redirect(`/entity/${encodeURIComponent(aliased.slug)}`);
+  }
+  entity = entity as EntityRow;
 
   // 2. Get all book_entity links for this entity
   const bookEntityRes = await supabase
