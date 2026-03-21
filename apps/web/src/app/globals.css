@@ -1310,6 +1310,19 @@ a.text-muted:hover {
   min-height: 1lh;
 }
 
+.om-explore-rail-module-header {
+  width: 100%;
+}
+
+.om-explore-rail-module-title {
+  min-width: 0;
+}
+
+.om-explore-rail-module-more {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .om-explore-module-content {
   margin-top: var(--space-14);
 }

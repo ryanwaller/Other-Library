@@ -623,10 +623,14 @@ function ExploreRailModule({
   return (
     <section className="om-explore-module">
       <hr className="divider" />
-      <div className="row om-explore-module-header" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--space-lg)", gap: "var(--space-md)" }}>
-        <div>{heading}</div>
+      <div className="row om-explore-module-header om-explore-rail-module-header" style={{ justifyContent: "space-between", alignItems: "flex-start", marginTop: "var(--space-lg)", gap: "var(--space-md)", flexWrap: "nowrap" }}>
+        <div className="om-explore-rail-module-title" style={{ minWidth: 0, flex: "1 1 auto" }}>{heading}</div>
         {cluster.slug ? (
-          <Link href={`/entity/${encodeURIComponent(cluster.slug)}`} className="text-muted" style={{ textDecoration: "none" }}>
+          <Link
+            href={`/entity/${encodeURIComponent(cluster.slug)}`}
+            className="text-muted om-explore-rail-module-more"
+            style={{ textDecoration: "none", flex: "0 0 auto", alignSelf: "flex-start" }}
+          >
             More
           </Link>
         ) : null}
