@@ -117,33 +117,25 @@ export default function PublicBookDetailGrid({
         >
           <div
             style={{
-              position: "absolute", top: 24, right: 24,
-              color: "#fff", cursor: "pointer",
-              fontSize: 14, textDecoration: "underline"
+              position: "absolute", top: 24, right: 24, zIndex: 2002,
+              display: "flex", gap: 16, alignItems: "center"
             }}
-            onClick={(e) => { e.stopPropagation(); setLightboxIndex(null); }}
+            onClick={(e) => e.stopPropagation()}
           >
-            Close
+            {galleryItems.length > 1 ? (
+              <button style={{ color: "#fff" }} onClick={() => setLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : galleryItems.length - 1))}>
+                Prev
+              </button>
+            ) : null}
+            {galleryItems.length > 1 ? (
+              <button style={{ color: "#fff" }} onClick={() => setLightboxIndex((prev) => (prev !== null && prev < galleryItems.length - 1 ? prev + 1 : 0))}>
+                Next
+              </button>
+            ) : null}
+            <button style={{ color: "#fff" }} onClick={() => setLightboxIndex(null)}>
+              Close
+            </button>
           </div>
-
-          {galleryItems.length > 1 ? (
-            <>
-              <div
-                style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "25%", cursor: "pointer" }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : galleryItems.length - 1));
-                }}
-              />
-              <div
-                style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "25%", cursor: "pointer" }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setLightboxIndex((prev) => (prev !== null && prev < galleryItems.length - 1 ? prev + 1 : 0));
-                }}
-              />
-            </>
-          ) : null}
 
           <div
             style={{

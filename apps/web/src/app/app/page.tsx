@@ -4361,7 +4361,7 @@ function AppShell({
                 gridCols={effectiveCols}
                 isMobile={isMobile}
                 searchQuery={searchQuery}
-                renderBooks={(limit, effectiveViewMode) => (
+                renderBooks={(limit, effectiveViewMode, onMeasuredColumnsChange) => (
                   <SortableCatalogGrid
                     libraryId={lib.id}
                     groups={groups}
@@ -4375,6 +4375,7 @@ function AppShell({
                     viewMode={viewMode}
                     bulkSelectedKeys={bulkSelectedKeys}
                     deleteStateByBookId={deleteStateByBookId}
+                    onMeasuredColumnsChange={onMeasuredColumnsChange}
                     onToggleSelected={toggleBulkKey}
                     onDeleteCopy={deleteEntry}
                     onStoreBookNavContext={storeBookNavContext}

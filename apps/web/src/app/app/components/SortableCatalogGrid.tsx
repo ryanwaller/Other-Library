@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   closestCenter,
   DndContext,
@@ -38,6 +38,7 @@ type SortableCatalogGridProps = {
   effectiveViewMode: BookCardViewMode;
   gridColumnsHint: number;
   gridTemplateColumns?: string;
+  onMeasuredColumnsChange?: (count: number) => void;
   showBookSkeleton: boolean;
   isRearranging: boolean;
   bulkMode: boolean;
@@ -200,6 +201,7 @@ const SortableCatalogGrid = memo(function SortableCatalogGrid({
   effectiveViewMode,
   gridColumnsHint,
   gridTemplateColumns,
+  onMeasuredColumnsChange,
   showBookSkeleton,
   isRearranging,
   bulkMode,
@@ -231,11 +233,43 @@ const SortableCatalogGrid = memo(function SortableCatalogGrid({
     () => (activeKey ? groups.find((group) => group.key === activeKey) ?? null : null),
     [activeKey, groups]
   );
+  const gridRef = useRef<HTMLDivElement | null>(null);
 
   const strategy = effectiveViewMode === "grid" ? rectSortingStrategy : verticalListSortingStrategy;
 
+  useEffect(() => {
+    if (effectiveViewMode !== "grid") {
+      onMeasuredColumnsChange?.(1);
+      return;
+    }
+    if (!gridRef.current || typeof window === "undefined") return;
+    const node = gridRef.current;
+    const measure = () => {
+      const styles = window.getComputedStyle(node);
+      const template = styles.gridTemplateColumns;
+      if (!template || template === "none") {
+        onMeasuredColumnsChange?.(Math.max(1, gridColumnsHint));
+        return;
+      }
+      const count = template
+        .split(" ")
+        .map((part) => part.trim())
+        .filter(Boolean).length;
+      onMeasuredColumnsChange?.(Math.max(1, count));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [effectiveViewMode, gridColumnsHint, gridTemplateColumns, onMeasuredColumnsChange]);
+
   const grid = (
     <div
+      ref={gridRef}
       style={{
         display: effectiveViewMode === "grid" ? "grid" : "flex",
         flexDirection: effectiveViewMode === "list" ? "column" : undefined,

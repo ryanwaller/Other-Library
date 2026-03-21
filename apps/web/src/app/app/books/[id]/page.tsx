@@ -5922,18 +5922,18 @@ export default function BookDetailPage() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {(lightboxIndex ?? 0) > 0 && (
+            {lightboxItems.length > 1 && (
               <button
                 style={{ color: "#fff" }}
-                onClick={() => setLightboxIndex(prev => prev !== null ? prev - 1 : 0)}
+                onClick={() => setLightboxIndex(prev => (prev !== null && prev > 0 ? prev - 1 : lightboxItems.length - 1))}
               >
                 Prev
               </button>
             )}
-            {(lightboxIndex ?? 0) < lightboxItems.length - 1 && (
+            {lightboxItems.length > 1 && (
               <button
                 style={{ color: "#fff" }}
-                onClick={() => setLightboxIndex(prev => prev !== null ? prev + 1 : 0)}
+                onClick={() => setLightboxIndex(prev => (prev !== null && prev < lightboxItems.length - 1 ? prev + 1 : 0))}
               >
                 Next
               </button>

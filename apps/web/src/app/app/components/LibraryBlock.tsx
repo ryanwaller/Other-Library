@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePagination } from "../hooks/usePagination";
 
@@ -65,13 +65,19 @@ export default function LibraryBlock({
   gridCols: number;
   isMobile?: boolean;
   searchQuery: string;
-  renderBooks: (limit: number, effectiveViewMode: "grid" | "list") => ReactNode;
+  renderBooks: (limit: number, effectiveViewMode: "grid" | "list", onMeasuredColumnsChange?: (count: number) => void) => ReactNode;
 }) {
   const hasNameChanges = nameDraft.trim() !== libraryName.trim();
 
   const effectiveViewMode = viewMode;
+  const [measuredGridColumns, setMeasuredGridColumns] = useState<number>(gridCols);
 
-  const { limit, loadMore, seeLess, canSeeLess } = usePagination(effectiveViewMode, gridCols, searchQuery);
+  const { limit, loadMore, seeLess, canSeeLess } = usePagination(
+    effectiveViewMode,
+    gridCols,
+    searchQuery,
+    measuredGridColumns
+  );
 
   return (
     <div className="card" style={{ marginTop: index === 0 ? 0 : "var(--space-14)" }}>
@@ -280,7 +286,7 @@ export default function LibraryBlock({
       {!collapsed && (
         <>
           {membersPanel}
-          {renderBooks(limit, effectiveViewMode)}
+          {renderBooks(limit, effectiveViewMode, setMeasuredGridColumns)}
           {(bookCount > limit || canSeeLess) && (
             <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: 24, justifyContent: "center" }}>
               {bookCount > limit ? (

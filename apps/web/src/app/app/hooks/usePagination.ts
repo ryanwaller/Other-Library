@@ -2,14 +2,17 @@
 
 import { useState, useMemo, useEffect } from "react";
 
-export function usePagination(viewMode: "grid" | "list", gridCols: number, searchQuery: string = "") {
+export function usePagination(
+  viewMode: "grid" | "list",
+  gridCols: number,
+  searchQuery: string = "",
+  actualColumns?: number
+) {
   const initialLimit = useMemo(() => {
     if (viewMode === "list") return 24;
-    if (gridCols <= 2) return 16;
-    if (gridCols <= 4) return 20;
-    if (gridCols <= 6) return 24;
-    return 36;
-  }, [viewMode, gridCols]);
+    const columns = Math.max(1, Number(actualColumns ?? gridCols ?? 1));
+    return Math.max(columns * 4, 8);
+  }, [viewMode, gridCols, actualColumns]);
 
   const [limit, setLimit] = useState(initialLimit);
 
