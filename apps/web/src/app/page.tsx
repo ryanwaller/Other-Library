@@ -306,13 +306,22 @@ async function loadExploreData() {
     : [];
 
   const ownerCounts = new Map<string, number>();
+  const ownerLatestCreatedAt = new Map<string, string>();
   for (const row of recentRows) {
     ownerCounts.set(row.owner_id, (ownerCounts.get(row.owner_id) ?? 0) + 1);
+    const currentLatest = ownerLatestCreatedAt.get(row.owner_id);
+    if (!currentLatest || String(row.created_at ?? "") > currentLatest) {
+      ownerLatestCreatedAt.set(row.owner_id, String(row.created_at ?? ""));
+    }
   }
   const topOwnerId =
     [...ownerCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .find(([ownerId, count]) => count >= 3 && usernameByOwnerId.has(ownerId))?.[0] ?? null;
+      .filter(([ownerId, count]) => count >= 6 && usernameByOwnerId.has(ownerId))
+      .sort((a, b) => {
+        const aLatest = ownerLatestCreatedAt.get(a[0]) ?? "";
+        const bLatest = ownerLatestCreatedAt.get(b[0]) ?? "";
+        return bLatest.localeCompare(aLatest) || b[1] - a[1];
+      })[0]?.[0] ?? null;
 
   const recentOwnerHeading = topOwnerId
     ? {
