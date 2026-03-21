@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import type { CoverCrop } from "../components/CoverImage";
+import CoverImage, { type CoverCrop } from "../components/CoverImage";
 import EntityBookGrid, { type GridItem } from "./entity/[slug]/EntityBookGrid";
 import { effectiveAuthorsFor } from "../lib/book";
 import { formatIssueDisplay, isMagazineObject } from "../lib/magazine";
@@ -39,9 +39,11 @@ type ExploreBookRow = {
 };
 
 type EntityCluster = {
+  role: "author" | "designer" | "publisher" | "performer";
   name: string;
   slug: string | null;
   count: number;
+  items: GridItem[];
 };
 
 const BOOK_SELECT =
@@ -123,12 +125,37 @@ async function loadExploreData() {
   const db = admin ?? supabase;
   if (!db) return null;
 
+  const publicProfilesRes = await db
+    .from("profiles")
+    .select("id,username")
+    .eq("visibility", "public")
+    .limit(500);
+
+  const publicProfiles = (publicProfilesRes.data ?? []) as Array<{ id: string; username: string }>;
+  const publicOwnerIds = publicProfiles.map((row) => row.id).filter(Boolean);
+  if (publicOwnerIds.length === 0) {
+    return {
+      recentItems: [] as GridItem[],
+      recentBooks: [] as GridItem[],
+      recentRecords: [] as GridItem[],
+      recentPeriodicals: [] as GridItem[],
+      designerHeading: null as { name: string; slug: string | null } | null,
+      designerItems: [] as GridItem[],
+      editorHeading: null as { name: string; slug: string | null } | null,
+      editorItems: [] as GridItem[],
+      groupHeading: null as { label: string; slug: string } | null,
+      groupItems: [] as GridItem[],
+      railClusters: [] as EntityCluster[],
+    };
+  }
+
   const recentRes = await db
     .from("user_books")
     .select(BOOK_SELECT)
-    .eq("visibility", "public")
+    .in("owner_id", publicOwnerIds)
+    .neq("visibility", "followers_only")
     .order("created_at", { ascending: false })
-    .limit(60);
+    .limit(120);
 
   const recentRows = uniqueById((recentRes.data ?? []) as unknown as ExploreBookRow[]);
   if (recentRows.length === 0) {
@@ -143,22 +170,11 @@ async function loadExploreData() {
       editorItems: [] as GridItem[],
       groupHeading: null as { label: string; slug: string } | null,
       groupItems: [] as GridItem[],
-      designerClusters: [] as EntityCluster[],
-      authorClusters: [] as EntityCluster[],
-      publisherClusters: [] as EntityCluster[],
-      performerClusters: [] as EntityCluster[],
+      railClusters: [] as EntityCluster[],
     };
   }
 
-  const ownerIds = [...new Set(recentRows.map((row) => row.owner_id).filter(Boolean))];
-  const profilesRes = ownerIds.length
-    ? await db.from("profiles").select("id,username").in("id", ownerIds).eq("visibility", "public")
-    : { data: [] as Array<{ id: string; username: string }> };
-
-  const usernameByOwnerId = new Map(
-    ((profilesRes.data ?? []) as Array<{ id: string; username: string }>)
-      .map((row) => [row.id, row.username] as const)
-  );
+  const usernameByOwnerId = new Map(publicProfiles.map((row) => [row.id, row.username] as const));
 
   const mediaPaths = [...new Set(recentRows.map((row) => coverStoragePath(row)).filter((path): path is string => Boolean(path)))];
   const signedMap: Record<string, string> = {};
@@ -195,19 +211,20 @@ async function loadExploreData() {
     .filter((item): item is GridItem => Boolean(item))
     .slice(0, 8);
 
-  const designerCounts = new Map<string, { id: string; name: string; slug: string | null; count: number }>();
+  const designerCounts = new Map<string, { id: string; name: string; slug: string | null; count: number; role: "designer" }>();
   const editorCounts = new Map<string, { id: string; name: string; slug: string | null; count: number }>();
-  const authorCounts = new Map<string, { id: string; name: string; slug: string | null; count: number }>();
-  const publisherCounts = new Map<string, { id: string; name: string; slug: string | null; count: number }>();
-  const performerCounts = new Map<string, { id: string; name: string; slug: string | null; count: number }>();
+  const authorCounts = new Map<string, { id: string; name: string; slug: string | null; count: number; role: "author" }>();
+  const publisherCounts = new Map<string, { id: string; name: string; slug: string | null; count: number; role: "publisher" }>();
+  const performerCounts = new Map<string, { id: string; name: string; slug: string | null; count: number; role: "performer" }>();
 
-  function incrementEntityCount(
-    map: Map<string, { id: string; name: string; slug: string | null; count: number }>,
+  function incrementEntityCount<T extends "author" | "designer" | "publisher" | "performer">(
+    map: Map<string, { id: string; name: string; slug: string | null; count: number; role: T }>,
     entityId: string,
     name: string,
-    slug: string | null
+    slug: string | null,
+    role: T
   ) {
-    const current = map.get(entityId) ?? { id: entityId, name, slug, count: 0 };
+    const current = map.get(entityId) ?? { id: entityId, name, slug, count: 0, role };
     current.count += 1;
     map.set(entityId, current);
   }
@@ -222,11 +239,11 @@ async function loadExploreData() {
       if (!entityId || !name || seenInRow.has(entityId)) continue;
       seenInRow.add(entityId);
       const slug = String(entity?.slug ?? "").trim() || null;
-      if (role === "designer" || role === "design") incrementEntityCount(designerCounts, entityId, name, slug);
-      if (role === "editor") incrementEntityCount(editorCounts, entityId, name, slug);
-      if (role === "author") incrementEntityCount(authorCounts, entityId, name, slug);
-      if (role === "publisher") incrementEntityCount(publisherCounts, entityId, name, slug);
-      if (role === "performer") incrementEntityCount(performerCounts, entityId, name, slug);
+      if (role === "designer" || role === "design") incrementEntityCount(designerCounts, entityId, name, slug, "designer");
+      if (role === "editor") editorCounts.set(entityId, { id: entityId, name, slug, count: (editorCounts.get(entityId)?.count ?? 0) + 1 });
+      if (role === "author") incrementEntityCount(authorCounts, entityId, name, slug, "author");
+      if (role === "publisher") incrementEntityCount(publisherCounts, entityId, name, slug, "publisher");
+      if (role === "performer") incrementEntityCount(performerCounts, entityId, name, slug, "performer");
     }
   }
 
@@ -264,6 +281,38 @@ async function loadExploreData() {
         .slice(0, 8)
     : [];
 
+  function clusterItemsFor(entityId: string, role: "author" | "designer" | "publisher" | "performer") {
+    return recentRows
+      .filter((row) =>
+        (row.book_entities ?? []).some((entityRow) => {
+          const entityRole = String(entityRow?.role ?? "").trim().toLowerCase();
+          if (role === "designer") return (entityRole === "designer" || entityRole === "design") && String(entityRow?.entity?.id ?? "") === entityId;
+          return entityRole === role && String(entityRow?.entity?.id ?? "") === entityId;
+        })
+      )
+      .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
+      .filter((item): item is GridItem => Boolean(item))
+      .slice(0, 4);
+  }
+
+  const railClusters = [
+    ...[...designerCounts.values()],
+    ...[...authorCounts.values()],
+    ...[...publisherCounts.values()],
+    ...[...performerCounts.values()],
+  ]
+    .filter((entry) => entry.count >= 3)
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, 6)
+    .map((entry) => ({
+      role: entry.role,
+      name: entry.name,
+      slug: entry.slug,
+      count: entry.count,
+      items: clusterItemsFor(entry.id, entry.role),
+    }))
+    .filter((entry) => entry.items.length > 0);
+
   const groupCounts = new Map<string, number>();
   for (const row of recentRows) {
     const label = String(row.group_label ?? "").trim();
@@ -294,10 +343,7 @@ async function loadExploreData() {
     editorItems,
     groupHeading: topGroupLabel ? { label: topGroupLabel, slug: slugify(topGroupLabel) } : null,
     groupItems,
-    designerClusters: [...designerCounts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 8),
-    authorClusters: [...authorCounts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 8),
-    publisherClusters: [...publisherCounts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 8),
-    performerClusters: [...performerCounts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 8),
+    railClusters,
   };
 }
 
@@ -330,28 +376,46 @@ function ExploreModule({
 }
 
 function ExploreRailModule({
-  title,
-  items,
+  cluster,
 }: {
-  title: string;
-  items: EntityCluster[];
+  cluster: EntityCluster;
 }) {
-  if (items.length === 0) return null;
+  if (cluster.items.length === 0) return null;
+  const heading =
+    cluster.role === "designer"
+      ? `Designed by ${cluster.name}`
+      : cluster.role === "author"
+        ? `Authored by ${cluster.name}`
+        : cluster.role === "publisher"
+          ? `Published by ${cluster.name}`
+          : `Performed by ${cluster.name}`;
   return (
     <section style={{ marginTop: "var(--space-xl)" }}>
       <hr className="divider" />
-      <div style={{ marginTop: "var(--space-lg)" }}>{title}</div>
-      <div style={{ marginTop: "var(--space-md)", display: "grid", gap: "var(--space-sm)" }}>
-        {items.map((item) => (
-          <div key={`${title}-${item.slug ?? item.name}`} className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
-            {item.slug ? (
-              <Link href={`/entity/${encodeURIComponent(item.slug)}`} style={{ textDecoration: "none" }}>
-                {item.name}
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--space-lg)", gap: "var(--space-md)" }}>
+        <div>{heading}</div>
+        {cluster.slug ? (
+          <Link href={`/entity/${encodeURIComponent(cluster.slug)}`} className="text-muted" style={{ textDecoration: "none" }}>
+            More
+          </Link>
+        ) : null}
+      </div>
+      <div className="om-explore-rail-grid" style={{ marginTop: "var(--space-md)" }}>
+        {cluster.items.map((item) => (
+          <div key={`${cluster.role}-${cluster.name}-${item.id}`}>
+            {item.href ? (
+              <Link href={item.href} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
+                <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
+                  <CoverImage
+                    alt={item.title}
+                    src={item.coverUrl}
+                    cropData={item.coverCrop}
+                    style={{ width: "100%", height: "auto", display: "block" }}
+                    objectFit="contain"
+                  />
+                </div>
               </Link>
-            ) : (
-              <span>{item.name}</span>
-            )}
-            <span className="text-muted">{item.count}</span>
+            ) : null}
           </div>
         ))}
       </div>
@@ -396,10 +460,9 @@ export default async function HomePage() {
           </div>
 
           <aside className="om-explore-rail" style={{ minWidth: 0 }}>
-            <ExploreRailModule title="Authors" items={data?.authorClusters ?? []} />
-            <ExploreRailModule title="Designers" items={data?.designerClusters ?? []} />
-            <ExploreRailModule title="Publishers" items={data?.publisherClusters ?? []} />
-            <ExploreRailModule title="Artists" items={data?.performerClusters ?? []} />
+            {(data?.railClusters ?? []).map((cluster) => (
+              <ExploreRailModule key={`${cluster.role}-${cluster.slug ?? cluster.name}`} cluster={cluster} />
+            ))}
           </aside>
         </div>
       </div>
