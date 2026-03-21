@@ -1430,7 +1430,7 @@ a.text-muted:hover {
 }
 
 .om-public-signin-gate-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 60;
   display: flex;
@@ -1451,7 +1451,6 @@ a.text-muted:hover {
 .om-public-signin-gate[data-state="locked"] .om-public-signin-gate-overlay {
   opacity: 1;
   background: rgba(0, 0, 0, 0.2);
-  pointer-events: auto;
 }
 
 .om-public-signin-gate-button {
@@ -1460,6 +1459,7 @@ a.text-muted:hover {
   background: var(--bg);
   opacity: 0;
   transform: translateY(6px);
+  pointer-events: none;
   transition:
     opacity 180ms ease,
     transform 180ms ease;
@@ -1468,6 +1468,7 @@ a.text-muted:hover {
 .om-public-signin-gate[data-state="locked"] .om-public-signin-gate-button {
   opacity: 1;
   transform: translateY(0);
+  pointer-events: auto;
 }
 
 .muted a,

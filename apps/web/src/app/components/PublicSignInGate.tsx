@@ -39,11 +39,15 @@ export default function PublicSignInGate({ children }: { children: React.ReactNo
         {children}
       </div>
       <div className="om-public-signin-gate-overlay" aria-hidden={authState === "unlocked" ? "true" : "false"}>
-        {authState === "locked" ? (
-          <Link href={nextHref} className="om-filter-control om-public-signin-gate-button" aria-label="Sign in to continue">
-            Sign in
-          </Link>
-        ) : null}
+        <Link
+          href={nextHref}
+          className="om-filter-control om-public-signin-gate-button"
+          aria-label="Sign in to continue"
+          tabIndex={authState === "locked" ? 0 : -1}
+          aria-hidden={authState === "locked" ? undefined : true}
+        >
+          Sign in
+        </Link>
       </div>
     </div>
   );
