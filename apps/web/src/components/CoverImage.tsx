@@ -2,27 +2,6 @@
 
 import { useState, useRef, useEffect, type CSSProperties } from "react";
 
-const SRCSET_WIDTHS = [200, 400, 800];
-
-function makeSizedUrl(src: string, width: number): string {
-  if (src.includes("/storage/v1/object/sign/")) {
-    return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=80`;
-  }
-  if (src.includes("/api/image-proxy")) {
-    try {
-      const url = new URL(src, "http://x");
-      url.searchParams.set("width", String(width));
-      return url.pathname + "?" + url.searchParams.toString();
-    } catch {
-      return src;
-    }
-  }
-  return src;
-}
-
-function buildSrcSet(src: string): string {
-  return SRCSET_WIDTHS.map((w) => `${makeSizedUrl(src, w)} ${w}w`).join(", ");
-}
 
 export type CoverCrop = {
   // Legacy fields (react-easy-crop)
@@ -182,8 +161,6 @@ export default function CoverImage({
           ref={imgRef}
           alt={alt}
           src={src}
-          srcSet={sizes ? buildSrcSet(src) : undefined}
-          sizes={sizes}
           onLoad={handleLoad}
           onError={handleError}
           style={{
