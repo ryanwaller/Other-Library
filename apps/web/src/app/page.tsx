@@ -136,11 +136,10 @@ async function loadExploreData() {
   if (publicOwnerIds.length === 0) {
     return {
       recentItems: [] as GridItem[],
-      recentBooks: [] as GridItem[],
       recentRecords: [] as GridItem[],
       recentPeriodicals: [] as GridItem[],
-      designerHeading: null as { name: string; slug: string | null } | null,
-      designerItems: [] as GridItem[],
+      recentOwnerHeading: null as { username: string } | null,
+      recentOwnerItems: [] as GridItem[],
       editorHeading: null as { name: string; slug: string | null } | null,
       editorItems: [] as GridItem[],
       groupHeading: null as { label: string; slug: string } | null,
@@ -161,11 +160,10 @@ async function loadExploreData() {
   if (recentRows.length === 0) {
     return {
       recentItems: [] as GridItem[],
-      recentBooks: [] as GridItem[],
       recentRecords: [] as GridItem[],
       recentPeriodicals: [] as GridItem[],
-      designerHeading: null as { name: string; slug: string | null } | null,
-      designerItems: [] as GridItem[],
+      recentOwnerHeading: null as { username: string } | null,
+      recentOwnerItems: [] as GridItem[],
       editorHeading: null as { name: string; slug: string | null } | null,
       editorItems: [] as GridItem[],
       groupHeading: null as { label: string; slug: string } | null,
@@ -189,15 +187,6 @@ async function loadExploreData() {
     .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
     .filter((item): item is GridItem => Boolean(item))
     .slice(0, 12);
-
-  const recentBooks = recentRows
-    .filter((row) => {
-      const objectType = String(row.object_type ?? "").trim().toLowerCase();
-      return objectType !== "music" && !isMagazineObject(row.object_type);
-    })
-    .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
-    .filter((item): item is GridItem => Boolean(item))
-    .slice(0, 8);
 
   const recentRecords = recentRows
     .filter((row) => String(row.object_type ?? "").trim().toLowerCase() === "music")
@@ -251,19 +240,6 @@ async function loadExploreData() {
     .filter((entry) => entry.count >= 4)
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))[0] ?? null;
 
-  const designerItems = topDesigner
-    ? recentRows
-        .filter((row) =>
-          (row.book_entities ?? []).some((entityRow) => {
-            const role = String(entityRow?.role ?? "").trim().toLowerCase();
-            return (role === "designer" || role === "design") && String(entityRow?.entity?.id ?? "") === topDesigner.id;
-          })
-        )
-        .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
-        .filter((item): item is GridItem => Boolean(item))
-        .slice(0, 8)
-    : [];
-
   const topEditor = [...editorCounts.values()]
     .filter((entry) => entry.count >= 4)
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))[0] ?? null;
@@ -276,6 +252,24 @@ async function loadExploreData() {
             return role === "editor" && String(entityRow?.entity?.id ?? "") === topEditor.id;
           })
         )
+        .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
+        .filter((item): item is GridItem => Boolean(item))
+        .slice(0, 8)
+    : [];
+
+  const ownerCounts = new Map<string, number>();
+  for (const row of recentRows) {
+    ownerCounts.set(row.owner_id, (ownerCounts.get(row.owner_id) ?? 0) + 1);
+  }
+  const topOwnerId =
+    [...ownerCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .find(([ownerId, count]) => count >= 3 && usernameByOwnerId.has(ownerId))?.[0] ?? null;
+
+  const recentOwnerHeading = topOwnerId ? { username: usernameByOwnerId.get(topOwnerId)! } : null;
+  const recentOwnerItems = topOwnerId
+    ? recentRows
+        .filter((row) => row.owner_id === topOwnerId)
         .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
         .filter((item): item is GridItem => Boolean(item))
         .slice(0, 8)
@@ -334,11 +328,10 @@ async function loadExploreData() {
 
   return {
     recentItems,
-    recentBooks,
     recentRecords,
     recentPeriodicals,
-    designerHeading: topDesigner ? { name: topDesigner.name, slug: topDesigner.slug } : null,
-    designerItems,
+    recentOwnerHeading,
+    recentOwnerItems,
     editorHeading: topEditor ? { name: topEditor.name, slug: topEditor.slug } : null,
     editorItems,
     groupHeading: topGroupLabel ? { label: topGroupLabel, slug: slugify(topGroupLabel) } : null,
@@ -439,13 +432,12 @@ export default async function HomePage() {
         <div className="om-explore-layout" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "var(--space-xl)" }}>
           <div className="om-explore-main" style={{ minWidth: 0 }}>
             <ExploreModule id="recent-additions" title="Recent additions" items={data?.recentItems ?? []} />
-            <ExploreModule title="Recent books" items={data?.recentBooks ?? []} />
             <ExploreModule title="Recent records" items={data?.recentRecords ?? []} />
             <ExploreModule title="Recent periodicals" items={data?.recentPeriodicals ?? []} />
             <ExploreModule
-              title={data?.designerHeading ? <>Designed by {data.designerHeading.name}</> : "Designed by"}
-              href={data?.designerHeading?.slug ? `/entity/${encodeURIComponent(data.designerHeading.slug)}` : null}
-              items={data?.designerItems ?? []}
+              title={data?.recentOwnerHeading ? <>Recently added by {data.recentOwnerHeading.username}</> : "Recently added by"}
+              href={data?.recentOwnerHeading ? `/u/${encodeURIComponent(data.recentOwnerHeading.username)}` : null}
+              items={data?.recentOwnerItems ?? []}
             />
             <ExploreModule
               title={data?.editorHeading ? <>Edited by {data.editorHeading.name}</> : "Edited by"}
