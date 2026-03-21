@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import SignInCard from "./components/SignInCard";
 
-export default function ExploreAuthPanel({ open }: { open: boolean }) {
+export default function ExploreAuthPanel({ open, standalone = false }: { open: boolean; standalone?: boolean }) {
   const router = useRouter();
   const [inviteToken, setInviteToken] = useState("");
   const [waitEmail, setWaitEmail] = useState("");
@@ -19,12 +19,12 @@ export default function ExploreAuthPanel({ open }: { open: boolean }) {
   if (!open) return null;
 
   return (
-    <section id="signin" style={{ marginTop: "var(--space-xl)" }}>
-      <hr className="divider" />
+    <section id="signin" style={{ marginTop: standalone ? "var(--space-lg)" : "var(--space-xl)" }}>
+      {!standalone ? <hr className="divider" /> : null}
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--space-lg)" }}>
         <div>Sign in</div>
         <button type="button" className="text-muted" onClick={() => router.replace("/")}>
-          Close
+          {standalone ? "Explore" : "Close"}
         </button>
       </div>
 
@@ -128,7 +128,7 @@ export default function ExploreAuthPanel({ open }: { open: boolean }) {
       </div>
 
       <div className="row" style={{ marginTop: "var(--space-md)" }}>
-        <Link href="#recent-additions">Back to Explore</Link>
+        <Link href="/">Back to Explore</Link>
       </div>
     </section>
   );

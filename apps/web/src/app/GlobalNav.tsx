@@ -472,7 +472,7 @@ export default function GlobalNav() {
               </Link>
             ) : null}
             {sessionUserId && <button onClick={signOut}>Sign out</button>}
-            {!sessionUserId && authResolved ? <Link href="/?login=1#signin">Sign in</Link> : null}
+            {!sessionUserId && authResolved ? <Link href="/signin">Sign in</Link> : null}
           </div>
         </div>
       </div>

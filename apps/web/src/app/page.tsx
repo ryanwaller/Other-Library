@@ -1,12 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { CoverCrop } from "../components/CoverImage";
-import ExploreAuthPanel from "./ExploreAuthPanel";
 import EntityBookGrid, { type GridItem } from "./entity/[slug]/EntityBookGrid";
 import { effectiveAuthorsFor } from "../lib/book";
 import { formatIssueDisplay, isMagazineObject } from "../lib/magazine";
 import { parseMusicMetadata } from "../lib/music";
-import { SITE_TITLE } from "../lib/pageTitle";
 import { bookIdSlug, slugify } from "../lib/slug";
 import { getSupabaseAdmin } from "../lib/supabaseAdmin";
 import { getServerSupabase } from "../lib/supabaseServer";
@@ -38,6 +36,12 @@ type ExploreBookRow = {
   edition: { title: string | null; authors?: string[] | null; cover_url: string | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
   book_entities?: Array<{ role: string; entity: { id: string; name: string; slug: string } | null }> | null;
+};
+
+type EntityCluster = {
+  name: string;
+  slug: string | null;
+  count: number;
 };
 
 const BOOK_SELECT =
@@ -130,11 +134,19 @@ async function loadExploreData() {
   if (recentRows.length === 0) {
     return {
       recentItems: [] as GridItem[],
+      recentBooks: [] as GridItem[],
+      recentRecords: [] as GridItem[],
       recentPeriodicals: [] as GridItem[],
       designerHeading: null as { name: string; slug: string | null } | null,
       designerItems: [] as GridItem[],
+      editorHeading: null as { name: string; slug: string | null } | null,
+      editorItems: [] as GridItem[],
       groupHeading: null as { label: string; slug: string } | null,
       groupItems: [] as GridItem[],
+      designerClusters: [] as EntityCluster[],
+      authorClusters: [] as EntityCluster[],
+      publisherClusters: [] as EntityCluster[],
+      performerClusters: [] as EntityCluster[],
     };
   }
 
@@ -162,6 +174,21 @@ async function loadExploreData() {
     .filter((item): item is GridItem => Boolean(item))
     .slice(0, 12);
 
+  const recentBooks = recentRows
+    .filter((row) => {
+      const objectType = String(row.object_type ?? "").trim().toLowerCase();
+      return objectType !== "music" && !isMagazineObject(row.object_type);
+    })
+    .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
+    .filter((item): item is GridItem => Boolean(item))
+    .slice(0, 8);
+
+  const recentRecords = recentRows
+    .filter((row) => String(row.object_type ?? "").trim().toLowerCase() === "music")
+    .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
+    .filter((item): item is GridItem => Boolean(item))
+    .slice(0, 8);
+
   const recentPeriodicals = recentRows
     .filter((row) => isMagazineObject(row.object_type))
     .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
@@ -169,19 +196,37 @@ async function loadExploreData() {
     .slice(0, 8);
 
   const designerCounts = new Map<string, { id: string; name: string; slug: string | null; count: number }>();
+  const editorCounts = new Map<string, { id: string; name: string; slug: string | null; count: number }>();
+  const authorCounts = new Map<string, { id: string; name: string; slug: string | null; count: number }>();
+  const publisherCounts = new Map<string, { id: string; name: string; slug: string | null; count: number }>();
+  const performerCounts = new Map<string, { id: string; name: string; slug: string | null; count: number }>();
+
+  function incrementEntityCount(
+    map: Map<string, { id: string; name: string; slug: string | null; count: number }>,
+    entityId: string,
+    name: string,
+    slug: string | null
+  ) {
+    const current = map.get(entityId) ?? { id: entityId, name, slug, count: 0 };
+    current.count += 1;
+    map.set(entityId, current);
+  }
+
   for (const row of recentRows) {
     const seenInRow = new Set<string>();
     for (const entityRow of row.book_entities ?? []) {
       const role = String(entityRow?.role ?? "").trim().toLowerCase();
-      if (role !== "designer" && role !== "design") continue;
       const entity = entityRow?.entity;
       const entityId = String(entity?.id ?? "").trim();
       const name = String(entity?.name ?? "").trim();
       if (!entityId || !name || seenInRow.has(entityId)) continue;
       seenInRow.add(entityId);
-      const current = designerCounts.get(entityId) ?? { id: entityId, name, slug: String(entity?.slug ?? "").trim() || null, count: 0 };
-      current.count += 1;
-      designerCounts.set(entityId, current);
+      const slug = String(entity?.slug ?? "").trim() || null;
+      if (role === "designer" || role === "design") incrementEntityCount(designerCounts, entityId, name, slug);
+      if (role === "editor") incrementEntityCount(editorCounts, entityId, name, slug);
+      if (role === "author") incrementEntityCount(authorCounts, entityId, name, slug);
+      if (role === "publisher") incrementEntityCount(publisherCounts, entityId, name, slug);
+      if (role === "performer") incrementEntityCount(performerCounts, entityId, name, slug);
     }
   }
 
@@ -195,6 +240,23 @@ async function loadExploreData() {
           (row.book_entities ?? []).some((entityRow) => {
             const role = String(entityRow?.role ?? "").trim().toLowerCase();
             return (role === "designer" || role === "design") && String(entityRow?.entity?.id ?? "") === topDesigner.id;
+          })
+        )
+        .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
+        .filter((item): item is GridItem => Boolean(item))
+        .slice(0, 8)
+    : [];
+
+  const topEditor = [...editorCounts.values()]
+    .filter((entry) => entry.count >= 4)
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))[0] ?? null;
+
+  const editorItems = topEditor
+    ? recentRows
+        .filter((row) =>
+          (row.book_entities ?? []).some((entityRow) => {
+            const role = String(entityRow?.role ?? "").trim().toLowerCase();
+            return role === "editor" && String(entityRow?.entity?.id ?? "") === topEditor.id;
           })
         )
         .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
@@ -223,11 +285,19 @@ async function loadExploreData() {
 
   return {
     recentItems,
+    recentBooks,
+    recentRecords,
     recentPeriodicals,
     designerHeading: topDesigner ? { name: topDesigner.name, slug: topDesigner.slug } : null,
     designerItems,
+    editorHeading: topEditor ? { name: topEditor.name, slug: topEditor.slug } : null,
+    editorItems,
     groupHeading: topGroupLabel ? { label: topGroupLabel, slug: slugify(topGroupLabel) } : null,
     groupItems,
+    designerClusters: [...designerCounts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 8),
+    authorClusters: [...authorCounts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 8),
+    publisherClusters: [...publisherCounts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 8),
+    performerClusters: [...performerCounts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 8),
   };
 }
 
@@ -259,46 +329,80 @@ function ExploreModule({
   );
 }
 
-export default async function HomePage({
-  searchParams,
+function ExploreRailModule({
+  title,
+  items,
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  title: string;
+  items: EntityCluster[];
 }) {
-  const params = (await searchParams) ?? {};
-  const loginParam = Array.isArray(params.login) ? params.login[0] : params.login;
-  const showLogin = String(loginParam ?? "").trim() === "1";
+  if (items.length === 0) return null;
+  return (
+    <section style={{ marginTop: "var(--space-xl)" }}>
+      <hr className="divider" />
+      <div style={{ marginTop: "var(--space-lg)" }}>{title}</div>
+      <div style={{ marginTop: "var(--space-md)", display: "grid", gap: "var(--space-sm)" }}>
+        {items.map((item) => (
+          <div key={`${title}-${item.slug ?? item.name}`} className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
+            {item.slug ? (
+              <Link href={`/entity/${encodeURIComponent(item.slug)}`} style={{ textDecoration: "none" }}>
+                {item.name}
+              </Link>
+            ) : (
+              <span>{item.name}</span>
+            )}
+            <span className="text-muted">{item.count}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export default async function HomePage() {
   const data = await loadExploreData();
 
   return (
     <main className="container" style={{ paddingBottom: "var(--space-2xl)" }}>
-      <section style={{ paddingTop: "var(--space-lg)" }}>
-        <div className="text-muted">Explore</div>
-        <h1 style={{ fontSize: "clamp(28px, 4vw, 48px)", lineHeight: 1.05, margin: "var(--space-sm) 0 0" }}>
-          Public additions, runs, and connections across {SITE_TITLE}.
-        </h1>
-        <div className="text-muted" style={{ marginTop: "var(--space-md)", maxWidth: 760 }}>
-          Browse recent objects, periodicals, and related clusters without dropping into the working library.
-        </div>
-        <div className="row" style={{ gap: "var(--space-md)", marginTop: "var(--space-md)" }}>
-          <Link href="#recent-additions">Recent additions</Link>
-          <Link href="/?login=1#signin">Sign in</Link>
-        </div>
-      </section>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr)",
+          gap: "var(--space-xl)",
+          paddingTop: "var(--space-md)",
+        }}
+      >
+        <div className="om-explore-layout" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "var(--space-xl)" }}>
+          <div className="om-explore-main" style={{ minWidth: 0 }}>
+            <ExploreModule id="recent-additions" title="Recent additions" items={data?.recentItems ?? []} />
+            <ExploreModule title="Recent books" items={data?.recentBooks ?? []} />
+            <ExploreModule title="Recent records" items={data?.recentRecords ?? []} />
+            <ExploreModule title="Recent periodicals" items={data?.recentPeriodicals ?? []} />
+            <ExploreModule
+              title={data?.designerHeading ? <>Designed by {data.designerHeading.name}</> : "Designed by"}
+              href={data?.designerHeading?.slug ? `/entity/${encodeURIComponent(data.designerHeading.slug)}` : null}
+              items={data?.designerItems ?? []}
+            />
+            <ExploreModule
+              title={data?.editorHeading ? <>Edited by {data.editorHeading.name}</> : "Edited by"}
+              href={data?.editorHeading?.slug ? `/entity/${encodeURIComponent(data.editorHeading.slug)}` : null}
+              items={data?.editorItems ?? []}
+            />
+            <ExploreModule
+              title={data?.groupHeading ? <>From the run: {data.groupHeading.label}</> : "From the run"}
+              href={data?.groupHeading ? `/group/${encodeURIComponent(data.groupHeading.slug)}` : null}
+              items={data?.groupItems ?? []}
+            />
+          </div>
 
-      <ExploreAuthPanel open={showLogin} />
-
-      <ExploreModule id="recent-additions" title="Recent additions" items={data?.recentItems ?? []} />
-      <ExploreModule title="Recent periodicals" items={data?.recentPeriodicals ?? []} />
-      <ExploreModule
-        title={data?.designerHeading ? <>Designed by {data.designerHeading.name}</> : "Designed by"}
-        href={data?.designerHeading?.slug ? `/entity/${encodeURIComponent(data.designerHeading.slug)}` : null}
-        items={data?.designerItems ?? []}
-      />
-      <ExploreModule
-        title={data?.groupHeading ? <>From the run: {data.groupHeading.label}</> : "From the run"}
-        href={data?.groupHeading ? `/group/${encodeURIComponent(data.groupHeading.slug)}` : null}
-        items={data?.groupItems ?? []}
-      />
+          <aside className="om-explore-rail" style={{ minWidth: 0 }}>
+            <ExploreRailModule title="Authors" items={data?.authorClusters ?? []} />
+            <ExploreRailModule title="Designers" items={data?.designerClusters ?? []} />
+            <ExploreRailModule title="Publishers" items={data?.publisherClusters ?? []} />
+            <ExploreRailModule title="Artists" items={data?.performerClusters ?? []} />
+          </aside>
+        </div>
+      </div>
     </main>
   );
 }
