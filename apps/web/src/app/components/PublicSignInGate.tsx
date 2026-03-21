@@ -8,30 +8,25 @@ import { supabase } from "../../lib/supabaseClient";
 export default function PublicSignInGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [authResolved, setAuthResolved] = useState(false);
-  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [authState, setAuthState] = useState<"checking" | "locked" | "unlocked">("checking");
 
   useEffect(() => {
     if (!supabase) {
-      setAuthResolved(true);
-      setSessionUserId(null);
+      setAuthState("locked");
       return;
     }
 
     supabase.auth.getSession().then(({ data }) => {
-      setSessionUserId(data.session?.user?.id ?? null);
-      setAuthResolved(true);
+      setAuthState(data.session?.user?.id ? "unlocked" : "locked");
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSessionUserId(session?.user?.id ?? null);
-      setAuthResolved(true);
+      setAuthState(session?.user?.id ? "unlocked" : "locked");
     });
 
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const locked = authResolved && !sessionUserId;
   const nextHref = useMemo(() => {
     const query = searchParams?.toString() ?? "";
     const target = `${pathname ?? "/"}${query ? `?${query}` : ""}`;
@@ -39,17 +34,17 @@ export default function PublicSignInGate({ children }: { children: React.ReactNo
   }, [pathname, searchParams]);
 
   return (
-    <div className="om-public-signin-gate">
-      <div className="om-public-signin-gate-content" data-locked={locked ? "true" : "false"}>
+    <div className="om-public-signin-gate" data-state={authState}>
+      <div className="om-public-signin-gate-content">
         {children}
       </div>
-      {locked ? (
-        <div className="om-public-signin-gate-overlay" aria-hidden="true">
+      <div className="om-public-signin-gate-overlay" aria-hidden={authState === "unlocked" ? "true" : "false"}>
+        {authState === "locked" ? (
           <Link href={nextHref} className="om-filter-control om-public-signin-gate-button" aria-label="Sign in to continue">
             Sign in
           </Link>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }
