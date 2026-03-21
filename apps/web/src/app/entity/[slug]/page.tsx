@@ -396,8 +396,9 @@ export default async function EntityPage({
   const libraryIds = Array.from(new Set(allCopies.map((b) => Number(b.library_id)).filter((id) => Number.isFinite(id) && id > 0)));
   let libraryMemberProfiles: Array<{ id: string; username: string; avatar_path: string | null }> = [];
   const memberIds = new Set<string>();
+  const membershipClient = admin ?? supabase;
   if (libraryIds.length > 0) {
-    const memberRes = await supabase
+    const memberRes = await membershipClient
       .from("catalog_members")
       .select("catalog_id,user_id,accepted_at")
       .in("catalog_id", libraryIds)
@@ -410,7 +411,7 @@ export default async function EntityPage({
   }
   const displayUserIds = Array.from(new Set([...ownerIds, ...memberIds]));
   if (displayUserIds.length > 0) {
-    const profilesRes = await supabase
+    const profilesRes = await membershipClient
       .from("profiles")
       .select("id,username,avatar_path")
       .in("id", displayUserIds)
