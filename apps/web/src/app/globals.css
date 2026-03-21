@@ -1270,9 +1270,21 @@ a.text-muted:hover {
 
 .om-explore-layout {
   display: grid;
+  position: relative;
   grid-template-columns: minmax(0, 3fr) minmax(300px, 1fr);
   gap: var(--space-32);
   align-items: start;
+}
+
+.om-explore-layout::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--space-xl) + var(--space-sm));
+  bottom: 0;
+  left: calc(((100% - var(--space-32)) * 0.75) + (var(--space-32) / 2));
+  width: 1px;
+  background: var(--border);
+  transform: translateX(-0.5px);
 }
 
 .om-explore-main,
@@ -1287,19 +1299,8 @@ a.text-muted:hover {
 
 .om-explore-rail {
   grid-column: 2;
-  position: relative;
   padding-left: var(--space-lg);
   padding-bottom: var(--space-4xl);
-}
-
-.om-explore-rail::before {
-  content: "";
-  position: absolute;
-  top: calc(var(--space-xl) + var(--space-sm));
-  bottom: 0;
-  left: calc(var(--space-32) / -2);
-  width: 1px;
-  background: var(--border);
 }
 
 .om-explore-module + .om-explore-module {
@@ -1746,6 +1747,10 @@ summary::-webkit-details-marker {
     gap: var(--space-xl);
   }
 
+  .om-explore-layout::before {
+    display: none;
+  }
+
   .om-explore-main-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1757,10 +1762,6 @@ summary::-webkit-details-marker {
 
   .om-explore-rail {
     padding-left: 0;
-  }
-
-  .om-explore-rail::before {
-    display: none;
   }
 
   .om-explore-rail-grid {
