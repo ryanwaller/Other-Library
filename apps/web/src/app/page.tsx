@@ -51,6 +51,10 @@ type ExploreUserHeading = {
   avatarUrl: string | null;
 };
 
+const EXPLORE_MAIN_MODULE_ITEMS = 4;
+const EXPLORE_RAIL_MODULE_COUNT = 3;
+const EXPLORE_RAIL_ITEMS = 4;
+
 const BOOK_SELECT =
   "id,owner_id,created_at,visibility,group_label,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,authors_override,editors_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))";
 
@@ -228,13 +232,13 @@ async function loadExploreData() {
     .filter((row) => String(row.object_type ?? "").trim().toLowerCase() === "music")
     .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
     .filter((item): item is GridItem => Boolean(item))
-    .slice(0, 8);
+    .slice(0, EXPLORE_MAIN_MODULE_ITEMS);
 
   const recentPeriodicals = recentRows
     .filter((row) => isMagazineObject(row.object_type))
     .map((row) => toRecentGridItem(row, usernameByOwnerId, avatarUrlByOwnerId, signedMap))
     .filter((item): item is GridItem => Boolean(item))
-    .slice(0, 8);
+    .slice(0, EXPLORE_MAIN_MODULE_ITEMS);
 
   const designerCounts = new Map<string, { id: string; name: string; slug: string | null; count: number; role: "designer" }>();
   const editorCounts = new Map<string, { id: string; name: string; slug: string | null; count: number }>();
@@ -286,7 +290,7 @@ async function loadExploreData() {
         )
         .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
         .filter((item): item is GridItem => Boolean(item))
-        .slice(0, 8)
+        .slice(0, EXPLORE_MAIN_MODULE_ITEMS)
     : [];
 
   const ownerCounts = new Map<string, number>();
@@ -309,14 +313,14 @@ async function loadExploreData() {
         .filter((row) => row.owner_id === topOwnerId)
         .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
         .filter((item): item is GridItem => Boolean(item))
-        .slice(0, 8)
+        .slice(0, EXPLORE_MAIN_MODULE_ITEMS)
     : [];
 
   const recentItems = recentRows
     .filter((row) => !topOwnerId || row.owner_id !== topOwnerId)
     .map((row) => toRecentGridItem(row, usernameByOwnerId, avatarUrlByOwnerId, signedMap))
     .filter((item): item is GridItem => Boolean(item))
-    .slice(0, 12);
+    .slice(0, EXPLORE_MAIN_MODULE_ITEMS);
 
   function clusterItemsFor(entityId: string, role: "author" | "designer" | "publisher" | "performer") {
     return recentRows
@@ -329,7 +333,7 @@ async function loadExploreData() {
       )
       .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
       .filter((item): item is GridItem => Boolean(item))
-      .slice(0, 4);
+      .slice(0, EXPLORE_RAIL_ITEMS);
   }
 
   const railClusters = [
@@ -340,7 +344,7 @@ async function loadExploreData() {
   ]
     .filter((entry) => entry.count >= 3)
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-    .slice(0, 6)
+    .slice(0, EXPLORE_RAIL_MODULE_COUNT)
     .map((entry) => ({
       role: entry.role,
       name: entry.name,
@@ -366,7 +370,7 @@ async function loadExploreData() {
         .filter((row) => String(row.group_label ?? "").trim() === topGroupLabel)
         .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
         .filter((item): item is GridItem => Boolean(item))
-        .slice(0, 8)
+        .slice(0, EXPLORE_MAIN_MODULE_ITEMS)
     : [];
 
   return {
