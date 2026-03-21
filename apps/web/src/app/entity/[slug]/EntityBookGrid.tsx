@@ -20,10 +20,16 @@ export type GridItem = {
   href: string | null;
 };
 
-export default function EntityBookGrid({ items }: { items: GridItem[] }) {
+export default function EntityBookGrid({
+  items,
+  gridClassName = "om-related-items-grid",
+}: {
+  items: GridItem[];
+  gridClassName?: string;
+}) {
   return (
     <div
-      className="om-related-items-grid"
+      className={gridClassName}
       style={{ marginTop: "var(--space-14)", ["--om-related-items-grid-min" as any]: `${RELATED_ITEMS_GRID_MIN_WIDTH}px` }}
     >
       {items.map((item) => {

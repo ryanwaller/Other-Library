@@ -504,7 +504,7 @@ function ExploreModule({
           </Link>
         ) : null}
       </div>
-      <EntityBookGrid items={items} />
+      <EntityBookGrid items={items} gridClassName="om-explore-main-grid" />
     </section>
   );
 }

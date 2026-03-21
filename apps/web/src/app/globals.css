@@ -1304,6 +1304,12 @@ a.text-muted:hover {
   margin-top: var(--space-14);
 }
 
+.om-explore-main-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .om-explore-rail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1709,6 +1715,10 @@ summary::-webkit-details-marker {
   .om-explore-layout {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-xl);
+  }
+
+  .om-explore-main-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .om-explore-main,
