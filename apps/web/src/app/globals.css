@@ -1314,6 +1314,25 @@ a.text-muted:hover {
   margin-top: var(--space-14);
 }
 
+.om-explore-user-heading {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.om-explore-user-heading-prefix {
+  white-space: nowrap;
+}
+
+.om-explore-user-link {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.om-explore-user-link-text {
+  display: block;
+  min-width: 0;
+}
+
 .om-explore-main-grid {
   display: grid;
   gap: 14px;
@@ -1746,6 +1765,20 @@ summary::-webkit-details-marker {
 
   .om-explore-rail-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .om-explore-rail-grid > :nth-child(n + 4) {
+    display: none;
+  }
+
+  .om-explore-user-heading {
+    flex-wrap: nowrap !important;
+  }
+
+  .om-explore-user-link-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .admin-summary-row {

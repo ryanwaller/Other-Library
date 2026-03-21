@@ -519,6 +519,7 @@ function ExploreUserLink({
   return (
     <Link
       href={`/u/${encodeURIComponent(username)}`}
+      className="om-explore-user-link"
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -534,7 +535,7 @@ function ExploreUserLink({
       ) : (
         <div className="om-avatar-img" style={{ background: "var(--bg-muted)" }} />
       )}
-      <span>{username}</span>
+      <span className="om-explore-user-link-text">{username}</span>
     </Link>
   );
 }
@@ -549,8 +550,8 @@ function ExploreUserHeading({
   avatarUrl: string | null;
 }) {
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-      <span>{prefix}</span>
+    <div className="om-explore-user-heading" style={{ display: "inline-flex", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+      <span className="om-explore-user-heading-prefix">{prefix}</span>
       <ExploreUserLink username={username} avatarUrl={avatarUrl} />
     </div>
   );
