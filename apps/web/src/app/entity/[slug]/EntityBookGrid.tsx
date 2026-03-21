@@ -35,27 +35,21 @@ export default function EntityBookGrid({
       {items.map((item) => {
         const ownerRow = item.owner ? (
           <div
-            className="om-avatar-lockup om-avatar-lockup-tight text-muted"
+            className="om-explore-owner-row text-muted"
             style={{ marginTop: "var(--space-4)", ["--avatar-size" as any]: "18px" }}
           >
-            <div style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {item.owner.prefix ? (
-                <span className="text-muted" style={{ marginRight: 6 }}>
-                  {item.owner.prefix}
-                </span>
-              ) : null}
-              <Link href={item.owner.href} className="om-avatar-link" aria-label={item.owner.username} style={{ marginRight: 6 }}>
-                {item.owner.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img alt="" src={item.owner.avatarUrl} className="om-avatar-img" />
-                ) : (
-                  <div className="om-avatar-img" style={{ background: "var(--bg-muted)" }} />
-                )}
-              </Link>
-              <Link href={item.owner.href} style={{ textDecoration: "none", color: "inherit" }}>
-                {item.owner.username}
-              </Link>
-            </div>
+            {item.owner.prefix ? <span className="om-explore-owner-prefix text-muted">{item.owner.prefix}</span> : null}
+            <Link href={item.owner.href} className="om-avatar-link om-explore-avatar-link" aria-label={item.owner.username}>
+              {item.owner.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt="" src={item.owner.avatarUrl} className="om-avatar-img om-explore-avatar-img" />
+              ) : (
+                <div className="om-avatar-img om-explore-avatar-img" style={{ background: "var(--bg-muted)" }} />
+              )}
+            </Link>
+            <Link href={item.owner.href} className="om-explore-owner-name" style={{ textDecoration: "none", color: "inherit" }}>
+              {item.owner.username}
+            </Link>
           </div>
         ) : null;
 

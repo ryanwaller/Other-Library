@@ -1324,6 +1324,8 @@ a.text-muted:hover {
 }
 
 .om-explore-user-link {
+  display: inline-flex;
+  align-items: baseline;
   min-width: 0;
   max-width: 100%;
 }
@@ -1331,6 +1333,32 @@ a.text-muted:hover {
 .om-explore-user-link-text {
   display: block;
   min-width: 0;
+}
+
+.om-explore-owner-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.om-explore-owner-prefix {
+  flex: 0 0 auto;
+}
+
+.om-explore-owner-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.om-explore-avatar-link {
+  flex: 0 0 auto;
+}
+
+.om-explore-avatar-img {
+  transform: translateY(1px);
 }
 
 .om-explore-main-grid {

@@ -578,9 +578,9 @@ function ExploreUserLink({
     >
       {avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img alt="" src={avatarUrl} className="om-avatar-img" />
+        <img alt="" src={avatarUrl} className="om-avatar-img om-explore-avatar-img" />
       ) : (
-        <div className="om-avatar-img" style={{ background: "var(--bg-muted)" }} />
+        <div className="om-avatar-img om-explore-avatar-img" style={{ background: "var(--bg-muted)" }} />
       )}
       <span className="om-explore-user-link-text">{username}</span>
     </Link>
