@@ -441,6 +441,23 @@ function ExploreUserLink({
   );
 }
 
+function ExploreUserHeading({
+  prefix,
+  username,
+  avatarUrl,
+}: {
+  prefix: string;
+  username: string;
+  avatarUrl: string | null;
+}) {
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+      <span>{prefix}</span>
+      <ExploreUserLink username={username} avatarUrl={avatarUrl} />
+    </div>
+  );
+}
+
 function ExploreRailModule({
   cluster,
 }: {
@@ -493,7 +510,7 @@ export default async function HomePage() {
   const data = await loadExploreData();
 
   return (
-    <main className="container" style={{ paddingBottom: "var(--space-2xl)" }}>
+    <main className="container" style={{ paddingBottom: "var(--space-4xl)" }}>
       <div
         style={{
           display: "grid",
@@ -510,10 +527,11 @@ export default async function HomePage() {
             <ExploreModule
               title={
                 data?.recentOwnerHeading ? (
-                  <span>
-                    Recently added by{" "}
-                    <ExploreUserLink username={data.recentOwnerHeading.username} avatarUrl={data.recentOwnerHeading.avatarUrl} />
-                  </span>
+                  <ExploreUserHeading
+                    prefix="Recently added by"
+                    username={data.recentOwnerHeading.username}
+                    avatarUrl={data.recentOwnerHeading.avatarUrl}
+                  />
                 ) : (
                   "Recently added by"
                 )

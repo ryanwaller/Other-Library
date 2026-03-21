@@ -1289,13 +1289,17 @@ a.text-muted:hover {
   border-left: 1px solid var(--border);
   padding-left: var(--space-xl);
   margin-top: var(--space-xl);
-  padding-bottom: var(--space-2xl);
+  padding-bottom: var(--space-4xl);
 }
 
 .om-explore-rail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.om-explore-rail > section:first-child {
+  margin-top: 0 !important;
 }
 
 .om-book-secondary a {
