@@ -1286,6 +1286,8 @@ a.text-muted:hover {
 
 .om-explore-rail {
   grid-column: 4;
+  border-left: 1px solid var(--border);
+  padding-left: var(--space-xl);
 }
 
 .om-explore-rail-grid {
@@ -1698,6 +1700,11 @@ summary::-webkit-details-marker {
   .om-explore-main,
   .om-explore-rail {
     grid-column: auto;
+  }
+
+  .om-explore-rail {
+    border-left: 0;
+    padding-left: 0;
   }
 
   .admin-summary-row {
