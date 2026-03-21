@@ -7,6 +7,7 @@ import type { CoverCrop } from "../../../components/CoverImage";
 import { formatIssueDisplay, isMagazineObject } from "../../../lib/magazine";
 import EntityBookGrid, { type GridItem } from "../../entity/[slug]/EntityBookGrid";
 import EntityLibraryOwners, { type OwnerProfile } from "../../entity/[slug]/EntityLibraryOwners";
+import PublicSignInGate from "../../components/PublicSignInGate";
 
 export const dynamic = "force-dynamic";
 
@@ -194,18 +195,20 @@ export default async function GroupPage({
     .sort((a, b) => a.username.localeCompare(b.username));
 
   return (
-    <main className="container">
-      <div>{canonicalLabel}</div>
-      <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
-        {items.length} {items.length === 1 ? "issue" : "issues"}
-      </div>
-      <EntityBookGrid items={items} />
-      {ownersForClient.length > 0 && (
-        <div id="section-libraries" style={{ marginTop: "var(--space-xl)" }}>
-          <hr className="divider" />
-          <EntityLibraryOwners owners={ownersForClient} />
+    <PublicSignInGate>
+      <main className="container">
+        <div>{canonicalLabel}</div>
+        <div className="text-muted" style={{ marginTop: "var(--space-sm)" }}>
+          {items.length} {items.length === 1 ? "issue" : "issues"}
         </div>
-      )}
-    </main>
+        <EntityBookGrid items={items} />
+        {ownersForClient.length > 0 && (
+          <div id="section-libraries" style={{ marginTop: "var(--space-xl)" }}>
+            <hr className="divider" />
+            <EntityLibraryOwners owners={ownersForClient} />
+          </div>
+        )}
+      </main>
+    </PublicSignInGate>
   );
 }

@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import SignInCard from "./components/SignInCard";
 
-export default function ExploreAuthPanel({ open, standalone = false }: { open: boolean; standalone?: boolean }) {
+export default function ExploreAuthPanel({
+  open,
+  standalone = false,
+  redirectTo = "/app"
+}: {
+  open: boolean;
+  standalone?: boolean;
+  redirectTo?: string;
+}) {
   const router = useRouter();
   const [inviteToken, setInviteToken] = useState("");
   const [waitEmail, setWaitEmail] = useState("");
@@ -32,7 +40,7 @@ export default function ExploreAuthPanel({ open, standalone = false }: { open: b
 
       <div className="row" style={{ alignItems: "flex-start", gap: "var(--space-lg)", marginTop: standalone ? 0 : "var(--space-md)", flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 360px", minWidth: 300 }}>
-          <SignInCard redirectTo="/app" />
+          <SignInCard redirectTo={redirectTo} />
         </div>
 
         <div style={{ flex: "1 1 320px", minWidth: 300, display: "grid", gap: "var(--space-md)" }}>

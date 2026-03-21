@@ -8,6 +8,7 @@ import PublicBookList from "./PublicBookList";
 import PublicProfileHeader from "../../components/PublicProfileHeader";
 import type { PublicBook } from "../../../lib/types";
 import { contextFromFilterParams } from "../../../lib/pageTitle";
+import PublicSignInGate from "../../components/PublicSignInGate";
 
 export const dynamic = "force-dynamic";
 
@@ -221,56 +222,58 @@ export default async function PublicProfilePage({
   const showLibraryBlocks = libraries.length > 1 || (libraries.length === 1 && libraries[0]?.name !== DEFAULT_LIBRARY_NAME);
 
   return (
-    <main className="container">
-      <PublicProfileHeader
-        avatarUrl={avatarUrl}
-        displayName={profile.display_name}
-        username={profile.username}
-        followerCount={followersCount}
-        followingCount={followingCount}
-        isLinked={false}
-        followButton={<FollowControls profileId={profile.id} profileUsername={profile.username} inline />}
-        bio={profile.bio}
-      />
-
-      <div style={{ marginTop: "var(--space-lg)" }}>
-        <AddToLibraryProvider editionIds={editionIds}>
-          <PublicBookList
-            libraries={libraries}
-            allBooks={visibleBooks}
-            username={profile.username}
-            profileId={profile.id}
-          signedMap={signedMap}
-          showLibraryBlocks={showLibraryBlocks}
-          initialSearch={filterQuery}
-          initialFilters={{
-            author: filterAuthor,
-            subject: filterSubject,
-            tag: filterTag,
-            category: filterCategory,
-            publisher: filterPublisher,
-            decade: filterDecade,
-            designer: filterDesigner,
-            publish_date: filterPublishDate,
-            release_date: filterReleaseDate,
-            original_release_year: filterOriginalReleaseYear,
-            format: filterFormat,
-            release_type: filterReleaseType,
-            pressing: filterPressing,
-            catalog_number: filterCatalogNumber,
-            barcode: filterBarcode,
-            country: filterCountry,
-            discogs_id: filterDiscogsId,
-            musicbrainz_id: filterMusicbrainzId,
-            speed: filterSpeed,
-            channels: filterChannels,
-            disc_count: filterDiscCount,
-            limited_edition: filterLimitedEdition,
-            reissue: filterReissue
-          }}
+    <PublicSignInGate>
+      <main className="container">
+        <PublicProfileHeader
+          avatarUrl={avatarUrl}
+          displayName={profile.display_name}
+          username={profile.username}
+          followerCount={followersCount}
+          followingCount={followingCount}
+          isLinked={false}
+          followButton={<FollowControls profileId={profile.id} profileUsername={profile.username} inline />}
+          bio={profile.bio}
         />
-        </AddToLibraryProvider>
-      </div>
-    </main>
+
+        <div style={{ marginTop: "var(--space-lg)" }}>
+          <AddToLibraryProvider editionIds={editionIds}>
+            <PublicBookList
+              libraries={libraries}
+              allBooks={visibleBooks}
+              username={profile.username}
+              profileId={profile.id}
+              signedMap={signedMap}
+              showLibraryBlocks={showLibraryBlocks}
+              initialSearch={filterQuery}
+              initialFilters={{
+                author: filterAuthor,
+                subject: filterSubject,
+                tag: filterTag,
+                category: filterCategory,
+                publisher: filterPublisher,
+                decade: filterDecade,
+                designer: filterDesigner,
+                publish_date: filterPublishDate,
+                release_date: filterReleaseDate,
+                original_release_year: filterOriginalReleaseYear,
+                format: filterFormat,
+                release_type: filterReleaseType,
+                pressing: filterPressing,
+                catalog_number: filterCatalogNumber,
+                barcode: filterBarcode,
+                country: filterCountry,
+                discogs_id: filterDiscogsId,
+                musicbrainz_id: filterMusicbrainzId,
+                speed: filterSpeed,
+                channels: filterChannels,
+                disc_count: filterDiscCount,
+                limited_edition: filterLimitedEdition,
+                reissue: filterReissue
+              }}
+            />
+          </AddToLibraryProvider>
+        </div>
+      </main>
+    </PublicSignInGate>
   );
 }

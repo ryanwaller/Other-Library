@@ -7,6 +7,7 @@ import type { CoverCrop } from "../../../components/CoverImage";
 import { formatIssueDisplay, isMagazineObject } from "../../../lib/magazine";
 import EntityPageModules, { type ModuleData, type EntityModuleItem, type OwnerEntry, type HiddenOwnerItem } from "./EntityPageModules";
 import EntityLibraryOwners, { type OwnerProfile } from "./EntityLibraryOwners";
+import PublicSignInGate from "../../components/PublicSignInGate";
 
 export const dynamic = "force-dynamic";
 
@@ -550,26 +551,28 @@ export default async function EntityPage({
   ];
 
   return (
-    <main className="container">
-      <div>{entity.name}</div>
-      {summaryLinks.length > 0 && (
-        <div className="entity-summary-stats text-muted" style={{ marginTop: "var(--space-sm)" }}>
-          {summaryLinks.map(({ label, href }) => (
-            <a key={href} href={href} className="text-muted">
-              {label}
-            </a>
-          ))}
-        </div>
-      )}
+    <PublicSignInGate>
+      <main className="container">
+        <div>{entity.name}</div>
+        {summaryLinks.length > 0 && (
+          <div className="entity-summary-stats text-muted" style={{ marginTop: "var(--space-sm)" }}>
+            {summaryLinks.map(({ label, href }) => (
+              <a key={href} href={href} className="text-muted">
+                {label}
+              </a>
+            ))}
+          </div>
+        )}
 
-      <EntityPageModules modules={modules} />
+        <EntityPageModules modules={modules} />
 
-      {ownersForClient.length > 0 && (
-        <div id="section-libraries" style={{ marginTop: "var(--space-xl)" }}>
-          <hr className="divider" />
-          <EntityLibraryOwners owners={ownersForClient} />
-        </div>
-      )}
-    </main>
+        {ownersForClient.length > 0 && (
+          <div id="section-libraries" style={{ marginTop: "var(--space-xl)" }}>
+            <hr className="divider" />
+            <EntityLibraryOwners owners={ownersForClient} />
+          </div>
+        )}
+      </main>
+    </PublicSignInGate>
   );
 }

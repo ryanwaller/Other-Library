@@ -1401,6 +1401,33 @@ a.text-muted:hover {
   text-decoration-color: var(--muted);
 }
 
+.om-public-signin-gate {
+  position: relative;
+}
+
+.om-public-signin-gate-content[data-locked="true"] {
+  filter: blur(8px);
+  opacity: 0.42;
+  pointer-events: none;
+  user-select: none;
+}
+
+.om-public-signin-gate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.om-public-signin-gate-button {
+  justify-content: center;
+  min-width: 116px;
+  background: var(--bg);
+}
+
 .muted a,
 .muted a:hover {
   color: inherit;

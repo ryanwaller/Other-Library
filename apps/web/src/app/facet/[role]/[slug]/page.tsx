@@ -5,6 +5,7 @@ import FacetBookList from "./FacetBookList";
 import ActiveFilterDisplay from "../../../../components/ActiveFilterDisplay";
 import type { CoverCrop } from "../../../../components/CoverImage";
 import { facetLabelForRole } from "../../../../lib/pageTitle";
+import PublicSignInGate from "../../../components/PublicSignInGate";
 
 export const dynamic = "force-dynamic";
 
@@ -242,45 +243,47 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
   const facetLabel = labelForRole(role);
 
   return (
-    <main className="container">
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-        <div className="om-stat-line">
-          <span className="om-stat-pair">
-            <span className="text-muted">Catalogs</span>
-            <span>{catalogsCount}</span>
-          </span>
-          <span className="om-stat-pair">
-            <span className="text-muted">Items</span>
-            <span>{booksCount}</span>
-          </span>
-        </div>
-        <ActiveFilterDisplay
-          pairs={[{ label: facetLabel, value: entity.name, key: role, clearHref: "/app" }]}
-        />
-      </div>
-
-      <hr className="om-hr" style={{ marginTop: "var(--space-10)" }} />
-
-      {groups.length === 0 ? (
-        <div className="card muted">No items in this facet yet.</div>
-      ) : (
-        groups.map((group, index) => (
-          <div key={group.libraryId} style={{ marginTop: index === 0 ? 0 : 12 }}>
-            {index > 0 ? <hr className="om-hr" /> : null}
-            <div className="row" style={{ gap: "var(--space-10)", marginTop: "var(--space-8)", marginBottom: "var(--space-10)" }}>
-              <span>{group.name}</span>
-              <span className="text-muted">
-                {group.rows.length} item{group.rows.length === 1 ? "" : "s"}
-              </span>
-            </div>
-
-            <FacetBookList
-              books={group.rows}
-              signedByPath={signedByPath}
-            />
+    <PublicSignInGate>
+      <main className="container">
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <div className="om-stat-line">
+            <span className="om-stat-pair">
+              <span className="text-muted">Catalogs</span>
+              <span>{catalogsCount}</span>
+            </span>
+            <span className="om-stat-pair">
+              <span className="text-muted">Items</span>
+              <span>{booksCount}</span>
+            </span>
           </div>
-        ))
-      )}
-    </main>
+          <ActiveFilterDisplay
+            pairs={[{ label: facetLabel, value: entity.name, key: role, clearHref: "/app" }]}
+          />
+        </div>
+
+        <hr className="om-hr" style={{ marginTop: "var(--space-10)" }} />
+
+        {groups.length === 0 ? (
+          <div className="card muted">No items in this facet yet.</div>
+        ) : (
+          groups.map((group, index) => (
+            <div key={group.libraryId} style={{ marginTop: index === 0 ? 0 : 12 }}>
+              {index > 0 ? <hr className="om-hr" /> : null}
+              <div className="row" style={{ gap: "var(--space-10)", marginTop: "var(--space-8)", marginBottom: "var(--space-10)" }}>
+                <span>{group.name}</span>
+                <span className="text-muted">
+                  {group.rows.length} item{group.rows.length === 1 ? "" : "s"}
+                </span>
+              </div>
+
+              <FacetBookList
+                books={group.rows}
+                signedByPath={signedByPath}
+              />
+            </div>
+          ))
+        )}
+      </main>
+    </PublicSignInGate>
   );
 }

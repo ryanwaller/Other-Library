@@ -24,6 +24,7 @@ import PublicBookDetailGrid from "./PublicBookDetailGrid";
 import AlsoOwnedBy from "../../AlsoOwnedBy";
 import PublicRelatedItemsSection from "./PublicRelatedItemsSection";
 import PublicBookAccessFallback from "./PublicBookAccessFallback";
+import PublicSignInGate from "../../../../components/PublicSignInGate";
 
 export const dynamic = "force-dynamic";
 
@@ -619,9 +620,10 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   const publicBookPath = `/u/${profile.username}/b/${canonical}`;
 
   return (
-    <main className="container">
-      <ScrollToTopOnMount />
-      <AddToLibraryProvider editionIds={editionId ? [editionId] : []}>
+    <PublicSignInGate>
+      <main className="container">
+        <ScrollToTopOnMount />
+        <AddToLibraryProvider editionIds={editionId ? [editionId] : []}>
         <PublicProfileHeader
           avatarUrl={avatarUrl}
           displayName={profile.display_name}
@@ -1240,7 +1242,8 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
             </div>
           </Suspense>
         </div>
-      </AddToLibraryProvider>
-    </main>
+        </AddToLibraryProvider>
+      </main>
+    </PublicSignInGate>
   );
 }
