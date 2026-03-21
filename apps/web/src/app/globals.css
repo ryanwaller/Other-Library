@@ -1297,7 +1297,7 @@ a.text-muted:hover {
   position: absolute;
   top: calc(var(--space-xl) + var(--space-sm));
   bottom: 0;
-  left: calc(var(--space-2xl) / -2);
+  left: calc(var(--space-2xl) * -0.75);
   width: 1px;
   background: var(--border);
 }
