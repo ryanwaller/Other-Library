@@ -2,6 +2,27 @@
 
 import { useState, useRef, useEffect, type CSSProperties } from "react";
 
+const SRCSET_WIDTHS = [200, 400, 800];
+
+function parseSupabasePath(src: string): { bucket: string; path: string } | null {
+  try {
+    const url = new URL(src);
+    const match = url.pathname.match(/^\/storage\/v1\/object\/sign\/([^/]+)\/(.+)$/);
+    if (!match) return null;
+    return { bucket: match[1], path: match[2] };
+  } catch {
+    return null;
+  }
+}
+
+function buildSrcSet(src: string): string {
+  const parsed = parseSupabasePath(src);
+  if (!parsed) return "";
+  const coverPath = `/api/cover?bucket=${encodeURIComponent(parsed.bucket)}&path=${encodeURIComponent(parsed.path)}`;
+  return SRCSET_WIDTHS
+    .map((w) => `/_next/image?url=${encodeURIComponent(coverPath)}&w=${w}&q=80 ${w}w`)
+    .join(", ");
+}
 
 export type CoverCrop = {
   // Legacy fields (react-easy-crop)
@@ -161,6 +182,8 @@ export default function CoverImage({
           ref={imgRef}
           alt={alt}
           src={src}
+          srcSet={sizes && src ? (buildSrcSet(src) || undefined) : undefined}
+          sizes={sizes}
           onLoad={handleLoad}
           onError={handleError}
           style={{

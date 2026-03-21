@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  images: {
+    imageSizes: [200, 400, 800]
+  },
   eslint: {
     ignoreDuringBuilds: true
   },
