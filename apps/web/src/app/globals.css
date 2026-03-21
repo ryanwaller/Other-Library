@@ -1271,7 +1271,7 @@ a.text-muted:hover {
 .om-explore-layout {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(300px, 1fr);
-  gap: var(--space-2xl);
+  gap: var(--space-32);
   align-items: start;
 }
 
@@ -1297,7 +1297,7 @@ a.text-muted:hover {
   position: absolute;
   top: calc(var(--space-xl) + var(--space-sm));
   bottom: 0;
-  left: calc(var(--space-2xl) * -0.75);
+  left: calc((var(--space-32) + var(--space-xl)) / -2);
   width: 1px;
   background: var(--border);
 }
