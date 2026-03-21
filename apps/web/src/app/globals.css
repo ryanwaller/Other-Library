@@ -1410,15 +1410,21 @@ a.text-muted:hover {
 }
 
 .om-public-signin-gate-content {
-  transition: opacity 180ms ease;
+  transition:
+    filter 180ms ease,
+    opacity 180ms ease;
 }
 
 .om-public-signin-gate[data-state="checking"] .om-public-signin-gate-content {
+  filter: blur(6px);
+  opacity: 0.58;
   pointer-events: none;
   user-select: none;
 }
 
 .om-public-signin-gate[data-state="locked"] .om-public-signin-gate-content {
+  filter: blur(8px);
+  opacity: 0.42;
   pointer-events: none;
   user-select: none;
 }
@@ -1434,25 +1440,17 @@ a.text-muted:hover {
   pointer-events: none;
   transition:
     background-color 180ms ease,
-    opacity 180ms ease,
-    backdrop-filter 180ms ease,
-    -webkit-backdrop-filter 180ms ease;
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
+    opacity 180ms ease;
 }
 
 .om-public-signin-gate[data-state="checking"] .om-public-signin-gate-overlay {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  background: rgba(0, 0, 0, 0.1);
 }
 
 .om-public-signin-gate[data-state="locked"] .om-public-signin-gate-overlay {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .om-public-signin-gate-button {
