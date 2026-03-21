@@ -4,7 +4,7 @@ import { getSupabaseAdmin, requireAdmin } from "../../../../lib/supabaseAdmin";
 export const runtime = "nodejs";
 
 const SURFACE = "explore_right_rail";
-const MAX_SLOTS = 3;
+const MAX_SLOTS = 4;
 
 type SlotMode = "automatic" | "pinned";
 type SlotRole = "author" | "designer" | "publisher" | "performer";

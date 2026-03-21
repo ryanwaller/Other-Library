@@ -140,7 +140,7 @@ function inviteStatus(row: InviteRow): "pending" | "used" | "expired" {
 }
 
 function defaultHomepageSlots(): HomepageRailSlot[] {
-  return [1, 2, 3].map((slot_index) => ({
+  return [1, 2, 3, 4].map((slot_index) => ({
     slot_index,
     mode: "automatic",
     role: "designer",

@@ -54,7 +54,7 @@ type ExploreUserHeading = {
 };
 
 const EXPLORE_MAIN_MODULE_ITEMS = 4;
-const EXPLORE_RAIL_MODULE_COUNT = 3;
+const EXPLORE_RAIL_MODULE_COUNT = 4;
 const EXPLORE_RAIL_ITEMS = 4;
 const EXPLORE_RAIL_SURFACE = "explore_right_rail";
 const EXPLORE_RAIL_ROLE_PRIORITY: Array<EntityCluster["role"]> = ["designer", "author", "publisher", "performer"];
