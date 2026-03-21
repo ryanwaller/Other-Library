@@ -1414,13 +1414,11 @@ a.text-muted:hover {
 }
 
 .om-public-signin-gate[data-state="checking"] .om-public-signin-gate-content {
-  opacity: 0.78;
   pointer-events: none;
   user-select: none;
 }
 
 .om-public-signin-gate[data-state="locked"] .om-public-signin-gate-content {
-  opacity: 0.68;
   pointer-events: none;
   user-select: none;
 }
@@ -1445,16 +1443,16 @@ a.text-muted:hover {
 
 .om-public-signin-gate[data-state="checking"] .om-public-signin-gate-overlay {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 .om-public-signin-gate[data-state="locked"] .om-public-signin-gate-overlay {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
 }
 
 .om-public-signin-gate-button {
