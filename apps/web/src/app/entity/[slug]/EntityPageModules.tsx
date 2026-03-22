@@ -132,14 +132,23 @@ export default function EntityPageModules({ modules }: { modules: ModuleData[] }
       )}
 
       {modules.map((mod) => {
-        const filteredItems: GridItem[] = mod.items.map((item) => ({
-          id: item.id,
-          title: item.title,
-          secondaryLine: item.secondaryLine ?? null,
-          coverUrl: item.coverUrl,
-          coverCrop: item.coverCrop,
-          href: item.publicFallbackHref
-        }));
+        const filteredItems: GridItem[] = mod.items.map((item) => {
+          let href = item.publicFallbackHref;
+          if (!href && userId) {
+            const myEntry = item.ownerEntries.find(
+              (e) => e.ownerId === userId || (e.libraryId !== null && myCatalogIds.has(e.libraryId))
+            );
+            if (myEntry) href = `/app/books/${myEntry.userBookId}`;
+          }
+          return {
+            id: item.id,
+            title: item.title,
+            secondaryLine: item.secondaryLine ?? null,
+            coverUrl: item.coverUrl,
+            coverCrop: item.coverCrop,
+            href
+          };
+        });
 
         if (filteredItems.length === 0) return null;
 
