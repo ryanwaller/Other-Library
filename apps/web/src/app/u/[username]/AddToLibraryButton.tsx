@@ -233,7 +233,7 @@ export default function AddToLibraryButton({
   }, [pickerOpen]);
 
   useEffect(() => {
-    if (!pickerOpen || !isMobileViewport || !pickerRef.current) {
+    if (!pickerOpen || !pickerRef.current) {
       if (!pickerOpen) setPickerViewportLayout(null);
       return;
     }
@@ -253,7 +253,7 @@ export default function AddToLibraryButton({
       window.removeEventListener("resize", syncLayout);
       window.removeEventListener("scroll", syncLayout, true);
     };
-  }, [pickerOpen, isMobileViewport]);
+  }, [pickerOpen]);
 
   async function loadCatalogs(): Promise<Catalog[]> {
     if (!supabase || !sessionUserId) return [];
@@ -673,7 +673,6 @@ export default function AddToLibraryButton({
 
   const picker = pickerOpen ? (
     <CatalogPickerDropdown
-      isMobileViewport={isMobileViewport}
       viewportLayout={pickerViewportLayout}
       catalogs={catalogs}
       catalogsWithEdition={catalogsWithEdition}
@@ -720,7 +719,6 @@ export default function AddToLibraryButton({
 }
 
 function CatalogPickerDropdown({
-  isMobileViewport,
   viewportLayout,
   catalogs,
   catalogsWithEdition,
@@ -737,7 +735,6 @@ function CatalogPickerDropdown({
   onNewCatalogNameChange,
   onCreateCatalog,
 }: {
-  isMobileViewport: boolean;
   viewportLayout: { left: number; top: number; width: number } | null;
   catalogs: Catalog[];
   catalogsWithEdition: Set<number>;
@@ -760,21 +757,16 @@ function CatalogPickerDropdown({
   const menu = (
     <div
       style={{
-        position: isMobileViewport ? "fixed" : "absolute",
-        top: isMobileViewport ? (viewportLayout?.top ?? 12) : "calc(100% + 4px)",
-        left: isMobileViewport ? 12 : "auto",
-        right: isMobileViewport ? 12 : 0,
-        zIndex: 200,
-        minWidth: isMobileViewport ? undefined : 200,
-        width: isMobileViewport ? "auto" : undefined,
-        maxWidth: isMobileViewport ? "calc(100vw - 24px)" : undefined,
+        position: "fixed",
+        top: viewportLayout?.top ?? 12,
+        left: viewportLayout?.left ?? 12,
+        width: viewportLayout?.width ?? 220,
+        zIndex: 9999,
         background: "var(--bg)",
-        opacity: 1,
         border: "1px solid var(--border)",
-        boxShadow: "0 12px 28px rgba(0, 0, 0, 0.32)",
+        boxShadow: "0 12px 28px rgba(0, 0, 0, 0.45)",
         fontSize: "inherit",
         boxSizing: "border-box",
-        isolation: "isolate",
       }}
     >
       <div
@@ -886,7 +878,7 @@ function CatalogPickerDropdown({
           )
         ) : null}
 
-        {(existingPlacements.length > 0 || addableCatalogs.length > 0 || catalogs.length === 0) ? (
+        {existingPlacements.length > 0 ? (
           <div style={{ height: 1, margin: "0 12px", background: "var(--border)" }} />
         ) : null}
 
@@ -929,7 +921,7 @@ function CatalogPickerDropdown({
           </button>
         )}
 
-        <div style={{ height: 1, margin: "0 12px", background: "var(--border)" }} />
+        <div style={{ height: 1, margin: "0", background: "var(--border)" }} />
         {canAddWishlist ? (
           <button
             onClick={onSelectWishlist}
@@ -954,9 +946,9 @@ function CatalogPickerDropdown({
     </div>
   );
 
-  if (isMobileViewport && typeof document !== "undefined") {
+  if (typeof document !== "undefined") {
     return createPortal(menu, document.body);
   }
 
-  return menu;
+  return null;
 }

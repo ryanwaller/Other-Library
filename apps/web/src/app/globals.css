@@ -1058,9 +1058,9 @@ a.text-muted:hover {
   grid-template-columns:
     var(--dense-leading, 0px)
     44px
-    minmax(220px, 2.25fr)
-    minmax(220px, 2.25fr)
-    minmax(220px, 2.25fr)
+    minmax(220px, 2.75fr)
+    minmax(220px, 2.75fr)
+    minmax(80px, 1.125fr)
     minmax(120px, 1.5fr)
     var(--dense-action, 0px);
   align-items: stretch;
@@ -1174,7 +1174,6 @@ a.text-muted:hover {
 
 .om-dense-list-cell--action {
   pointer-events: auto;
-  border-left: 1px solid var(--border);
   min-width: var(--dense-action, 0px);
 }
 
@@ -1292,7 +1291,7 @@ a.text-muted:hover {
 }
 
 .om-section-divider-block + .om-section-divider-block {
-  margin-top: calc(var(--catalog-section-divider-gap) + 12px);
+  margin-top: var(--catalog-section-divider-gap);
   padding-top: var(--catalog-section-divider-gap);
   border-top: 1px solid var(--border);
 }
