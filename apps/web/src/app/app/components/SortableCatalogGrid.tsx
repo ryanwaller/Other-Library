@@ -113,7 +113,7 @@ function renderCard({
       ? group.primary.resolved_cover_url
       : null;
   const originalCoverSrc =
-    (typeof group.primary.cover_original_url === "string" && group.primary.cover_original_url.trim()
+    (typeof group.primary.cover_original_url === "string" && group.primary.cover_original_url.trim().startsWith("http")
       ? group.primary.cover_original_url.trim()
       : null) ||
     (typeof group.primary.edition?.cover_url === "string" && group.primary.edition.cover_url.trim()

@@ -61,11 +61,9 @@ export default function DenseListRow({
         />
       ) : null}
 
-      {hasLeading ? (
-        <div className="om-dense-list-control" data-dense-interactive="true">
-          {leadingControl}
-        </div>
-      ) : null}
+      <div className="om-dense-list-control" data-dense-interactive="true">
+        {leadingControl}
+      </div>
 
       <div className="om-dense-list-thumb">
         <div className="om-dense-list-thumb-frame" style={{ borderRadius: coverRadius }}>
@@ -99,11 +97,9 @@ export default function DenseListRow({
         <span className="om-dense-list-single-line">{utilityLabel ?? ""}</span>
       </div>
 
-      {hasTrailing ? (
-        <div className="om-dense-list-cell om-dense-list-cell--action" data-dense-interactive="true">
-          {trailingAction}
-        </div>
-      ) : null}
+      <div className="om-dense-list-cell om-dense-list-cell--action" data-dense-interactive="true">
+        {trailingAction}
+      </div>
     </div>
   );
 }
