@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "../../../lib/supabaseClient";
 import { useAddToLibraryContext } from "./AddToLibraryProvider";
 import { WISHLIST_LIBRARY_NAME } from "../../../lib/collection";
@@ -746,7 +747,7 @@ function CatalogPickerDropdown({
   onNewCatalogNameChange: (v: string) => void;
   onCreateCatalog: () => void;
 }) {
-  return (
+  const menu = (
     <div
       style={{
         position: isMobileViewport ? "fixed" : "absolute",
@@ -757,16 +758,17 @@ function CatalogPickerDropdown({
         minWidth: isMobileViewport ? undefined : 200,
         width: isMobileViewport ? "auto" : undefined,
         maxWidth: isMobileViewport ? "calc(100vw - 24px)" : undefined,
-        backgroundColor: "rgba(10, 10, 10, 0.98)",
+        backgroundColor: "var(--bg)",
         border: "1px solid var(--border)",
         boxShadow: "0 12px 28px rgba(0, 0, 0, 0.32)",
         fontSize: "inherit",
         boxSizing: "border-box",
+        isolation: "isolate",
       }}
     >
       <div
         className="text-muted"
-        style={{ padding: "8px 12px 6px", fontSize: "0.82em", letterSpacing: "0.02em" }}
+        style={{ padding: "8px 12px 6px" }}
       >
         Add to catalog
       </div>
@@ -776,35 +778,39 @@ function CatalogPickerDropdown({
           No catalogs
         </div>
       ) : (
-        catalogs.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => onSelect(cat)}
-            disabled={busy}
-            style={{
-              display: "flex",
-              width: "100%",
-              textAlign: "left",
-              padding: "8px 12px",
-              border: "none",
-              borderBottom: "1px solid var(--border)",
-              background: "transparent",
-              cursor: busy ? "default" : "pointer",
-              gap: "var(--space-8)",
-              alignItems: "baseline",
-            }}
-          >
-            <span style={{ flex: 1 }}>{cat.name}</span>
-            {catalogsWithEdition.has(cat.id) ? (
-              <span className="text-muted" style={{ fontSize: "0.85em" }}>✓</span>
+        catalogs.map((cat, index) => (
+          <div key={cat.id}>
+            <button
+              onClick={() => onSelect(cat)}
+              disabled={busy}
+              style={{
+                display: "flex",
+                width: "100%",
+                textAlign: "left",
+                padding: "8px 12px",
+                border: "none",
+                background: "transparent",
+                cursor: busy ? "default" : "pointer",
+                gap: "var(--space-8)",
+                alignItems: "baseline",
+              }}
+            >
+              <span style={{ flex: 1 }}>{cat.name}</span>
+              {catalogsWithEdition.has(cat.id) ? (
+                <span className="text-muted" style={{ fontSize: "0.85em" }}>✓</span>
+              ) : null}
+            </button>
+            {index < catalogs.length - 1 ? (
+              <div style={{ height: 1, margin: "0 12px", background: "var(--border)" }} />
             ) : null}
-          </button>
+          </div>
         ))
       )}
 
       <div>
+        <div style={{ height: 1, margin: "0 12px", background: "var(--border)" }} />
         {newCatalogMode ? (
-          <div style={{ padding: "8px 12px", display: "flex", gap: "var(--space-8)", alignItems: "baseline", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ padding: "8px 12px", display: "flex", gap: "var(--space-8)", alignItems: "baseline" }}>
             <input
               autoFocus
               value={newCatalogName}
@@ -834,8 +840,6 @@ function CatalogPickerDropdown({
               textAlign: "left",
               padding: "8px 12px",
               border: "none",
-              borderTop: "1px solid var(--border)",
-              borderBottom: "1px solid var(--border)",
               background: "transparent",
               cursor: "pointer",
             }}
@@ -844,6 +848,7 @@ function CatalogPickerDropdown({
           </button>
         )}
 
+        <div style={{ height: 1, margin: "0 12px", background: "var(--border)" }} />
         <button
           onClick={onSelectWishlist}
           disabled={busy || wantedCount > 0}
@@ -866,4 +871,10 @@ function CatalogPickerDropdown({
       </div>
     </div>
   );
+
+  if (isMobileViewport && typeof document !== "undefined") {
+    return createPortal(menu, document.body);
+  }
+
+  return menu;
 }
