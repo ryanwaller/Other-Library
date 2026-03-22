@@ -1537,6 +1537,19 @@ a.text-muted:hover {
   align-items: flex-start;
 }
 
+.om-book-detail-grid .om-row-baseline > :last-child {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.om-book-detail-grid .om-row-baseline > :last-child a,
+.om-book-detail-grid .om-row-baseline > :last-child span {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .om-field-visibility-toggle {
   background: none;
   border: none;
