@@ -17,7 +17,7 @@ export default function PagedBookList<T>({
   viewMode: "grid" | "list";
   gridCols: number;
   searchQuery?: string;
-  renderItem: (item: T) => ReactNode;
+  renderItem: (item: T, index: number, isLast: boolean) => ReactNode;
   containerStyle?: React.CSSProperties;
   noItemsMessage?: string;
 }) {
@@ -67,7 +67,7 @@ export default function PagedBookList<T>({
   return (
     <>
       <div ref={containerRef} style={containerStyle}>
-        {items.slice(0, limit).map(renderItem)}
+        {items.slice(0, limit).map((item, index, visibleItems) => renderItem(item, index, index === visibleItems.length - 1))}
       </div>
       {(items.length > limit || canSeeLess) && (
         <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: 24, justifyContent: "center" }}>

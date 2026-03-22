@@ -1057,15 +1057,19 @@ a.text-muted:hover {
   grid-template-columns:
     var(--dense-leading, 0px)
     44px
-    minmax(240px, 5.6fr)
-    minmax(152px, 1.7fr)
-    minmax(84px, 0.95fr)
+    minmax(220px, 2.25fr)
+    minmax(220px, 2.25fr)
+    minmax(96px, 1.1fr)
     88px
     var(--dense-action, 0px);
   align-items: stretch;
   min-height: 52px;
   border-bottom: 1px solid var(--border);
   background: transparent;
+}
+
+.om-dense-list-row[data-last-row="true"] {
+  border-bottom: 0;
 }
 
 .om-dense-list-row:hover {
@@ -1170,6 +1174,7 @@ a.text-muted:hover {
 .om-dense-list-cell--action {
   pointer-events: auto;
   border-left: 1px solid var(--border);
+  min-width: var(--dense-action, 0px);
 }
 
 @media (max-width: 767px) {

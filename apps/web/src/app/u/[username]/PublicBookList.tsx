@@ -689,7 +689,7 @@ export default function PublicBookList({
     return effectiveLibraries.length > 1 || (effectiveLibraries.length === 1 && effectiveLibraries[0]?.name !== DEFAULT_LIBRARY_NAME);
   }, [effectiveLibraries, wishlistMode]);
 
-  const renderBook = (g: CatalogGroup) => {
+  const renderBook = (g: CatalogGroup, _index?: number, isLast = false) => {
     const b = g.primary;
     const e = b.edition;
     const title = effectiveTitleFor(b);
@@ -731,6 +731,8 @@ export default function PublicBookList({
           cropData={cropData}
           roundedCover={wishlistMode}
           utilityLabel={formatAddedDate((b as any).created_at)}
+          trailingActionWidth={26}
+          isLastRow={isLast}
           trailingAction={
             <AddToLibraryButton
               editionId={e?.id ?? null}

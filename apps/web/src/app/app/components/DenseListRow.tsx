@@ -16,6 +16,8 @@ type DenseListRowProps = {
   utilityLabel?: string | null;
   leadingControl?: React.ReactNode;
   trailingAction?: React.ReactNode;
+  trailingActionWidth?: number;
+  isLastRow?: boolean;
   onOpen?: () => void;
 };
 
@@ -29,6 +31,8 @@ export default function DenseListRow({
   utilityLabel = null,
   leadingControl,
   trailingAction,
+  trailingActionWidth = 40,
+  isLastRow = false,
   onOpen
 }: DenseListRowProps) {
   const fields = denseListFieldsFor(item);
@@ -43,9 +47,10 @@ export default function DenseListRow({
       style={
         {
           ["--dense-leading" as string]: hasLeading ? "28px" : "0px",
-          ["--dense-action" as string]: hasTrailing ? "40px" : "0px"
+          ["--dense-action" as string]: hasTrailing ? `${trailingActionWidth}px` : "0px"
         } as CSSProperties
       }
+      data-last-row={isLastRow ? "true" : "false"}
     >
       {isClickable ? (
         <Link

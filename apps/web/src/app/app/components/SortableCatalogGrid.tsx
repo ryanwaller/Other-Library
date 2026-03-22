@@ -79,6 +79,7 @@ type SortableCatalogGridProps = {
 type SortableCatalogCardProps = {
   group: CatalogGroup;
   libraryId: number;
+  isLastRow: boolean;
   viewMode: BookCardViewMode;
   bulkMode: boolean;
   gridColumnsHint: number;
@@ -94,6 +95,7 @@ type SortableCatalogCardProps = {
 
 function renderCard({
   group,
+  isLastRow,
   viewMode,
   bulkMode,
   gridColumnsHint,
@@ -142,6 +144,7 @@ function renderCard({
       roundedCover={String(group.primary.collection_state ?? "").trim().toLowerCase() === "wanted"}
       item={group.primary as any}
       utilityLabel={formatAddedDate(group.latestCreatedAt)}
+      isLastRow={isLastRow && viewMode === "list"}
       wishlistMatchSummary={group.primary.wishlist_match_summary ?? null}
       showWishlistMatchSummary={showWishlistMatchSummary}
     />
@@ -151,6 +154,7 @@ function renderCard({
 function SortableCatalogCard({
   group,
   libraryId,
+  isLastRow,
   viewMode,
   bulkMode,
   gridColumnsHint,
@@ -180,6 +184,7 @@ function SortableCatalogCard({
 
   const card = renderCard({
     group,
+    isLastRow,
     viewMode,
     bulkMode,
     gridColumnsHint,
@@ -322,11 +327,12 @@ const SortableCatalogGrid = memo(function SortableCatalogGrid({
             <div key={`skeleton-${libraryId}-${i}`} className="om-cover-placeholder" style={{ width: "100%", aspectRatio: "3/4" }} />
           ))
         : null}
-      {visibleGroups.map((group) => (
+      {visibleGroups.map((group, index) => (
         <SortableCatalogCard
           key={group.key}
           group={group}
           libraryId={libraryId}
+          isLastRow={index === visibleGroups.length - 1}
           viewMode={viewMode}
           bulkMode={bulkMode}
           gridColumnsHint={gridColumnsHint}
