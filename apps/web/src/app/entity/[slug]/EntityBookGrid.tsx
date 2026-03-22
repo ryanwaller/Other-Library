@@ -78,7 +78,7 @@ export default function EntityBookGrid({
                 />
               </div>
             )}
-            <div style={{ marginTop: "var(--space-sm)" }}>
+            <div className="om-explore-card-meta" style={{ marginTop: "var(--space-sm)" }}>
               {item.href ? (
                 <Link href={item.href} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
                   <span className="om-book-title">{item.title}</span>

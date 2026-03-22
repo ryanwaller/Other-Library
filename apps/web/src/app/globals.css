@@ -1971,6 +1971,11 @@ summary::-webkit-details-marker {
     white-space: nowrap;
   }
 
+  .om-explore-main-grid .om-explore-card-meta,
+  .om-explore-rail-grid .om-explore-card-meta {
+    min-height: 78px;
+  }
+
   .om-explore-main-grid::-webkit-scrollbar,
   .om-explore-rail-grid::-webkit-scrollbar {
     display: none;
