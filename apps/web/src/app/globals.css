@@ -1922,6 +1922,7 @@ summary::-webkit-details-marker {
   }
 
   .om-explore-rail {
+    padding-top: 0;
     padding-left: 0;
   }
 
