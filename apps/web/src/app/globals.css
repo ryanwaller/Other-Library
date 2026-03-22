@@ -1174,6 +1174,7 @@ a.text-muted:hover {
 
 .om-dense-list-cell--action {
   pointer-events: auto;
+  border-left: 0;
   min-width: var(--dense-action, 0px);
 }
 
