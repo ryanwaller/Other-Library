@@ -519,36 +519,6 @@ function AdminPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, tab, entityMergeQuery]);
 
-  useEffect(() => {
-    if (!token || tab !== "entities") return;
-    const sourceIds = selectedMergeEntities.map((entity) => entity.id).filter((id) => id !== entityMergeKeepId);
-    if (!entityMergeKeepId || sourceIds.length === 0) {
-      setEntityMergePreview(null);
-      return;
-    }
-
-    let alive = true;
-    const params = new URLSearchParams({ preview: "1" });
-    for (const sourceId of sourceIds) params.append("source_entity_id", sourceId);
-
-    api<EntityMergePreviewResponse>(`/api/admin/entities/merge?${params.toString()}`, { method: "GET", token })
-      .then((res) => {
-        if (!alive) return;
-        setEntityMergePreview(res.preview ?? null);
-      })
-      .catch((e: any) => {
-        if (!alive) return;
-        const msg = e?.message ?? "Failed to load merge preview";
-        if (handleAuthError(msg)) return;
-        setError(msg);
-        setEntityMergePreview(null);
-      });
-
-    return () => {
-      alive = false;
-    };
-  }, [token, tab, selectedMergeEntities, entityMergeKeepId]);
-
   const userTotalPages = usersData ? Math.max(1, Math.ceil(usersData.total / usersData.pageSize)) : 1;
   const waitTotalPages = waitlistData ? Math.max(1, Math.ceil(waitlistData.total / waitlistData.pageSize)) : 1;
   const invitesTotalPages = invitesData ? Math.max(1, Math.ceil(invitesData.total / invitesData.pageSize)) : 1;
@@ -594,6 +564,36 @@ function AdminPageInner() {
       })
       .filter((section) => section.clusters.length > 0);
   }, [sortedEntityMergeSections]);
+
+  useEffect(() => {
+    if (!token || tab !== "entities") return;
+    const sourceIds = selectedMergeEntities.map((entity) => entity.id).filter((id) => id !== entityMergeKeepId);
+    if (!entityMergeKeepId || sourceIds.length === 0) {
+      setEntityMergePreview(null);
+      return;
+    }
+
+    let alive = true;
+    const params = new URLSearchParams({ preview: "1" });
+    for (const sourceId of sourceIds) params.append("source_entity_id", sourceId);
+
+    api<EntityMergePreviewResponse>(`/api/admin/entities/merge?${params.toString()}`, { method: "GET", token })
+      .then((res) => {
+        if (!alive) return;
+        setEntityMergePreview(res.preview ?? null);
+      })
+      .catch((e: any) => {
+        if (!alive) return;
+        const msg = e?.message ?? "Failed to load merge preview";
+        if (handleAuthError(msg)) return;
+        setError(msg);
+        setEntityMergePreview(null);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [token, tab, selectedMergeEntities, entityMergeKeepId]);
 
   useEffect(() => setUserPage((prev) => clampPage(prev, userTotalPages)), [userTotalPages]);
   useEffect(() => setWaitPage((prev) => clampPage(prev, waitTotalPages)), [waitTotalPages]);
