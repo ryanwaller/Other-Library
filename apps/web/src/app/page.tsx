@@ -640,8 +640,7 @@ function ExploreModule({
   if (items.length === 0) return null;
   return (
     <section id={id} className="om-explore-module">
-      <hr className="divider" />
-      <div className="row om-explore-module-header" style={{ justifyContent: "space-between", alignItems: "baseline", marginTop: "var(--page-top-gap)" }}>
+      <div className="row om-explore-module-header" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
         <div>{title}</div>
         {href ? (
           <Link href={href} className="text-muted" style={{ textDecoration: "none" }}>
@@ -711,8 +710,7 @@ function ExploreRailModule({
   const heading = cluster.heading ?? railHeading(cluster.role, cluster.name);
   return (
     <section className="om-explore-module">
-      <hr className="divider" />
-      <div className="row om-explore-module-header om-explore-rail-module-header" style={{ justifyContent: "space-between", alignItems: "flex-start", marginTop: "var(--page-top-gap)", gap: "var(--space-md)", flexWrap: "nowrap" }}>
+      <div className="row om-explore-module-header om-explore-rail-module-header" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-md)", flexWrap: "nowrap" }}>
         <div className="om-explore-rail-module-title" style={{ minWidth: 0, flex: "1 1 auto" }}>{heading}</div>
         {cluster.slug ? (
           <Link

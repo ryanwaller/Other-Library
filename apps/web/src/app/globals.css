@@ -1460,7 +1460,9 @@ a.text-muted:hover {
 }
 
 .om-explore-module + .om-explore-module {
-  margin-top: var(--space-xl);
+  margin-top: 0;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
 }
 
 .om-explore-module-header {
@@ -1481,7 +1483,7 @@ a.text-muted:hover {
 }
 
 .om-explore-module-content {
-  margin-top: var(--space-14);
+  margin-top: var(--space-md);
 }
 
 .om-explore-user-heading {
@@ -1689,6 +1691,11 @@ body.om-explore-lock-open {
 .om-explore-lock-signin:hover,
 .om-explore-lock-signin:focus-visible {
   text-decoration: none !important;
+}
+
+.om-book-detail-sticky-band {
+  margin-top: 0;
+  padding-top: 0;
 }
 
 .muted a,
@@ -2110,7 +2117,8 @@ summary::-webkit-details-marker {
   }
 
   .om-explore-module + .om-explore-module {
-    margin-top: var(--space-lg);
+    margin-top: 0;
+    padding-top: var(--space-md);
   }
 
   .om-explore-divider {

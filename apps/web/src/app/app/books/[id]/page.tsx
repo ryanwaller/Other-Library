@@ -4047,7 +4047,7 @@ export default function BookDetailPage() {
               {controlsFixed ? <div aria-hidden style={{ height: controlsBandHeight }} /> : null}
               <div
                 ref={controlsBandRef}
-                className="om-smart-sticky-band"
+                className="om-smart-sticky-band om-book-detail-sticky-band"
                 data-docked={controlsDocked ? "true" : "false"}
                 data-visible={!controlsDocked || controlsVisible ? "true" : "false"}
                 data-fixed={controlsFixed ? "true" : "false"}
