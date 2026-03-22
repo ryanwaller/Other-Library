@@ -550,6 +550,10 @@ function AppShell({
   const userId = session.user.id;
   const wishlistMode = isWishlistMode(collectionMode);
   const activeCollectionState = collectionStateForMode(collectionMode);
+  const wishlistInsertFields = useMemo(
+    () => (wishlistMode ? { status: "wishlist", visibility: "followers_only", borrowable_override: false } : {}),
+    [wishlistMode]
+  );
   const [profile, setProfile] = useState<{ username: string; visibility: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [debugLibrariesSource, setDebugLibrariesSource] = useState<string>("libs:init");
@@ -1793,7 +1797,7 @@ function AppShell({
 
       const created = await supabase
         .from("user_books")
-        .insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId, collection_state: activeCollectionState })
+        .insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId, collection_state: activeCollectionState, ...wishlistInsertFields })
         .select("id")
         .single();
       if (created.error) throw new Error(created.error.message);
@@ -1837,6 +1841,7 @@ function AppShell({
           owner_id: userId,
           library_id: addLibraryId,
           collection_state: activeCollectionState,
+          ...wishlistInsertFields,
           edition_id: null,
           title_override: title,
           authors_override: authors.length > 0 ? authors : null,
@@ -1921,7 +1926,7 @@ function AppShell({
       editionId = inserted.data.id;
     }
 
-    const created = await supabase.from("user_books").insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId, collection_state: activeCollectionState }).select("id").single();
+    const created = await supabase.from("user_books").insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId, collection_state: activeCollectionState, ...wishlistInsertFields }).select("id").single();
     if (created.error) throw new Error(created.error.message);
     const createdId = created.data.id as number;
 
@@ -1953,6 +1958,7 @@ function AppShell({
         owner_id: userId,
         library_id: addLibraryId,
         collection_state: activeCollectionState,
+        ...wishlistInsertFields,
         edition_id: null,
         title_override: title,
         authors_override: row.authors.length > 0 ? row.authors : null,
@@ -2326,6 +2332,7 @@ function AppShell({
           owner_id: userId,
           library_id: addLibraryId,
           collection_state: activeCollectionState,
+          ...wishlistInsertFields,
           edition_id: null
         })
         .select("id")
@@ -2373,6 +2380,7 @@ function AppShell({
         owner_id: userId,
         library_id: selectedLibraryId,
         collection_state: activeCollectionState,
+        ...wishlistInsertFields,
         edition_id: null,
         object_type: "music",
         title_override: data.title ?? null,
@@ -2431,6 +2439,7 @@ function AppShell({
         owner_id: userId,
         library_id: selectedLibraryId,
         collection_state: activeCollectionState,
+        ...wishlistInsertFields,
         edition_id: null,
         object_type: "magazine",
         title_override: data.title ?? null,
@@ -2501,7 +2510,7 @@ function AppShell({
         }
       }
     }
-    const insertPayload: Record<string, unknown> = { owner_id: userId, library_id: selectedLibraryId, collection_state: activeCollectionState, edition_id: editionId ?? null };
+    const insertPayload: Record<string, unknown> = { owner_id: userId, library_id: selectedLibraryId, collection_state: activeCollectionState, ...wishlistInsertFields, edition_id: editionId ?? null };
     if (!editionId) {
       insertPayload.title_override = data.title ?? null;
       insertPayload.authors_override = (data.authors ?? []).length > 0 ? data.authors : null;

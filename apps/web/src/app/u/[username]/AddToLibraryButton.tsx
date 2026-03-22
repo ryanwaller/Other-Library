@@ -14,9 +14,67 @@ type AddToLibraryButtonProps = {
   authorsFallback: string[];
   publisherFallback?: string | null;
   publishDateFallback?: string | null;
+  sourceBookId?: number | null;
   sourceOwnerId?: string | null;
   compact?: boolean;
 };
+
+type SourceBook = {
+  id: number;
+  edition_id: number | null;
+  object_type: string | null;
+  source_type?: string | null;
+  source_url?: string | null;
+  external_source_ids?: Record<string, string | null> | null;
+  music_metadata?: Record<string, unknown> | null;
+  issue_number?: string | null;
+  issue_volume?: string | null;
+  issue_season?: string | null;
+  issue_year?: number | null;
+  issn?: string | null;
+  subtitle_override?: string | null;
+  decade?: string | null;
+  pages?: number | null;
+  trim_width?: number | null;
+  trim_height?: number | null;
+  trim_unit?: string | null;
+  cover_original_url?: string | null;
+  cover_crop?: Record<string, unknown> | null;
+  title_override?: string | null;
+  authors_override?: string[] | null;
+  editors_override?: string[] | null;
+  designers_override?: string[] | null;
+  publisher_override?: string | null;
+  printer_override?: string | null;
+  materials_override?: string | null;
+  edition_override?: string | null;
+  publish_date_override?: string | null;
+  description_override?: string | null;
+  subjects_override?: string[] | null;
+  group_label?: string | null;
+  media?: Array<{ kind: "cover" | "image"; storage_path: string; caption: string | null }> | null;
+  book_tags?: Array<{ tag: { id: number; name: string; kind: "tag" | "category" } | null }>;
+  book_entities?: Array<{
+    role: string;
+    position: number | null;
+    visibility?: boolean | null;
+    entity: { id?: string; name: string; slug?: string | null } | null;
+  }> | null;
+};
+
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const normalized = String(value ?? "").trim();
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(normalized);
+  }
+  return out;
+}
 
 export default function AddToLibraryButton({
   editionId,
@@ -24,6 +82,7 @@ export default function AddToLibraryButton({
   authorsFallback,
   publisherFallback,
   publishDateFallback,
+  sourceBookId,
   sourceOwnerId,
   compact
 }: AddToLibraryButtonProps) {
@@ -37,6 +96,7 @@ export default function AddToLibraryButton({
   const [latestOwnedId, setLatestOwnedId] = useState<number | null>(null);
   const [wantedCount, setWantedCount] = useState<number>(0);
   const [latestWantedId, setLatestWantedId] = useState<number | null>(null);
+  const [flashMode, setFlashMode] = useState<"owned" | "wanted" | null>(null);
 
   // Catalog picker state
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -122,6 +182,12 @@ export default function AddToLibraryButton({
     refreshExisting();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionUserId, editionId, ctx]);
+
+  useEffect(() => {
+    if (!flashMode) return;
+    const timer = window.setTimeout(() => setFlashMode(null), 1100);
+    return () => window.clearTimeout(timer);
+  }, [flashMode]);
 
   // Close picker on outside click
   useEffect(() => {
@@ -220,6 +286,99 @@ export default function AddToLibraryButton({
     return Number((created.data as any)?.id ?? 0);
   }
 
+  async function getOrCreateOwnedTagId(ownerId: string, name: string, kind: "tag" | "category"): Promise<number> {
+    if (!supabase) throw new Error("Sign in required");
+    const normalized = name.trim().replace(/\s+/g, " ");
+    const existing = await supabase
+      .from("tags")
+      .select("id")
+      .eq("owner_id", ownerId)
+      .eq("name", normalized)
+      .eq("kind", kind)
+      .maybeSingle();
+    if (existing.error) throw new Error(existing.error.message);
+    const existingId = Number((existing.data as any)?.id ?? 0);
+    if (existingId > 0) return existingId;
+    const inserted = await supabase
+      .from("tags")
+      .insert({ owner_id: ownerId, name: normalized, kind })
+      .select("id")
+      .single();
+    if (inserted.error) throw new Error(inserted.error.message);
+    return Number((inserted.data as any)?.id ?? 0);
+  }
+
+  async function fetchSourceBook(): Promise<SourceBook | null> {
+    if (!supabase || !sourceBookId || !Number.isFinite(sourceBookId)) return null;
+    const res = await supabase
+      .from("user_books")
+      .select(
+        "id,edition_id,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,subtitle_override,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,group_label,media:user_book_media(kind,storage_path,caption),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,visibility,entity:entities(id,name,slug))"
+      )
+      .eq("id", sourceBookId)
+      .maybeSingle();
+    if (res.error) throw new Error(res.error.message);
+    return (res.data ?? null) as SourceBook | null;
+  }
+
+  async function syncBookEntitiesAndTags(targetBookId: number, source: SourceBook) {
+    if (!supabase || !sessionUserId) return;
+
+    const namesByRole = new Map<string, string[]>();
+    const visibilitiesByRole = new Map<string, boolean[]>();
+
+    for (const row of source.book_entities ?? []) {
+      const roleRaw = String(row?.role ?? "").trim();
+      const name = String(row?.entity?.name ?? "").trim();
+      if (!roleRaw || !name) continue;
+      const role = roleRaw === "design" ? "designer" : roleRaw;
+      const names = namesByRole.get(role) ?? [];
+      const visibilities = visibilitiesByRole.get(role) ?? [];
+      names.push(name);
+      visibilities.push(row?.visibility !== false);
+      namesByRole.set(role, names);
+      visibilitiesByRole.set(role, visibilities);
+    }
+
+    for (const [role, names] of namesByRole.entries()) {
+      const visibilities = visibilitiesByRole.get(role) ?? names.map(() => true);
+      const rpc = await supabase.rpc("set_book_entities_v2", {
+        p_user_book_id: targetBookId,
+        p_role: role,
+        p_names: names,
+        p_visibility: visibilities
+      });
+      if (rpc.error) {
+        await supabase.rpc("set_book_entities", { p_user_book_id: targetBookId, p_role: role, p_names: names });
+      }
+    }
+
+    const tagRows: Array<{ user_book_id: number; tag_id: number }> = [];
+    for (const tagRow of source.book_tags ?? []) {
+      const tag = tagRow?.tag;
+      const kind = tag?.kind === "category" ? "category" : tag?.kind === "tag" ? "tag" : null;
+      const name = String(tag?.name ?? "").trim();
+      if (!kind || !name) continue;
+      const tagId = await getOrCreateOwnedTagId(sessionUserId, name, kind);
+      tagRows.push({ user_book_id: targetBookId, tag_id: tagId });
+    }
+    if (tagRows.length > 0) {
+      const upsert = await supabase.from("user_book_tags").upsert(tagRows as any, { onConflict: "user_book_id,tag_id" });
+      if (upsert.error) throw new Error(upsert.error.message);
+    }
+  }
+
+  async function syncWishlistCover(targetBookId: number, source: SourceBook) {
+    if (!supabase) return;
+    const fallbackCoverPath =
+      String(source.cover_original_url ?? "").trim() ||
+      String((source.media ?? []).find((media) => media.kind === "cover")?.storage_path ?? "").trim();
+    if (fallbackCoverPath) {
+      const updated = await supabase.from("user_books").update({ cover_original_url: fallbackCoverPath }).eq("id", targetBookId);
+      if (updated.error) throw new Error(updated.error.message);
+    }
+  }
+
   async function addToLibrary(libraryId: number, catalogName: string) {
     if (!supabase || !sessionUserId) return;
     setBusy(true);
@@ -242,6 +401,7 @@ export default function AddToLibraryButton({
         setLatestOwnedId(id);
         setCatalogsWithEdition((prev) => new Set([...prev, libraryId]));
       }
+      setFlashMode("owned");
     } catch (e: any) {
       setError(e?.message ?? "Add failed");
     } finally {
@@ -258,28 +418,64 @@ export default function AddToLibraryButton({
     setError(null);
     try {
       const wishlistLibraryId = await ensureWishlistLibraryId();
-      const canonicalEditionId = await ensureCanonicalEditionId();
+      const source = await fetchSourceBook();
+      const canonicalEditionId = source?.edition_id ?? (await ensureCanonicalEditionId());
+      const fallbackAuthors = uniqueStrings(authorsFallback);
       const payload: any = {
         owner_id: sessionUserId,
         library_id: wishlistLibraryId,
         edition_id: canonicalEditionId,
         collection_state: "wanted",
-        status: "owned"
+        visibility: "followers_only",
+        status: "wishlist",
+        borrowable_override: false
       };
-      if (!canonicalEditionId) {
-        payload.title_override = titleFallback.trim() ? titleFallback.trim() : null;
-        payload.authors_override = (authorsFallback ?? []).filter(Boolean).length > 0 ? (authorsFallback ?? []).filter(Boolean) : null;
-      }
+      payload.object_type = source?.object_type ?? null;
+      payload.source_type = source?.source_type ?? null;
+      payload.source_url = source?.source_url ?? null;
+      payload.external_source_ids = source?.external_source_ids ?? null;
+      payload.music_metadata = source?.music_metadata ?? null;
+      payload.issue_number = source?.issue_number ?? null;
+      payload.issue_volume = source?.issue_volume ?? null;
+      payload.issue_season = source?.issue_season ?? null;
+      payload.issue_year = source?.issue_year ?? null;
+      payload.issn = source?.issn ?? null;
+      payload.subtitle_override = source?.subtitle_override ?? null;
+      payload.decade = source?.decade ?? null;
+      payload.pages = source?.pages ?? null;
+      payload.trim_width = source?.trim_width ?? null;
+      payload.trim_height = source?.trim_height ?? null;
+      payload.trim_unit = source?.trim_unit ?? null;
+      payload.cover_crop = source?.cover_crop ?? null;
+      payload.group_label = source?.group_label ?? null;
+      payload.title_override = String(source?.title_override ?? "").trim() || titleFallback.trim() || null;
+      payload.authors_override = Array.isArray(source?.authors_override)
+        ? uniqueStrings(source?.authors_override)
+        : (fallbackAuthors.length > 0 ? fallbackAuthors : null);
+      payload.editors_override = Array.isArray(source?.editors_override) ? uniqueStrings(source?.editors_override) : null;
+      payload.designers_override = Array.isArray(source?.designers_override) ? uniqueStrings(source?.designers_override) : null;
+      payload.publisher_override = String(source?.publisher_override ?? "").trim() || String(publisherFallback ?? "").trim() || null;
+      payload.printer_override = String(source?.printer_override ?? "").trim() || null;
+      payload.materials_override = String(source?.materials_override ?? "").trim() || null;
+      payload.edition_override = String(source?.edition_override ?? "").trim() || null;
+      payload.publish_date_override = String(source?.publish_date_override ?? "").trim() || String(publishDateFallback ?? "").trim() || null;
+      payload.description_override = String(source?.description_override ?? "").trim() || null;
+      payload.subjects_override = Array.isArray(source?.subjects_override) ? uniqueStrings(source?.subjects_override) : [];
       const ins = await supabase.from("user_books").insert(payload).select("id").single();
       if (ins.error) throw new Error(ins.error.message);
       const id = Number((ins.data as any)?.id ?? 0);
       if (!id) throw new Error("Wishlist add failed");
+      if (source) {
+        await syncBookEntitiesAndTags(id, source);
+        await syncWishlistCover(id, source);
+      }
       setCreatedWantedId(id);
       if (canonicalEditionId) {
         ctx?.bumpWanted(canonicalEditionId, id);
       }
       setWantedCount((c) => c + 1);
       setLatestWantedId(id);
+      setFlashMode("wanted");
     } catch (e: any) {
       setError(e?.message ?? "Wishlist add failed");
     } finally {
@@ -397,7 +593,7 @@ export default function AddToLibraryButton({
 
   const ownedIdToOpen = latestOwnedId ?? createdOwnedId;
   const wantedIdToOpen = latestWantedId ?? createdWantedId;
-  const label = compact ? "＋" : "＋ Add";
+  const label = flashMode === "owned" || flashMode === "wanted" ? "✓" : compact ? "＋" : "＋ Add";
 
   const picker = pickerOpen ? (
     <CatalogPickerDropdown
@@ -430,7 +626,7 @@ export default function AddToLibraryButton({
           </button>
           <div ref={pickerRef} style={{ position: "relative", display: "inline-block" }}>
             <button onClick={handleAddClick} disabled={busy} title="Add another copy">
-              {busy ? (compact ? "…" : "Adding…") : compact ? "＋" : "Add copy"}
+              {busy ? (compact ? "…" : "Adding…") : flashMode === "owned" ? "✓" : compact ? "＋" : "Add copy"}
             </button>
             {picker}
           </div>
@@ -448,7 +644,7 @@ export default function AddToLibraryButton({
           </button>
           <div ref={pickerRef} style={{ position: "relative", display: "inline-block" }}>
             <button onClick={handleAddClick} disabled={busy} title="Add to catalog or wishlist">
-              {busy ? (compact ? "…" : "Adding…") : compact ? "＋" : "Add"}
+              {busy ? (compact ? "…" : "Adding…") : flashMode === "wanted" ? "✓" : compact ? "＋" : "Add"}
             </button>
             {picker}
           </div>

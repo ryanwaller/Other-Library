@@ -141,6 +141,7 @@ type PublicBookDetail = {
   id: number;
   owner_id: string;
   library_id: number;
+  collection_state?: "owned" | "wanted" | null;
   visibility: "inherit" | "followers_only" | "public";
   status: string | null;
   title_override: string | null;
@@ -638,7 +639,14 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
         <hr className="divider" />
 
         <div className="card">
-          <PublicBookDetailGrid coverSrc={coverSrc} cropData={cropData} effectiveTitle={effectiveTitle} images={images} signedMap={signedMap}>
+          <PublicBookDetailGrid
+            coverSrc={coverSrc}
+            cropData={cropData}
+            effectiveTitle={effectiveTitle}
+            images={images}
+            signedMap={signedMap}
+            roundedCover={String(book.collection_state ?? "owned").trim().toLowerCase() === "wanted"}
+          >
             <div>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>
                 <div>{effectiveTitle}</div>
@@ -648,6 +656,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   authorsFallback={effectiveAuthors}
                   publisherFallback={effectivePublisher}
                   publishDateFallback={effectivePublishDate}
+                  sourceBookId={book.id}
                   sourceOwnerId={book.owner_id}
                   compact
                 />

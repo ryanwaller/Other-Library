@@ -16,6 +16,7 @@ export default function PublicBookDetailGrid({
   images,
   signedMap,
   children,
+  roundedCover = false,
 }: {
   coverSrc: string | null;
   cropData: CoverCrop | null;
@@ -23,6 +24,7 @@ export default function PublicBookDetailGrid({
   images: ImageMedia[];
   signedMap: Record<string, string>;
   children: React.ReactNode;
+  roundedCover?: boolean;
 }) {
   const [coverExpanded, setCoverExpanded] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -69,7 +71,7 @@ export default function PublicBookDetailGrid({
         <div>
           <div
             className="om-cover-slot"
-            style={{ width: "100%", height: "auto", cursor: coverSrc ? "pointer" : undefined }}
+            style={{ width: "100%", height: "auto", cursor: coverSrc ? "pointer" : undefined, borderRadius: roundedCover ? 24 : 0, overflow: roundedCover ? "hidden" : "visible" }}
             onClick={coverSrc ? () => setLightboxIndex(0) : undefined}
           >
           <CoverImage

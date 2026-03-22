@@ -86,7 +86,7 @@ export default function BookCard({
   }, [gridCols, authors, isMobile]);
 
   const coverEl = (
-    <div className="om-cover-slot" style={{ height: "auto", width: "100%", borderRadius: roundedCover ? 12 : 0, overflow: roundedCover ? "hidden" : "visible" }}>
+    <div className="om-cover-slot" style={{ height: "auto", width: "100%", borderRadius: roundedCover ? 24 : 0, overflow: roundedCover ? "hidden" : "visible" }}>
       <CoverImage
         alt={title}
         src={originalSrc ?? coverUrl}

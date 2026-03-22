@@ -97,6 +97,7 @@ type CoverEditorSectionProps = {
   setCoverToolsOpen: (open: boolean) => void;
   coverExpanded: boolean;
   setCoverExpanded: React.Dispatch<React.SetStateAction<boolean>>;
+  roundedCover?: boolean;
   refresh: () => Promise<void>;
   setSuggestedCoverUrl: (url: string | null) => void;
   onOptimisticCoverDelete: () => void;
@@ -130,6 +131,7 @@ const CoverEditorSection = forwardRef<CoverEditorSectionHandle, CoverEditorSecti
     setCoverToolsOpen,
     coverExpanded,
     setCoverExpanded,
+    roundedCover = false,
     refresh,
     setSuggestedCoverUrl,
     onOptimisticCoverDelete,
@@ -326,6 +328,7 @@ const CoverEditorSection = forwardRef<CoverEditorSectionHandle, CoverEditorSecti
             height: "auto",
             padding: 0,
             overflow: "hidden",
+            borderRadius: roundedCover ? 24 : 0,
             display: coverEditorSrc ? "block" : "flex",
             touchAction: "pan-y",
             filter: coverEditorSrc

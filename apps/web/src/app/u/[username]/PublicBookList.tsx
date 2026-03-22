@@ -90,6 +90,7 @@ export default function PublicBookList({
   libraries,
   allBooks,
   username,
+  profileId,
   collectionMode,
   signedMap,
   showLibraryBlocks: _showLibraryBlocks,
@@ -697,8 +698,8 @@ export default function PublicBookList({
         .map((c) => (c.cover_original_url ? combinedSignedMap[c.cover_original_url] : null))
         .find(Boolean) ?? null;
     const href = sharedBookIds.has(Number(b.id)) && !!sessionUserId ? `/app/books/${b.id}` : `/u/${username}/b/${bookIdSlug(b.id, title)}`;
-    const roundedCoverStyle = wishlistMode ? { width: "100%", height: "auto", display: "block", borderRadius: 14, overflow: "hidden" } : { width: "100%", height: "auto", display: "block" };
-    const roundedListCoverStyle = wishlistMode ? { width: "100%", height: "auto", display: "block", borderRadius: 10, overflow: "hidden" } : { width: "100%", height: "auto", display: "block" };
+    const roundedCoverStyle = wishlistMode ? { width: "100%", height: "auto", display: "block", borderRadius: 28, overflow: "hidden" } : { width: "100%", height: "auto", display: "block" };
+    const roundedListCoverStyle = wishlistMode ? { width: "100%", height: "auto", display: "block", borderRadius: 20, overflow: "hidden" } : { width: "100%", height: "auto", display: "block" };
 
     if (viewMode === "list") {
       return (
@@ -738,6 +739,8 @@ export default function PublicBookList({
               authorsFallback={authors}
               publisherFallback={effectivePublisherFor(b)}
               publishDateFallback={String(b.publish_date_override ?? e?.publish_date ?? "").trim() || null}
+              sourceBookId={Number(b.id)}
+              sourceOwnerId={profileId}
               compact
             />
           </div>
@@ -759,6 +762,8 @@ export default function PublicBookList({
             authorsFallback={authors}
             publisherFallback={effectivePublisherFor(b)}
             publishDateFallback={String(b.publish_date_override ?? e?.publish_date ?? "").trim() || null}
+            sourceBookId={Number(b.id)}
+            sourceOwnerId={profileId}
             compact
           />
         </div>

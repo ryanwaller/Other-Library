@@ -65,6 +65,7 @@ type FacetRole =
   | MusicContributorRole;
 
 type EntityRef = { id: string; name: string; slug: string };
+type DetailStatus = "owned" | "loaned" | "selling" | "trading" | "wishlist";
 
 type UserBookDetail = {
   id: number;
@@ -72,7 +73,7 @@ type UserBookDetail = {
   library_id: number;
   collection_state?: "owned" | "wanted" | null;
   visibility: "inherit" | "followers_only" | "public";
-  status: "owned" | "loaned" | "selling" | "trading";
+  status: DetailStatus;
   borrowable_override: boolean | null;
   borrow_request_scope_override: string | null;
   group_label: string | null;
@@ -594,7 +595,7 @@ export default function BookDetailPage() {
     formShelf: string;
     formNotes: string;
     formVisibility: "inherit" | "followers_only" | "public";
-    formStatus: "owned" | "loaned" | "selling" | "trading";
+    formStatus: DetailStatus;
     formBorrowable: "inherit" | "yes" | "no";
     formLibraryId: number | null;
     facetDraft: Record<FacetRole, string[]>;
@@ -672,7 +673,7 @@ export default function BookDetailPage() {
     }));
   }
   const [formVisibility, setFormVisibility] = useState<"inherit" | "followers_only" | "public">("inherit");
-  const [formStatus, setFormStatus] = useState<"owned" | "loaned" | "selling" | "trading">("owned");
+  const [formStatus, setFormStatus] = useState<DetailStatus>("owned");
   const [formBorrowable, setFormBorrowable] = useState<"inherit" | "yes" | "no">("inherit");
   const [formTrimWidth, setFormTrimWidth] = useState<string>("");
   const [formTrimHeight, setFormTrimHeight] = useState<string>("");
@@ -699,6 +700,12 @@ export default function BookDetailPage() {
     error: null,
     message: null
   });
+
+  useEffect(() => {
+    if (formStatus !== "wishlist") return;
+    setFormVisibility("followers_only");
+    setFormBorrowable("no");
+  }, [formStatus]);
 
   const [facetDraft, setFacetDraft] = useState<Record<FacetRole, string[]>>({
     author: [],
@@ -1258,10 +1265,18 @@ export default function BookDetailPage() {
         }
         setCropTrimUnit(initCropUnit);
       }
-      setFormVisibility(row.visibility);
-      setFormStatus(row.status);
+      setFormVisibility(String(row.collection_state ?? "owned").trim().toLowerCase() === "wanted" ? "followers_only" : row.visibility);
+      setFormStatus(String(row.collection_state ?? "owned").trim().toLowerCase() === "wanted" ? "wishlist" : ((row.status as DetailStatus | null) ?? "owned"));
       setFormLibraryId((row as any).library_id ?? null);
-      setFormBorrowable(row.borrowable_override === null || row.borrowable_override === undefined ? "inherit" : row.borrowable_override ? "yes" : "no");
+      setFormBorrowable(
+        String(row.collection_state ?? "owned").trim().toLowerCase() === "wanted"
+          ? "no"
+          : row.borrowable_override === null || row.borrowable_override === undefined
+            ? "inherit"
+            : row.borrowable_override
+              ? "yes"
+              : "no"
+      );
 
       setSearchResults([]);
       setSearchState({ busy: false, error: null, message: null });
@@ -2550,6 +2565,37 @@ export default function BookDetailPage() {
     setSaveState({ busy: true, error: null, message: "Saving…" });
 
     try {
+      const nextCollectionState = formStatus === "wishlist" ? "wanted" : "owned";
+      let nextLibraryId = formLibraryId ?? book.library_id ?? null;
+      if (nextCollectionState === "wanted") {
+        const wishlistRes = await supabase
+          .from("libraries")
+          .select("id")
+          .eq("owner_id", userId)
+          .eq("kind", "wishlist")
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (wishlistRes.error) throw new Error(wishlistRes.error.message);
+        let wishlistLibraryId = Number((wishlistRes.data as any)?.id ?? 0);
+        if (!wishlistLibraryId) {
+          const createdWishlist = await supabase
+            .from("libraries")
+            .insert({ owner_id: userId, name: WISHLIST_LIBRARY_NAME, kind: "wishlist" })
+            .select("id")
+            .single();
+          if (createdWishlist.error) throw new Error(createdWishlist.error.message);
+          wishlistLibraryId = Number((createdWishlist.data as any)?.id ?? 0);
+        }
+        nextLibraryId = wishlistLibraryId;
+      } else if (!nextLibraryId || !libraries.some((library) => library.id === nextLibraryId)) {
+        nextLibraryId = libraries[0]?.id ?? null;
+        if (!nextLibraryId) {
+          setSaveState({ busy: false, error: "Create a catalog first.", message: "Save failed" });
+          return false;
+        }
+      }
+
       const title_override = formTitle.trim() ? formTitle.trim() : null;
       const authors_override = uniqStrings(facetDraft.author ?? parseAuthorsInput(formAuthors));
       const editors_override = uniqStrings(facetDraft.editor ?? parseAuthorsInput(formEditors));
@@ -2596,6 +2642,8 @@ export default function BookDetailPage() {
       }
 
       const payload: any = {
+        collection_state: nextCollectionState,
+        library_id: nextLibraryId,
         group_label,
         object_type,
         decade,
@@ -2618,9 +2666,10 @@ export default function BookDetailPage() {
         location: formLocation.trim() ? formLocation.trim() : null,
         shelf: formShelf.trim() ? formShelf.trim() : null,
         notes: formNotes.trim() ? formNotes.trim() : null,
-        visibility: formVisibility,
-        status: formStatus,
-        borrowable_override: formBorrowable === "inherit" ? null : formBorrowable === "yes",
+        visibility: nextCollectionState === "wanted" ? "followers_only" : formVisibility,
+        status: nextCollectionState === "wanted" ? "wishlist" : formStatus,
+        borrowable_override: nextCollectionState === "wanted" ? false : formBorrowable === "inherit" ? null : formBorrowable === "yes",
+        borrow_request_scope_override: nextCollectionState === "wanted" ? null : book.borrow_request_scope_override ?? null,
         music_metadata: isMusicObject ? formMusic : null
       };
       if (isMusicObject) {
@@ -2793,7 +2842,7 @@ export default function BookDetailPage() {
     const ok = await saveEdits();
     if (!ok) return;
     const desiredCopies = Number(copiesDraft);
-    if (copiesCount !== null && Number.isFinite(desiredCopies) && desiredCopies >= 1 && desiredCopies !== copiesCount) {
+    if (formStatus !== "wishlist" && copiesCount !== null && Number.isFinite(desiredCopies) && desiredCopies >= 1 && desiredCopies !== copiesCount) {
       const copiesOk = await updateCopies();
       if (!copiesOk) return;
     }
@@ -3916,7 +3965,10 @@ export default function BookDetailPage() {
   }
 
   if (!initialLoadDone) return null;
-  const showUrlSection = Boolean(publicBookUrl);
+  const persistedWishlistState = String(book?.collection_state ?? "owned").trim().toLowerCase() === "wanted";
+  const isWishlistItem = editMode ? formStatus === "wishlist" : persistedWishlistState;
+  const showOwnershipMeta = !isWishlistItem;
+  const showUrlSection = Boolean(publicBookUrl) && !isWishlistItem;
   const showDividerBorrowableLocation = showLocationBlock || showUrlSection;
   const showDividerShelfUrl = showShelfSection && showUrlSection;
 
@@ -4494,6 +4546,7 @@ export default function BookDetailPage() {
               isNarrow={isNarrow}
               userId={userId}
               effectiveTitle={effectiveTitle}
+              roundedCover={isWishlistItem}
               formTrimWidth={formTrimWidth}
               formTrimHeight={formTrimHeight}
               formTrimUnit={formTrimUnit}
@@ -5505,26 +5558,12 @@ export default function BookDetailPage() {
                 <>
                   <hr className="divider" />
                   <div className="meta-list" style={{ gap: 0 }}>
-                    <div className="row om-row-baseline">
-                      <div style={{ minWidth: 110 }} className="text-muted">
-                        {String(book?.collection_state ?? "owned").trim().toLowerCase() === "wanted" ? "Wishlist" : "Catalog"}
-                      </div>
-                      {String(book?.collection_state ?? "owned").trim().toLowerCase() === "wanted" ? (
-                        <div className="row" style={{ alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap" }}>
-                          <span>{WISHLIST_LIBRARY_NAME}</span>
-                          <button
-                            type="button"
-                            onClick={() => convertWishlistToOwned()}
-                            disabled={collectionMoveState.busy || libraries.length === 0}
-                          >
-                            {collectionMoveState.busy ? "Converting…" : "Convert to owned"}
-                          </button>
-                          <span className="text-muted">
-                            {collectionMoveState.message ? (collectionMoveState.error ? `${collectionMoveState.message} (${collectionMoveState.error})` : collectionMoveState.message) : ""}
-                            {!collectionMoveState.message && libraries.length === 0 ? "Create a catalog first" : ""}
-                          </span>
+                    {!isWishlistItem ? (
+                      <div className="row om-row-baseline">
+                        <div style={{ minWidth: 110 }} className="text-muted">
+                          Catalog
                         </div>
-                      ) : editMode ? (
+                        {editMode ? (
                         <>
                           <select
                             className="om-inline-control"
@@ -5546,64 +5585,67 @@ export default function BookDetailPage() {
                             {libraryMoveState.message ? (libraryMoveState.error ? `${libraryMoveState.message} (${libraryMoveState.error})` : libraryMoveState.message) : ""}
                           </div>
                         </>
-                      ) : (
-                        <div className="row" style={{ alignItems: "center", gap: "var(--space-sm)", flexWrap: "nowrap" }}>
-                          <span>{libraries.find((l) => l.id === formLibraryId)?.name ?? "—"}</span>
-                          {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length > 0 ? (
-                            <span className="om-member-stack" aria-label="Shared catalog members">
-                              {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).slice(0, 6).map((m) =>
-                                (
-                                  <Link key={m.userId} href={`/u/${encodeURIComponent(m.username)}`} aria-label={`Open ${m.username}'s profile`} style={{ display: "inline-flex" }}>
-                                {m.avatarUrl ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar om-member-stack-avatar-detail-up" />
-                                    ) : (
-                                      <span className="om-member-stack-avatar om-member-stack-avatar-detail-up" title={m.username} />
-                                    )}
-                                </Link>
-                                )
-                              )}
-                              {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length > 6 ? (
-                                <span className="om-member-stack-overflow" title={`${(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length - 6} more members`}>
-                                  +{(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length - 6}
-                                </span>
-                              ) : null}
-                            </span>
-                          ) : null}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                      <div style={{ minWidth: 110 }} className="text-muted">
-                        {copiesLabel}
-                      </div>
-                      {editMode ? (
-                        <>
-                          <input
-                            type="number"
-                            min={1}
-                            className="om-inline-control"
-                            value={copiesDraft || ""}
-                            onChange={(e) => setCopiesDraft(e.target.value)}
-                            style={{ width: 90 }}
-                          />
-                          <div className="text-muted" style={{ marginLeft: "var(--space-10)" }}>
-                            {copiesUpdateState.message
-                              ? copiesUpdateState.error
-                                ? `${copiesUpdateState.message} (${copiesUpdateState.error})`
-                                : copiesUpdateState.message
-                              : copiesCountState.error
-                                ? copiesCountState.error
-                                : copiesCountState.busy
-                                  ? "…"
-                                  : ""}
+                        ) : (
+                          <div className="row" style={{ alignItems: "center", gap: "var(--space-sm)", flexWrap: "nowrap" }}>
+                            <span>{libraries.find((l) => l.id === formLibraryId)?.name ?? "—"}</span>
+                            {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length > 0 ? (
+                              <span className="om-member-stack" aria-label="Shared catalog members">
+                                {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).slice(0, 6).map((m) =>
+                                  (
+                                    <Link key={m.userId} href={`/u/${encodeURIComponent(m.username)}`} aria-label={`Open ${m.username}'s profile`} style={{ display: "inline-flex" }}>
+                                  {m.avatarUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img alt={m.username} src={m.avatarUrl} className="om-member-stack-avatar om-member-stack-avatar-detail-up" />
+                                      ) : (
+                                        <span className="om-member-stack-avatar om-member-stack-avatar-detail-up" title={m.username} />
+                                      )}
+                                  </Link>
+                                  )
+                                )}
+                                {(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length > 6 ? (
+                                  <span className="om-member-stack-overflow" title={`${(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length - 6} more members`}>
+                                    +{(libMemberPreviewsById[formLibraryId ?? 0] ?? []).length - 6}
+                                  </span>
+                                ) : null}
+                              </span>
+                            ) : null}
                           </div>
-                        </>
-                      ) : (
-                        <div>{copiesCountState.busy ? "…" : copiesCount !== null ? String(copiesCount) : "—"}</div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    ) : null}
+
+                    {showOwnershipMeta ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">
+                          {copiesLabel}
+                        </div>
+                        {editMode ? (
+                          <>
+                            <input
+                              type="number"
+                              min={1}
+                              className="om-inline-control"
+                              value={copiesDraft || ""}
+                              onChange={(e) => setCopiesDraft(e.target.value)}
+                              style={{ width: 90 }}
+                            />
+                            <div className="text-muted" style={{ marginLeft: "var(--space-10)" }}>
+                              {copiesUpdateState.message
+                                ? copiesUpdateState.error
+                                  ? `${copiesUpdateState.message} (${copiesUpdateState.error})`
+                                  : copiesUpdateState.message
+                                : copiesCountState.error
+                                  ? copiesCountState.error
+                                  : copiesCountState.busy
+                                    ? "…"
+                                    : ""}
+                            </div>
+                          </>
+                        ) : (
+                          <div>{copiesCountState.busy ? "…" : copiesCount !== null ? String(copiesCount) : "—"}</div>
+                        )}
+                      </div>
+                    ) : null}
                     {(editMode || (facetView.category.length > 0 && fieldVisibility.category !== false)) && (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)", opacity: editMode && fieldVisibility.category === false ? 0.6 : 1 }}>
                         <div style={{ minWidth: 110 }} className="text-muted">
@@ -5688,43 +5730,45 @@ export default function BookDetailPage() {
 
                   <hr className="divider" />
                   <div className="meta-list" style={{ gap: 0 }}>
-                    <div className="row om-row-baseline">
-                      <div style={{ minWidth: 110 }} className="text-muted">
-                        Visibility
-                      </div>
-                      {editMode ? (
-                        formVisibility === "inherit" ? (
-                          <>
-                            <div className="text-muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
-                              {ownerProfile ? `From settings: ${ownerProfile.visibility === "public" ? "public" : "private"}` : "From settings: …"}
-                            </div>
-                            <button
-                              onClick={() => setFormVisibility(ownerProfile?.visibility === "public" ? "public" : "followers_only")}
-                              disabled={!ownerProfile}
-                            >
-                              Override
-                            </button>
-                          </>
+                    {showOwnershipMeta ? (
+                      <div className="row om-row-baseline">
+                        <div style={{ minWidth: 110 }} className="text-muted">
+                          Visibility
+                        </div>
+                        {editMode ? (
+                          formVisibility === "inherit" ? (
+                            <>
+                              <div className="text-muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
+                                {ownerProfile ? `From settings: ${ownerProfile.visibility === "public" ? "public" : "private"}` : "From settings: …"}
+                              </div>
+                              <button
+                                onClick={() => setFormVisibility(ownerProfile?.visibility === "public" ? "public" : "followers_only")}
+                                disabled={!ownerProfile}
+                              >
+                                Override
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <select
+                                className="om-inline-control"
+                                value={formVisibility}
+                                onChange={(e) => setFormVisibility(e.target.value as any)}
+                                style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
+                              >
+                                <option value="followers_only">private</option>
+                                <option value="public">public</option>
+                              </select>
+                              <button onClick={() => setFormVisibility("inherit")}>Revert</button>
+                            </>
+                          )
                         ) : (
-                          <>
-                            <select
-                              className="om-inline-control"
-                              value={formVisibility}
-                              onChange={(e) => setFormVisibility(e.target.value as any)}
-                              style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
-                            >
-                              <option value="followers_only">private</option>
-                              <option value="public">public</option>
-                            </select>
-                            <button onClick={() => setFormVisibility("inherit")}>Revert</button>
-                          </>
-                        )
-                      ) : (
-                        <div>{formVisibility === "inherit" ? (ownerProfile?.visibility === "public" ? "public" : "private") : formVisibility === "public" ? "public" : "private"}</div>
-                      )}
-                    </div>
+                          <div>{formVisibility === "inherit" ? (ownerProfile?.visibility === "public" ? "public" : "private") : formVisibility === "public" ? "public" : "private"}</div>
+                        )}
+                      </div>
+                    ) : null}
 
-                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                    <div className="row om-row-baseline" style={{ marginTop: showOwnershipMeta ? "var(--space-8)" : 0 }}>
                       <div style={{ minWidth: 110 }} className="text-muted">
                         Status
                       </div>
@@ -5739,44 +5783,47 @@ export default function BookDetailPage() {
                           <option value="loaned">loaned</option>
                           <option value="selling">selling</option>
                           <option value="trading">trading</option>
+                          <option value="wishlist">wishlist</option>
                         </select>
                       ) : (
                         <div>{formStatus}</div>
                       )}
                     </div>
 
-                    <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
-                      <div style={{ minWidth: 110 }} className="text-muted">
-                        Borrowable
-                      </div>
-                      {editMode ? (
-                        formBorrowable === "inherit" ? (
-                          <>
-                            <div className="text-muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
-                              {ownerBorrowDefaults ? `From settings: ${ownerBorrowDefaults.borrowable_default ? "yes" : "no"}` : "From settings: …"}
-                            </div>
-                            <button onClick={() => setFormBorrowable(ownerBorrowDefaults?.borrowable_default ? "yes" : "no")} disabled={!ownerBorrowDefaults}>
-                              Override
-                            </button>
-                          </>
+                    {showOwnershipMeta ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">
+                          Borrowable
+                        </div>
+                        {editMode ? (
+                          formBorrowable === "inherit" ? (
+                            <>
+                              <div className="text-muted" style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}>
+                                {ownerBorrowDefaults ? `From settings: ${ownerBorrowDefaults.borrowable_default ? "yes" : "no"}` : "From settings: …"}
+                              </div>
+                              <button onClick={() => setFormBorrowable(ownerBorrowDefaults?.borrowable_default ? "yes" : "no")} disabled={!ownerBorrowDefaults}>
+                                Override
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <select
+                                className="om-inline-control"
+                                value={formBorrowable}
+                                onChange={(e) => setFormBorrowable(e.target.value as any)}
+                                style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
+                              >
+                                <option value="yes">yes</option>
+                                <option value="no">no</option>
+                              </select>
+                              <button onClick={() => setFormBorrowable("inherit")}>Revert</button>
+                            </>
+                          )
                         ) : (
-                          <>
-                            <select
-                              className="om-inline-control"
-                              value={formBorrowable}
-                              onChange={(e) => setFormBorrowable(e.target.value as any)}
-                              style={{ width: isNarrow ? "100%" : 220, maxWidth: "100%" }}
-                            >
-                              <option value="yes">yes</option>
-                              <option value="no">no</option>
-                            </select>
-                            <button onClick={() => setFormBorrowable("inherit")}>Revert</button>
-                          </>
-                        )
-                      ) : (
-                        <div>{formBorrowable === "inherit" ? (ownerBorrowDefaults?.borrowable_default ? "yes" : "no") : formBorrowable}</div>
-                      )}
-                    </div>
+                          <div>{formBorrowable === "inherit" ? (ownerBorrowDefaults?.borrowable_default ? "yes" : "no") : formBorrowable}</div>
+                        )}
+                      </div>
+                    ) : null}
 
                   </div>
 
