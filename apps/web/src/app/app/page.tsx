@@ -654,6 +654,7 @@ function AppShell({
   }
 
   function setCollectionMode(nextMode: LibraryMode) {
+    setPendingCollectionMode(nextMode);
     const params = new URLSearchParams(searchParams.toString());
     if (nextMode === "wishlist") params.set("mode", "wishlist");
     else params.delete("mode");
@@ -717,6 +718,7 @@ function AppShell({
 
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [booksLoading, setBooksLoading] = useState(false);
+  const [pendingCollectionMode, setPendingCollectionMode] = useState<LibraryMode | null>(null);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [desktopGridDensity, setDesktopGridDensity] = useState<DesktopGridDensity>(DEFAULT_DESKTOP_GRID_DENSITY);
@@ -1770,9 +1772,14 @@ function AppShell({
 
   useEffect(() => {
     if (!supabase) return;
-    void refreshLibraries();
+    void refreshLibraries().finally(() => setPendingCollectionMode(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collectionMode]);
+
+  useEffect(() => {
+    if (pendingCollectionMode && pendingCollectionMode !== collectionMode) return;
+    if (!booksLoading) setPendingCollectionMode(null);
+  }, [booksLoading, collectionMode, pendingCollectionMode]);
 
   async function addByIsbnValue(isbnValue: string): Promise<number> {
     if (!supabase) throw new Error("Supabase is not configured");
@@ -3506,6 +3513,7 @@ function AppShell({
     () => (showSharedLibraries ? [...ownedRenderLibraries, ...sharedRenderLibraries] : ownedRenderLibraries),
     [ownedRenderLibraries, sharedRenderLibraries, showSharedLibraries]
   );
+  const displayGroupCount = pendingCollectionMode === collectionMode ? 0 : displayGroups.length;
   const firstSharedDisplayIndex = useMemo(() => displayLibraries.findIndex((l) => l.myRole === "editor"), [displayLibraries]);
 
   const availableCategories = useMemo(() => {
@@ -3590,7 +3598,7 @@ function AppShell({
                 </span>
                 <span className="om-stat-pair">
                   <span className="text-muted">Items</span>
-                  <span>{displayGroups.length}</span>
+                  <span>{displayGroupCount}</span>
                 </span>
                 <button
                   type="button"
@@ -3605,7 +3613,7 @@ function AppShell({
               <>
                 <span className="om-stat-pair">
                   <span className="text-muted">Wishlist Items</span>
-                  <span>{displayGroups.length}</span>
+                  <span>{displayGroupCount}</span>
                 </span>
                 <button
                   type="button"
