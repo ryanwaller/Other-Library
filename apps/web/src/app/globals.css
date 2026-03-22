@@ -1297,6 +1297,10 @@ a.text-muted:hover {
   border-top: 1px solid var(--border);
 }
 
+.om-section-divider-block[data-view-mode="list"] + .om-section-divider-block[data-view-mode="list"] {
+  border-top: 0;
+}
+
 .om-stat-line,
 .admin-meta-line {
   display: flex;

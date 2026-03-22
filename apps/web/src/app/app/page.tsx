@@ -4463,7 +4463,7 @@ function AppShell({
           ) : null;
           return (
             <CatalogRenderBoundary key={lib.id} libraryName={lib.name}>
-              <div>
+              <div className="om-section-divider-block" data-view-mode={viewMode}>
               <LibraryBlock
                 libraryId={lib.id}
                 libraryName={lib.name}
@@ -4534,7 +4534,6 @@ function AppShell({
                   />
                 )}
               />
-              {idx < displayLibraries.length - 1 && <hr className="om-hr" />}
               </div>
             </CatalogRenderBoundary>
           );
