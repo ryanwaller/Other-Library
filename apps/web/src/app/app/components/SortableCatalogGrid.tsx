@@ -29,6 +29,18 @@ import type { CatalogGroup } from "../../../lib/types";
 import { effectiveSecondaryLineFor } from "../../../lib/book";
 import BookCard, { type BookCardViewMode } from "./BookCard";
 
+function formatAddedDate(timestamp: number): string | null {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return null;
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return null;
+  const now = new Date();
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return new Intl.DateTimeFormat("en-US", sameYear
+    ? { month: "short", day: "numeric" }
+    : { month: "short", day: "numeric", year: "numeric" }
+  ).format(date);
+}
+
 type DeleteState = { busy: boolean; error: string | null; message: string | null } | undefined;
 
 type SortableCatalogGridProps = {
@@ -111,6 +123,8 @@ function renderCard({
       gridCols={gridColumnsHint}
       secondaryMode={effectiveSecondaryLineFor(group.primary).mode}
       roundedCover={String(group.primary.collection_state ?? "").trim().toLowerCase() === "wanted"}
+      item={group.primary as any}
+      utilityLabel={formatAddedDate(group.latestCreatedAt)}
       wishlistMatchSummary={group.primary.wishlist_match_summary ?? null}
       showWishlistMatchSummary={showWishlistMatchSummary}
     />
@@ -283,7 +297,7 @@ const SortableCatalogGrid = memo(function SortableCatalogGrid({
         display: effectiveViewMode === "grid" ? "grid" : "flex",
         flexDirection: effectiveViewMode === "list" ? "column" : undefined,
         gridTemplateColumns: effectiveViewMode === "grid" ? gridTemplateColumns ?? `repeat(${gridColumnsHint}, minmax(0, 1fr))` : undefined,
-        gap: "var(--space-md)"
+        gap: effectiveViewMode === "grid" ? "var(--space-md)" : 0
       }}
     >
       {showBookSkeleton

@@ -6,6 +6,7 @@ import { useMemo, useState, useEffect, type MouseEvent } from "react";
 import CoverImage from "../../../components/CoverImage";
 import type { CatalogItem } from "../../../lib/types";
 import { effectiveTitleFor } from "../../../lib/book";
+import DenseListRow from "./DenseListRow";
 
 export type BookCardViewMode = "grid" | "list";
 
@@ -29,7 +30,9 @@ export default function BookCard({
   secondaryMode = "authors",
   roundedCover = false,
   wishlistMatchSummary = null,
-  showWishlistMatchSummary = true
+  showWishlistMatchSummary = true,
+  item,
+  utilityLabel = null
 }: {
   viewMode: BookCardViewMode;
   bulkMode: boolean;
@@ -52,6 +55,8 @@ export default function BookCard({
   gridCols?: number;
   secondaryMode?: "authors" | "plain";
   roundedCover?: boolean;
+  item?: CatalogItem;
+  utilityLabel?: string | null;
   wishlistMatchSummary?: {
     followedCount: number;
     followedUsernames: string[];
@@ -145,26 +150,35 @@ export default function BookCard({
   }, [showWishlistMatchSummary, wishlistMatchSummary]);
 
   if (viewMode === "list") {
+    const rowItem = item ?? ({
+      id: 0,
+      library_id: 0,
+      visibility: "public",
+      title_override: title,
+      subtitle_override: null,
+      authors_override: authors,
+      subjects_override: [],
+      publisher_override: null,
+      edition: null,
+      media: [],
+      cover_original_url: null,
+      cover_crop: cropData ?? null
+    } as CatalogItem);
+
     return (
-      <div className="card" style={{ display: "grid", gridTemplateColumns: bulkMode ? "26px 70px 1fr" : "70px 1fr", gap: "var(--space-md)", alignItems: "start" }}>
-        {bulkMode ? <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" /> : null}
-        <Link href={href} style={{ display: "block" }} className="om-book-card-link" onClick={onOpen}>
-          <div className="om-cover-slot" style={{ width: 70, height: "auto" }}>
-            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto" }} objectFit="contain" />
-          </div>
-        </Link>
-        <div>
-          <div>
-            <Link href={href} className="om-book-card-link" style={{ color: "inherit", textDecoration: "none" }} onClick={onOpen}>
-              <span className="om-book-title">{title}</span>
-            </Link>
-          </div>
-          <div className="text-muted" style={{ marginTop: 4 }}>
-            {renderSecondaryText()}
-          </div>
-          {wishlistMatchLine ? <div className="text-muted" style={{ marginTop: 4 }}>{wishlistMatchLine}</div> : null}
-        </div>
-      </div>
+      <DenseListRow
+        item={rowItem}
+        href={!bulkMode && href ? href : undefined}
+        coverUrl={coverUrl}
+        originalSrc={originalSrc}
+        cropData={cropData}
+        roundedCover={roundedCover}
+        utilityLabel={utilityLabel}
+        leadingControl={
+          bulkMode ? <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" /> : undefined
+        }
+        onOpen={onOpen}
+      />
     );
   }
 

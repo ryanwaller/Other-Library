@@ -2,6 +2,14 @@ import type { PublicBook } from "./types";
 import { parseMusicMetadata } from "./music";
 import { formatIssueDisplay, isMagazineObject } from "./magazine";
 
+export type DenseListFields = {
+  primaryTitle: string;
+  primarySubtitle: string | null;
+  secondary: string | null;
+  tertiary: string | null;
+  mobileSecondary: string | null;
+};
+
 export function normalizeKeyPart(input: string): string {
   return (input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -68,6 +76,77 @@ export function effectivePublisherFor(b: PublicBook): string {
   const o = (b.publisher_override ?? "").trim();
   if (o) return o;
   return (b.edition?.publisher ?? "").trim();
+}
+
+function firstYearFrom(value: unknown): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const match = raw.match(/\b(1[5-9]\d{2}|20\d{2}|21\d{2})\b/);
+  return match ? match[1] : null;
+}
+
+export function effectiveYearFor(b: PublicBook): string | null {
+  return (
+    firstYearFrom(b.issue_year) ??
+    firstYearFrom(b.publish_date_override) ??
+    firstYearFrom(b.edition?.publish_date) ??
+    null
+  );
+}
+
+export function effectiveDateLabelFor(b: PublicBook): string | null {
+  const rawPublishDate = String(b.publish_date_override ?? b.edition?.publish_date ?? "").trim();
+  if (rawPublishDate) return rawPublishDate;
+  const issue = formatIssueDisplay(b);
+  if (issue) return issue;
+  return effectiveYearFor(b);
+}
+
+function joinClean(values: Array<string | null | undefined>): string | null {
+  const cleaned = values.map((value) => String(value ?? "").trim()).filter(Boolean);
+  return cleaned.length > 0 ? cleaned.join(", ") : null;
+}
+
+export function denseListFieldsFor(b: PublicBook): DenseListFields {
+  const title = effectiveTitleFor(b);
+  const subtitle = String(b.subtitle_override ?? "").trim() || null;
+
+  if (isMagazineObject(b.object_type)) {
+    const issueLine = formatIssueDisplay(b) || null;
+    const dateLine = effectiveDateLabelFor(b);
+    return {
+      primaryTitle: title,
+      primarySubtitle: subtitle,
+      secondary: issueLine,
+      tertiary: dateLine && dateLine !== issueLine ? dateLine : null,
+      mobileSecondary: joinClean([issueLine, dateLine && dateLine !== issueLine ? dateLine : null])
+    };
+  }
+
+  if (String(b.object_type ?? "").trim() === "music") {
+    const music = parseMusicMetadata(b.music_metadata);
+    const artist = joinClean(effectiveAuthorsFor(b));
+    const tertiary = joinClean([effectiveYearFor(b), music?.label ?? effectivePublisherFor(b), music?.format]);
+    return {
+      primaryTitle: title,
+      primarySubtitle: subtitle,
+      secondary: artist,
+      tertiary,
+      mobileSecondary: artist ?? tertiary
+    };
+  }
+
+  const secondary = joinClean(effectiveAuthorsFor(b));
+  const publisher = String(effectivePublisherFor(b) ?? "").trim() || null;
+  const tertiary = effectiveYearFor(b) ?? publisher;
+
+  return {
+    primaryTitle: title,
+    primarySubtitle: subtitle,
+    secondary,
+    tertiary,
+    mobileSecondary: secondary ?? tertiary
+  };
 }
 
 export function groupKeyFor(b: PublicBook): string {

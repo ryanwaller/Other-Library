@@ -7,6 +7,7 @@ import AddToLibraryButton from "./AddToLibraryButton";
 import CoverImage from "../../../components/CoverImage";
 import ActiveFilterDisplay, { type FilterPair } from "../../../components/ActiveFilterDisplay";
 import PagedBookList from "../../app/components/PagedBookList";
+import DenseListRow from "../../app/components/DenseListRow";
 import type { PublicBook, CatalogGroup } from "../../../lib/types";
 import { supabase } from "../../../lib/supabaseClient";
 import { DECADE_OPTIONS } from "../../../lib/decades";
@@ -84,6 +85,18 @@ function uniqCaseInsensitive(values: string[]): string[] {
     out.push(normalized);
   }
   return out;
+}
+
+function formatAddedDate(value: unknown): string | null {
+  const timestamp = Date.parse(String(value ?? ""));
+  if (!Number.isFinite(timestamp)) return null;
+  const date = new Date(timestamp);
+  const now = new Date();
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return new Intl.DateTimeFormat(
+    "en-US",
+    sameYear ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" }
+  ).format(date);
 }
 
 export default function PublicBookList({
@@ -606,7 +619,7 @@ export default function PublicBookList({
 
   const containerStyle = useMemo((): React.CSSProperties => {
     if (viewMode === "list") {
-      return { display: "flex", flexDirection: "column", gap: "var(--space-8)" };
+      return { display: "flex", flexDirection: "column", gap: 0 };
     }
     return {
       display: "grid",
@@ -699,40 +712,18 @@ export default function PublicBookList({
         .find(Boolean) ?? null;
     const href = sharedBookIds.has(Number(b.id)) && !!sessionUserId ? `/app/books/${b.id}` : `/u/${username}/b/${bookIdSlug(b.id, title)}`;
     const roundedCoverStyle = wishlistMode ? { width: "100%", height: "auto", display: "block", borderRadius: 28, overflow: "hidden" } : { width: "100%", height: "auto", display: "block" };
-    const roundedListCoverStyle = wishlistMode ? { width: "100%", height: "auto", display: "block", borderRadius: 20, overflow: "hidden" } : { width: "100%", height: "auto", display: "block" };
-
     if (viewMode === "list") {
       return (
-        <div key={g.key} className="card" style={{ display: "flex", gap: "var(--space-md)", alignItems: "start" }}>
-          <Link href={href} style={{ display: "block" }} className="om-book-card-link">
-            <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
-              <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={roundedListCoverStyle} objectFit="contain" sizes={coverSizes} />
-            </div>
-          </Link>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <Link href={href}>{title}</Link>
-            <div className="om-book-secondary">
-              {truncatedAuthors.length > 0
-                ? truncatedAuthors.map((a, idx) => (
-                    <span key={a}>
-                      {secondary.mode === "plain" || a === "+ more" ? (
-                        <span className="text-muted">{a}</span>
-                      ) : (
-                        <button 
-                          onClick={() => setFilterAndUrl("author", a)}
-                          className="om-filter-link"
-                          style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "inherit", cursor: "pointer" }}
-                        >
-                          {a}
-                        </button>
-                      )}
-                      {idx < truncatedAuthors.length - 1 ? <span>, </span> : null}
-                    </span>
-                  ))
-                : null}
-            </div>
-          </div>
-          <div style={{ marginLeft: "auto" }}>
+        <DenseListRow
+          key={g.key}
+          item={b}
+          href={href}
+          coverUrl={coverUrl}
+          originalSrc={originalSrc}
+          cropData={cropData}
+          roundedCover={wishlistMode}
+          utilityLabel={formatAddedDate((b as any).created_at)}
+          trailingAction={
             <AddToLibraryButton
               editionId={e?.id ?? null}
               titleFallback={title}
@@ -743,8 +734,8 @@ export default function PublicBookList({
               sourceOwnerId={profileId}
               compact
             />
-          </div>
-        </div>
+          }
+        />
       );
     }
 
