@@ -118,6 +118,7 @@ export default function DenseListRow({
                 cropData={cropData}
                 style={{ display: "block", width: "100%" }}
                 objectFit="contain"
+                sizes="160px"
               />
             </div>,
             document.body

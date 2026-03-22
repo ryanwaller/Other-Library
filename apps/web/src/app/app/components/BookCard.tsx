@@ -94,6 +94,14 @@ export default function BookCard({
     return authors;
   }, [gridCols, authors, isMobile]);
 
+  const gridSizes = isMobile
+    ? "50vw"
+    : (gridCols ?? 6) >= 8
+      ? "(max-width: 1100px) 15vw, 12vw"
+      : (gridCols ?? 6) >= 6
+        ? "(max-width: 1100px) 20vw, 17vw"
+        : "(max-width: 1100px) 30vw, 25vw";
+
   const coverEl = (
     <div className="om-cover-slot" style={{ height: "auto", width: "100%", borderRadius: roundedCover ? 24 : 0, overflow: roundedCover ? "hidden" : "visible" }}>
       <CoverImage
@@ -102,6 +110,7 @@ export default function BookCard({
         cropData={cropData}
         style={{ display: "block", width: "100%", height: "auto" }}
         objectFit="contain"
+        sizes={gridSizes}
       />
     </div>
   );

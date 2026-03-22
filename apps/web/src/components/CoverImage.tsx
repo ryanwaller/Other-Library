@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, type CSSProperties } from "react";
 
-const SRCSET_WIDTHS = [200, 400, 800, 1200];
+const SRCSET_WIDTHS = [80, 200, 400, 800, 1200];
 
 function parseSupabasePath(src: string): { bucket: string; path: string } | null {
   try {
