@@ -108,6 +108,15 @@ type EntityMergeResponse = {
   }>;
 };
 
+type EntityMergePreviewResponse = {
+  preview: {
+    sourceCount: number;
+    linkCount: number;
+    itemCount: number;
+    homepageSlotCount: number;
+  };
+};
+
 type TabKey = "users" | "waitlist" | "invites" | "feedback" | "homepage" | "entities";
 
 type MetaPair = { label: string; value: string | number };
@@ -133,6 +142,16 @@ function clampPage(current: number, totalPages: number) {
 function titleCase(input: string): string {
   if (!input) return "";
   return input.charAt(0).toUpperCase() + input.slice(1).toLowerCase();
+}
+
+function duplicateKeyForEntityName(input: string): string {
+  return String(input ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[.,/#!$%^&*;:{}=_`~()]/g, " ")
+    .replace(/\b(llc|l\.l\.c\.|inc|incorporated|ltd|limited|corp|corporation|co|company|pllc|llp|lp)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function inviteStatus(row: InviteRow): "pending" | "used" | "expired" {
@@ -282,6 +301,9 @@ function AdminPageInner() {
   const [entityMergeSections, setEntityMergeSections] = useState<EntityMergeResponse["sections"]>([]);
   const [entityMergeSelected, setEntityMergeSelected] = useState<Record<string, MergeEntity>>({});
   const [entityMergeKeepId, setEntityMergeKeepId] = useState<string | null>(null);
+  const [entityMergeView, setEntityMergeView] = useState<"role" | "duplicates">("role");
+  const [entityMergeSort, setEntityMergeSort] = useState<"count" | "alpha">("count");
+  const [entityMergePreview, setEntityMergePreview] = useState<EntityMergePreviewResponse["preview"] | null>(null);
   const [entityMergeBusy, setEntityMergeBusy] = useState(false);
   const [entityMergeNotice, setEntityMergeNotice] = useState<string | null>(null);
 
@@ -497,6 +519,36 @@ function AdminPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, tab, entityMergeQuery]);
 
+  useEffect(() => {
+    if (!token || tab !== "entities") return;
+    const sourceIds = selectedMergeEntities.map((entity) => entity.id).filter((id) => id !== entityMergeKeepId);
+    if (!entityMergeKeepId || sourceIds.length === 0) {
+      setEntityMergePreview(null);
+      return;
+    }
+
+    let alive = true;
+    const params = new URLSearchParams({ preview: "1" });
+    for (const sourceId of sourceIds) params.append("source_entity_id", sourceId);
+
+    api<EntityMergePreviewResponse>(`/api/admin/entities/merge?${params.toString()}`, { method: "GET", token })
+      .then((res) => {
+        if (!alive) return;
+        setEntityMergePreview(res.preview ?? null);
+      })
+      .catch((e: any) => {
+        if (!alive) return;
+        const msg = e?.message ?? "Failed to load merge preview";
+        if (handleAuthError(msg)) return;
+        setError(msg);
+        setEntityMergePreview(null);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [token, tab, selectedMergeEntities, entityMergeKeepId]);
+
   const userTotalPages = usersData ? Math.max(1, Math.ceil(usersData.total / usersData.pageSize)) : 1;
   const waitTotalPages = waitlistData ? Math.max(1, Math.ceil(waitlistData.total / waitlistData.pageSize)) : 1;
   const invitesTotalPages = invitesData ? Math.max(1, Math.ceil(invitesData.total / invitesData.pageSize)) : 1;
@@ -504,6 +556,44 @@ function AdminPageInner() {
     () => Object.values(entityMergeSelected).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })),
     [entityMergeSelected]
   );
+  const sortedEntityMergeSections = useMemo(
+    () =>
+      entityMergeSections.map((section) => ({
+        ...section,
+        entities: [...section.entities].sort((a, b) => {
+          if (entityMergeSort === "alpha") {
+            return a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true });
+          }
+          if (b.count !== a.count) return b.count - a.count;
+          return a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true });
+        }),
+      })),
+    [entityMergeSections, entityMergeSort]
+  );
+  const likelyDuplicateSections = useMemo(() => {
+    return sortedEntityMergeSections
+      .map((section) => {
+        const clusters = new Map<string, MergeEntity[]>();
+        for (const entity of section.entities) {
+          const key = duplicateKeyForEntityName(entity.name);
+          if (!key) continue;
+          const bucket = clusters.get(key) ?? [];
+          bucket.push(entity);
+          clusters.set(key, bucket);
+        }
+        return {
+          key: section.key,
+          label: section.label,
+          clusters: [...clusters.entries()]
+            .map(([key, entities]) => ({
+              key,
+              entities: [...entities].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })),
+            }))
+            .filter((cluster) => cluster.entities.length > 1),
+        };
+      })
+      .filter((section) => section.clusters.length > 0);
+  }, [sortedEntityMergeSections]);
 
   useEffect(() => setUserPage((prev) => clampPage(prev, userTotalPages)), [userTotalPages]);
   useEffect(() => setWaitPage((prev) => clampPage(prev, waitTotalPages)), [waitTotalPages]);
@@ -1187,6 +1277,22 @@ function AdminPageInner() {
                     Clear
                   </button>
                 ) : null}
+                <select
+                  value={entityMergeView}
+                  onChange={(e) => setEntityMergeView(e.target.value as "role" | "duplicates")}
+                  disabled={entityMergeBusy}
+                >
+                  <option value="role">By role</option>
+                  <option value="duplicates">Likely duplicates</option>
+                </select>
+                <select
+                  value={entityMergeSort}
+                  onChange={(e) => setEntityMergeSort(e.target.value as "count" | "alpha")}
+                  disabled={entityMergeBusy}
+                >
+                  <option value="count">Sort by count</option>
+                  <option value="alpha">Sort alphabetically</option>
+                </select>
               </div>
 
               <div className="om-list" style={{ marginTop: "var(--space-lg)" }}>
@@ -1290,13 +1396,23 @@ function AdminPageInner() {
                 </button>
               </div>
 
+              {entityMergePreview ? (
+                <div className="text-muted" style={{ marginTop: "var(--space-10)" }}>
+                  This merge will move {entityMergePreview.linkCount} entity links across {entityMergePreview.itemCount} items
+                  {entityMergePreview.homepageSlotCount > 0 ? ` and update ${entityMergePreview.homepageSlotCount} homepage slot${entityMergePreview.homepageSlotCount === 1 ? "" : "s"}` : ""}
+                  .
+                </div>
+              ) : null}
+
               <div className="om-list" style={{ marginTop: "var(--space-lg)" }}>
-                {entityMergeSections.length === 0 ? (
+                {(entityMergeView === "role" ? sortedEntityMergeSections.length === 0 : likelyDuplicateSections.length === 0) ? (
                   <div className="om-list-row text-muted">
-                    {entityMergeQuery ? "No entities matched that filter." : "No entities found."}
+                    {entityMergeView === "duplicates"
+                      ? (entityMergeQuery ? "No likely duplicates matched that filter." : "No likely duplicate clusters found.")
+                      : (entityMergeQuery ? "No entities matched that filter." : "No entities found.")}
                   </div>
                 ) : null}
-                {entityMergeSections.map((section) => (
+                {entityMergeView === "role" ? sortedEntityMergeSections.map((section) => (
                   <div key={section.key} className="om-list-row">
                     <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-md)", flexWrap: "wrap" }}>
                       <div>{section.label}</div>
@@ -1356,6 +1472,74 @@ function AdminPageInner() {
                           </label>
                         );
                       })}
+                    </div>
+                  </div>
+                )) : likelyDuplicateSections.map((section) => (
+                  <div key={`dupe-${section.key}`} className="om-list-row">
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-md)", flexWrap: "wrap" }}>
+                      <div>{section.label}</div>
+                      <div className="text-muted">{section.clusters.length} clusters</div>
+                    </div>
+                    <div className="om-list" style={{ marginTop: "var(--space-md)" }}>
+                      {section.clusters.map((cluster) => (
+                        <div key={`${section.key}-${cluster.key}`} className="om-list-row">
+                          <div className="text-muted" style={{ marginBottom: "var(--space-8)" }}>
+                            Likely duplicate cluster
+                          </div>
+                          <div className="om-list">
+                            {cluster.entities.map((entity) => {
+                              const selected = Boolean(entityMergeSelected[entity.id]);
+                              const keep = entityMergeKeepId === entity.id;
+                              return (
+                                <label key={`${section.key}-${cluster.key}-${entity.id}`} className="om-list-row" style={{ cursor: "pointer" }}>
+                                  <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-md)", flexWrap: "wrap" }}>
+                                    <div className="row" style={{ gap: "var(--space-10)", alignItems: "center", minWidth: 0, flex: 1 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={selected}
+                                        onChange={(e) => {
+                                          const checked = e.target.checked;
+                                          setEntityMergeSelected((prev) => {
+                                            if (checked) return { ...prev, [entity.id]: entity };
+                                            const next = { ...prev };
+                                            delete next[entity.id];
+                                            return next;
+                                          });
+                                          setEntityMergeKeepId((prev) => {
+                                            if (!checked && prev === entity.id) return null;
+                                            if (checked && !prev) return entity.id;
+                                            return prev;
+                                          });
+                                          setEntityMergeNotice(null);
+                                        }}
+                                      />
+                                      <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                                        {entity.name}
+                                        <span className="text-muted"> · {entity.count}</span>
+                                        {entity.slug ? <span className="text-muted"> · /entity/{entity.slug}</span> : null}
+                                      </div>
+                                    </div>
+                                    <div className="row" style={{ gap: "var(--space-8)", alignItems: "center", flexWrap: "wrap" }}>
+                                      {selected ? (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            setEntityMergeKeepId(entity.id);
+                                          }}
+                                          disabled={entityMergeBusy}
+                                        >
+                                          {keep ? "Keeping" : "Keep"}
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}

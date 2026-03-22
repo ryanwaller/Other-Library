@@ -33,6 +33,13 @@ type EntityRoleGroup = {
   entities: GroupedEntity[];
 };
 
+type MergePreview = {
+  sourceCount: number;
+  linkCount: number;
+  itemCount: number;
+  homepageSlotCount: number;
+};
+
 const ROLE_GROUP_ORDER: EntityRoleGroupKey[] = [
   "author",
   "contributor",
@@ -139,6 +146,49 @@ async function loadGroupedEntities(admin: any, q: string): Promise<EntityRoleGro
   })).filter((group) => group.entities.length > 0);
 }
 
+function parseSourceIds(url: URL): string[] {
+  return Array.from(
+    new Set(
+      [
+        ...url.searchParams.getAll("source_entity_id"),
+        ...String(url.searchParams.get("source_entity_ids") ?? "")
+          .split(",")
+          .map((value) => value.trim()),
+      ].filter(Boolean)
+    )
+  );
+}
+
+async function loadMergePreview(admin: any, sourceIds: string[]): Promise<MergePreview> {
+  const uniqueSourceIds = Array.from(new Set(sourceIds.map((value) => String(value ?? "").trim()).filter(Boolean)));
+  if (uniqueSourceIds.length === 0) {
+    return { sourceCount: 0, linkCount: 0, itemCount: 0, homepageSlotCount: 0 };
+  }
+
+  const linksRes = await admin
+    .from("book_entities")
+    .select("user_book_id")
+    .in("entity_id", uniqueSourceIds)
+    .limit(10000);
+  if (linksRes.error) throw new Error(linksRes.error.message);
+
+  const linkRows = (linksRes.data ?? []) as Array<{ user_book_id: number }>;
+  const distinctItems = new Set(linkRows.map((row) => Number(row.user_book_id)).filter(Number.isFinite));
+
+  const homepageRes = await admin
+    .from("homepage_feature_slots")
+    .select("slot_index", { count: "exact", head: true })
+    .in("entity_id", uniqueSourceIds);
+  if (homepageRes.error && homepageRes.error.code !== "42P01") throw new Error(homepageRes.error.message);
+
+  return {
+    sourceCount: uniqueSourceIds.length,
+    linkCount: linkRows.length,
+    itemCount: distinctItems.size,
+    homepageSlotCount: homepageRes.error?.code === "42P01" ? 0 : Number(homepageRes.count ?? 0),
+  };
+}
+
 export async function GET(req: Request) {
   try {
     await requireAdmin(req);
@@ -146,6 +196,13 @@ export async function GET(req: Request) {
     if (!admin) return NextResponse.json({ error: "admin_not_configured" }, { status: 500 });
 
     const url = new URL(req.url);
+    const preview = String(url.searchParams.get("preview") ?? "").trim() === "1";
+    if (preview) {
+      const sourceIds = parseSourceIds(url);
+      const previewData = await loadMergePreview(admin, sourceIds);
+      return NextResponse.json({ preview: previewData });
+    }
+
     const q = String(url.searchParams.get("q") ?? "").trim();
     const sections = await loadGroupedEntities(admin, q);
     return NextResponse.json({ sections });
