@@ -230,6 +230,20 @@ function toDisplayCoverUrl(mediaUrlsByPath: Record<string, string>, client: any,
   return publicUrl ?? null;
 }
 
+function resolvedCoverUrlForItem(item: CatalogItem, mediaUrlsByPath: Record<string, string>, client: any): string | null {
+  const preferredMediaPath =
+    (item.media ?? []).find((m) => String(m?.kind ?? "").trim().toLowerCase() === "cover")?.storage_path ??
+    (item.media ?? [])[0]?.storage_path ??
+    null;
+
+  return (
+    toDisplayCoverUrl(mediaUrlsByPath, client, item.cover_original_url ?? null) ||
+    toDisplayCoverUrl(mediaUrlsByPath, client, preferredMediaPath) ||
+    toDisplayCoverUrl(mediaUrlsByPath, client, item.edition?.cover_url ?? null) ||
+    null
+  );
+}
+
 const HOMEPAGE_CACHE_KEY = "om_homepage_home_cache_v2";
 const HOMEPAGE_CACHE_TTL_MS = 120_000;
 
@@ -3126,10 +3140,15 @@ function AppShell({
             }
           }
 
+          const primaryWithResolved = {
+            ...primary,
+            resolved_cover_url: resolvedCoverUrlForItem(primary, mediaUrlsByPath, supabase),
+          };
+
           return [{
             key,
             libraryId: primary.library_id,
-            primary,
+            primary: primaryWithResolved,
             copies: sorted,
             copiesCount: sorted.length,
             tagNames: Array.from(tagSet.values()).sort((a, b) => a.localeCompare(b)),
@@ -3291,7 +3310,7 @@ function AppShell({
       console.error("displayGroups_failed", err);
       return [];
     }
-  }, [filteredItems, filterTag, tagMode, filterAuthor, filterSubject, filterPublisher, filterDesigner, filterGroup, filterDecade, filterCategory, categoryMode, visibilityMode, sortMode, searchQuery, profile?.visibility, searchParams]);
+  }, [filteredItems, filterTag, tagMode, filterAuthor, filterSubject, filterPublisher, filterDesigner, filterGroup, filterDecade, filterCategory, categoryMode, visibilityMode, sortMode, searchQuery, profile?.visibility, searchParams, mediaUrlsByPath, supabase]);
 
   const bulkSelectedGroups = useMemo(() => displayGroups.filter((g) => bulkSelectedKeys[g.key]), [displayGroups, bulkSelectedKeys]);
 
