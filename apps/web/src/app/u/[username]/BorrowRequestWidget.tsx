@@ -223,7 +223,7 @@ export default function BorrowRequestWidget({
   }
 
   if (!borrowable) {
-    return <div className="text-muted">Not borrowable.</div>;
+    return null;
   }
 
   return (
