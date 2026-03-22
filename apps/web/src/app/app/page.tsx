@@ -155,6 +155,7 @@ type CatalogMemberView = {
 
 type CatalogHomeCachePayload = {
   ts: number;
+  mode: LibraryMode;
   libraries: LibrarySummary[];
   books: any[];
 };
@@ -257,13 +258,18 @@ function resolvedCoverUrlForItem(item: CatalogItem, mediaUrlsByPath: Record<stri
 const HOMEPAGE_CACHE_KEY = "om_homepage_home_cache_v2";
 const HOMEPAGE_CACHE_TTL_MS = 120_000;
 
-function loadHomepageCache(): CatalogHomeCachePayload | null {
+function loadHomepageCache(expectedMode?: LibraryMode): CatalogHomeCachePayload | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(HOMEPAGE_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CatalogHomeCachePayload;
     if (!parsed || !Array.isArray(parsed.libraries) || !Array.isArray(parsed.books) || typeof parsed.ts !== "number") return null;
+    if (parsed.mode !== "catalog" && parsed.mode !== "wishlist") {
+      clearHomepageCache();
+      return null;
+    }
+    if (expectedMode && parsed.mode !== expectedMode) return null;
     if (!Number.isFinite(parsed.ts) || Date.now() - parsed.ts > HOMEPAGE_CACHE_TTL_MS) return null;
     return parsed;
   } catch {
@@ -719,6 +725,8 @@ function AppShell({
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [booksLoading, setBooksLoading] = useState(false);
   const [pendingCollectionMode, setPendingCollectionMode] = useState<LibraryMode | null>(null);
+  const [loadedItemsMode, setLoadedItemsMode] = useState<LibraryMode | null>(null);
+  const [loadedLibrariesMode, setLoadedLibrariesMode] = useState<LibraryMode | null>(null);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [desktopGridDensity, setDesktopGridDensity] = useState<DesktopGridDensity>(DEFAULT_DESKTOP_GRID_DENSITY);
@@ -1154,6 +1162,7 @@ function AppShell({
       const cachedList = normalizeLibrariesDeterministically(cached.libraries);
       if (cachedList.length === 0 && cached.books.length === 0) return;
       setLibraries(cachedList);
+      setLoadedLibrariesMode(cached.mode);
       setDebugLibrariesSource("libs:cache");
       setBooksLoading(false);
       applyLibrarySelection(cachedList);
@@ -1173,7 +1182,7 @@ function AppShell({
       }
       if (Array.isArray(cached.books) && cached.books.length > 0) {
         setDebugBooksSource("books:cache");
-        await applyBooksFromServer(cached.books, "books:cache", requestSeq);
+        await applyBooksFromServer(cached.books, "books:cache", requestSeq, cached.mode);
       }
     } catch (err) {
       console.error("homepage_cache_hydrate_failed", err);
@@ -1204,7 +1213,7 @@ function AppShell({
     });
   }, []);
 
-  async function applyBooksFromServer(serverRows: any[], source: string, requestSeq?: number) {
+  async function applyBooksFromServer(serverRows: any[], source: string, requestSeq?: number, mode: LibraryMode = collectionMode) {
     const client = supabase;
     if (!client) return;
     if (typeof requestSeq === "number" && booksRequestSeqRef.current !== requestSeq) return;
@@ -1228,6 +1237,7 @@ function AppShell({
     if (typeof requestSeq === "number" && booksRequestSeqRef.current !== requestSeq) return;
     setDebugBooksSource(source);
     setItems(normalizedRows as any);
+    setLoadedItemsMode(mode);
     const serverPaths = Array.from(
       new Set([
         ...normalizedRows
@@ -1313,6 +1323,7 @@ function AppShell({
     booksRequestSeqRef.current = requestSeq;
     const isStale = () => booksRequestSeqRef.current !== requestSeq;
     setBooksLoading(true);
+    setLoadedItemsMode(null);
     const ids = Array.from(new Set((targetLibraryIds ?? libraries.map((l) => l.id)).filter((n) => Number.isFinite(n) && n > 0)));
     const idsQuery = ids.length > 0 ? `catalog_ids=${encodeURIComponent(ids.join(","))}` : "";
     const modeQuery = `mode=${encodeURIComponent(collectionMode)}`;
@@ -1322,7 +1333,7 @@ function AppShell({
       if (options?.fastFirst) {
         const liteHome = await catalogApi<{ ok: true; books: any[] }>(liteEndpoint, { method: "GET" });
         if (Array.isArray(liteHome.books)) {
-          await applyBooksFromServer(liteHome.books as any[], ids.length > 0 ? "books:server-home-lite" : "books:server-home-lite-noids", requestSeq);
+          await applyBooksFromServer(liteHome.books as any[], ids.length > 0 ? "books:server-home-lite" : "books:server-home-lite-noids", requestSeq, collectionMode);
           if (options.skipSecondApiCall && liteHome.books.length > 0) {
             return;
           }
@@ -1340,14 +1351,14 @@ function AppShell({
         }
       }
       if (Array.isArray(serverHome.books) && serverHome.books.length > 0) {
-        await applyBooksFromServer(serverHome.books as any[], ids.length > 0 ? "books:server-home" : "books:server-home-noids", requestSeq);
+        await applyBooksFromServer(serverHome.books as any[], ids.length > 0 ? "books:server-home" : "books:server-home-noids", requestSeq, collectionMode);
         return;
       }
       if (Array.isArray(serverHome.books) && serverHome.books.length === 0 && ids.length > 0) {
         const fallback = await fetchBooksDirectFromClient(ids, requestSeq);
         if (fallback.ok && !isStale()) {
           setDebugBooksSource(fallback.source);
-          await applyBooksFromServer(fallback.rows, "books:client-fallback");
+          await applyBooksFromServer(fallback.rows, "books:client-fallback", requestSeq, collectionMode);
           return;
         }
         if (!fallback.ok) {
@@ -1373,18 +1384,22 @@ function AppShell({
           }));
           if (ownerRows.length > 0) {
             setDebugBooksSource("books:client-owner-fallback");
-            await applyBooksFromServer(ownerRows, "books:client-owner-fallback", requestSeq);
+            await applyBooksFromServer(ownerRows, "books:client-owner-fallback", requestSeq, collectionMode);
             return;
           }
         }
       }
       if (isStale()) return;
       setDebugBooksSource("books:failed");
+      setItems([]);
+      setLoadedItemsMode(collectionMode);
       return;
     } catch (err: any) {
       if (isStale()) return;
       setDebugLastError(String(err?.message ?? "server_home_failed"));
       setDebugBooksSource("books:failed");
+      setItems([]);
+      setLoadedItemsMode(collectionMode);
       return;
     } finally {
       if (!isStale()) setBooksLoading(false);
@@ -1464,8 +1479,10 @@ function AppShell({
     const isStale = () => librariesRequestSeqRef.current !== requestSeq;
     setLibraryState({ busy: true, error: null, message: null });
     setBooksLoading(true);
+    setLoadedLibrariesMode(null);
+    setLoadedItemsMode(null);
 
-    const cached = loadHomepageCache();
+    const cached = loadHomepageCache(collectionMode);
     if (cached) {
       const cachedList = normalizeLibrariesDeterministically(cached.libraries);
       if (!isStale() && cachedList.length > 0) {
@@ -1526,12 +1543,14 @@ function AppShell({
 
       if (isStale()) return [];
       setLibraries(list);
+      setLoadedLibrariesMode(collectionMode);
       if (liteBooks.length > 0) {
         setDebugBooksSource("books:server-home-lite");
-        await applyBooksFromServer(liteBooks, "books:server-home-lite", booksRequestSeq);
+        await applyBooksFromServer(liteBooks, "books:server-home-lite", booksRequestSeq, collectionMode);
         if (list.length > 0 && liteBooks.length > 0) {
           saveHomepageCache({
             ts: Date.now(),
+            mode: collectionMode,
             libraries: list,
             books: liteBooks
           });
@@ -1575,6 +1594,7 @@ function AppShell({
           const ownerList = normalizeLibrariesDeterministically(((ownerFallback.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const }))) as LibrarySummary[];
         if (isStale()) return [];
         setLibraries(ownerList);
+        setLoadedLibrariesMode(collectionMode);
         setShowSharedLibraries(true);
         applyLibrarySelection(ownerList);
         try {
@@ -1592,6 +1612,7 @@ function AppShell({
       setDebugLibrariesSource("libs:failed");
       setDebugLastError(e?.message ?? "libs_failed");
       setLibraries([]);
+      setLoadedLibrariesMode(collectionMode);
       persistAddLibrarySelection(null);
       setLibraryState({ busy: false, error: e?.message ?? "Failed to load catalogs", message: null });
       setBooksLoading(false);
@@ -1737,7 +1758,7 @@ function AppShell({
         .select("username,visibility,avatar_path")
         .eq("id", userId)
         .maybeSingle();
-      const homepageCache = loadHomepageCache();
+      const homepageCache = loadHomepageCache(collectionMode);
 
       try {
         const hasCachedHomePayload = !!(homepageCache && ((homepageCache.libraries.length > 0 || homepageCache.books.length > 0)));
@@ -1772,6 +1793,8 @@ function AppShell({
 
   useEffect(() => {
     if (!supabase) return;
+    setLoadedLibrariesMode(null);
+    setLoadedItemsMode(null);
     void refreshLibraries().finally(() => setPendingCollectionMode(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collectionMode]);
@@ -3513,7 +3536,8 @@ function AppShell({
     () => (showSharedLibraries ? [...ownedRenderLibraries, ...sharedRenderLibraries] : ownedRenderLibraries),
     [ownedRenderLibraries, sharedRenderLibraries, showSharedLibraries]
   );
-  const displayGroupCount = pendingCollectionMode === collectionMode ? 0 : displayGroups.length;
+  const displayLibraryCount = loadedLibrariesMode === collectionMode ? displayLibraries.length : 0;
+  const displayGroupCount = loadedItemsMode === collectionMode && pendingCollectionMode !== collectionMode ? displayGroups.length : 0;
   const firstSharedDisplayIndex = useMemo(() => displayLibraries.findIndex((l) => l.myRole === "editor"), [displayLibraries]);
 
   const availableCategories = useMemo(() => {
@@ -3594,7 +3618,7 @@ function AppShell({
               <>
                 <span className="om-stat-pair">
                   <span className="text-muted">Catalogs</span>
-                  <span>{displayLibraries.length}</span>
+                  <span>{displayLibraryCount}</span>
                 </span>
                 <span className="om-stat-pair">
                   <span className="text-muted">Items</span>
@@ -3603,8 +3627,7 @@ function AppShell({
                 <button
                   type="button"
                   onClick={() => setCollectionMode("wishlist")}
-                  className="text-muted"
-                  style={{ background: "transparent", border: 0, padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}
+                  className="muted text-muted"
                 >
                   Wishlist
                 </button>
@@ -3618,8 +3641,7 @@ function AppShell({
                 <button
                   type="button"
                   onClick={() => setCollectionMode("catalog")}
-                  className="text-muted"
-                  style={{ background: "transparent", border: 0, padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}
+                  className="muted text-muted"
                 >
                   Back to Catalogs
                 </button>
