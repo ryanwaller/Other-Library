@@ -1060,8 +1060,8 @@ a.text-muted:hover {
     44px
     minmax(220px, 2.25fr)
     minmax(220px, 2.25fr)
-    minmax(96px, 1.1fr)
-    88px
+    minmax(220px, 2.25fr)
+    minmax(120px, 1.5fr)
     var(--dense-action, 0px);
   align-items: stretch;
   min-height: 52px;

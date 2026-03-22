@@ -116,9 +116,6 @@ function renderCard({
     (typeof group.primary.cover_original_url === "string" && group.primary.cover_original_url.trim().startsWith("http")
       ? group.primary.cover_original_url.trim()
       : null) ||
-    (typeof group.primary.edition?.cover_url === "string" && group.primary.edition.cover_url.trim()
-      ? group.primary.edition.cover_url.trim()
-      : null) ||
     resolvedCoverUrl;
 
   return (
