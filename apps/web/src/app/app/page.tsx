@@ -3566,26 +3566,40 @@ function AppShell({
         <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
           <div className="om-stat-line">
             {!wishlistMode ? (
-              <span className="om-stat-pair">
-                <span className="text-muted">Catalogs</span>
-                <span>{displayLibraries.length}</span>
-              </span>
+              <>
+                <span className="om-stat-pair">
+                  <span className="text-muted">Catalogs</span>
+                  <span>{displayLibraries.length}</span>
+                </span>
+                <span className="om-stat-pair">
+                  <span className="text-muted">Items</span>
+                  <span>{displayGroups.length}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCollectionMode("wishlist")}
+                  className="text-muted"
+                  style={{ background: "transparent", border: 0, padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}
+                >
+                  Wishlist
+                </button>
+              </>
             ) : (
-              <span className="om-stat-pair">
-                <span className="text-muted">Wishlist</span>
-                <span>{displayGroups.length}</span>
-              </span>
+              <>
+                <span className="om-stat-pair">
+                  <span className="text-muted">Wishlist Items</span>
+                  <span>{displayGroups.length}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCollectionMode("catalog")}
+                  className="text-muted"
+                  style={{ background: "transparent", border: 0, padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}
+                >
+                  Back to Catalogs
+                </button>
+              </>
             )}
-            <span className="om-stat-pair">
-              <span className="text-muted">Items</span>
-              <span>{displayGroups.length}</span>
-            </span>
-            <button type="button" onClick={() => setCollectionMode("catalog")} className={wishlistMode ? "text-muted" : ""} style={{ background: "transparent", border: 0, padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}>
-              Catalog
-            </button>
-            <button type="button" onClick={() => setCollectionMode("wishlist")} className={wishlistMode ? "" : "text-muted"} style={{ background: "transparent", border: 0, padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}>
-              Wishlist
-            </button>
             {bulkMode && (
               <>
                 <span className="om-stat-pair">
