@@ -138,7 +138,7 @@ export function denseListFieldsFor(b: PublicBook): DenseListFields {
 
   const secondary = joinClean(effectiveAuthorsFor(b));
   const publisher = String(effectivePublisherFor(b) ?? "").trim() || null;
-  const tertiary = effectiveYearFor(b) ?? publisher;
+  const tertiary = joinClean([publisher, effectiveYearFor(b)]);
 
   return {
     primaryTitle: title,
