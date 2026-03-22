@@ -694,14 +694,14 @@ export default function AddToLibraryButton({
 
   return (
     <span className="row" style={{ gap: "var(--space-8)", flexWrap: "nowrap", alignItems: "center", minHeight: 24 }}>
-      {editionId && ownedCount > 0 ? (
+      {!compact && editionId && ownedCount > 0 ? (
         <Link href={ownedIdToOpen ? `/app/books/${ownedIdToOpen}` : "/app"} style={{ textDecoration: "none" }}>
           <span className="card" style={{ padding: "2px 8px", display: "inline-flex", alignItems: "center" }}>
             {ownedCount}
           </span>
         </Link>
       ) : null}
-      {editionId && wantedCount > 0 ? (
+      {!compact && editionId && wantedCount > 0 ? (
         <Link href={wantedIdToOpen ? `/app/books/${wantedIdToOpen}` : "/app"} style={{ textDecoration: "none" }}>
           <span className="card" style={{ padding: "2px 8px", display: "inline-flex", alignItems: "center" }}>
             Wishlist
@@ -768,7 +768,8 @@ function CatalogPickerDropdown({
         minWidth: isMobileViewport ? undefined : 200,
         width: isMobileViewport ? "auto" : undefined,
         maxWidth: isMobileViewport ? "calc(100vw - 24px)" : undefined,
-        backgroundColor: "var(--bg)",
+        background: "var(--bg)",
+        opacity: 1,
         border: "1px solid var(--border)",
         boxShadow: "0 12px 28px rgba(0, 0, 0, 0.32)",
         fontSize: "inherit",
@@ -845,7 +846,7 @@ function CatalogPickerDropdown({
       )}
 
       <div>
-        <div style={{ height: 1, margin: "0 12px", background: "var(--border)" }} />
+        <div style={{ height: 1, margin: "0", background: "var(--border)" }} />
         {existingPlacements.length > 0 ? (
           <div className="text-muted" style={{ padding: "8px 12px 6px" }}>
             Add to catalog
