@@ -9,6 +9,14 @@ import { WISHLIST_LIBRARY_NAME } from "../../../lib/collection";
 
 type Catalog = { id: number; name: string };
 
+type ExistingPlacement = {
+  libraryId: number;
+  libraryName: string;
+  collectionState: "owned" | "wanted";
+  latestBookId: number;
+  copyCount: number;
+};
+
 type AddToLibraryButtonProps = {
   editionId: number | null;
   titleFallback: string;
@@ -119,6 +127,7 @@ export default function AddToLibraryButton({
   const [newCatalogBusy, setNewCatalogBusy] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [pickerViewportLayout, setPickerViewportLayout] = useState<{ left: number; top: number; width: number } | null>(null);
+  const [existingPlacements, setExistingPlacements] = useState<ExistingPlacement[]>([]);
 
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -272,6 +281,52 @@ export default function AddToLibraryButton({
     if (res.error) return;
     const ids = new Set<number>((res.data ?? []).map((r: any) => Number(r.library_id)));
     setCatalogsWithEdition(ids);
+  }
+
+  async function loadExistingPlacements() {
+    if (!supabase || !sessionUserId || !editionId) {
+      setExistingPlacements([]);
+      return;
+    }
+    const res = await supabase
+      .from("user_books")
+      .select("id,library_id,collection_state,created_at,library:libraries(id,name,kind)")
+      .eq("owner_id", sessionUserId)
+      .eq("edition_id", editionId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (res.error) return;
+
+    const byKey = new Map<string, ExistingPlacement>();
+    for (const row of (res.data ?? []) as any[]) {
+      const state = String(row?.collection_state ?? "owned").trim().toLowerCase() === "wanted" ? "wanted" : "owned";
+      const libraryId = Number(row?.library_id ?? row?.library?.id ?? 0);
+      const latestBookId = Number(row?.id ?? 0);
+      if (!Number.isFinite(libraryId) || libraryId <= 0 || !Number.isFinite(latestBookId) || latestBookId <= 0) continue;
+      const key = `${state}:${libraryId}`;
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.copyCount += 1;
+        continue;
+      }
+      byKey.set(key, {
+        libraryId,
+        libraryName:
+          state === "wanted"
+            ? WISHLIST_LIBRARY_NAME
+            : String(row?.library?.name ?? "").trim() || "Catalog",
+        collectionState: state,
+        latestBookId,
+        copyCount: 1,
+      });
+    }
+
+    const placements = Array.from(byKey.values()).sort((a, b) => {
+      if (a.collectionState !== b.collectionState) return a.collectionState === "owned" ? -1 : 1;
+      return a.libraryName.localeCompare(b.libraryName);
+    });
+    setExistingPlacements(placements);
+    setCatalogsWithEdition(new Set(placements.filter((entry) => entry.collectionState === "owned").map((entry) => entry.libraryId)));
   }
 
   async function ensureCanonicalEditionId(): Promise<number | null> {
@@ -545,8 +600,9 @@ export default function AddToLibraryButton({
     let loaded = catalogs;
     if (!catalogsLoaded) {
       loaded = await loadCatalogs();
-      await loadCatalogsWithEdition(loaded);
     }
+    await loadCatalogsWithEdition(loaded);
+    await loadExistingPlacements();
     setPickerOpen(true);
   }
 
@@ -572,67 +628,27 @@ export default function AddToLibraryButton({
     }
   }
 
-  async function removeOne() {
+  async function removePlacement(entry: ExistingPlacement) {
     if (!supabase || !sessionUserId) return;
-    if (!editionId) return;
-    let id = latestOwnedId;
-    if (!id) {
-      const latestRes = await supabase
-        .from("user_books")
-        .select("id")
-        .eq("owner_id", sessionUserId)
-        .eq("edition_id", editionId)
-        .eq("collection_state", "owned")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (latestRes.error) return;
-      id = (latestRes.data as any)?.id ?? null;
-    }
-    if (!id) return;
+    const id = entry.latestBookId;
+    if (!Number.isFinite(id) || id <= 0) return;
     setBusy(true);
     setError(null);
     try {
       const del = await supabase.from("user_books").delete().eq("id", id).eq("owner_id", sessionUserId);
       if (del.error) throw new Error(del.error.message);
-      setOwnedCount((c) => Math.max(0, c - 1));
-      setCreatedOwnedId(null);
-      await ctx?.refresh(editionId);
+      if (entry.collectionState === "wanted") {
+        setWantedCount((c) => Math.max(0, c - 1));
+        setCreatedWantedId(null);
+      } else {
+        setOwnedCount((c) => Math.max(0, c - 1));
+        setCreatedOwnedId(null);
+      }
+      if (editionId) {
+        await ctx?.refresh(editionId);
+      }
       await refreshExisting();
-    } catch (e: any) {
-      setError(e?.message ?? "Remove failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function removeWishlist() {
-    if (!supabase || !sessionUserId) return;
-    if (!editionId) return;
-    let id = latestWantedId;
-    if (!id) {
-      const latestRes = await supabase
-        .from("user_books")
-        .select("id")
-        .eq("owner_id", sessionUserId)
-        .eq("edition_id", editionId)
-        .eq("collection_state", "wanted")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (latestRes.error) return;
-      id = (latestRes.data as any)?.id ?? null;
-    }
-    if (!id) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const del = await supabase.from("user_books").delete().eq("id", id).eq("owner_id", sessionUserId);
-      if (del.error) throw new Error(del.error.message);
-      setWantedCount((c) => Math.max(0, c - 1));
-      setCreatedWantedId(null);
-      await ctx?.refresh(editionId);
-      await refreshExisting();
+      await loadExistingPlacements();
     } catch (e: any) {
       setError(e?.message ?? "Remove failed");
     } finally {
@@ -645,7 +661,15 @@ export default function AddToLibraryButton({
 
   const ownedIdToOpen = latestOwnedId ?? createdOwnedId;
   const wantedIdToOpen = latestWantedId ?? createdWantedId;
-  const label = flashMode === "owned" || flashMode === "wanted" ? "✓" : compact ? "＋" : "＋ Add";
+  const hasAnyPlacement = ownedCount > 0 || wantedCount > 0;
+  const label =
+    flashMode === "owned" || flashMode === "wanted"
+      ? "✓"
+      : hasAnyPlacement
+        ? "－"
+        : compact
+          ? "＋"
+          : "＋ Add";
 
   const picker = pickerOpen ? (
     <CatalogPickerDropdown
@@ -653,12 +677,14 @@ export default function AddToLibraryButton({
       viewportLayout={pickerViewportLayout}
       catalogs={catalogs}
       catalogsWithEdition={catalogsWithEdition}
+      existingPlacements={existingPlacements}
       wantedCount={wantedCount}
       newCatalogMode={newCatalogMode}
       newCatalogName={newCatalogName}
       newCatalogBusy={newCatalogBusy}
       busy={busy}
       onSelect={(cat) => addToLibrary(cat.id, cat.name)}
+      onRemovePlacement={removePlacement}
       onSelectWishlist={addToWishlist}
       onNewCatalogMode={() => setNewCatalogMode(true)}
       onNewCatalogNameChange={setNewCatalogName}
@@ -669,48 +695,25 @@ export default function AddToLibraryButton({
   return (
     <span className="row" style={{ gap: "var(--space-8)", flexWrap: "nowrap", alignItems: "center", minHeight: 24 }}>
       {editionId && ownedCount > 0 ? (
-        <>
-          <Link href={ownedIdToOpen ? `/app/books/${ownedIdToOpen}` : "/app"} style={{ textDecoration: "none" }}>
-            <span className="card" style={{ padding: "2px 8px", display: "inline-flex", alignItems: "center" }}>
-              {ownedCount}
-            </span>
-          </Link>
-          <button onClick={removeOne} disabled={busy} title="Remove one copy">
-            {busy ? (compact ? "…" : "Removing…") : compact ? "－" : "Remove copy"}
-          </button>
-          <div ref={pickerRef} style={{ position: "relative", display: "inline-block" }}>
-            <button onClick={handleAddClick} disabled={busy} title="Add another copy">
-              {busy ? (compact ? "…" : "Adding…") : flashMode === "owned" ? "✓" : compact ? "＋" : "Add copy"}
-            </button>
-            {picker}
-          </div>
-          {wantedCount > 0 ? <span className="text-muted">{compact ? "Wishlist" : "In wishlist"}</span> : null}
-        </>
-      ) : editionId && wantedCount > 0 ? (
-        <>
-          <Link href={wantedIdToOpen ? `/app/books/${wantedIdToOpen}` : "/app"} style={{ textDecoration: "none" }}>
-            <span className="card" style={{ padding: "2px 8px", display: "inline-flex", alignItems: "center" }}>
-              Wishlist
-            </span>
-          </Link>
-          <button onClick={removeWishlist} disabled={busy} title="Remove from wishlist">
-            {busy ? (compact ? "…" : "Removing…") : compact ? "－" : "Remove"}
-          </button>
-          <div ref={pickerRef} style={{ position: "relative", display: "inline-block" }}>
-            <button onClick={handleAddClick} disabled={busy} title="Add to catalog or wishlist">
-              {busy ? (compact ? "…" : "Adding…") : flashMode === "wanted" ? "✓" : compact ? "＋" : "Add"}
-            </button>
-            {picker}
-          </div>
-        </>
-      ) : (
-        <div ref={pickerRef} style={{ position: "relative", display: "inline-block" }}>
-          <button onClick={handleAddClick} disabled={busy}>
-            {busy ? (compact ? "…" : "Adding…") : label}
-          </button>
-          {picker}
-        </div>
-      )}
+        <Link href={ownedIdToOpen ? `/app/books/${ownedIdToOpen}` : "/app"} style={{ textDecoration: "none" }}>
+          <span className="card" style={{ padding: "2px 8px", display: "inline-flex", alignItems: "center" }}>
+            {ownedCount}
+          </span>
+        </Link>
+      ) : null}
+      {editionId && wantedCount > 0 ? (
+        <Link href={wantedIdToOpen ? `/app/books/${wantedIdToOpen}` : "/app"} style={{ textDecoration: "none" }}>
+          <span className="card" style={{ padding: "2px 8px", display: "inline-flex", alignItems: "center" }}>
+            Wishlist
+          </span>
+        </Link>
+      ) : null}
+      <div ref={pickerRef} style={{ position: "relative", display: "inline-block" }}>
+        <button onClick={handleAddClick} disabled={busy} title={hasAnyPlacement ? "Manage catalogs and wishlist" : "Add to catalog or wishlist"}>
+          {busy ? (compact ? "…" : "Working…") : label}
+        </button>
+        {picker}
+      </div>
       {error ? <span className="text-muted">{error}</span> : null}
     </span>
   );
@@ -721,12 +724,14 @@ function CatalogPickerDropdown({
   viewportLayout,
   catalogs,
   catalogsWithEdition,
+  existingPlacements,
   wantedCount,
   newCatalogMode,
   newCatalogName,
   newCatalogBusy,
   busy,
   onSelect,
+  onRemovePlacement,
   onSelectWishlist,
   onNewCatalogMode,
   onNewCatalogNameChange,
@@ -736,17 +741,22 @@ function CatalogPickerDropdown({
   viewportLayout: { left: number; top: number; width: number } | null;
   catalogs: Catalog[];
   catalogsWithEdition: Set<number>;
+  existingPlacements: ExistingPlacement[];
   wantedCount: number;
   newCatalogMode: boolean;
   newCatalogName: string;
   newCatalogBusy: boolean;
   busy: boolean;
   onSelect: (cat: Catalog) => void;
+  onRemovePlacement: (entry: ExistingPlacement) => void;
   onSelectWishlist: () => void;
   onNewCatalogMode: () => void;
   onNewCatalogNameChange: (v: string) => void;
   onCreateCatalog: () => void;
 }) {
+  const addableCatalogs = catalogs.filter((cat) => !catalogsWithEdition.has(cat.id));
+  const canAddWishlist = wantedCount <= 0;
+
   const menu = (
     <div
       style={{
@@ -770,15 +780,44 @@ function CatalogPickerDropdown({
         className="text-muted"
         style={{ padding: "8px 12px 6px" }}
       >
-        Add to catalog
+        {existingPlacements.length > 0 ? "Remove from" : "Add to catalog"}
       </div>
 
-      {catalogs.length === 0 ? (
+      {existingPlacements.length > 0 ? (
+        existingPlacements.map((entry, index) => (
+          <div key={`${entry.collectionState}:${entry.libraryId}`}>
+            <button
+              onClick={() => onRemovePlacement(entry)}
+              disabled={busy}
+              style={{
+                display: "flex",
+                width: "100%",
+                textAlign: "left",
+                padding: "8px 12px",
+                border: "none",
+                background: "transparent",
+                cursor: busy ? "default" : "pointer",
+                gap: "var(--space-8)",
+                alignItems: "baseline",
+              }}
+            >
+              <span style={{ flex: 1 }}>
+                {entry.collectionState === "wanted" ? "Wishlist" : entry.libraryName}
+                {entry.collectionState === "owned" && entry.copyCount > 1 ? ` (${entry.copyCount})` : ""}
+              </span>
+              <span className="text-muted">－</span>
+            </button>
+            {index < existingPlacements.length - 1 ? (
+              <div style={{ height: 1, margin: "0 12px", background: "var(--border)" }} />
+            ) : null}
+          </div>
+        ))
+      ) : addableCatalogs.length === 0 ? (
         <div className="text-muted" style={{ padding: "0 12px 8px" }}>
           No catalogs
         </div>
       ) : (
-        catalogs.map((cat, index) => (
+        addableCatalogs.map((cat, index) => (
           <div key={cat.id}>
             <button
               onClick={() => onSelect(cat)}
@@ -796,11 +835,9 @@ function CatalogPickerDropdown({
               }}
             >
               <span style={{ flex: 1 }}>{cat.name}</span>
-              {catalogsWithEdition.has(cat.id) ? (
-                <span className="text-muted" style={{ fontSize: "0.85em" }}>✓</span>
-              ) : null}
+              <span className="text-muted">＋</span>
             </button>
-            {index < catalogs.length - 1 ? (
+            {index < addableCatalogs.length - 1 ? (
               <div style={{ height: 1, margin: "0 12px", background: "var(--border)" }} />
             ) : null}
           </div>
@@ -809,6 +846,49 @@ function CatalogPickerDropdown({
 
       <div>
         <div style={{ height: 1, margin: "0 12px", background: "var(--border)" }} />
+        {existingPlacements.length > 0 ? (
+          <div className="text-muted" style={{ padding: "8px 12px 6px" }}>
+            Add to catalog
+          </div>
+        ) : null}
+        {existingPlacements.length > 0 ? (
+          addableCatalogs.length === 0 ? (
+            <div className="text-muted" style={{ padding: "0 12px 8px" }}>
+              No other catalogs
+            </div>
+          ) : (
+            addableCatalogs.map((cat, index) => (
+              <div key={`add-${cat.id}`}>
+                <button
+                  onClick={() => onSelect(cat)}
+                  disabled={busy}
+                  style={{
+                    display: "flex",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "8px 12px",
+                    border: "none",
+                    background: "transparent",
+                    cursor: busy ? "default" : "pointer",
+                    gap: "var(--space-8)",
+                    alignItems: "baseline",
+                  }}
+                >
+                  <span style={{ flex: 1 }}>{cat.name}</span>
+                  <span className="text-muted">＋</span>
+                </button>
+                {index < addableCatalogs.length - 1 ? (
+                  <div style={{ height: 1, margin: "0 12px", background: "var(--border)" }} />
+                ) : null}
+              </div>
+            ))
+          )
+        ) : null}
+
+        {(existingPlacements.length > 0 || addableCatalogs.length > 0 || catalogs.length === 0) ? (
+          <div style={{ height: 1, margin: "0 12px", background: "var(--border)" }} />
+        ) : null}
+
         {newCatalogMode ? (
           <div style={{ padding: "8px 12px", display: "flex", gap: "var(--space-8)", alignItems: "baseline" }}>
             <input
@@ -849,25 +929,26 @@ function CatalogPickerDropdown({
         )}
 
         <div style={{ height: 1, margin: "0 12px", background: "var(--border)" }} />
-        <button
-          onClick={onSelectWishlist}
-          disabled={busy || wantedCount > 0}
-          style={{
-            display: "flex",
-            width: "100%",
-            textAlign: "left",
-            padding: "8px 12px",
-            border: "none",
-            background: "transparent",
-            cursor: busy ? "default" : "pointer",
-            gap: "var(--space-8)",
-            alignItems: "baseline",
-            opacity: wantedCount > 0 ? 0.5 : 1
-          }}
-        >
-          <span style={{ flex: 1 }}>Add to wishlist</span>
-          {wantedCount > 0 ? <span className="text-muted">✓</span> : null}
-        </button>
+        {canAddWishlist ? (
+          <button
+            onClick={onSelectWishlist}
+            disabled={busy}
+            style={{
+              display: "flex",
+              width: "100%",
+              textAlign: "left",
+              padding: "8px 12px",
+              border: "none",
+              background: "transparent",
+              cursor: busy ? "default" : "pointer",
+              gap: "var(--space-8)",
+              alignItems: "baseline",
+            }}
+          >
+            <span style={{ flex: 1 }}>Add to wishlist</span>
+            <span className="text-muted">＋</span>
+          </button>
+        ) : null}
       </div>
     </div>
   );
