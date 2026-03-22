@@ -70,7 +70,7 @@ type InvitesResponse = {
   metrics: { total: number; pending: number; used: number; expired: number };
 };
 
-type HomepageRailRole = "author" | "designer" | "publisher" | "performer" | "tag" | "material";
+type HomepageRailRole = "author" | "designer" | "publisher" | "performer" | "tag" | "category" | "material";
 
 type HomepageRailEntity = {
   id: string;
@@ -1087,9 +1087,9 @@ function AdminPageInner() {
                                 ? {
                                     ...row,
                                     role,
-                                    entity_id: role === "tag" ? null : row.entity_id,
-                                    match_name: role === "tag" ? (row.entity?.name ?? row.match_name) : "",
-                                    entity: role === "tag" && row.entity ? { ...row.entity, slug: null } : row.entity,
+                                    entity_id: role === "tag" || role === "category" ? null : row.entity_id,
+                                    match_name: role === "tag" || role === "category" ? (row.entity?.name ?? row.match_name) : "",
+                                    entity: (role === "tag" || role === "category") && row.entity ? { ...row.entity, slug: null } : row.entity,
                                   }
                                 : row
                             )
@@ -1103,6 +1103,7 @@ function AdminPageInner() {
                         <option value="publisher">Publisher</option>
                         <option value="performer">Performer</option>
                         <option value="tag">Tag</option>
+                        <option value="category">Category</option>
                         <option value="material">Material</option>
                       </select>
                       <input
@@ -1111,7 +1112,7 @@ function AdminPageInner() {
                           const value = e.target.value;
                           setHomepageSearchDrafts((prev) => ({ ...prev, [slot.slot_index]: value }));
                         }}
-                        placeholder="Search entity"
+                        placeholder={slot.role === "tag" || slot.role === "category" ? "Search tag" : "Search entity"}
                         style={{ minWidth: 200, flex: "1 1 220px" }}
                         disabled={slot.mode !== "pinned"}
                         onKeyDown={async (e) => {
@@ -1172,8 +1173,8 @@ function AdminPageInner() {
                                           row.slot_index === slot.slot_index
                                             ? {
                                                 ...row,
-                                                entity_id: row.role === "tag" ? null : entity.id,
-                                                match_name: row.role === "tag" ? entity.name : "",
+                                                entity_id: row.role === "tag" || row.role === "category" ? null : entity.id,
+                                                match_name: row.role === "tag" || row.role === "category" ? entity.name : "",
                                                 entity,
                                               }
                                             : row

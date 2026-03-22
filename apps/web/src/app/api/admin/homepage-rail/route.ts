@@ -7,7 +7,7 @@ const SURFACE = "explore_right_rail";
 const DEFAULT_SLOTS = 3;
 
 type SlotMode = "automatic" | "pinned";
-type SlotRole = "author" | "designer" | "publisher" | "performer" | "tag" | "material";
+type SlotRole = "author" | "designer" | "publisher" | "performer" | "tag" | "category" | "material";
 
 function normalizeMode(value: unknown): SlotMode {
   return value === "pinned" ? "pinned" : "automatic";
@@ -15,7 +15,7 @@ function normalizeMode(value: unknown): SlotMode {
 
 function normalizeRole(value: unknown): SlotRole {
   const next = String(value ?? "").trim().toLowerCase();
-  if (next === "author" || next === "designer" || next === "publisher" || next === "performer" || next === "tag" || next === "material") return next;
+  if (next === "author" || next === "designer" || next === "publisher" || next === "performer" || next === "tag" || next === "category" || next === "material") return next;
   return "designer";
 }
 
@@ -42,11 +42,11 @@ export async function GET(req: Request) {
     const role = normalizeRole(url.searchParams.get("role"));
 
     if (q) {
-      if (role === "tag") {
+      if (role === "tag" || role === "category") {
         const tagRes = await admin
           .from("tags")
           .select("id,name")
-          .eq("kind", "tag")
+          .eq("kind", role)
           .ilike("name", `%${q}%`)
           .order("name", { ascending: true })
           .limit(8);
@@ -137,8 +137,8 @@ export async function POST(req: Request) {
         slot_index: idx + 1,
         mode,
         role: mode === "pinned" ? role : null,
-        entity_id: mode === "pinned" && role !== "tag" && raw.entity_id ? String(raw.entity_id) : null,
-        match_name: mode === "pinned" && role === "tag" ? String(raw.match_name ?? "").trim() || null : null,
+        entity_id: mode === "pinned" && role !== "tag" && role !== "category" && raw.entity_id ? String(raw.entity_id) : null,
+        match_name: mode === "pinned" && (role === "tag" || role === "category") ? String(raw.match_name ?? "").trim() || null : null,
         title_override: String(raw.title_override ?? "").trim() || null,
       };
     });
