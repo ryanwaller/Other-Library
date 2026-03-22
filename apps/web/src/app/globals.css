@@ -1012,6 +1012,10 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   width: 100%;
 }
 
+.om-page-top-card {
+  padding-top: 0;
+}
+
 .om-inline-search-input {
   width: 100%;
   border: 0;

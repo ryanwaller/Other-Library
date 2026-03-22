@@ -71,7 +71,7 @@ export default function PublicProfileHeader({
   );
 
   return (
-    <div className="card">
+    <div className="card om-page-top-card">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
         <div className="row" style={{ gap: "var(--space-md)", alignItems: "center" }}>
           {isLinked ? (

@@ -752,7 +752,7 @@ export default async function HomePage() {
 
   return (
     <main className="container" style={{ paddingBottom: "calc(var(--space-xl) + var(--space-32) + var(--space-md))" }}>
-      <div style={{ paddingTop: "var(--space-md)" }}>
+      <div style={{ paddingTop: 0 }}>
         <ExploreSignInLock>
           <ExploreColumns
             main={

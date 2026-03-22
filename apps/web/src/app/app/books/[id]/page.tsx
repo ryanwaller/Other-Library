@@ -4022,6 +4022,7 @@ export default function BookDetailPage() {
         <div
           className="card"
           style={{
+            paddingTop: 0,
             transform: swipeOffsetX ? `translate3d(${swipeOffsetX}px, 0, 0)` : undefined,
             filter: swipeBlurPx > 0 ? `blur(${swipeBlurPx}px)` : undefined,
             transition: swipeAnimating ? "transform 220ms cubic-bezier(0.22, 1, 0.36, 1), filter 220ms ease-out" : "none",
@@ -4031,7 +4032,7 @@ export default function BookDetailPage() {
           <div
             className="om-book-detail-grid"
             style={{
-              marginTop: "var(--space-10)",
+              marginTop: 0,
               rowGap: 12,
               columnGap: 14,
               alignItems: "start",
