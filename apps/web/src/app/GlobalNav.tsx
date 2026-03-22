@@ -47,6 +47,7 @@ export default function GlobalNav() {
   const [followingCount, setFollowingCount] = useState<number>(0);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [navMetricsReady, setNavMetricsReady] = useState(false);
+  const [exploreLockOpen, setExploreLockOpen] = useState(false);
 
   async function signOut() {
     try {
@@ -68,6 +69,15 @@ export default function GlobalNav() {
       setAuthResolved(true);
     });
     return () => sub.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const onState = (event: Event) => {
+      const detail = (event as CustomEvent<{ open?: boolean }>).detail;
+      setExploreLockOpen(Boolean(detail?.open));
+    };
+    window.addEventListener("om:explore-lock-state", onState as EventListener);
+    return () => window.removeEventListener("om:explore-lock-state", onState as EventListener);
   }, []);
 
   useEffect(() => {
@@ -461,7 +471,18 @@ export default function GlobalNav() {
               </Link>
             ) : null}
             {sessionUserId && <button onClick={signOut}>Sign out</button>}
-            {!sessionUserId && authResolved ? <Link href="/signin">Sign in</Link> : null}
+            {!sessionUserId && authResolved ? (
+              pathname === "/" && exploreLockOpen ? (
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event("om:explore-lock-close"))}
+                >
+                  Close
+                </button>
+              ) : (
+                <Link href="/signin">Sign in</Link>
+              )
+            ) : null}
           </div>
         </div>
       </div>

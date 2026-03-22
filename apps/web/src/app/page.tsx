@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import CoverImage, { type CoverCrop } from "../components/CoverImage";
 import EntityBookGrid, { type GridItem } from "./entity/[slug]/EntityBookGrid";
 import ExploreColumns from "./ExploreColumns";
+import ExploreSignInLock from "./ExploreSignInLock";
 import { effectiveAuthorsFor } from "../lib/book";
 import { formatIssueDisplay, isMagazineObject } from "../lib/magazine";
 import { parseMusicMetadata } from "../lib/music";
@@ -752,47 +753,49 @@ export default async function HomePage() {
   return (
     <main className="container" style={{ paddingBottom: "calc(var(--space-xl) + var(--space-32) + var(--space-md))" }}>
       <div style={{ paddingTop: "var(--space-md)" }}>
-        <ExploreColumns
-          main={
-            <>
-            <ExploreModule id="recent-additions" title="Recent additions" items={data?.recentItems ?? []} />
-            <ExploreModule title="Recent records" items={data?.recentRecords ?? []} />
-            <ExploreModule title="Recent periodicals" items={data?.recentPeriodicals ?? []} />
-            <ExploreModule
-              title={
-                data?.recentOwnerHeading ? (
-                  <ExploreUserHeading
-                    prefix="Recently added by"
-                    username={data.recentOwnerHeading.username}
-                    avatarUrl={data.recentOwnerHeading.avatarUrl}
-                  />
-                ) : (
-                  "Recently added by"
-                )
-              }
-              href={data?.recentOwnerHeading ? `/u/${encodeURIComponent(data.recentOwnerHeading.username)}` : null}
-              items={data?.recentOwnerItems ?? []}
-            />
-            <ExploreModule
-              title={data?.editorHeading ? <>Edited by {data.editorHeading.name}</> : "Edited by"}
-              href={data?.editorHeading?.slug ? `/entity/${encodeURIComponent(data.editorHeading.slug)}` : null}
-              items={data?.editorItems ?? []}
-            />
-            <ExploreModule
-              title={data?.groupHeading ? <>From the run: {data.groupHeading.label}</> : "From the run"}
-              href={data?.groupHeading ? `/group/${encodeURIComponent(data.groupHeading.slug)}` : null}
-              items={data?.groupItems ?? []}
-            />
-            </>
-          }
-          rail={
-            <>
-            {(data?.railClusters ?? []).map((cluster) => (
-              <ExploreRailModule key={`${cluster.role}-${cluster.slug ?? cluster.name}`} cluster={cluster} />
-            ))}
-            </>
-          }
-        />
+        <ExploreSignInLock>
+          <ExploreColumns
+            main={
+              <>
+              <ExploreModule id="recent-additions" title="Recent additions" items={data?.recentItems ?? []} />
+              <ExploreModule title="Recent records" items={data?.recentRecords ?? []} />
+              <ExploreModule title="Recent periodicals" items={data?.recentPeriodicals ?? []} />
+              <ExploreModule
+                title={
+                  data?.recentOwnerHeading ? (
+                    <ExploreUserHeading
+                      prefix="Recently added by"
+                      username={data.recentOwnerHeading.username}
+                      avatarUrl={data.recentOwnerHeading.avatarUrl}
+                    />
+                  ) : (
+                    "Recently added by"
+                  )
+                }
+                href={data?.recentOwnerHeading ? `/u/${encodeURIComponent(data.recentOwnerHeading.username)}` : null}
+                items={data?.recentOwnerItems ?? []}
+              />
+              <ExploreModule
+                title={data?.editorHeading ? <>Edited by {data.editorHeading.name}</> : "Edited by"}
+                href={data?.editorHeading?.slug ? `/entity/${encodeURIComponent(data.editorHeading.slug)}` : null}
+                items={data?.editorItems ?? []}
+              />
+              <ExploreModule
+                title={data?.groupHeading ? <>From the run: {data.groupHeading.label}</> : "From the run"}
+                href={data?.groupHeading ? `/group/${encodeURIComponent(data.groupHeading.slug)}` : null}
+                items={data?.groupItems ?? []}
+              />
+              </>
+            }
+            rail={
+              <>
+              {(data?.railClusters ?? []).map((cluster) => (
+                <ExploreRailModule key={`${cluster.role}-${cluster.slug ?? cluster.name}`} cluster={cluster} />
+              ))}
+              </>
+            }
+          />
+        </ExploreSignInLock>
       </div>
     </main>
   );

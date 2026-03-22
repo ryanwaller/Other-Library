@@ -1485,6 +1485,68 @@ a.text-muted:hover {
   pointer-events: auto;
 }
 
+body.om-explore-lock-open {
+  overflow: hidden;
+}
+
+.om-explore-signin-lock {
+  position: relative;
+}
+
+.om-explore-lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.om-explore-signin-lock[data-state="open"] .om-explore-lock-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.om-explore-lock-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.42)),
+    rgba(10, 10, 12, 0.24);
+  backdrop-filter: blur(16px) saturate(0.7);
+  -webkit-backdrop-filter: blur(16px) saturate(0.7);
+  cursor: default;
+}
+
+.om-explore-lock-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, calc(100vw - (var(--page-pad) * 2)));
+  min-height: 220px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(9, 9, 10, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.38);
+}
+
+.om-explore-lock-signin {
+  min-width: 120px;
+  justify-content: center;
+  text-decoration: none !important;
+}
+
+.om-explore-lock-signin:hover,
+.om-explore-lock-signin:focus-visible {
+  text-decoration: none !important;
+}
+
 .muted a,
 .muted a:hover {
   color: inherit;
