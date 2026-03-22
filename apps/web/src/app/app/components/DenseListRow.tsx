@@ -44,7 +44,10 @@ export default function DenseListRow({
   const coverRadius = roundedCover ? 12 : 0;
 
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
-  const coverSrc = originalSrc ?? coverUrl;
+  // Thumbnail always uses coverUrl (Supabase storage URL) so /api/cover can
+  // resize it. originalSrc may be an external URL that can't be proxied.
+  const thumbSrc = coverUrl;
+  const hoverSrc = originalSrc ?? coverUrl;
 
   function handleThumbMouseMove(e: React.MouseEvent) {
     setHoverPos({ x: e.clientX, y: e.clientY });
@@ -82,12 +85,12 @@ export default function DenseListRow({
         className="om-dense-list-thumb"
         onMouseMove={handleThumbMouseMove}
         onMouseLeave={handleThumbMouseLeave}
-        style={{ cursor: coverSrc ? "default" : undefined }}
+        style={{ cursor: thumbSrc ? "default" : undefined }}
       >
         <div className="om-dense-list-thumb-frame" style={{ borderRadius: coverRadius }}>
           <CoverImage
             alt={fields.primaryTitle}
-            src={coverSrc}
+            src={thumbSrc}
             cropData={cropData}
             style={{ display: "block", width: "100%", aspectRatio: "3 / 4" }}
             objectFit="contain"
@@ -96,7 +99,7 @@ export default function DenseListRow({
         </div>
       </div>
 
-      {hoverPos && coverSrc && typeof document !== "undefined"
+      {hoverPos && hoverSrc && typeof document !== "undefined"
         ? createPortal(
             <div
               style={{
@@ -114,7 +117,7 @@ export default function DenseListRow({
             >
               <CoverImage
                 alt=""
-                src={coverSrc}
+                src={hoverSrc}
                 cropData={cropData}
                 style={{ display: "block", width: "100%" }}
                 objectFit="contain"
