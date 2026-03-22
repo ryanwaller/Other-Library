@@ -56,6 +56,7 @@
   --space-32: 32px;
   --space-xl: 48px;
   --catalog-top-gap: var(--space-xl);
+  --catalog-section-divider-gap: var(--space-md);
   --stat-pair-gap: var(--space-10);
   --stat-group-gap: var(--space-16);
   --page-top-gap: var(--space-md);
@@ -1468,8 +1469,8 @@ a.text-muted:hover {
 }
 
 .om-explore-module + .om-explore-module {
-  margin-top: 0;
-  padding-top: var(--space-14);
+  margin-top: var(--catalog-section-divider-gap);
+  padding-top: var(--catalog-section-divider-gap);
   border-top: 1px solid var(--border);
 }
 
@@ -2125,8 +2126,8 @@ summary::-webkit-details-marker {
   }
 
   .om-explore-module + .om-explore-module {
-    margin-top: 0;
-    padding-top: var(--space-14);
+    margin-top: var(--catalog-section-divider-gap);
+    padding-top: var(--catalog-section-divider-gap);
   }
 
   .om-explore-divider {
