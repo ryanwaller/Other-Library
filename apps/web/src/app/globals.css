@@ -1218,7 +1218,8 @@ a.text-muted:hover {
   }
 
   .om-dense-list-cell--action {
-    display: none;
+    display: flex;
+    padding: 0 4px;
   }
 }
 

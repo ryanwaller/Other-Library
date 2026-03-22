@@ -21,6 +21,38 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Server misconfigured." }, { status: 500 });
   }
 
+  // Primary: Supabase image transform API (no native binaries needed).
+  // Requires the image transformation feature to be enabled on the project.
+  if (targetWidth && Number.isFinite(targetWidth) && targetWidth > 0 && targetWidth <= 2000) {
+    try {
+      const { data: signedData, error: signedError } = await (admin.storage
+        .from(bucket) as any)
+        .createSignedUrl(path, 60, {
+          transform: { width: targetWidth, quality: 80 }
+        });
+
+      if (!signedError && signedData?.signedUrl) {
+        const imgRes = await fetch(signedData.signedUrl);
+        if (imgRes.ok) {
+          const buf = await imgRes.arrayBuffer();
+          return new NextResponse(new Uint8Array(buf), {
+            status: 200,
+            headers: {
+              "content-type": imgRes.headers.get("content-type") || "image/jpeg",
+              "cache-control": "public, max-age=31536000, immutable"
+            }
+          });
+        }
+        console.error("[cover] supabase transform fetch failed:", imgRes.status, imgRes.statusText);
+      } else if (signedError) {
+        console.error("[cover] supabase transform signedUrl error:", signedError);
+      }
+    } catch (err) {
+      console.error("[cover] supabase transform exception:", err);
+    }
+  }
+
+  // Fallback: download original, resize with sharp if available.
   const { data, error } = await admin.storage.from(bucket).download(path);
   if (error || !data) {
     return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
@@ -44,7 +76,6 @@ export async function GET(req: NextRequest) {
       });
     } catch (sharpErr) {
       console.error("[cover] sharp error:", sharpErr);
-      // Sharp unavailable — fall through and return original
     }
   }
 
