@@ -106,6 +106,8 @@ export default function AddToLibraryButton({
   const [newCatalogMode, setNewCatalogMode] = useState(false);
   const [newCatalogName, setNewCatalogName] = useState("");
   const [newCatalogBusy, setNewCatalogBusy] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [pickerViewportLayout, setPickerViewportLayout] = useState<{ left: number; top: number; width: number } | null>(null);
 
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -114,6 +116,13 @@ export default function AddToLibraryButton({
     supabase.auth.getSession().then(({ data }) => setSessionUserId(data.session?.user?.id ?? null));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => setSessionUserId(newSession?.user?.id ?? null));
     return () => sub.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setIsMobileViewport(window.innerWidth < 768);
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
   }, []);
 
   const isSelf = useMemo(() => {
@@ -202,6 +211,29 @@ export default function AddToLibraryButton({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [pickerOpen]);
+
+  useEffect(() => {
+    if (!pickerOpen || !isMobileViewport || !pickerRef.current) {
+      if (!pickerOpen) setPickerViewportLayout(null);
+      return;
+    }
+    const syncLayout = () => {
+      const rect = pickerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const viewportWidth = window.innerWidth;
+      const maxWidth = Math.min(280, viewportWidth - 24);
+      const left = Math.max(12, Math.min(rect.right - maxWidth, viewportWidth - maxWidth - 12));
+      const top = Math.max(12, rect.bottom + 4);
+      setPickerViewportLayout({ left, top, width: maxWidth });
+    };
+    syncLayout();
+    window.addEventListener("resize", syncLayout);
+    window.addEventListener("scroll", syncLayout, true);
+    return () => {
+      window.removeEventListener("resize", syncLayout);
+      window.removeEventListener("scroll", syncLayout, true);
+    };
+  }, [pickerOpen, isMobileViewport]);
 
   async function loadCatalogs(): Promise<Catalog[]> {
     if (!supabase || !sessionUserId) return [];
@@ -597,6 +629,8 @@ export default function AddToLibraryButton({
 
   const picker = pickerOpen ? (
     <CatalogPickerDropdown
+      isMobileViewport={isMobileViewport}
+      viewportLayout={pickerViewportLayout}
       catalogs={catalogs}
       catalogsWithEdition={catalogsWithEdition}
       wantedCount={wantedCount}
@@ -663,6 +697,8 @@ export default function AddToLibraryButton({
 }
 
 function CatalogPickerDropdown({
+  isMobileViewport,
+  viewportLayout,
   catalogs,
   catalogsWithEdition,
   wantedCount,
@@ -676,6 +712,8 @@ function CatalogPickerDropdown({
   onNewCatalogNameChange,
   onCreateCatalog,
 }: {
+  isMobileViewport: boolean;
+  viewportLayout: { left: number; top: number; width: number } | null;
   catalogs: Catalog[];
   catalogsWithEdition: Set<number>;
   wantedCount: number;
@@ -692,14 +730,18 @@ function CatalogPickerDropdown({
   return (
     <div
       style={{
-        position: "absolute",
-        top: "calc(100% + 4px)",
-        right: 0,
+        position: isMobileViewport ? "fixed" : "absolute",
+        top: isMobileViewport ? (viewportLayout?.top ?? 12) : "calc(100% + 4px)",
+        left: isMobileViewport ? 12 : "auto",
+        right: isMobileViewport ? 12 : 0,
         zIndex: 200,
-        minWidth: 200,
+        minWidth: isMobileViewport ? undefined : 200,
+        width: isMobileViewport ? "auto" : undefined,
+        maxWidth: isMobileViewport ? "calc(100vw - 24px)" : undefined,
         background: "var(--bg)",
         border: "1px solid var(--border)",
         fontSize: "inherit",
+        boxSizing: "border-box",
       }}
     >
       {catalogs.length === 0 ? (

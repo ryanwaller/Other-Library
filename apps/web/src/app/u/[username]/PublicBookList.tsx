@@ -813,24 +813,7 @@ export default function PublicBookList({
         <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
           <div className="om-stat-line" style={{ margin: 0 }}>
             <span className="om-stat-pair">
-              <button
-                type="button"
-                onClick={() => setCollectionMode("catalog")}
-                className={wishlistMode ? "text-muted" : ""}
-                style={{ background: "transparent", border: 0, padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}
-              >
-                Catalog
-              </button>
-            </span>
-            <span className="om-stat-pair">
-              <button
-                type="button"
-                onClick={() => setCollectionMode("wishlist")}
-                className={wishlistMode ? "" : "text-muted"}
-                style={{ background: "transparent", border: 0, padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}
-              >
-                Wishlist
-              </button>
+              <span>{wishlistMode ? "Wishlist" : "Catalog"}</span>
             </span>
             <span className="om-stat-pair">
               <span className="text-muted">Items</span>
