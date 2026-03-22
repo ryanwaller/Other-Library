@@ -123,6 +123,13 @@ export default function CoverImage({
   };
 
   const handleError = () => {
+    const img = imgRef.current;
+    if (img && img.srcset) {
+      // A srcset entry failed — strip srcset and let the browser retry with src
+      img.srcset = "";
+      img.sizes = "";
+      return;
+    }
     setStatus("error");
   };
 
