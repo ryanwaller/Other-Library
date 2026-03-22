@@ -18,9 +18,8 @@ function parseSupabasePath(src: string): { bucket: string; path: string } | null
 function buildSrcSet(src: string): string {
   const parsed = parseSupabasePath(src);
   if (!parsed) return "";
-  const coverPath = `/api/cover?bucket=${encodeURIComponent(parsed.bucket)}&path=${encodeURIComponent(parsed.path)}`;
   return SRCSET_WIDTHS
-    .map((w) => `/_next/image?url=${encodeURIComponent(coverPath)}&w=${w}&q=80 ${w}w`)
+    .map((w) => `/api/cover?bucket=${encodeURIComponent(parsed.bucket)}&path=${encodeURIComponent(parsed.path)}&w=${w} ${w}w`)
     .join(", ");
 }
 

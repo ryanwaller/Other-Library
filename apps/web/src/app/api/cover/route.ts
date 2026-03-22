@@ -9,6 +9,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const bucket = searchParams.get("bucket") ?? "";
   const path = searchParams.get("path") ?? "";
+  const wParam = searchParams.get("w");
+  const targetWidth = wParam ? parseInt(wParam, 10) : null;
 
   if (!ALLOWED_BUCKETS.has(bucket) || !path) {
     return NextResponse.json({ ok: false, error: "Invalid request." }, { status: 400 });
@@ -26,11 +28,29 @@ export async function GET(req: NextRequest) {
 
   const buf = await data.arrayBuffer();
 
+  if (targetWidth && Number.isFinite(targetWidth) && targetWidth > 0 && targetWidth <= 2000) {
+    try {
+      const sharp = (await import("sharp")).default;
+      const resized = await sharp(Buffer.from(buf))
+        .resize({ width: targetWidth, withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
+      return new NextResponse(new Uint8Array(resized), {
+        status: 200,
+        headers: {
+          "content-type": "image/webp",
+          "cache-control": "public, max-age=31536000, immutable"
+        }
+      });
+    } catch {
+      // Sharp unavailable — fall through and return original
+    }
+  }
+
   return new NextResponse(buf, {
     status: 200,
     headers: {
       "content-type": data.type || "application/octet-stream",
-      // Storage paths contain a timestamp so they are immutable — cache for 1 year
       "cache-control": "public, max-age=31536000, immutable"
     }
   });
