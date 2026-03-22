@@ -130,6 +130,7 @@ export default function AddToLibraryButton({
   const [existingPlacements, setExistingPlacements] = useState<ExistingPlacement[]>([]);
 
   const pickerRef = useRef<HTMLDivElement>(null);
+  const pickerMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -222,7 +223,11 @@ export default function AddToLibraryButton({
   useEffect(() => {
     if (!pickerOpen) return;
     function handleClick(e: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        pickerRef.current && !pickerRef.current.contains(target) &&
+        pickerMenuRef.current && !pickerMenuRef.current.contains(target)
+      ) {
         setPickerOpen(false);
         setNewCatalogMode(false);
         setNewCatalogName("");
@@ -673,6 +678,7 @@ export default function AddToLibraryButton({
 
   const picker = pickerOpen ? (
     <CatalogPickerDropdown
+      menuRef={pickerMenuRef}
       viewportLayout={pickerViewportLayout}
       catalogs={catalogs}
       catalogsWithEdition={catalogsWithEdition}
@@ -719,6 +725,7 @@ export default function AddToLibraryButton({
 }
 
 function CatalogPickerDropdown({
+  menuRef,
   viewportLayout,
   catalogs,
   catalogsWithEdition,
@@ -735,6 +742,7 @@ function CatalogPickerDropdown({
   onNewCatalogNameChange,
   onCreateCatalog,
 }: {
+  menuRef: React.RefObject<HTMLDivElement | null>;
   viewportLayout: { left: number; top: number; width: number } | null;
   catalogs: Catalog[];
   catalogsWithEdition: Set<number>;
@@ -756,6 +764,7 @@ function CatalogPickerDropdown({
 
   const menu = (
     <div
+      ref={menuRef}
       style={{
         position: "fixed",
         top: viewportLayout?.top ?? 12,
