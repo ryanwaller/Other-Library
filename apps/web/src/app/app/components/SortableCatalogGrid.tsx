@@ -68,6 +68,7 @@ type SortableCatalogCardProps = {
   onToggleSelected: () => void;
   onDeleteCopy: () => void;
   onStoreBookNavContext: () => void;
+  showWishlistMatchSummary?: boolean;
 };
 
 function renderCard({
@@ -128,7 +129,8 @@ function SortableCatalogCard({
   orderedBookIds,
   onToggleSelected,
   onDeleteCopy,
-  onStoreBookNavContext
+  onStoreBookNavContext,
+  showWishlistMatchSummary = true
 }: SortableCatalogCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({
     id: group.key,
@@ -304,6 +306,7 @@ const SortableCatalogGrid = memo(function SortableCatalogGrid({
           onToggleSelected={() => onToggleSelected(group.key)}
           onDeleteCopy={() => onDeleteCopy(group.primary.id)}
           onStoreBookNavContext={() => onStoreBookNavContext(libraryId, orderedBookIds)}
+          showWishlistMatchSummary={showWishlistMatchSummary}
         />
       ))}
     </div>
@@ -372,7 +375,8 @@ const SortableCatalogGrid = memo(function SortableCatalogGrid({
               orderedBookIds,
               onToggleSelected: () => {},
               onDeleteCopy: () => {},
-              onStoreBookNavContext: () => {}
+              onStoreBookNavContext: () => {},
+              showWishlistMatchSummary
             })}
           </motion.div>
         ) : null}
