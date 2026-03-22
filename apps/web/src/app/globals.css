@@ -1902,6 +1902,10 @@ summary::-webkit-details-marker {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .om-explore-module + .om-explore-module {
+    margin-top: var(--space-lg);
+  }
+
   .om-explore-divider {
     display: none;
   }
