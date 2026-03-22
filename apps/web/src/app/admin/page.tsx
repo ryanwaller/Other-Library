@@ -1388,13 +1388,32 @@ function AdminPageInner() {
                         return (
                           <div key={`selected-${entity.id}`} className="om-list-row">
                             <div className="row" style={{ justifyContent: "space-between", gap: "var(--space-md)", alignItems: "center", flexWrap: "wrap" }}>
-                              <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
-                                {entity.name}
-                                <span className="text-muted"> · {entity.count}</span>
-                                {entity.rawRoles && entity.rawRoles.length > 0 ? (
-                                  <span className="text-muted"> · {entity.rawRoles.join(", ")}</span>
-                                ) : null}
-                              </div>
+                              <label
+                                className="row"
+                                style={{ gap: "var(--space-10)", alignItems: "center", minWidth: 0, flex: 1, cursor: entityMergeBusy ? "default" : "pointer" }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked
+                                  onChange={() => {
+                                    setEntityMergeSelected((prev) => {
+                                      const next = { ...prev };
+                                      delete next[entity.id];
+                                      return next;
+                                    });
+                                    setEntityMergeKeepId((prev) => (prev === entity.id ? null : prev));
+                                    setEntityMergeNotice(null);
+                                  }}
+                                  disabled={entityMergeBusy}
+                                />
+                                <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                                  {entity.name}
+                                  <span className="text-muted"> · {entity.count}</span>
+                                  {entity.rawRoles && entity.rawRoles.length > 0 ? (
+                                    <span className="text-muted"> · {entity.rawRoles.join(", ")}</span>
+                                  ) : null}
+                                </div>
+                              </label>
                               <div className="row" style={{ gap: "var(--space-8)", alignItems: "center", flexWrap: "wrap" }}>
                                 <button
                                   type="button"
@@ -1422,7 +1441,7 @@ function AdminPageInner() {
                                   }}
                                   disabled={entityMergeBusy}
                                 >
-                                  Remove
+                                  Unselect
                                 </button>
                               </div>
                             </div>
