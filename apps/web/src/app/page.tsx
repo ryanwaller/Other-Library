@@ -36,6 +36,7 @@ type ExploreBookRow = {
   cover_crop: CoverCrop | null;
   edition: { title: string | null; authors?: string[] | null; cover_url: string | null } | null;
   media: Array<{ kind: "cover" | "image"; storage_path: string }>;
+  book_tags?: Array<{ tag: { id: number | string; name: string; kind: string } | null }> | null;
   book_entities?: Array<{ role: string; entity: { id: string; name: string; slug: string } | null }> | null;
 };
 
@@ -61,7 +62,7 @@ const EXPLORE_RAIL_SURFACE = "explore_right_rail";
 const EXPLORE_RAIL_ROLE_PRIORITY: Array<EntityCluster["role"]> = ["designer", "author", "publisher", "performer"];
 
 const BOOK_SELECT =
-  "id,owner_id,created_at,visibility,group_label,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,authors_override,editors_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,authors,cover_url),media:user_book_media(kind,storage_path),book_entities:book_entities(role,entity:entities(id,name,slug))";
+  "id,owner_id,created_at,visibility,group_label,object_type,title_override,subtitle_override,issue_number,issue_volume,issue_season,issue_year,authors_override,editors_override,music_metadata,cover_original_url,cover_crop,edition:editions(title,authors,cover_url),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,entity:entities(id,name,slug))";
 
 function isRemoteUrl(value: string | null | undefined): boolean {
   return /^https?:\/\//i.test(String(value ?? "").trim());
@@ -166,9 +167,15 @@ function railHeading(role: EntityCluster["role"], name: string): string {
 
 function rowMatchesPinnedCluster(row: ExploreBookRow, entityId: string, role: EntityCluster["role"]): boolean {
   if (role === "tag") {
+    const tagMatch = (row.book_tags ?? []).some((tagRow) => {
+      const tag = tagRow?.tag;
+      const kind = String(tag?.kind ?? "").trim().toLowerCase();
+      return kind === "tag" && String(tag?.id ?? "") === entityId;
+    });
+    if (tagMatch) return true;
     return (row.book_entities ?? []).some((entityRow) => {
       const entityRole = String(entityRow?.role ?? "").trim().toLowerCase();
-      return (entityRole === "tag" || entityRole === "category") && String(entityRow?.entity?.id ?? "") === entityId;
+      return entityRole === "tag" && String(entityRow?.entity?.id ?? "") === entityId;
     });
   }
   if (role === "material") {
@@ -181,6 +188,21 @@ function rowMatchesPinnedCluster(row: ExploreBookRow, entityId: string, role: En
     const entityRole = String(entityRow?.role ?? "").trim().toLowerCase();
     if (role === "designer") return (entityRole === "designer" || entityRole === "design") && String(entityRow?.entity?.id ?? "") === entityId;
     return entityRole === role && String(entityRow?.entity?.id ?? "") === entityId;
+  });
+}
+
+function rowMatchesPinnedTagName(row: ExploreBookRow, tagName: string): boolean {
+  const normalized = tagName.trim().toLowerCase();
+  if (!normalized) return false;
+  const directTagMatch = (row.book_tags ?? []).some((tagRow) => {
+    const tag = tagRow?.tag;
+    const kind = String(tag?.kind ?? "").trim().toLowerCase();
+    return kind === "tag" && String(tag?.name ?? "").trim().toLowerCase() === normalized;
+  });
+  if (directTagMatch) return true;
+  return (row.book_entities ?? []).some((entityRow) => {
+    const entityRole = String(entityRow?.role ?? "").trim().toLowerCase();
+    return entityRole === "tag" && String(entityRow?.entity?.name ?? "").trim().toLowerCase() === normalized;
   });
 }
 
@@ -411,11 +433,18 @@ async function loadExploreData() {
     }
   }
 
-  const railSlotRes = await db
+  let railSlotRes = await db
     .from("homepage_feature_slots")
-    .select("slot_index,mode,role,title_override,entity:entities(id,name,slug)")
+    .select("slot_index,mode,role,title_override,match_name,entity:entities(id,name,slug)")
     .eq("surface", EXPLORE_RAIL_SURFACE)
     .order("slot_index", { ascending: true });
+  if (railSlotRes.error && (railSlotRes.error as any).code === "42703") {
+    railSlotRes = await db
+      .from("homepage_feature_slots")
+      .select("slot_index,mode,role,title_override,entity:entities(id,name,slug)")
+      .eq("surface", EXPLORE_RAIL_SURFACE)
+      .order("slot_index", { ascending: true });
+  }
 
   const pinnedSlotRows = (Array.isArray(railSlotRes.data) ? railSlotRes.data : []).filter(
     (row) => String((row as any).mode ?? "").trim().toLowerCase() === "pinned"
@@ -429,7 +458,7 @@ async function loadExploreData() {
       .in("owner_id", publicOwnerIds)
       .neq("visibility", "followers_only")
       .order("created_at", { ascending: false })
-      .limit(2000);
+      .limit(5000);
 
     const broadRows = uniqueById((broadRes.data ?? []) as unknown as ExploreBookRow[]);
     if (broadRows.length > 0) {
@@ -485,20 +514,21 @@ async function loadExploreData() {
         ? (roleValue as EntityCluster["role"])
         : null;
     const entity = (row as any).entity;
+    const matchName = String((row as any).match_name ?? "").trim();
     const entityId = String(entity?.id ?? "").trim();
-    const name = String(entity?.name ?? "").trim();
+    const name = String(entity?.name ?? "").trim() || matchName;
     const slug = String(entity?.slug ?? "").trim() || null;
-    if (!role || !entityId || !name) continue;
+    const pinnedKey = role === "tag" ? `tag:${name.toLowerCase()}` : `${role}:${entityId}`;
+    if (!role || !name || (role !== "tag" && !entityId)) continue;
     const items = allVisibleRows
-      .filter((bookRow) => rowMatchesPinnedCluster(bookRow, entityId, role))
+      .filter((bookRow) => (role === "tag" ? rowMatchesPinnedTagName(bookRow, name) : rowMatchesPinnedCluster(bookRow, entityId, role)))
       .map((bookRow) => toGridItem(bookRow, usernameByOwnerId, signedMap))
       .filter((item): item is GridItem => Boolean(item))
       .slice(0, EXPLORE_RAIL_ITEMS);
     if (items.length === 0) continue;
-    const key = `${role}:${entityId}`;
-    usedKeys.add(key);
+    usedKeys.add(pinnedKey);
     railBySlot.set(slotIndex, {
-      entityId,
+      entityId: role === "tag" ? pinnedKey : entityId,
       role,
       name,
       slug,

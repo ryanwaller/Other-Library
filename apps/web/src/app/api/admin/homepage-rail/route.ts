@@ -25,6 +25,7 @@ function defaultSlots() {
     mode: "automatic" as SlotMode,
     role: "designer" as SlotRole,
     entity_id: null as string | null,
+    match_name: "" as string,
     title_override: "",
     entity: null as { id: string; name: string; slug: string | null } | null,
   }));
@@ -38,8 +39,26 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     const q = String(url.searchParams.get("q") ?? "").trim();
+    const role = normalizeRole(url.searchParams.get("role"));
 
     if (q) {
+      if (role === "tag") {
+        const tagRes = await admin
+          .from("tags")
+          .select("id,name")
+          .eq("kind", "tag")
+          .ilike("name", `%${q}%`)
+          .order("name", { ascending: true })
+          .limit(8);
+        if (tagRes.error) return NextResponse.json({ error: tagRes.error.message }, { status: 500 });
+        return NextResponse.json({
+          entities: (tagRes.data ?? []).map((row) => ({
+            id: `tag:${String(row.id)}`,
+            name: String(row.name ?? ""),
+            slug: null,
+          })),
+        });
+      }
       const entityRes = await admin
         .from("entities")
         .select("id,name,slug")
@@ -50,11 +69,18 @@ export async function GET(req: Request) {
       return NextResponse.json({ entities: entityRes.data ?? [] });
     }
 
-    const res = await admin
+    let res = await admin
       .from("homepage_feature_slots")
-      .select("slot_index,mode,role,entity_id,title_override,entity:entities(id,name,slug)")
+      .select("slot_index,mode,role,entity_id,match_name,title_override,entity:entities(id,name,slug)")
       .eq("surface", SURFACE)
       .order("slot_index", { ascending: true });
+    if (res.error && (res.error as any).code === "42703") {
+      res = await admin
+        .from("homepage_feature_slots")
+        .select("slot_index,mode,role,entity_id,title_override,entity:entities(id,name,slug)")
+        .eq("surface", SURFACE)
+        .order("slot_index", { ascending: true });
+    }
     if (res.error) {
       if ((res.error as any).code === "42P01") return NextResponse.json({ slots: defaultSlots(), migrationRequired: true });
       return NextResponse.json({ error: res.error.message }, { status: 500 });
@@ -66,12 +92,22 @@ export async function GET(req: Request) {
         mode: normalizeMode(row.mode),
         role: normalizeRole(row.role),
         entity_id: row.entity_id ? String(row.entity_id) : null,
+        match_name: String((row as any).match_name ?? ""),
         title_override: String(row.title_override ?? ""),
-        entity: row.entity && typeof row.entity === "object" ? {
-          id: String((row.entity as any).id ?? ""),
-          name: String((row.entity as any).name ?? ""),
-          slug: String((row.entity as any).slug ?? "") || null,
-        } : null,
+        entity:
+          row.entity && typeof row.entity === "object"
+            ? {
+                id: String((row.entity as any).id ?? ""),
+                name: String((row.entity as any).name ?? ""),
+                slug: String((row.entity as any).slug ?? "") || null,
+              }
+            : String((row as any).match_name ?? "").trim()
+              ? {
+                  id: `tag:${String((row as any).match_name ?? "").trim().toLowerCase()}`,
+                  name: String((row as any).match_name ?? "").trim(),
+                  slug: null,
+                }
+              : null,
       }))
       .filter((row) => Number.isFinite(row.slot_index) && row.slot_index >= 1)
       .sort((a, b) => a.slot_index - b.slot_index)
@@ -101,7 +137,8 @@ export async function POST(req: Request) {
         slot_index: idx + 1,
         mode,
         role: mode === "pinned" ? role : null,
-        entity_id: mode === "pinned" && raw.entity_id ? String(raw.entity_id) : null,
+        entity_id: mode === "pinned" && role !== "tag" && raw.entity_id ? String(raw.entity_id) : null,
+        match_name: mode === "pinned" && role === "tag" ? String(raw.match_name ?? "").trim() || null : null,
         title_override: String(raw.title_override ?? "").trim() || null,
       };
     });
@@ -114,7 +151,7 @@ export async function POST(req: Request) {
 
     const ins = await admin.from("homepage_feature_slots").insert(normalizedSlots);
     if (ins.error) {
-      if ((ins.error as any).code === "23514") return NextResponse.json({ error: "migration_required" }, { status: 409 });
+      if ((ins.error as any).code === "23514" || (ins.error as any).code === "42703") return NextResponse.json({ error: "migration_required" }, { status: 409 });
       return NextResponse.json({ error: ins.error.message }, { status: 500 });
     }
 

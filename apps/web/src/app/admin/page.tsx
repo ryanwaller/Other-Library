@@ -83,6 +83,7 @@ type HomepageRailSlot = {
   mode: "automatic" | "pinned";
   role: HomepageRailRole;
   entity_id: string | null;
+  match_name: string;
   title_override: string;
   entity: HomepageRailEntity | null;
 };
@@ -169,6 +170,7 @@ function defaultHomepageSlots(): HomepageRailSlot[] {
     mode: "automatic",
     role: "designer",
     entity_id: null,
+    match_name: "",
     title_override: "",
     entity: null,
   }));
@@ -452,7 +454,7 @@ function AdminPageInner() {
     try {
       const res = await api<HomepageRailResponse>("/api/admin/homepage-rail", { method: "GET", token });
       setHomepageSlots(Array.isArray(res.slots) && res.slots.length ? res.slots : defaultHomepageSlots());
-      if (res.migrationRequired) setHomepageNotice("Apply migration 0044_homepage_feature_slots.sql to enable saved homepage overrides.");
+      if (res.migrationRequired) setHomepageNotice("Apply homepage rail migrations to enable saved homepage overrides.");
     } catch (e: any) {
       const msg = e?.message ?? "Failed to load homepage rail";
       if (handleAuthError(msg)) return;
@@ -666,7 +668,7 @@ function AdminPageInner() {
     if (tab === "homepage") {
       return [
         { label: "Slots", value: homepageSlots.length },
-        { label: "Pinned", value: homepageSlots.filter((slot) => slot.mode === "pinned" && slot.entity_id).length },
+        { label: "Pinned", value: homepageSlots.filter((slot) => slot.mode === "pinned" && (slot.entity_id || slot.match_name)).length },
         { label: "Automatic", value: homepageSlots.filter((slot) => slot.mode === "automatic").length }
       ];
     }
@@ -1062,6 +1064,7 @@ function AdminPageInner() {
                                     ...row,
                                     mode,
                                     entity_id: mode === "automatic" ? null : row.entity_id,
+                                    match_name: mode === "automatic" ? "" : row.match_name,
                                     entity: mode === "automatic" ? null : row.entity,
                                   }
                                 : row
@@ -1078,7 +1081,19 @@ function AdminPageInner() {
                         onChange={(e) => {
                           const role = e.target.value as HomepageRailRole;
                           setHomepageNotice(null);
-                          setHomepageSlots((prev) => prev.map((row) => (row.slot_index === slot.slot_index ? { ...row, role } : row)));
+                          setHomepageSlots((prev) =>
+                            prev.map((row) =>
+                              row.slot_index === slot.slot_index
+                                ? {
+                                    ...row,
+                                    role,
+                                    entity_id: role === "tag" ? null : row.entity_id,
+                                    match_name: role === "tag" ? (row.entity?.name ?? row.match_name) : "",
+                                    entity: role === "tag" && row.entity ? { ...row.entity, slug: null } : row.entity,
+                                  }
+                                : row
+                            )
+                          );
                         }}
                         className="om-filter-control"
                         disabled={slot.mode !== "pinned"}
@@ -1101,7 +1116,7 @@ function AdminPageInner() {
                         disabled={slot.mode !== "pinned"}
                         onKeyDown={async (e) => {
                           if (e.key !== "Enter" || slot.mode !== "pinned" || !searchDraft.trim()) return;
-                          const res = await api<{ entities: HomepageRailEntity[] }>(`/api/admin/homepage-rail?q=${encodeURIComponent(searchDraft.trim())}`, {
+                          const res = await api<{ entities: HomepageRailEntity[] }>(`/api/admin/homepage-rail?q=${encodeURIComponent(searchDraft.trim())}&role=${encodeURIComponent(slot.role)}`, {
                             method: "GET",
                             token
                           });
@@ -1114,7 +1129,7 @@ function AdminPageInner() {
                         onClick={async () => {
                           setError(null);
                           try {
-                            const res = await api<{ entities: HomepageRailEntity[] }>(`/api/admin/homepage-rail?q=${encodeURIComponent(searchDraft.trim())}`, {
+                            const res = await api<{ entities: HomepageRailEntity[] }>(`/api/admin/homepage-rail?q=${encodeURIComponent(searchDraft.trim())}&role=${encodeURIComponent(slot.role)}`, {
                               method: "GET",
                               token
                             });
@@ -1155,7 +1170,12 @@ function AdminPageInner() {
                                       setHomepageSlots((prev) =>
                                         prev.map((row) =>
                                           row.slot_index === slot.slot_index
-                                            ? { ...row, entity_id: entity.id, entity }
+                                            ? {
+                                                ...row,
+                                                entity_id: row.role === "tag" ? null : entity.id,
+                                                match_name: row.role === "tag" ? entity.name : "",
+                                                entity,
+                                              }
                                             : row
                                         )
                                       );
@@ -1191,6 +1211,7 @@ function AdminPageInner() {
                             mode: "automatic",
                             role: "designer",
                             entity_id: null,
+                            match_name: "",
                             title_override: "",
                             entity: null,
                           },
@@ -1217,6 +1238,7 @@ function AdminPageInner() {
                               mode: slot.mode,
                               role: slot.role,
                               entity_id: slot.entity_id,
+                              match_name: slot.match_name,
                               title_override: slot.title_override,
                             })),
                           }),
@@ -1224,7 +1246,7 @@ function AdminPageInner() {
                         await refreshHomepageRail();
                         setHomepageNotice("Saved");
                       } catch (e: any) {
-                        setError(e?.message === "migration_required" ? "Apply migration 0048_homepage_rail_tag_material_slots.sql before saving homepage slot changes." : (e?.message ?? "Failed to save homepage rail"));
+                        setError(e?.message === "migration_required" ? "Apply the latest homepage rail migrations before saving homepage slot changes." : (e?.message ?? "Failed to save homepage rail"));
                       } finally {
                         setHomepageSaving(false);
                       }
