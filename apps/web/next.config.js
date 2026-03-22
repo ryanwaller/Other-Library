@@ -2,6 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
   serverExternalPackages: ["sharp"],
+  // Ensure sharp's native binaries are traced and included in the
+  // /api/cover serverless function bundle (dynamic import isn't traced).
+  outputFileTracingIncludes: {
+    "/api/cover": ["./node_modules/sharp/**/*"]
+  },
   eslint: {
     ignoreDuringBuilds: true
   },

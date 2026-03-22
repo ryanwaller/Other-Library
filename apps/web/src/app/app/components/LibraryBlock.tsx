@@ -80,7 +80,7 @@ export default function LibraryBlock({
   );
 
   return (
-    <div className="card" style={{ marginTop: index === 0 ? 0 : "var(--catalog-section-divider-gap)" }}>
+    <div className="card" style={{ marginTop: 0 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap" }}>
         <div className="row" style={{ gap: "var(--space-10)", flex: 1, alignItems: "baseline", flexWrap: "nowrap", minWidth: 0 }}>
           <button
@@ -288,7 +288,7 @@ export default function LibraryBlock({
           {membersPanel}
           {renderBooks(limit, effectiveViewMode, setMeasuredGridColumns)}
           {(bookCount > limit || canSeeLess) && (
-            <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: 24, justifyContent: "center" }}>
+            <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: "var(--space-md)", justifyContent: "center" }}>
               {bookCount > limit ? (
                 <button onClick={loadMore} className="text-muted">
                   Load more

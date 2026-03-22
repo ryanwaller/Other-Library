@@ -70,7 +70,7 @@ export default function PagedBookList<T>({
         {items.slice(0, limit).map((item, index, visibleItems) => renderItem(item, index, index === visibleItems.length - 1))}
       </div>
       {(items.length > limit || canSeeLess) && (
-        <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: 24, justifyContent: "center" }}>
+        <div className="row" style={{ marginTop: "var(--space-md)", marginBottom: "var(--space-md)", justifyContent: "center" }}>
           {items.length > limit ? (
             <button onClick={loadMore} className="text-muted">
               Load more
