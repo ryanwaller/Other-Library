@@ -42,8 +42,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ username: strin
     );
     if (sharedCatalogIds.length === 0) return NextResponse.json({ ok: true, books: [], libraries: [], signed_map: {} });
 
-    const librariesRes = await admin.from("libraries").select("id,name,sort_order").in("id", sharedCatalogIds);
+    const librariesRes = await admin.from("libraries").select("id,name,sort_order,kind").in("id", sharedCatalogIds);
     const libraries = ((librariesRes.error ? [] : librariesRes.data) ?? [])
+      .filter((l: any) => String(l?.kind ?? "catalog").trim() !== "wishlist")
       .map((l: any) => ({
         id: Number(l.id),
         name: String(l.name ?? `Catalog ${l.id}`),
@@ -51,11 +52,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ username: strin
         member_previews: [] as Array<{ user_id: string; username: string; avatar_url: string | null }>
       }))
       .filter((l: any) => Number.isFinite(l.id) && l.id > 0);
+    const visibleSharedCatalogIds = libraries.map((l: any) => l.id);
+    if (visibleSharedCatalogIds.length === 0) return NextResponse.json({ ok: true, books: [], libraries: [], signed_map: {} });
 
     const membersRes = await admin
       .from("catalog_members")
       .select("catalog_id,user_id,accepted_at")
-      .in("catalog_id", sharedCatalogIds)
+      .in("catalog_id", visibleSharedCatalogIds)
       .not("accepted_at", "is", null);
     const memberRows = ((membersRes.error ? [] : membersRes.data) ?? [])
       .map((r: any) => ({
@@ -126,7 +129,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ username: strin
     const booksRes = await admin
       .from("user_books")
       .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))")
-      .in("library_id", sharedCatalogIds)
+      .in("library_id", visibleSharedCatalogIds)
+      .eq("collection_state", "owned")
       .order("created_at", { ascending: false })
       .limit(1200);
     if (booksRes.error) throw new Error(booksRes.error.message);

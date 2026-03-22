@@ -1,9 +1,11 @@
 import type { CoverCrop } from "../components/CoverImage";
 import type { MusicMetadata } from "./music";
+import type { CollectionState, LibraryKind } from "./collection";
 
 export type PublicBook = {
   id: number;
   library_id: number;
+  collection_state?: CollectionState | null;
   visibility: "inherit" | "followers_only" | "public";
   title_override: string | null;
   subtitle_override?: string | null;
@@ -31,6 +33,12 @@ export type PublicBook = {
   location?: string | null;
   shelf?: string | null;
   status?: string | null;
+  wishlist_match_summary?: {
+    followedCount: number;
+    followedUsernames: string[];
+    publicCount: number;
+    publicUsernames: string[];
+  } | null;
   primary_cover_ref?: string | null;
   resolved_cover_url?: string | null;
   cover_original_url: string | null;
@@ -50,6 +58,17 @@ export type PublicBook = {
   media: Array<{ id?: number; kind: "cover" | "image"; storage_path: string; caption?: string | null; created_at?: string }>;
   book_tags?: Array<{ tag: { id: number; name: string; kind: "tag" | "category" } | null }>;
   book_entities?: Array<{ role: string; position: number | null; entity: { id: string; name: string; slug: string } | null }> | null;
+};
+
+export type LibrarySummary = {
+  id: number;
+  name: string;
+  created_at: string;
+  sort_order?: number | null;
+  owner_id?: string | null;
+  myRole?: "owner" | "editor";
+  kind?: LibraryKind | null;
+  memberPreviews?: Array<{ userId: string; username: string; avatarUrl: string | null }>;
 };
 
 export type CatalogItem = PublicBook & {

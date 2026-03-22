@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminClient, requireUser, toApiError } from "../_lib";
+import { collectionStateForMode, parseLibraryMode, WISHLIST_LIBRARY_NAME } from "../../../../lib/collection";
 
 function parseCatalogIds(raw: string): number[] {
   return Array.from(
@@ -10,6 +11,28 @@ function parseCatalogIds(raw: string): number[] {
         .filter((n) => Number.isFinite(n) && n > 0)
     )
   );
+}
+
+async function ensureWishlistLibrary(admin: ReturnType<typeof requireAdminClient>, ownerId: string): Promise<number | null> {
+  const existing = await admin
+    .from("libraries")
+    .select("id")
+    .eq("owner_id", ownerId)
+    .eq("kind", "wishlist")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!existing.error) {
+    const id = Number((existing.data as any)?.id ?? 0);
+    if (id > 0) return id;
+  }
+  const created = await admin
+    .from("libraries")
+    .insert({ owner_id: ownerId, name: WISHLIST_LIBRARY_NAME, kind: "wishlist" })
+    .select("id")
+    .single();
+  if (created.error) return null;
+  return Number((created.data as any)?.id ?? 0) || null;
 }
 
 function isStoragePath(value: string): boolean {
@@ -132,22 +155,94 @@ async function attachResolvedCoverUrls(req: Request, admin: ReturnType<typeof re
   });
 }
 
+async function attachWishlistMatchSummaries(
+  admin: ReturnType<typeof requireAdminClient>,
+  currentUserId: string,
+  rows: any[]
+) {
+  const editionIds = Array.from(new Set(rows.map((row) => Number(row?.edition?.id ?? row?.edition_id ?? 0)).filter((id) => Number.isFinite(id) && id > 0)));
+  if (editionIds.length === 0) return rows;
+
+  const followsRes = await admin
+    .from("follows")
+    .select("followee_id")
+    .eq("follower_id", currentUserId)
+    .eq("status", "approved");
+  const followedIds = new Set<string>(((followsRes.error ? [] : followsRes.data) ?? []).map((row: any) => String(row.followee_id ?? "")).filter(Boolean));
+
+  const ownersRes = await admin
+    .from("user_books")
+    .select("id,owner_id,edition_id,visibility,collection_state,owner:profiles(username,visibility)")
+    .eq("collection_state", "owned")
+    .in("edition_id", editionIds)
+    .neq("owner_id", currentUserId)
+    .order("created_at", { ascending: false })
+    .limit(2000);
+
+  if (ownersRes.error) return rows;
+
+  const summaryByEdition = new Map<number, { followed: string[]; public: string[] }>();
+  for (const row of (ownersRes.data ?? []) as any[]) {
+    const editionId = Number(row?.edition_id ?? 0);
+    const ownerId = String(row?.owner_id ?? "");
+    const username = String(row?.owner?.username ?? "").trim();
+    const ownerVisibility = String(row?.owner?.visibility ?? "").trim().toLowerCase();
+    const itemVisibility = String(row?.visibility ?? "").trim().toLowerCase();
+    if (!editionId || !ownerId || !username) continue;
+    const isFollowed = followedIds.has(ownerId);
+    const isVisibleToCurrent =
+      itemVisibility === "public" ||
+      (itemVisibility === "inherit" && ownerVisibility === "public") ||
+      (isFollowed && (itemVisibility === "followers_only" || itemVisibility === "inherit" || itemVisibility === "public"));
+    if (!isVisibleToCurrent) continue;
+    const current = summaryByEdition.get(editionId) ?? { followed: [], public: [] };
+    const bucket = isFollowed ? current.followed : current.public;
+    if (!bucket.includes(username)) bucket.push(username);
+    summaryByEdition.set(editionId, current);
+  }
+
+  return rows.map((row) => {
+    const editionId = Number(row?.edition?.id ?? row?.edition_id ?? 0);
+    const summary = summaryByEdition.get(editionId);
+    if (!summary) return row;
+    return {
+      ...row,
+      wishlist_match_summary: {
+        followedCount: summary.followed.length,
+        followedUsernames: summary.followed.slice(0, 3),
+        publicCount: summary.public.length,
+        publicUsernames: summary.public.slice(0, 3)
+      }
+    };
+  });
+}
+
 export async function GET(req: Request) {
   try {
     const current = await requireUser(req);
     const admin = requireAdminClient();
     const url = new URL(req.url);
+    const mode = parseLibraryMode(url.searchParams.get("mode"));
+    const collectionState = collectionStateForMode(mode);
     const idsRaw = String(url.searchParams.get("catalog_ids") ?? "").trim();
     const lite = String(url.searchParams.get("lite") ?? "") === "1";
     const requestedIds = parseCatalogIds(idsRaw);
 
-    const ownedRes = await admin.from("libraries").select("id").eq("owner_id", current.id);
-    const ownedIds = Array.from(
+    const ownedRes = await admin
+      .from("libraries")
+      .select("id")
+      .eq("owner_id", current.id)
+      .eq("kind", mode === "wishlist" ? "wishlist" : "catalog");
+    let ownedIds = Array.from(
       new Set(((ownedRes.error ? [] : ownedRes.data) ?? []).map((l: any) => Number(l.id)).filter((id) => Number.isFinite(id) && id > 0))
     );
+    if (mode === "wishlist" && ownedIds.length === 0) {
+      const wishlistLibraryId = await ensureWishlistLibrary(admin, current.id);
+      if (wishlistLibraryId) ownedIds = [wishlistLibraryId];
+    }
 
     let membershipRows: Array<{ catalog_id: number; role: "owner" | "editor" }> = [];
-    if (requestedIds.length === 0) {
+    if (mode === "catalog" && requestedIds.length === 0) {
       const membershipsRes = await admin
         .from("catalog_members")
         .select("catalog_id,role,accepted_at")
@@ -175,7 +270,7 @@ export async function GET(req: Request) {
     if (allowedIds.length > 0) {
       const libsRes = await admin
         .from("libraries")
-        .select("id,name,created_at,sort_order,owner_id")
+        .select("id,name,created_at,sort_order,owner_id,kind")
         .in("id", allowedIds);
 
       if (!libsRes.error) {
@@ -187,6 +282,7 @@ export async function GET(req: Request) {
             created_at: String(l.created_at ?? new Date(0).toISOString()),
             sort_order: Number.isFinite(Number(l.sort_order)) ? Number(l.sort_order) : null,
             owner_id: l.owner_id ? String(l.owner_id) : null,
+            kind: typeof l.kind === "string" ? String(l.kind) : "catalog",
             myRole: roleByCatalog.get(id) ?? (ownedIds.includes(id) ? "owner" : "editor"),
             memberPreviews: [] as Array<{ userId: string; username: string; avatarUrl: string | null }>
           };
@@ -196,11 +292,12 @@ export async function GET(req: Request) {
           id,
           name: `Catalog ${id}`,
           created_at: new Date(0).toISOString(),
-          sort_order: null,
-          owner_id: null,
-          myRole: roleByCatalog.get(id) ?? (ownedIds.includes(id) ? "owner" : "editor"),
-          memberPreviews: [] as Array<{ userId: string; username: string; avatarUrl: string | null }>
-        }));
+            sort_order: null,
+            owner_id: null,
+            kind: mode === "wishlist" ? "wishlist" : "catalog",
+            myRole: roleByCatalog.get(id) ?? (ownedIds.includes(id) ? "owner" : "editor"),
+            memberPreviews: [] as Array<{ userId: string; username: string; avatarUrl: string | null }>
+          }));
       }
     }
 
@@ -288,19 +385,20 @@ export async function GET(req: Request) {
     let books: any[] = [];
     if (allowedIds.length > 0) {
       const liteSelect =
-        "id,library_id,created_at,visibility,sort_order,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))";
+        "id,library_id,created_at,visibility,collection_state,sort_order,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))";
       const fullSelect =
-        "id,library_id,created_at,visibility,sort_order,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))";
+        "id,library_id,created_at,visibility,collection_state,sort_order,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,cover_original_url,cover_crop,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))";
       const basicSelect =
-        "id,library_id,created_at,visibility,sort_order,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))";
+        "id,library_id,created_at,visibility,collection_state,sort_order,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,edition:editions(id,isbn13,title,authors,subjects,publisher,cover_url,publish_date),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))";
     const minimalSelect =
-      "id,library_id,created_at,visibility,sort_order,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn";
+      "id,library_id,created_at,visibility,collection_state,sort_order,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn";
 
     const fetchBooks = async (select: string): Promise<{ rows: any[]; error: unknown }> => {
       const res = await admin
         .from("user_books")
         .select(select)
         .in("library_id", allowedIds)
+        .eq("collection_state", collectionState)
         .order("created_at", { ascending: false })
         .limit(800);
       return { rows: (res.error ? [] : (res.data as any[])) ?? [], error: res.error ?? null };
@@ -325,6 +423,7 @@ export async function GET(req: Request) {
         books = liteRes.rows;
       }
       books = await attachResolvedCoverUrls(req, admin, books);
+      if (mode === "wishlist") books = await attachWishlistMatchSummaries(admin, current.id, books);
       return NextResponse.json({ ok: true, catalogs, books });
     }
 
@@ -332,6 +431,7 @@ export async function GET(req: Request) {
         .from("user_books")
         .select(fullSelect)
         .in("library_id", allowedIds)
+        .eq("collection_state", collectionState)
         .order("created_at", { ascending: false })
         .limit(800);
 
@@ -342,6 +442,7 @@ export async function GET(req: Request) {
           .from("user_books")
           .select(basicSelect)
           .in("library_id", allowedIds)
+          .eq("collection_state", collectionState)
           .order("created_at", { ascending: false })
           .limit(800);
 
@@ -352,12 +453,14 @@ export async function GET(req: Request) {
             .from("user_books")
             .select(minimalSelect)
             .in("library_id", allowedIds)
+            .eq("collection_state", collectionState)
             .order("created_at", { ascending: false })
             .limit(800);
           books = (minimalRes.error ? [] : minimalRes.data) as any[];
         }
       }
       books = await attachResolvedCoverUrls(req, admin, books);
+      if (mode === "wishlist") books = await attachWishlistMatchSummaries(admin, current.id, books);
     }
 
     return NextResponse.json({ ok: true, catalogs, books });

@@ -774,8 +774,6 @@ function AdminPageInner() {
                 if (tab === "feedback") setFeedbackRefreshToken((prev) => prev + 1);
                 if (tab === "homepage") refreshHomepageRail();
                 if (tab === "entities") {
-                  setEntityMergeSourceResults([]);
-                  setEntityMergeTargetResults([]);
                   setEntityMergeNotice(null);
                 }
               }}

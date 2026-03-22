@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { useAddToLibraryContext } from "./AddToLibraryProvider";
+import { WISHLIST_LIBRARY_NAME } from "../../../lib/collection";
 
 type Catalog = { id: number; name: string };
 
@@ -11,18 +12,31 @@ type AddToLibraryButtonProps = {
   editionId: number | null;
   titleFallback: string;
   authorsFallback: string[];
+  publisherFallback?: string | null;
+  publishDateFallback?: string | null;
   sourceOwnerId?: string | null;
   compact?: boolean;
 };
 
-export default function AddToLibraryButton({ editionId, titleFallback, authorsFallback, sourceOwnerId, compact }: AddToLibraryButtonProps) {
+export default function AddToLibraryButton({
+  editionId,
+  titleFallback,
+  authorsFallback,
+  publisherFallback,
+  publishDateFallback,
+  sourceOwnerId,
+  compact
+}: AddToLibraryButtonProps) {
   const ctx = useAddToLibraryContext();
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [createdId, setCreatedId] = useState<number | null>(null);
-  const [count, setCount] = useState<number>(0);
-  const [latestId, setLatestId] = useState<number | null>(null);
+  const [createdOwnedId, setCreatedOwnedId] = useState<number | null>(null);
+  const [createdWantedId, setCreatedWantedId] = useState<number | null>(null);
+  const [ownedCount, setOwnedCount] = useState<number>(0);
+  const [latestOwnedId, setLatestOwnedId] = useState<number | null>(null);
+  const [wantedCount, setWantedCount] = useState<number>(0);
+  const [latestWantedId, setLatestWantedId] = useState<number | null>(null);
 
   // Catalog picker state
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -56,27 +70,52 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
 
   async function refreshExisting() {
     if (!editionId) {
-      setCount(0);
-      setLatestId(null);
+      setOwnedCount(0);
+      setLatestOwnedId(null);
+      setWantedCount(0);
+      setLatestWantedId(null);
       return;
     }
 
     const fromCtx = ctx?.getInfo(editionId) ?? null;
     if (fromCtx) {
-      setCount(fromCtx.count);
-      setLatestId(fromCtx.latestId);
+      setOwnedCount(fromCtx.ownedCount);
+      setLatestOwnedId(fromCtx.latestOwnedId);
+      setWantedCount(fromCtx.wantedCount);
+      setLatestWantedId(fromCtx.latestWantedId);
       return;
     }
 
     if (!supabase || !sessionUserId) return;
-    const [countRes, latestRes] = await Promise.all([
-      supabase.from("user_books").select("id", { count: "exact", head: true }).eq("owner_id", sessionUserId).eq("edition_id", editionId),
-      supabase.from("user_books").select("id").eq("owner_id", sessionUserId).eq("edition_id", editionId).order("created_at", { ascending: false }).limit(1).maybeSingle()
-    ]);
-    if (countRes.error) return;
-    if (latestRes.error) return;
-    setCount(countRes.count ?? 0);
-    setLatestId((latestRes.data as any)?.id ?? null);
+    const rowsRes = await supabase
+      .from("user_books")
+      .select("id,collection_state,created_at")
+      .eq("owner_id", sessionUserId)
+      .eq("edition_id", editionId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (rowsRes.error) return;
+    const rows = (rowsRes.data ?? []) as any[];
+    let nextOwnedCount = 0;
+    let nextWantedCount = 0;
+    let nextLatestOwnedId: number | null = null;
+    let nextLatestWantedId: number | null = null;
+    for (const row of rows) {
+      const id = Number(row?.id);
+      if (!Number.isFinite(id) || id <= 0) continue;
+      const state = String(row?.collection_state ?? "owned").trim().toLowerCase();
+      if (state === "wanted") {
+        nextWantedCount += 1;
+        if (!nextLatestWantedId) nextLatestWantedId = id;
+      } else {
+        nextOwnedCount += 1;
+        if (!nextLatestOwnedId) nextLatestOwnedId = id;
+      }
+    }
+    setOwnedCount(nextOwnedCount);
+    setLatestOwnedId(nextLatestOwnedId);
+    setWantedCount(nextWantedCount);
+    setLatestWantedId(nextLatestWantedId);
   }
 
   useEffect(() => {
@@ -104,6 +143,7 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
       .from("libraries")
       .select("id,name")
       .eq("owner_id", sessionUserId)
+      .eq("kind", "catalog")
       .order("created_at", { ascending: true });
     if (res.error) return [];
     const loaded = (res.data ?? []).map((r: any) => ({ id: Number(r.id), name: String(r.name ?? "") }));
@@ -118,10 +158,66 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
       .from("user_books")
       .select("library_id")
       .eq("owner_id", sessionUserId)
+      .eq("collection_state", "owned")
       .eq("edition_id", editionId);
     if (res.error) return;
     const ids = new Set<number>((res.data ?? []).map((r: any) => Number(r.library_id)));
     setCatalogsWithEdition(ids);
+  }
+
+  async function ensureCanonicalEditionId(): Promise<number | null> {
+    if (!supabase) return null;
+    if (editionId) return editionId;
+    const title = titleFallback.trim();
+    const authors = (authorsFallback ?? []).map((value) => String(value ?? "").trim()).filter(Boolean);
+    if (!title) return null;
+
+    let query = supabase.from("editions").select("id,authors,created_at").eq("title", title).order("created_at", { ascending: false }).limit(20);
+    if (authors.length > 0) query = query.contains("authors", authors);
+    const existing = await query;
+    if (!existing.error) {
+      const match = ((existing.data ?? []) as any[]).find((row) => {
+        const rowAuthors = Array.isArray(row?.authors) ? row.authors.map((value: unknown) => String(value ?? "").trim().toLowerCase()).filter(Boolean) : [];
+        if (authors.length === 0) return true;
+        return authors.every((author) => rowAuthors.includes(author.toLowerCase()));
+      });
+      if (match?.id) return Number(match.id);
+    }
+
+    const inserted = await supabase
+      .from("editions")
+      .insert({
+        title,
+        authors,
+        publisher: publisherFallback?.trim() || null,
+        publish_date: publishDateFallback?.trim() || null
+      })
+      .select("id")
+      .single();
+    if (inserted.error) throw new Error(inserted.error.message);
+    return Number((inserted.data as any)?.id ?? 0) || null;
+  }
+
+  async function ensureWishlistLibraryId(): Promise<number> {
+    if (!supabase || !sessionUserId) throw new Error("Sign in required");
+    const existing = await supabase
+      .from("libraries")
+      .select("id")
+      .eq("owner_id", sessionUserId)
+      .eq("kind", "wishlist")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (existing.error) throw new Error(existing.error.message);
+    const foundId = Number((existing.data as any)?.id ?? 0);
+    if (foundId > 0) return foundId;
+    const created = await supabase
+      .from("libraries")
+      .insert({ owner_id: sessionUserId, name: WISHLIST_LIBRARY_NAME, kind: "wishlist" })
+      .select("id")
+      .single();
+    if (created.error) throw new Error(created.error.message);
+    return Number((created.data as any)?.id ?? 0);
   }
 
   async function addToLibrary(libraryId: number, catalogName: string) {
@@ -129,9 +225,9 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
     setBusy(true);
     setError(null);
     try {
-      const payload: any = { owner_id: sessionUserId, library_id: libraryId, edition_id: editionId };
-      if (!editionId) {
-        payload.edition_id = null;
+      const canonicalEditionId = await ensureCanonicalEditionId();
+      const payload: any = { owner_id: sessionUserId, library_id: libraryId, edition_id: canonicalEditionId, collection_state: "owned" };
+      if (!canonicalEditionId) {
         payload.title_override = titleFallback.trim() ? titleFallback.trim() : null;
         payload.authors_override = (authorsFallback ?? []).filter(Boolean).length > 0 ? (authorsFallback ?? []).filter(Boolean) : null;
       }
@@ -139,15 +235,53 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
       if (ins.error) throw new Error(ins.error.message);
       const id = (ins.data as any)?.id as number | undefined;
       if (!id) throw new Error("Add failed");
-      setCreatedId(id);
-      if (editionId) {
-        ctx?.bump(editionId, id);
-        setCount((c) => c + 1);
-        setLatestId(id);
+      setCreatedOwnedId(id);
+      if (canonicalEditionId) {
+        ctx?.bumpOwned(canonicalEditionId, id);
+        setOwnedCount((c) => c + 1);
+        setLatestOwnedId(id);
         setCatalogsWithEdition((prev) => new Set([...prev, libraryId]));
       }
     } catch (e: any) {
       setError(e?.message ?? "Add failed");
+    } finally {
+      setBusy(false);
+      setPickerOpen(false);
+      setNewCatalogMode(false);
+      setNewCatalogName("");
+    }
+  }
+
+  async function addToWishlist() {
+    if (!supabase || !sessionUserId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const wishlistLibraryId = await ensureWishlistLibraryId();
+      const canonicalEditionId = await ensureCanonicalEditionId();
+      const payload: any = {
+        owner_id: sessionUserId,
+        library_id: wishlistLibraryId,
+        edition_id: canonicalEditionId,
+        collection_state: "wanted",
+        status: "owned"
+      };
+      if (!canonicalEditionId) {
+        payload.title_override = titleFallback.trim() ? titleFallback.trim() : null;
+        payload.authors_override = (authorsFallback ?? []).filter(Boolean).length > 0 ? (authorsFallback ?? []).filter(Boolean) : null;
+      }
+      const ins = await supabase.from("user_books").insert(payload).select("id").single();
+      if (ins.error) throw new Error(ins.error.message);
+      const id = Number((ins.data as any)?.id ?? 0);
+      if (!id) throw new Error("Wishlist add failed");
+      setCreatedWantedId(id);
+      if (canonicalEditionId) {
+        ctx?.bumpWanted(canonicalEditionId, id);
+      }
+      setWantedCount((c) => c + 1);
+      setLatestWantedId(id);
+    } catch (e: any) {
+      setError(e?.message ?? "Wishlist add failed");
     } finally {
       setBusy(false);
       setPickerOpen(false);
@@ -165,13 +299,6 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
       loaded = await loadCatalogs();
       await loadCatalogsWithEdition(loaded);
     }
-
-    // Single catalog → add directly, no picker
-    if (loaded.length === 1) {
-      await addToLibrary(loaded[0]!.id, loaded[0]!.name);
-      return;
-    }
-
     setPickerOpen(true);
   }
 
@@ -182,7 +309,7 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
     try {
       const res = await supabase
         .from("libraries")
-        .insert({ owner_id: sessionUserId, name })
+        .insert({ owner_id: sessionUserId, name, kind: "catalog" })
         .select("id")
         .single();
       if (res.error) throw new Error(res.error.message);
@@ -192,6 +319,7 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
       await addToLibrary(newId, name);
     } catch (e: any) {
       setError(e?.message ?? "Failed to create catalog");
+    } finally {
       setNewCatalogBusy(false);
     }
   }
@@ -199,13 +327,14 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
   async function removeOne() {
     if (!supabase || !sessionUserId) return;
     if (!editionId) return;
-    let id = latestId;
+    let id = latestOwnedId;
     if (!id) {
       const latestRes = await supabase
         .from("user_books")
         .select("id")
         .eq("owner_id", sessionUserId)
         .eq("edition_id", editionId)
+        .eq("collection_state", "owned")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -218,8 +347,42 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
     try {
       const del = await supabase.from("user_books").delete().eq("id", id).eq("owner_id", sessionUserId);
       if (del.error) throw new Error(del.error.message);
-      setCount((c) => Math.max(0, c - 1));
-      setCreatedId(null);
+      setOwnedCount((c) => Math.max(0, c - 1));
+      setCreatedOwnedId(null);
+      await ctx?.refresh(editionId);
+      await refreshExisting();
+    } catch (e: any) {
+      setError(e?.message ?? "Remove failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeWishlist() {
+    if (!supabase || !sessionUserId) return;
+    if (!editionId) return;
+    let id = latestWantedId;
+    if (!id) {
+      const latestRes = await supabase
+        .from("user_books")
+        .select("id")
+        .eq("owner_id", sessionUserId)
+        .eq("edition_id", editionId)
+        .eq("collection_state", "wanted")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestRes.error) return;
+      id = (latestRes.data as any)?.id ?? null;
+    }
+    if (!id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const del = await supabase.from("user_books").delete().eq("id", id).eq("owner_id", sessionUserId);
+      if (del.error) throw new Error(del.error.message);
+      setWantedCount((c) => Math.max(0, c - 1));
+      setCreatedWantedId(null);
       await ctx?.refresh(editionId);
       await refreshExisting();
     } catch (e: any) {
@@ -232,18 +395,21 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
   if (!supabase) return null;
   if (!canAdd) return null;
 
-  const idToOpen = latestId ?? createdId;
+  const ownedIdToOpen = latestOwnedId ?? createdOwnedId;
+  const wantedIdToOpen = latestWantedId ?? createdWantedId;
   const label = compact ? "＋" : "＋ Add";
 
   const picker = pickerOpen ? (
     <CatalogPickerDropdown
       catalogs={catalogs}
       catalogsWithEdition={catalogsWithEdition}
+      wantedCount={wantedCount}
       newCatalogMode={newCatalogMode}
       newCatalogName={newCatalogName}
       newCatalogBusy={newCatalogBusy}
       busy={busy}
       onSelect={(cat) => addToLibrary(cat.id, cat.name)}
+      onSelectWishlist={addToWishlist}
       onNewCatalogMode={() => setNewCatalogMode(true)}
       onNewCatalogNameChange={setNewCatalogName}
       onCreateCatalog={handleCreateCatalog}
@@ -252,11 +418,11 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
 
   return (
     <span className="row" style={{ gap: "var(--space-8)", flexWrap: "nowrap", alignItems: "center", minHeight: 24 }}>
-      {editionId && count > 0 ? (
+      {editionId && ownedCount > 0 ? (
         <>
-          <Link href={idToOpen ? `/app/books/${idToOpen}` : "/app"} style={{ textDecoration: "none" }}>
+          <Link href={ownedIdToOpen ? `/app/books/${ownedIdToOpen}` : "/app"} style={{ textDecoration: "none" }}>
             <span className="card" style={{ padding: "2px 8px", display: "inline-flex", alignItems: "center" }}>
-              {count}
+              {ownedCount}
             </span>
           </Link>
           <button onClick={removeOne} disabled={busy} title="Remove one copy">
@@ -265,6 +431,24 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
           <div ref={pickerRef} style={{ position: "relative", display: "inline-block" }}>
             <button onClick={handleAddClick} disabled={busy} title="Add another copy">
               {busy ? (compact ? "…" : "Adding…") : compact ? "＋" : "Add copy"}
+            </button>
+            {picker}
+          </div>
+          {wantedCount > 0 ? <span className="text-muted">{compact ? "Wishlist" : "In wishlist"}</span> : null}
+        </>
+      ) : editionId && wantedCount > 0 ? (
+        <>
+          <Link href={wantedIdToOpen ? `/app/books/${wantedIdToOpen}` : "/app"} style={{ textDecoration: "none" }}>
+            <span className="card" style={{ padding: "2px 8px", display: "inline-flex", alignItems: "center" }}>
+              Wishlist
+            </span>
+          </Link>
+          <button onClick={removeWishlist} disabled={busy} title="Remove from wishlist">
+            {busy ? (compact ? "…" : "Removing…") : compact ? "－" : "Remove"}
+          </button>
+          <div ref={pickerRef} style={{ position: "relative", display: "inline-block" }}>
+            <button onClick={handleAddClick} disabled={busy} title="Add to catalog or wishlist">
+              {busy ? (compact ? "…" : "Adding…") : compact ? "＋" : "Add"}
             </button>
             {picker}
           </div>
@@ -285,22 +469,26 @@ export default function AddToLibraryButton({ editionId, titleFallback, authorsFa
 function CatalogPickerDropdown({
   catalogs,
   catalogsWithEdition,
+  wantedCount,
   newCatalogMode,
   newCatalogName,
   newCatalogBusy,
   busy,
   onSelect,
+  onSelectWishlist,
   onNewCatalogMode,
   onNewCatalogNameChange,
   onCreateCatalog,
 }: {
   catalogs: Catalog[];
   catalogsWithEdition: Set<number>;
+  wantedCount: number;
   newCatalogMode: boolean;
   newCatalogName: string;
   newCatalogBusy: boolean;
   busy: boolean;
   onSelect: (cat: Catalog) => void;
+  onSelectWishlist: () => void;
   onNewCatalogMode: () => void;
   onNewCatalogNameChange: (v: string) => void;
   onCreateCatalog: () => void;
@@ -350,6 +538,26 @@ function CatalogPickerDropdown({
       )}
 
       <div style={{ borderTop: "1px solid var(--border)" }}>
+        <button
+          onClick={onSelectWishlist}
+          disabled={busy || wantedCount > 0}
+          style={{
+            display: "flex",
+            width: "100%",
+            textAlign: "left",
+            padding: "8px 12px",
+            border: "none",
+            borderBottom: "1px solid var(--border)",
+            background: "transparent",
+            cursor: busy ? "default" : "pointer",
+            gap: "var(--space-8)",
+            alignItems: "baseline",
+            opacity: wantedCount > 0 ? 0.5 : 1
+          }}
+        >
+          <span style={{ flex: 1 }}>Add to wishlist</span>
+          {wantedCount > 0 ? <span className="text-muted">✓</span> : null}
+        </button>
         {newCatalogMode ? (
           <div style={{ padding: "8px 12px", display: "flex", gap: "var(--space-8)", alignItems: "baseline" }}>
             <input

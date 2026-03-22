@@ -37,6 +37,7 @@ import {
   normalizeIssn,
   type MagazineMetadata
 } from "../../../../lib/magazine";
+import { WISHLIST_LIBRARY_NAME } from "../../../../lib/collection";
 import AlsoOwnedBy from "../../../u/[username]/AlsoOwnedBy";
 import RelatedItemsModule, { type RelatedItemsCandidate } from "../../../components/RelatedItemsModule";
 import SignInCard from "../../../components/SignInCard";
@@ -69,6 +70,7 @@ type UserBookDetail = {
   id: number;
   owner_id: string;
   library_id: number;
+  collection_state?: "owned" | "wanted" | null;
   visibility: "inherit" | "followers_only" | "public";
   status: "owned" | "loaned" | "selling" | "trading";
   borrowable_override: boolean | null;
@@ -629,6 +631,11 @@ export default function BookDetailPage() {
     error: null,
     message: null
   });
+  const [collectionMoveState, setCollectionMoveState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
+    busy: false,
+    error: null,
+    message: null
+  });
   const [copiesDraft, setCopiesDraft] = useState<string>("");
   const [copiesUpdateState, setCopiesUpdateState] = useState<{ busy: boolean; error: string | null; message: string | null }>({
     busy: false,
@@ -984,11 +991,11 @@ export default function BookDetailPage() {
         setLibraries([]);
         return;
       }
-      const ownRes = await supabase.from("libraries").select("id,name,created_at").eq("owner_id", userId).order("created_at", { ascending: true });
+      const ownRes = await supabase.from("libraries").select("id,name,created_at").eq("owner_id", userId).eq("kind", "catalog").order("created_at", { ascending: true });
       if (!alive) return;
       if (!ownRes.error) {
         const ownLibraries = (ownRes.data ?? []) as any[];
-        if (book.library_id && !ownLibraries.some((l: any) => l.id === book.library_id)) {
+        if (book.library_id && !ownLibraries.some((l: any) => l.id === book.library_id) && String(book.collection_state ?? "owned").trim().toLowerCase() !== "wanted") {
           const currentRes = await supabase.from("libraries").select("id,name,created_at").eq("id", book.library_id).maybeSingle();
           if (!alive) return;
           if (!currentRes.error && currentRes.data) {
@@ -1082,9 +1089,9 @@ export default function BookDetailPage() {
     setCopiesCountState({ busy: false, error: null });
     try {
       const baseNew =
-        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,subtitle_override,field_visibility,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,collection_state,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,subtitle_override,field_visibility,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
       const baseOld =
-        "id,owner_id,library_id,visibility,status,borrowable_override,borrow_request_scope_override,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,field_visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,collection_state,visibility,status,borrowable_override,borrow_request_scope_override,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,field_visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
 
       const entitiesSelect = ",book_entities:book_entities(role,position,visibility,entity:entities(id,name,slug))";
       const selectNew = baseNew + entitiesSelect;
@@ -2213,11 +2220,11 @@ export default function BookDetailPage() {
           ["category", categories.map((t) => t.name)]
         ];
 
-        if (isMusicObject(String(book.object_type ?? "").trim())) {
+        if (String(book.object_type ?? "").trim() === "music") {
           const music = parseMusicMetadata(book.music_metadata ?? null);
-          const primaryArtist = String(music.primary_artist ?? "").trim();
+          const primaryArtist = String(music?.primary_artist ?? "").trim();
           const performerNames = uniqStrings([primaryArtist, ...facetView.performer.map((item) => item.name)]);
-          const labelNames = String(music.label ?? "").trim() ? [String(music.label ?? "").trim()] : [];
+          const labelNames = String(music?.label ?? "").trim() ? [String(music?.label ?? "").trim()] : [];
           roles.splice(0, roles.length,
             ["subject", facetView.subject.map((item) => item.name)],
             ["tag", tags.map((t) => t.name)],
@@ -2814,6 +2821,38 @@ export default function BookDetailPage() {
       window.setTimeout(() => setLibraryMoveState({ busy: false, error: null, message: null }), 1200);
     } catch (e: any) {
       setLibraryMoveState({ busy: false, error: e?.message ?? "Move failed", message: "Move failed" });
+    }
+  }
+
+  async function convertWishlistToOwned(nextLibraryId?: number) {
+    if (!supabase || !book || !userId) return;
+    if (!isOwner) return;
+    if (String(book.collection_state ?? "owned").trim().toLowerCase() !== "wanted") return;
+    const targetLibraryId = nextLibraryId ?? libraries[0]?.id ?? null;
+    if (!targetLibraryId || !Number.isFinite(targetLibraryId)) {
+      setCollectionMoveState({ busy: false, error: "Create a catalog first", message: "Convert failed" });
+      return;
+    }
+    setCollectionMoveState({ busy: true, error: null, message: "Converting…" });
+    try {
+      const upd = await supabase
+        .from("user_books")
+        .update({ collection_state: "owned", library_id: targetLibraryId, status: "owned" })
+        .eq("id", book.id)
+        .eq("owner_id", userId);
+      if (upd.error) throw new Error(upd.error.message);
+      setFormLibraryId(targetLibraryId);
+      setFormStatus("owned");
+      try {
+        window.localStorage.setItem("om_currentLibraryId", String(targetLibraryId));
+      } catch {
+        // ignore
+      }
+      await refresh();
+      setCollectionMoveState({ busy: false, error: null, message: "Converted" });
+      window.setTimeout(() => setCollectionMoveState({ busy: false, error: null, message: null }), 1200);
+    } catch (e: any) {
+      setCollectionMoveState({ busy: false, error: e?.message ?? "Convert failed", message: "Convert failed" });
     }
   }
 
@@ -5468,9 +5507,24 @@ export default function BookDetailPage() {
                   <div className="meta-list" style={{ gap: 0 }}>
                     <div className="row om-row-baseline">
                       <div style={{ minWidth: 110 }} className="text-muted">
-                        Catalog
+                        {String(book?.collection_state ?? "owned").trim().toLowerCase() === "wanted" ? "Wishlist" : "Catalog"}
                       </div>
-                      {editMode ? (
+                      {String(book?.collection_state ?? "owned").trim().toLowerCase() === "wanted" ? (
+                        <div className="row" style={{ alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap" }}>
+                          <span>{WISHLIST_LIBRARY_NAME}</span>
+                          <button
+                            type="button"
+                            onClick={() => convertWishlistToOwned()}
+                            disabled={collectionMoveState.busy || libraries.length === 0}
+                          >
+                            {collectionMoveState.busy ? "Converting…" : "Convert to owned"}
+                          </button>
+                          <span className="text-muted">
+                            {collectionMoveState.message ? (collectionMoveState.error ? `${collectionMoveState.message} (${collectionMoveState.error})` : collectionMoveState.message) : ""}
+                            {!collectionMoveState.message && libraries.length === 0 ? "Create a catalog first" : ""}
+                          </span>
+                        </div>
+                      ) : editMode ? (
                         <>
                           <select
                             className="om-inline-control"

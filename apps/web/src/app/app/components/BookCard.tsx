@@ -26,7 +26,9 @@ export default function BookCard({
   deleteState,
   hideCopyCount,
   gridCols,
-  secondaryMode = "authors"
+  secondaryMode = "authors",
+  roundedCover = false,
+  wishlistMatchSummary = null
 }: {
   viewMode: BookCardViewMode;
   bulkMode: boolean;
@@ -48,6 +50,13 @@ export default function BookCard({
   showDeleteCopy?: boolean;
   gridCols?: number;
   secondaryMode?: "authors" | "plain";
+  roundedCover?: boolean;
+  wishlistMatchSummary?: {
+    followedCount: number;
+    followedUsernames: string[];
+    publicCount: number;
+    publicUsernames: string[];
+  } | null;
 }) {
   const router = useRouter();
 
@@ -77,7 +86,7 @@ export default function BookCard({
   }, [gridCols, authors, isMobile]);
 
   const coverEl = (
-    <div className="om-cover-slot" style={{ height: "auto", width: "100%" }}>
+    <div className="om-cover-slot" style={{ height: "auto", width: "100%", borderRadius: roundedCover ? 12 : 0, overflow: roundedCover ? "hidden" : "visible" }}>
       <CoverImage
         alt={title}
         src={originalSrc ?? coverUrl}
@@ -124,6 +133,14 @@ export default function BookCard({
     );
   }
 
+  const wishlistMatchLine = useMemo(() => {
+    if (!wishlistMatchSummary) return null;
+    if (wishlistMatchSummary.followedCount > 1) return `Owned by ${wishlistMatchSummary.followedCount} people you follow`;
+    if (wishlistMatchSummary.followedCount === 1) return `In ${wishlistMatchSummary.followedUsernames[0]}'s library`;
+    if (wishlistMatchSummary.publicCount > 0) return `In ${wishlistMatchSummary.publicUsernames[0]}'s library`;
+    return null;
+  }, [wishlistMatchSummary]);
+
   if (viewMode === "list") {
     return (
       <div className="card" style={{ display: "grid", gridTemplateColumns: bulkMode ? "26px 70px 1fr" : "70px 1fr", gap: "var(--space-md)", alignItems: "start" }}>
@@ -142,6 +159,7 @@ export default function BookCard({
           <div className="text-muted" style={{ marginTop: 4 }}>
             {renderSecondaryText()}
           </div>
+          {wishlistMatchLine ? <div className="text-muted" style={{ marginTop: 4 }}>{wishlistMatchLine}</div> : null}
         </div>
       </div>
     );
@@ -171,6 +189,7 @@ export default function BookCard({
                 {renderSecondaryText()}
               </div>
             ) : null}
+            {wishlistMatchLine ? <div className="text-muted" style={{ marginTop: "var(--space-xs)" }}>{wishlistMatchLine}</div> : null}
           </div>
         </>
       ) : (
@@ -189,6 +208,7 @@ export default function BookCard({
                 {renderSecondaryText()}
               </div>
             ) : null}
+            {wishlistMatchLine ? <div className="text-muted" style={{ marginTop: "var(--space-xs)" }}>{wishlistMatchLine}</div> : null}
           </div>
         </>
       )}

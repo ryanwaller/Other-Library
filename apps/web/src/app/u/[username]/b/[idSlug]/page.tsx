@@ -334,6 +334,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     ])
   );
   const rawToStorage = new Map<string, string>();
+  const admin = getSupabaseAdmin();
   const storagePaths = Array.from(
     new Set(
       rawMediaRefs
@@ -371,8 +372,8 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
     storagePaths.length > 0
       ? signingClient.storage.from("user-book-media").createSignedUrls(storagePaths, 60 * 30)
       : Promise.resolve(null),
-    Number.isFinite(Number(book.library_id)) && Number(book.library_id) > 0
-      ? getSupabaseAdmin().from("libraries").select("name").eq("id", Number(book.library_id)).maybeSingle()
+    admin && Number.isFinite(Number(book.library_id)) && Number(book.library_id) > 0
+      ? admin.from("libraries").select("name").eq("id", Number(book.library_id)).maybeSingle()
       : Promise.resolve(null),
     book.edition?.id
       ? supabase
@@ -544,8 +545,7 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
   if (libName) catalogName = libName;
 
   let memberPreviews: MemberPreview[] = [];
-  if (Number.isFinite(Number(book.library_id)) && Number(book.library_id) > 0) {
-    const admin = getSupabaseAdmin();
+  if (admin && Number.isFinite(Number(book.library_id)) && Number(book.library_id) > 0) {
     const membersRes = await admin
       .from("catalog_members")
       .select("user_id,accepted_at")
@@ -646,6 +646,8 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
                   editionId={editionId}
                   titleFallback={effectiveTitle}
                   authorsFallback={effectiveAuthors}
+                  publisherFallback={effectivePublisher}
+                  publishDateFallback={effectivePublishDate}
                   sourceOwnerId={book.owner_id}
                   compact
                 />

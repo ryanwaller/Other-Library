@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { permanentRedirect } from "next/navigation";
 import { getServerSupabase } from "../../../lib/supabaseServer";
-import Link from "next/link";
 import FollowControls from "./FollowControls";
 import AddToLibraryProvider from "./AddToLibraryProvider";
 import PublicBookList from "./PublicBookList";
@@ -9,6 +8,7 @@ import PublicProfileHeader from "../../components/PublicProfileHeader";
 import type { PublicBook } from "../../../lib/types";
 import { contextFromFilterParams } from "../../../lib/pageTitle";
 import PublicSignInGate from "../../components/PublicSignInGate";
+import { collectionStateForMode, parseLibraryMode } from "../../../lib/collection";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +42,7 @@ export async function generateMetadata({
     disc_count?: string;
     limited_edition?: string;
     reissue?: string;
+    mode?: string;
   }>;
 }): Promise<Metadata> {
   const { username } = await params;
@@ -73,7 +74,7 @@ export default async function PublicProfilePage({
     author?: string; tag?: string; subject?: string; category?: string; publisher?: string; decade?: string; designer?: string; q?: string;
     publish_date?: string; release_date?: string; original_release_year?: string; format?: string; release_type?: string; pressing?: string;
     catalog_number?: string; barcode?: string; country?: string; discogs_id?: string; musicbrainz_id?: string; speed?: string; channels?: string;
-    disc_count?: string; limited_edition?: string; reissue?: string;
+    disc_count?: string; limited_edition?: string; reissue?: string; mode?: string;
   }>
 }) {
   const { username } = await params;
@@ -102,6 +103,8 @@ export default async function PublicProfilePage({
   const filterDiscCount = rawParams.disc_count ? decodeURIComponent(rawParams.disc_count) : undefined;
   const filterLimitedEdition = rawParams.limited_edition ? decodeURIComponent(rawParams.limited_edition) : undefined;
   const filterReissue = rawParams.reissue ? decodeURIComponent(rawParams.reissue) : undefined;
+  const collectionMode = parseLibraryMode(rawParams.mode);
+  const collectionState = collectionStateForMode(collectionMode);
 
   const usernameNorm = (username ?? "").trim().toLowerCase();
   const supabase = getServerSupabase();
@@ -155,6 +158,7 @@ export default async function PublicProfilePage({
       .from("user_books")
       .select("*,edition:editions(id,isbn13,title,authors,cover_url,subjects,publisher,publish_date,description),media:user_book_media(kind,storage_path),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))")
       .eq("owner_id", profile.id)
+      .eq("collection_state", collectionState)
       .order("created_at", { ascending: false })
       .limit(1000)
   ]);
@@ -190,14 +194,24 @@ export default async function PublicProfilePage({
         .filter((id) => Number.isFinite(id) && id > 0)
     )
   );
-  let libraries: Array<{ id: number; name: string; sort_order: number | null }> = [];
+  let libraries: Array<{ id: number; name: string; sort_order: number | null; kind?: "catalog" | "wishlist" | null }> = [];
   if (libraryIds.length > 0) {
-    const librariesRes = await supabase.from("libraries").select("id,name,sort_order").in("id", libraryIds);
+    const librariesRes = await supabase.from("libraries").select("id,name,sort_order,kind").in("id", libraryIds);
     libraries = ((librariesRes.data ?? []) as any[])
-      .map((l) => ({ id: Number(l.id), name: String(l.name ?? `Catalog ${l.id}`), sort_order: l.sort_order ?? null }))
+      .map((l) => ({
+        id: Number(l.id),
+        name: String(l.name ?? `Catalog ${l.id}`),
+        sort_order: l.sort_order ?? null,
+        kind: (String(l.kind ?? "").trim() === "wishlist" ? "wishlist" : "catalog") as "catalog" | "wishlist"
+      }))
       .filter((l) => Number.isFinite(l.id) && l.id > 0);
     if (libraries.length === 0) {
-      libraries = libraryIds.map((id) => ({ id, name: `Catalog ${id}`, sort_order: null }));
+      libraries = libraryIds.map((id) => ({
+        id,
+        name: `Catalog ${id}`,
+        sort_order: null,
+        kind: collectionMode === "wishlist" ? "wishlist" : "catalog"
+      }));
     }
   }
 
@@ -218,7 +232,7 @@ export default async function PublicProfilePage({
 
   const editionIds = Array.from(new Set(visibleBooks.map(b => b.edition?.id).filter(Boolean))) as number[];
 
-  const DEFAULT_LIBRARY_NAME = "Your catalog";
+  const DEFAULT_LIBRARY_NAME = collectionMode === "wishlist" ? "Wishlist" : "Your catalog";
   const showLibraryBlocks = libraries.length > 1 || (libraries.length === 1 && libraries[0]?.name !== DEFAULT_LIBRARY_NAME);
 
   return (
@@ -242,6 +256,7 @@ export default async function PublicProfilePage({
               allBooks={visibleBooks}
               username={profile.username}
               profileId={profile.id}
+              collectionMode={collectionMode}
               signedMap={signedMap}
               showLibraryBlocks={showLibraryBlocks}
               initialSearch={filterQuery}

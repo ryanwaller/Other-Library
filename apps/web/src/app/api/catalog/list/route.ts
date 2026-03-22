@@ -13,6 +13,7 @@ export async function GET(req: Request) {
       .from("libraries")
       .select("id,name,created_at,sort_order,owner_id")
       .eq("owner_id", current.id)
+      .eq("kind", "catalog")
       .order("sort_order", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true });
     if (!ownedRes.error) {
@@ -24,6 +25,7 @@ export async function GET(req: Request) {
           .from("libraries")
           .select("id,name,created_at,owner_id")
           .eq("owner_id", current.id)
+          .eq("kind", "catalog")
           .order("created_at", { ascending: true });
         if (fallback.error) throw new Error(fallback.error.message);
         ownedRows = ((fallback.data ?? []) as any[]).map((l) => ({ ...l, sort_order: null }));

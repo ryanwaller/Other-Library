@@ -32,14 +32,16 @@ import {
   type DesktopGridDensity,
   type MobileGridCols
 } from "../../../lib/grid";
+import { isWishlistMode, type LibraryMode } from "../../../lib/collection";
 
 type SortMode = "latest" | "earliest" | "title_asc" | "title_desc";
 
 type Props = {
-  libraries: Array<{ id: number; name: string; sort_order?: number | null }>;
+  libraries: Array<{ id: number; name: string; sort_order?: number | null; kind?: "catalog" | "wishlist" | null }>;
   allBooks: PublicBook[]; // All visible books, unfiltered
   username: string;
   profileId: string;
+  collectionMode: LibraryMode;
   signedMap: Record<string, string>;
   showLibraryBlocks: boolean;
   initialSearch?: string;
@@ -88,6 +90,7 @@ export default function PublicBookList({
   libraries,
   allBooks,
   username,
+  collectionMode,
   signedMap,
   showLibraryBlocks: _showLibraryBlocks,
   initialSearch,
@@ -110,6 +113,7 @@ export default function PublicBookList({
   const [sharedSignedMap, setSharedSignedMap] = useState<Record<string, string>>({});
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
+  const wishlistMode = isWishlistMode(collectionMode);
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -302,6 +306,13 @@ export default function PublicBookList({
     (async () => {
       if (!supabase) return;
       if (!authResolved) return;
+      if (wishlistMode) {
+        if (!alive) return;
+        setSharedBooks([]);
+        setSharedLibraries([]);
+        setSharedSignedMap({});
+        return;
+      }
       if (!sessionUserId) {
         if (!alive) return;
         setSharedBooks([]);
@@ -347,7 +358,7 @@ export default function PublicBookList({
     return () => {
       alive = false;
     };
-  }, [username, authResolved, sessionUserId]);
+  }, [username, authResolved, sessionUserId, wishlistMode]);
 
   const mergedAllBooks = useMemo(() => {
     const byId = new Map<number, PublicBook>();
@@ -361,6 +372,21 @@ export default function PublicBookList({
 
   const combinedSignedMap = useMemo(() => ({ ...sharedSignedMap, ...signedMap }), [sharedSignedMap, signedMap]);
 
+  const replaceUrl = useCallback((mutate: (params: URLSearchParams) => void) => {
+    const params = new URLSearchParams(window.location.search);
+    mutate(params);
+    if (wishlistMode) params.set("mode", "wishlist");
+    else params.delete("mode");
+    window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+  }, [username, wishlistMode]);
+
+  const setCollectionMode = useCallback((nextMode: LibraryMode) => {
+    const params = new URLSearchParams(window.location.search);
+    if (nextMode === "wishlist") params.set("mode", "wishlist");
+    else params.delete("mode");
+    window.location.assign(`/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+  }, [username]);
+
   function setFilterAndUrl(key: Exclude<DetailFilterKey, "q">, value?: string) {
     const next = { ...activeFilters } as Partial<Record<Exclude<DetailFilterKey, "q">, string>>;
     if (value && value.trim()) {
@@ -369,10 +395,10 @@ export default function PublicBookList({
       delete next[key];
     }
     setActiveFilters(next);
-    const params = new URLSearchParams(window.location.search);
-    if (value && value.trim()) params.set(key, value);
-    else params.delete(key);
-    window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+    replaceUrl((params) => {
+      if (value && value.trim()) params.set(key, value);
+      else params.delete(key);
+    });
   }
 
   const filteredGroups = useMemo(() => {
@@ -637,9 +663,9 @@ export default function PublicBookList({
   }, [libraries, sharedLibraries, filteredGroups]);
 
   const showLibraryBlocks = useMemo(() => {
-    const DEFAULT_LIBRARY_NAME = "Your catalog";
+    const DEFAULT_LIBRARY_NAME = wishlistMode ? "Wishlist" : "Your catalog";
     return effectiveLibraries.length > 1 || (effectiveLibraries.length === 1 && effectiveLibraries[0]?.name !== DEFAULT_LIBRARY_NAME);
-  }, [effectiveLibraries]);
+  }, [effectiveLibraries, wishlistMode]);
 
   const renderBook = (g: CatalogGroup) => {
     const b = g.primary;
@@ -671,13 +697,15 @@ export default function PublicBookList({
         .map((c) => (c.cover_original_url ? combinedSignedMap[c.cover_original_url] : null))
         .find(Boolean) ?? null;
     const href = sharedBookIds.has(Number(b.id)) && !!sessionUserId ? `/app/books/${b.id}` : `/u/${username}/b/${bookIdSlug(b.id, title)}`;
+    const roundedCoverStyle = wishlistMode ? { width: "100%", height: "auto", display: "block", borderRadius: 14, overflow: "hidden" } : { width: "100%", height: "auto", display: "block" };
+    const roundedListCoverStyle = wishlistMode ? { width: "100%", height: "auto", display: "block", borderRadius: 10, overflow: "hidden" } : { width: "100%", height: "auto", display: "block" };
 
     if (viewMode === "list") {
       return (
         <div key={g.key} className="card" style={{ display: "flex", gap: "var(--space-md)", alignItems: "start" }}>
           <Link href={href} style={{ display: "block" }} className="om-book-card-link">
             <div className="om-cover-slot" style={{ width: 60, height: "auto" }}>
-              <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" sizes={coverSizes} />
+              <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={roundedListCoverStyle} objectFit="contain" sizes={coverSizes} />
             </div>
           </Link>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -704,7 +732,14 @@ export default function PublicBookList({
             </div>
           </div>
           <div style={{ marginLeft: "auto" }}>
-            <AddToLibraryButton editionId={e?.id ?? null} titleFallback={title} authorsFallback={authors} compact />
+            <AddToLibraryButton
+              editionId={e?.id ?? null}
+              titleFallback={title}
+              authorsFallback={authors}
+              publisherFallback={effectivePublisherFor(b)}
+              publishDateFallback={String(b.publish_date_override ?? e?.publish_date ?? "").trim() || null}
+              compact
+            />
           </div>
         </div>
       );
@@ -714,7 +749,7 @@ export default function PublicBookList({
       <div key={g.key} className="om-book-card" style={{ position: "relative" }}>
         <Link href={href} className="om-book-card-link" style={{ display: "block" }}>
           <div className="om-cover-slot" style={{ width: "100%", height: "auto" }}>
-            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={{ width: "100%", height: "auto", display: "block" }} objectFit="contain" sizes={coverSizes} />
+            <CoverImage alt={title} src={originalSrc ?? coverUrl} cropData={cropData} style={roundedCoverStyle} objectFit="contain" sizes={coverSizes} />
           </div>
         </Link>
         <div className="om-cover-add-btn" style={{ position: "absolute", top: 6, right: 6, zIndex: 1 }}>
@@ -722,6 +757,8 @@ export default function PublicBookList({
             editionId={e?.id ?? null}
             titleFallback={title}
             authorsFallback={authors}
+            publisherFallback={effectivePublisherFor(b)}
+            publishDateFallback={String(b.publish_date_override ?? e?.publish_date ?? "").trim() || null}
             compact
           />
         </div>
@@ -771,8 +808,24 @@ export default function PublicBookList({
         <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
           <div className="om-stat-line" style={{ margin: 0 }}>
             <span className="om-stat-pair">
-              <span className="text-muted">Catalogs</span>
-              <span>{effectiveLibraries.length}</span>
+              <button
+                type="button"
+                onClick={() => setCollectionMode("catalog")}
+                className={wishlistMode ? "text-muted" : ""}
+                style={{ background: "transparent", border: 0, padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}
+              >
+                Catalog
+              </button>
+            </span>
+            <span className="om-stat-pair">
+              <button
+                type="button"
+                onClick={() => setCollectionMode("wishlist")}
+                className={wishlistMode ? "" : "text-muted"}
+                style={{ background: "transparent", border: 0, padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}
+              >
+                Wishlist
+              </button>
             </span>
             <span className="om-stat-pair">
               <span className="text-muted">Items</span>
@@ -785,9 +838,7 @@ export default function PublicBookList({
                 const pairs: FilterPair[] = [];
                 if (queryFilter.trim()) {
                   pairs.push({ label: "Search", value: queryFilter.trim(), key: "q", onClear: () => {
-                    const params = new URLSearchParams(window.location.search);
-                    params.delete("q");
-                    window.history.replaceState({}, "", `/u/${username}${params.toString() ? `?${params.toString()}` : ""}`);
+                    replaceUrl((params) => params.delete("q"));
                     setQueryFilter("");
                     setSearchQuery("");
                   } });
@@ -812,7 +863,11 @@ export default function PublicBookList({
                 setActiveFilters({});
                 setQueryFilter("");
                 setSearchQuery("");
-                window.history.replaceState({}, "", `/u/${username}`);
+                replaceUrl((params) => {
+                  Array.from(params.keys()).forEach((key) => {
+                    if (key !== "mode") params.delete(key);
+                  });
+                });
               }}
             />
           </div>
@@ -828,7 +883,7 @@ export default function PublicBookList({
           </button>
           <input
             className="om-inline-search-input"
-            placeholder="Search books"
+            placeholder={wishlistMode ? "Search wishlist" : "Search books"}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ minWidth: 0, flex: 1 }}

@@ -40,6 +40,7 @@ import { DECADE_OPTIONS } from "../../lib/decades";
 import { saveBookNavContext } from "../../lib/bookNav";
 import { parseMusicMetadata, type MusicMetadata, type MusicContributorRole } from "../../lib/music";
 import { formatIssueDisplay, looksLikeIssn, normalizeIssueYear, normalizeIssn, parseMagazineTitle } from "../../lib/magazine";
+import { collectionStateForMode, isWishlistMode, parseLibraryMode, type LibraryMode } from "../../lib/collection";
 import {
   coverSizesForGrid,
   DEFAULT_DESKTOP_GRID_DENSITY,
@@ -130,6 +131,7 @@ type LibrarySummary = {
   created_at: string;
   sort_order?: number | null;
   owner_id?: string | null;
+  kind?: "catalog" | "wishlist" | null;
   myRole?: "owner" | "editor";
   memberPreviews?: Array<{ userId: string; username: string; avatarUrl: string | null }>;
 };
@@ -482,6 +484,7 @@ function parseStructuredNotes(notes: string | null): {
 
 function AppShell({
   session,
+  collectionMode,
   filterTag,
   filterAuthor,
   filterSubject,
@@ -510,6 +513,7 @@ function AppShell({
   openAddPanel
 }: {
   session: Session;
+  collectionMode: LibraryMode;
   filterTag: string | null;
   filterAuthor: string | null;
   filterSubject: string | null;
@@ -544,6 +548,8 @@ function AppShell({
   const tagMenuRef = useRef<HTMLDivElement | null>(null);
   const categoryMenuRef = useRef<HTMLDivElement | null>(null);
   const userId = session.user.id;
+  const wishlistMode = isWishlistMode(collectionMode);
+  const activeCollectionState = collectionStateForMode(collectionMode);
   const [profile, setProfile] = useState<{ username: string; visibility: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [debugLibrariesSource, setDebugLibrariesSource] = useState<string>("libs:init");
@@ -624,6 +630,14 @@ function AppShell({
     } catch {
       if (typeof window !== "undefined") window.location.assign("/app");
     }
+  }
+
+  function setCollectionMode(nextMode: LibraryMode) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextMode === "wishlist") params.set("mode", "wishlist");
+    else params.delete("mode");
+    const qs = params.toString();
+    router.push(`/app${qs ? `?${qs}` : ""}`);
   }
   type CsvImportRow = {
     raw_title?: string | null;
@@ -733,6 +747,7 @@ function AppShell({
     error: null,
     message: null
   });
+  const addLibraryStorageKey = wishlistMode ? "om_addLibraryId:wishlist" : "om_addLibraryId:catalog";
 
   useEffect(() => {
     const fallbackId = addLibraryId ?? libraries[0]?.id ?? null;
@@ -1277,8 +1292,9 @@ function AppShell({
     setBooksLoading(true);
     const ids = Array.from(new Set((targetLibraryIds ?? libraries.map((l) => l.id)).filter((n) => Number.isFinite(n) && n > 0)));
     const idsQuery = ids.length > 0 ? `catalog_ids=${encodeURIComponent(ids.join(","))}` : "";
-    const endpoint = idsQuery ? `/api/catalog/home?${idsQuery}` : "/api/catalog/home";
-    const liteEndpoint = idsQuery ? `/api/catalog/home?${idsQuery}&lite=1` : "/api/catalog/home?lite=1";
+    const modeQuery = `mode=${encodeURIComponent(collectionMode)}`;
+    const endpoint = idsQuery ? `/api/catalog/home?${idsQuery}&${modeQuery}` : `/api/catalog/home?${modeQuery}`;
+    const liteEndpoint = idsQuery ? `/api/catalog/home?${idsQuery}&lite=1&${modeQuery}` : `/api/catalog/home?lite=1&${modeQuery}`;
     try {
       if (options?.fastFirst) {
         const liteHome = await catalogApi<{ ok: true; books: any[] }>(liteEndpoint, { method: "GET" });
@@ -1319,9 +1335,10 @@ function AppShell({
         const ownerFallback = await supabase
           .from("user_books")
           .select(
-            "id,library_id,created_at,visibility,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,cover_original_url,cover_crop,notes,edition_id,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date,description,subjects),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))"
+            "id,library_id,created_at,visibility,collection_state,title_override,authors_override,editors_override,subjects_override,publisher_override,designers_override,group_label,object_type,decade,source_type,source_url,external_source_ids,music_metadata,cover_original_url,cover_crop,notes,edition_id,edition:editions(id,isbn13,title,authors,publisher,cover_url,publish_date,description,subjects),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind)),book_entities:book_entities(role,position,entity:entities(id,name,slug))"
           )
           .eq("owner_id", userId)
+          .eq("collection_state", collectionStateForMode(collectionMode))
           .order("created_at", { ascending: false })
           .limit(1200);
         if (!ownerFallback.error) {
@@ -1353,7 +1370,7 @@ function AppShell({
 
   function applyLibrarySelection(list: LibrarySummary[]) {
     try {
-      const raw = window.localStorage.getItem("om_addLibraryId");
+      const raw = window.localStorage.getItem(addLibraryStorageKey);
       const parsed = raw ? Number(raw) : NaN;
       if (Number.isFinite(parsed) && parsed > 0 && list.some((l) => l.id === parsed)) {
         setAddLibraryId(parsed);
@@ -1370,7 +1387,7 @@ function AppShell({
     if (!Number.isFinite(normalized) || normalized <= 0) {
       setAddLibraryId(null);
       try {
-        window.localStorage.removeItem("om_addLibraryId");
+        window.localStorage.removeItem(addLibraryStorageKey);
       } catch {
         // ignore
       }
@@ -1378,7 +1395,7 @@ function AppShell({
     }
     setAddLibraryId(normalized);
     try {
-      window.localStorage.setItem("om_addLibraryId", String(normalized));
+      window.localStorage.setItem(addLibraryStorageKey, String(normalized));
     } catch {
       // ignore
     }
@@ -1434,7 +1451,7 @@ function AppShell({
     }
 
     try {
-      const homeLite = await catalogApi<{ ok: true; catalogs: LibrarySummary[]; books: any[] }>("/api/catalog/home?lite=1", { method: "GET" });
+      const homeLite = await catalogApi<{ ok: true; catalogs: LibrarySummary[]; books: any[] }>(`/api/catalog/home?lite=1&mode=${encodeURIComponent(collectionMode)}`, { method: "GET" });
       if (isStale()) return [];
 
       const liteBooks = Array.isArray(homeLite.books) ? homeLite.books : [];
@@ -1444,7 +1461,11 @@ function AppShell({
       }
 
       if (list.length === 0) {
-        const created = await supabase.from("libraries").insert({ owner_id: userId, name: "Your catalog" }).select("id").single();
+        const created = await supabase
+          .from("libraries")
+          .insert({ owner_id: userId, name: wishlistMode ? "Wishlist" : "Your catalog", kind: wishlistMode ? "wishlist" : "catalog" })
+          .select("id")
+          .single();
         if (created.error) throw new Error(created.error.message);
         const createdId = Number((created.data as any)?.id ?? 0);
         if (createdId > 0) {
@@ -1455,8 +1476,9 @@ function AppShell({
         }
         const res2 = await supabase
           .from("libraries")
-          .select("id,name,created_at,owner_id")
+          .select("id,name,created_at,owner_id,kind")
           .eq("owner_id", userId)
+          .eq("kind", wishlistMode ? "wishlist" : "catalog")
           .order("created_at", { ascending: true });
         if (res2.error) throw new Error(res2.error.message);
         list = normalizeLibrariesDeterministically(((res2.data ?? []) as any[]).map((l) => ({ ...l, myRole: "owner" as const })));
@@ -1521,8 +1543,9 @@ function AppShell({
       try {
         const ownerFallback = await supabase
           .from("libraries")
-          .select("id,name,created_at,owner_id")
+          .select("id,name,created_at,owner_id,kind")
           .eq("owner_id", userId)
+          .eq("kind", wishlistMode ? "wishlist" : "catalog")
           .order("created_at", { ascending: true });
         if (!ownerFallback.error) {
           setDebugLibrariesSource("libs:owner-fallback");
@@ -1555,11 +1578,12 @@ function AppShell({
 
   async function createLibrary(name: string) {
     if (!supabase) return;
+    if (wishlistMode) return;
     const n = name.trim().replace(/\s+/g, " ");
     if (!n) return;
     setLibraryState({ busy: true, error: null, message: "Creating…" });
     try {
-      const created = await supabase.from("libraries").insert({ owner_id: userId, name: n }).select("id").single();
+      const created = await supabase.from("libraries").insert({ owner_id: userId, name: n, kind: "catalog" }).select("id").single();
       if (created.error) throw new Error(created.error.message);
       const createdId = Number((created.data as any)?.id ?? 0);
       if (createdId > 0) {
@@ -1602,6 +1626,10 @@ function AppShell({
     if (!supabase) return;
     const lib = libraries.find((l) => l.id === libraryId);
     if (!lib) return;
+    if (lib.kind === "wishlist") {
+      window.alert("Wishlist can’t be deleted.");
+      return;
+    }
     if (libraries.length <= 1) {
       window.alert("You must keep at least one catalog.");
       return;
@@ -1719,6 +1747,12 @@ function AppShell({
     };
   }, [userId]);
 
+  useEffect(() => {
+    if (!supabase) return;
+    void refreshLibraries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collectionMode]);
+
   async function addByIsbnValue(isbnValue: string): Promise<number> {
     if (!supabase) throw new Error("Supabase is not configured");
     if (!addLibraryId) throw new Error("Choose a catalog first");
@@ -1759,7 +1793,7 @@ function AppShell({
 
       const created = await supabase
         .from("user_books")
-        .insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId })
+        .insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId, collection_state: activeCollectionState })
         .select("id")
         .single();
       if (created.error) throw new Error(created.error.message);
@@ -1802,6 +1836,7 @@ function AppShell({
         .insert({
           owner_id: userId,
           library_id: addLibraryId,
+          collection_state: activeCollectionState,
           edition_id: null,
           title_override: title,
           authors_override: authors.length > 0 ? authors : null,
@@ -1886,7 +1921,7 @@ function AppShell({
       editionId = inserted.data.id;
     }
 
-    const created = await supabase.from("user_books").insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId }).select("id").single();
+    const created = await supabase.from("user_books").insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId, collection_state: activeCollectionState }).select("id").single();
     if (created.error) throw new Error(created.error.message);
     const createdId = created.data.id as number;
 
@@ -1917,6 +1952,7 @@ function AppShell({
       .insert({
         owner_id: userId,
         library_id: addLibraryId,
+        collection_state: activeCollectionState,
         edition_id: null,
         title_override: title,
         authors_override: row.authors.length > 0 ? row.authors : null,
@@ -2289,6 +2325,7 @@ function AppShell({
         .insert({
           owner_id: userId,
           library_id: addLibraryId,
+          collection_state: activeCollectionState,
           edition_id: null
         })
         .select("id")
@@ -2335,6 +2372,7 @@ function AppShell({
       const insertPayload: Record<string, unknown> = {
         owner_id: userId,
         library_id: selectedLibraryId,
+        collection_state: activeCollectionState,
         edition_id: null,
         object_type: "music",
         title_override: data.title ?? null,
@@ -2392,6 +2430,7 @@ function AppShell({
       const insertPayload: Record<string, unknown> = {
         owner_id: userId,
         library_id: selectedLibraryId,
+        collection_state: activeCollectionState,
         edition_id: null,
         object_type: "magazine",
         title_override: data.title ?? null,
@@ -2462,7 +2501,7 @@ function AppShell({
         }
       }
     }
-    const insertPayload: Record<string, unknown> = { owner_id: userId, library_id: selectedLibraryId, edition_id: editionId ?? null };
+    const insertPayload: Record<string, unknown> = { owner_id: userId, library_id: selectedLibraryId, collection_state: activeCollectionState, edition_id: editionId ?? null };
     if (!editionId) {
       insertPayload.title_override = data.title ?? null;
       insertPayload.authors_override = (data.authors ?? []).length > 0 ? data.authors : null;
@@ -3517,14 +3556,27 @@ function AppShell({
 
         <div className="row" style={{ justifyContent: "space-between", margin: 0 }}>
           <div className="om-stat-line">
-            <span className="om-stat-pair">
-              <span className="text-muted">Catalogs</span>
-              <span>{displayLibraries.length}</span>
-            </span>
+            {!wishlistMode ? (
+              <span className="om-stat-pair">
+                <span className="text-muted">Catalogs</span>
+                <span>{displayLibraries.length}</span>
+              </span>
+            ) : (
+              <span className="om-stat-pair">
+                <span className="text-muted">Wishlist</span>
+                <span>{displayGroups.length}</span>
+              </span>
+            )}
             <span className="om-stat-pair">
               <span className="text-muted">Items</span>
               <span>{displayGroups.length}</span>
             </span>
+            <button type="button" onClick={() => setCollectionMode("catalog")} className={wishlistMode ? "text-muted" : ""} style={{ background: "transparent", border: 0, padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}>
+              Catalog
+            </button>
+            <button type="button" onClick={() => setCollectionMode("wishlist")} className={wishlistMode ? "" : "text-muted"} style={{ background: "transparent", border: 0, padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}>
+              Wishlist
+            </button>
             {bulkMode && (
               <>
                 <span className="om-stat-pair">
@@ -3792,7 +3844,7 @@ function AppShell({
               <div className="row" style={{ width: "100%", marginTop: "var(--space-sm)", alignItems: "baseline", gap: "var(--space-md)", flexWrap: "nowrap", position: "relative", zIndex: 9, paddingBottom: "var(--space-xs)" }}>
                 <input
                   className="om-inline-search-input"
-                  placeholder="Search your catalog"
+                  placeholder={wishlistMode ? "Search your wishlist" : "Search your catalog"}
                   value={searchQuery}
                   onFocus={() => { if (bulkMode) exitEditMode(); setSortOpen(false); cancelAddPreview(); setSearchFocused(true); }}
                   onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
@@ -4417,6 +4469,7 @@ function AppShell({
           );
       })}
 
+      {!wishlistMode ? (
       <div style={{ marginTop: 24 }} className="card">
         <div className="row" style={{ marginTop: "var(--space-sm)", flexWrap: isMobile ? "wrap" : "nowrap", gap: "var(--space-10)", width: "100%", alignItems: "baseline" }}>
           <input
@@ -4433,6 +4486,7 @@ function AppShell({
           )}
         </div>
       </div>
+      ) : null}
       <div style={{ height: 24 }} />
       <BookScannerModal open={scannerOpen} onClose={closeScanner} onResult={(query) => { setAddInput(query); smartAddOrSearch(query); }} />
     </>
@@ -4441,7 +4495,8 @@ function AppShell({
 
 function AppWithFilters({ session }: { session: Session }) {
   const searchParams = useSearchParams();
-  usePageTitle(useMemo(() => contextFromFilterParams(searchParams, "Home"), [searchParams]));
+  const collectionMode = parseLibraryMode(searchParams.get("mode"));
+  usePageTitle(useMemo(() => contextFromFilterParams(searchParams, collectionMode === "wishlist" ? "Wishlist" : "Home"), [searchParams, collectionMode]));
   const filterTag = searchParams.get("tag");
   const filterAuthor = searchParams.get("author");
   const filterSubject = searchParams.get("subject");
@@ -4471,6 +4526,7 @@ function AppWithFilters({ session }: { session: Session }) {
   return (
     <AppShell
       session={session}
+      collectionMode={collectionMode}
       filterTag={filterTag}
       filterAuthor={filterAuthor}
       filterSubject={filterSubject}

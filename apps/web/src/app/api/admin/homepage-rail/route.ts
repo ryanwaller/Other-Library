@@ -69,7 +69,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ entities: entityRes.data ?? [] });
     }
 
-    let res = await admin
+    let res: any = await admin
       .from("homepage_feature_slots")
       .select("slot_index,mode,role,entity_id,match_name,title_override,entity:entities(id,name,slug)")
       .eq("surface", SURFACE)
@@ -86,8 +86,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: res.error.message }, { status: 500 });
     }
 
-    const rows = (res.data ?? [])
-      .map((row) => ({
+    const rows = ((res.data ?? []) as any[])
+      .map((row: any) => ({
         slot_index: Number(row.slot_index),
         mode: normalizeMode(row.mode),
         role: normalizeRole(row.role),
@@ -109,9 +109,9 @@ export async function GET(req: Request) {
                 }
               : null,
       }))
-      .filter((row) => Number.isFinite(row.slot_index) && row.slot_index >= 1)
-      .sort((a, b) => a.slot_index - b.slot_index)
-      .map((row, idx) => ({ ...row, slot_index: idx + 1 }));
+      .filter((row: any) => Number.isFinite(row.slot_index) && row.slot_index >= 1)
+      .sort((a: any, b: any) => a.slot_index - b.slot_index)
+      .map((row: any, idx: number) => ({ ...row, slot_index: idx + 1 }));
 
     return NextResponse.json({ slots: rows.length > 0 ? rows : defaultSlots() });
   } catch (e: any) {
@@ -129,7 +129,7 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
     const inputSlots = Array.isArray(body?.slots) ? body.slots : [];
-    const normalizedSlots = (inputSlots.length > 0 ? inputSlots : defaultSlots()).map((raw, idx) => {
+    const normalizedSlots = (inputSlots.length > 0 ? inputSlots : defaultSlots()).map((raw: any, idx: number) => {
       const mode = normalizeMode(raw.mode);
       const role = normalizeRole(raw.role);
       return {

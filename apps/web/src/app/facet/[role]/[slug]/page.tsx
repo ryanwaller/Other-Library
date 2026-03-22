@@ -277,7 +277,7 @@ export default async function FacetBrowsePage({ params }: { params: Promise<{ ro
               </div>
 
               <FacetBookList
-                books={group.rows}
+                books={group.rows as any}
                 signedByPath={signedByPath}
               />
             </div>

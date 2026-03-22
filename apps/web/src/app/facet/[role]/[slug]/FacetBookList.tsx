@@ -64,7 +64,7 @@ export default function FacetBookList({
       }}
       renderItem={(book) => {
         const title = String((book.title_override ?? "").trim() || book.edition?.title || "(untitled)");
-        const secondary = effectiveSecondaryLineFor(book);
+        const secondary = effectiveSecondaryLineFor(book as any);
         const coverMedia = (book.media ?? []).find((m) => m.kind === "cover");
         const coverUrl = coverMedia ? signedByPath[coverMedia.storage_path] : book.edition?.cover_url ?? null;
         const cropData = book.cover_crop ?? null;

@@ -107,6 +107,8 @@ function renderCard({
       deleteState={deleteState}
       gridCols={gridColumnsHint}
       secondaryMode={effectiveSecondaryLineFor(group.primary).mode}
+      roundedCover={String(group.primary.collection_state ?? "").trim().toLowerCase() === "wanted"}
+      wishlistMatchSummary={group.primary.wishlist_match_summary ?? null}
     />
   );
 }

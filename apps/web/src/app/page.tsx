@@ -469,7 +469,7 @@ async function loadExploreData() {
     }
   }
 
-  let railSlotRes = await db
+  let railSlotRes: any = await db
     .from("homepage_feature_slots")
     .select("slot_index,mode,role,title_override,match_name,entity:entities(id,name,slug)")
     .eq("surface", EXPLORE_RAIL_SURFACE)
@@ -483,7 +483,7 @@ async function loadExploreData() {
   }
 
   const pinnedSlotRows = (Array.isArray(railSlotRes.data) ? railSlotRes.data : []).filter(
-    (row) => String((row as any).mode ?? "").trim().toLowerCase() === "pinned"
+    (row: any) => String((row as any).mode ?? "").trim().toLowerCase() === "pinned"
   );
 
   let allVisibleRows = recentRowsWithCovers;
@@ -502,7 +502,7 @@ async function loadExploreData() {
         ...new Set(
           broadRows
             .map((row) => coverStoragePath(row))
-            .filter((path): path is string => Boolean(path) && !signedMap[path])
+            .filter((path): path is string => typeof path === "string" && path.length > 0 && !signedMap[path])
         ),
       ];
       if (missingMediaPaths.length > 0) {
@@ -531,8 +531,8 @@ async function loadExploreData() {
   };
 
   const slotRows = (Array.isArray(railSlotRes.data) ? railSlotRes.data : [])
-    .filter((row) => Number.isFinite(Number((row as any).slot_index)) && Number((row as any).slot_index) >= 1)
-    .sort((a, b) => Number((a as any).slot_index) - Number((b as any).slot_index));
+    .filter((row: any) => Number.isFinite(Number((row as any).slot_index)) && Number((row as any).slot_index) >= 1)
+    .sort((a: any, b: any) => Number((a as any).slot_index) - Number((b as any).slot_index));
   const railSlotCount = slotRows.length > 0 ? slotRows.length : DEFAULT_EXPLORE_RAIL_MODULE_COUNT;
   for (const row of slotRows) {
     const slotIndex = Number(row.slot_index);
