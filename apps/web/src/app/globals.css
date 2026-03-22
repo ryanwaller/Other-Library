@@ -1462,7 +1462,7 @@ a.text-muted:hover {
 
 .om-explore-module + .om-explore-module {
   margin-top: 0;
-  padding-top: var(--space-md);
+  padding-top: var(--space-14);
   border-top: 1px solid var(--border);
 }
 
@@ -2119,7 +2119,7 @@ summary::-webkit-details-marker {
 
   .om-explore-module + .om-explore-module {
     margin-top: 0;
-    padding-top: var(--space-md);
+    padding-top: var(--space-14);
   }
 
   .om-explore-divider {
