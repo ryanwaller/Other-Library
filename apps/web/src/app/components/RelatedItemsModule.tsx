@@ -17,6 +17,7 @@ export type RelatedItemsCandidate = {
   mediaScope: "book" | "music" | "all";
   entityId?: string | null;
   entitySlug?: string | null;
+  moreHref?: string | null;
 };
 
 type RelatedItemRow = {
@@ -182,6 +183,7 @@ export default function RelatedItemsModule({
   const [rows, setRows] = useState<RelatedItemRow[]>([]);
   const [signedMap, setSignedMap] = useState<Record<string, string>>({});
   const [expanded, setExpanded] = useState(false);
+  const [moreHref, setMoreHref] = useState<string | null>(null);
 
   const dedupedCandidates = useMemo(() => {
     const seen = new Set<string>();
@@ -208,6 +210,7 @@ export default function RelatedItemsModule({
         setHeading(null);
         setRows([]);
         setSignedMap({});
+        setMoreHref(null);
         return;
       }
 
@@ -232,6 +235,9 @@ export default function RelatedItemsModule({
         setRows(Array.isArray(payload?.rows) ? (payload.rows as RelatedItemRow[]) : []);
         setSignedMap({});
         setExpanded(false);
+        const matchedCandidate =
+          dedupedCandidates.find((candidate) => candidate.heading === payload?.heading) ?? null;
+        setMoreHref(typeof matchedCandidate?.moreHref === "string" ? matchedCandidate.moreHref : null);
         return;
       }
 
@@ -322,6 +328,7 @@ export default function RelatedItemsModule({
         setRows(matchedRows);
         setSignedMap(nextSignedMap);
         setExpanded(false);
+        setMoreHref(typeof candidate.moreHref === "string" ? candidate.moreHref : null);
         return;
       }
 
@@ -330,6 +337,7 @@ export default function RelatedItemsModule({
       setRows([]);
       setSignedMap({});
       setExpanded(false);
+      setMoreHref(null);
     }
 
     void load();
@@ -341,15 +349,23 @@ export default function RelatedItemsModule({
 
   if (!heading || rows.length < 1) return null;
   const visibleRows = expanded ? rows : rows.slice(0, 4);
-  const showPager = rows.length > 4;
+  const showMoreLink = rows.length > 4 && !!moreHref;
+  const showPager = rows.length > 4 && !moreHref;
 
   return (
     <>
       <hr className="divider" />
       <div style={{ marginTop: "var(--space-lg)" }}>
-        <div>{heading}</div>
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-md)" }}>
+          <div style={{ minWidth: 0, flex: 1 }}>{heading}</div>
+          {showMoreLink ? (
+            <Link href={moreHref!} className="text-muted" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
+              More
+            </Link>
+          ) : null}
+        </div>
         <div
-          className="om-related-items-grid"
+          className="om-related-items-grid om-related-items-mobile-grid"
           style={{ marginTop: "var(--space-14)", ["--om-related-items-grid-min" as any]: `${RELATED_ITEMS_GRID_MIN_WIDTH}px` }}
         >
           {visibleRows.map((row) => {

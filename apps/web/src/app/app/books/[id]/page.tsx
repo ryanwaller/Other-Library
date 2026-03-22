@@ -1965,6 +1965,7 @@ export default function BookDetailPage() {
         name: entity.name,
         entityId: entity.id,
         entitySlug: entity.slug,
+        moreHref: entity.slug ? `/entity/${encodeURIComponent(entity.slug)}` : null,
         heading: `Other books by ${entity.name}`,
         mediaScope: "book"
       });
@@ -1992,6 +1993,7 @@ export default function BookDetailPage() {
           name: entity.name,
           entityId: entity.id,
           entitySlug: entity.slug,
+          moreHref: entity.slug ? `/entity/${encodeURIComponent(entity.slug)}` : null,
           heading: `Other records by ${entity.name}`,
           mediaScope: "music"
         });
@@ -2015,6 +2017,7 @@ export default function BookDetailPage() {
         name: entity.name,
         entityId: entity.id,
         entitySlug: entity.slug,
+        moreHref: entity.slug ? `/entity/${encodeURIComponent(entity.slug)}` : null,
         heading: `Other items designed by ${entity.name}`,
         mediaScope: "all"
       });
@@ -2025,6 +2028,7 @@ export default function BookDetailPage() {
       pushCandidate({
         role: "group",
         name: groupLabel,
+        moreHref: `/group/${encodeURIComponent(slugifyFallback(groupLabel))}`,
         heading: `Other issues of ${groupLabel}`,
         mediaScope: "all"
       });

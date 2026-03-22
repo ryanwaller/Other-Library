@@ -38,6 +38,7 @@ type Candidate = {
   name: string;
   heading: string;
   mediaScope: "book" | "music" | "all";
+  moreHref?: string | null;
 };
 
 function normalizeName(value: string | null | undefined): string {
@@ -147,11 +148,25 @@ function deriveCandidates(book: PublicBookLike): Candidate[] {
 
   const authorEntityNames = (book.book_entities ?? [])
     .filter((entry) => String(entry?.role ?? "").trim().toLowerCase() === "author")
-    .map((entry) => String(entry?.entity?.name ?? "").trim())
-    .filter(Boolean);
-  const authorNames = authorEntityNames.length > 0 ? authorEntityNames : uniqueNames([...(book.authors_override ?? []), ...((book.edition?.authors ?? []) as string[])]);
-  for (const name of authorNames) {
-    push({ role: "author", name, heading: `Other books by ${name}`, mediaScope: "book" });
+    .map((entry) => entry?.entity)
+    .filter((entity): entity is NonNullable<typeof book.book_entities>[number]["entity"] => Boolean(entity?.name));
+  if (authorEntityNames.length > 0) {
+    for (const entity of authorEntityNames) {
+      const name = String(entity?.name ?? "").trim();
+      if (!name) continue;
+      push({
+        role: "author",
+        name,
+        moreHref: entity?.slug ? `/entity/${encodeURIComponent(entity.slug)}` : null,
+        heading: `Other books by ${name}`,
+        mediaScope: "book"
+      });
+    }
+  } else {
+    const authorNames = uniqueNames([...(book.authors_override ?? []), ...((book.edition?.authors ?? []) as string[])]);
+    for (const name of authorNames) {
+      push({ role: "author", name, heading: `Other books by ${name}`, mediaScope: "book" });
+    }
   }
 
   const music = parseMusicMetadata(book.music_metadata);
@@ -160,12 +175,20 @@ function deriveCandidates(book: PublicBookLike): Candidate[] {
     push({ role: "performer", name: primaryArtist, heading: `Other records by ${primaryArtist}`, mediaScope: "music" });
   }
   for (const role of MUSIC_CONTRIBUTOR_ROLES.filter((role) => !["designer", "art direction", "artwork", "photography"].includes(role))) {
-    const names = (book.book_entities ?? [])
+    const entities = (book.book_entities ?? [])
       .filter((entry) => String(entry?.role ?? "").trim().toLowerCase() === role)
-      .map((entry) => String(entry?.entity?.name ?? "").trim())
-      .filter(Boolean);
-    for (const name of names) {
-      push({ role, name, heading: `Other records by ${name}`, mediaScope: "music" });
+      .map((entry) => entry?.entity)
+      .filter((entity): entity is NonNullable<typeof book.book_entities>[number]["entity"] => Boolean(entity?.name));
+    for (const entity of entities) {
+      const name = String(entity?.name ?? "").trim();
+      if (!name) continue;
+      push({
+        role,
+        name,
+        moreHref: entity?.slug ? `/entity/${encodeURIComponent(entity.slug)}` : null,
+        heading: `Other records by ${name}`,
+        mediaScope: "music"
+      });
     }
   }
 
@@ -174,11 +197,25 @@ function deriveCandidates(book: PublicBookLike): Candidate[] {
       const role = String(entry?.role ?? "").trim().toLowerCase();
       return role === "designer" || role === "design" || role === "art direction";
     })
-    .map((entry) => String(entry?.entity?.name ?? "").trim())
-    .filter(Boolean);
-  const designerNames = designerEntityNames.length > 0 ? designerEntityNames : uniqueNames(book.designers_override ?? []);
-  for (const name of designerNames) {
-    push({ role: "designer", name, heading: `Other items designed by ${name}`, mediaScope: "all" });
+    .map((entry) => entry?.entity)
+    .filter((entity): entity is NonNullable<typeof book.book_entities>[number]["entity"] => Boolean(entity?.name));
+  if (designerEntityNames.length > 0) {
+    for (const entity of designerEntityNames) {
+      const name = String(entity?.name ?? "").trim();
+      if (!name) continue;
+      push({
+        role: "designer",
+        name,
+        moreHref: entity?.slug ? `/entity/${encodeURIComponent(entity.slug)}` : null,
+        heading: `Other items designed by ${name}`,
+        mediaScope: "all"
+      });
+    }
+  } else {
+    const designerNames = uniqueNames(book.designers_override ?? []);
+    for (const name of designerNames) {
+      push({ role: "designer", name, heading: `Other items designed by ${name}`, mediaScope: "all" });
+    }
   }
 
   return candidates;
@@ -228,12 +265,14 @@ export default async function PublicRelatedItemsSection({
   const allBooks = ((booksRes.data ?? []) as unknown as PublicBookLike[]).filter((row) => isVisibleToPublic(row, profileVisibility));
 
   let heading: string | null = null;
+  let moreHref: string | null = null;
   let relatedRows: PublicBookLike[] = [];
   for (const candidate of candidates) {
     const matches = allBooks.filter((row) => rowMatchesCandidate(row, candidate));
     if (matches.length < 1) continue;
     heading = candidate.heading;
-    relatedRows = matches.slice(0, 4);
+    moreHref = candidate.moreHref ?? null;
+    relatedRows = matches;
     break;
   }
 
@@ -266,5 +305,5 @@ export default async function PublicRelatedItemsSection({
     };
   });
 
-  return <PublicRelatedItemsGrid heading={heading} rows={rows} />;
+  return <PublicRelatedItemsGrid heading={heading} rows={rows} moreHref={relatedRows.length > 4 ? moreHref : null} />;
 }
