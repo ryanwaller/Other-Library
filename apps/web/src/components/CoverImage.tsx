@@ -15,11 +15,13 @@ function parseSupabasePath(src: string): { bucket: string; path: string } | null
   }
 }
 
+const COVER_VERSION = 2;
+
 function buildSrcSet(src: string): string {
   const parsed = parseSupabasePath(src);
   if (!parsed) return "";
   return SRCSET_WIDTHS
-    .map((w) => `/api/cover?bucket=${encodeURIComponent(parsed.bucket)}&path=${encodeURIComponent(parsed.path)}&w=${w} ${w}w`)
+    .map((w) => `/api/cover?bucket=${encodeURIComponent(parsed.bucket)}&path=${encodeURIComponent(parsed.path)}&w=${w}&v=${COVER_VERSION} ${w}w`)
     .join(", ");
 }
 

@@ -42,7 +42,8 @@ export async function GET(req: NextRequest) {
           "cache-control": "public, max-age=31536000, immutable"
         }
       });
-    } catch {
+    } catch (sharpErr) {
+      console.error("[cover] sharp error:", sharpErr);
       // Sharp unavailable — fall through and return original
     }
   }
