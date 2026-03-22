@@ -34,6 +34,7 @@ import {
   type MobileGridCols
 } from "../../../lib/grid";
 import { isWishlistMode, type LibraryMode } from "../../../lib/collection";
+import SelectControl from "../../../components/SelectControl";
 
 type SortMode = "latest" | "earliest" | "title_asc" | "title_desc";
 
@@ -881,63 +882,54 @@ export default function PublicBookList({
 
         {sortOpen && (
           <div className="om-filter-row" style={{ marginTop: "var(--space-10)", marginBottom: 4, gap: "var(--space-10)", alignItems: "center" }}>
-            <select className="om-filter-control" value={viewMode} onChange={(e) => setViewMode(e.target.value as "grid" | "list")}>
-              <option value="grid">grid</option>
-              <option value="list">list</option>
-            </select>
+            <SelectControl
+              value={viewMode}
+              onChange={(v) => setViewMode(v as "grid" | "list")}
+              options={[{ value: "grid", label: "grid" }, { value: "list", label: "list" }]}
+            />
             {viewMode === "grid" && (
-              <select
-                className="om-filter-control"
+              <SelectControl
                 value={isMobile ? String(mobileGridCols) : desktopGridDensity}
-                onChange={(e) => {
-                  if (isMobile) setMobileGridCols(Number(e.target.value) as MobileGridCols);
-                  else setDesktopGridDensity(e.target.value as DesktopGridDensity);
+                onChange={(v) => {
+                  if (isMobile) setMobileGridCols(Number(v) as MobileGridCols);
+                  else setDesktopGridDensity(v as DesktopGridDensity);
                 }}
-              >
-                {isMobile ? (
-                  <>
-                    <option value={3}>small</option>
-                    <option value={2}>medium</option>
-                    <option value={1}>large</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="small">small</option>
-                    <option value="medium">medium</option>
-                    <option value="large">large</option>
-                  </>
-                )}
-              </select>
+                options={isMobile
+                  ? [{ value: "3", label: "small" }, { value: "2", label: "medium" }, { value: "1", label: "large" }]
+                  : [{ value: "small", label: "small" }, { value: "medium", label: "medium" }, { value: "large", label: "large" }]
+                }
+              />
             )}
-            <select className="om-filter-control" value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)}>
-              <option value="latest">latest</option>
-              <option value="earliest">earliest</option>
-              <option value="title_asc">title A-Z</option>
-              <option value="title_desc">title Z-A</option>
-            </select>
+            <SelectControl
+              value={sortMode}
+              onChange={(v) => setSortMode(v as SortMode)}
+              options={[
+                { value: "latest", label: "latest" },
+                { value: "earliest", label: "earliest" },
+                { value: "title_asc", label: "title A-Z" },
+                { value: "title_desc", label: "title Z-A" }
+              ]}
+            />
             {(availableCategories.length > 0 || !!(activeFilters.category ?? "").trim()) && (
-              <select className="om-filter-control" value={activeFilters.category ?? ""} onChange={(e) => setFilterAndUrl("category", e.target.value || undefined)}>
-                <option value="">category</option>
-                {availableCategories.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              <SelectControl
+                value={activeFilters.category ?? ""}
+                onChange={(v) => setFilterAndUrl("category", v || undefined)}
+                options={[{ value: "", label: "category" }, ...availableCategories.map((s) => ({ value: s, label: s }))]}
+              />
             )}
             {(availableTags.length > 0 || !!(activeFilters.tag ?? "").trim()) && (
-              <select className="om-filter-control" value={activeFilters.tag ?? ""} onChange={(e) => setFilterAndUrl("tag", e.target.value || undefined)}>
-                <option value="">tags</option>
-                {availableTags.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+              <SelectControl
+                value={activeFilters.tag ?? ""}
+                onChange={(v) => setFilterAndUrl("tag", v || undefined)}
+                options={[{ value: "", label: "tags" }, ...availableTags.map((t) => ({ value: t, label: t }))]}
+              />
             )}
             {(availableDecades.length > 0 || !!(activeFilters.decade ?? "").trim()) && (
-              <select className="om-filter-control" value={activeFilters.decade ?? ""} onChange={(e) => setFilterAndUrl("decade", e.target.value || undefined)}>
-                <option value="">decade</option>
-                {availableDecades.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+              <SelectControl
+                value={activeFilters.decade ?? ""}
+                onChange={(v) => setFilterAndUrl("decade", v || undefined)}
+                options={[{ value: "", label: "decade" }, ...availableDecades.map((d) => ({ value: d, label: d }))]}
+              />
             )}
           </div>
         )}

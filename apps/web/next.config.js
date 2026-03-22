@@ -1,11 +1,19 @@
+const path = require("path");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   serverExternalPackages: ["sharp"],
-  // Ensure sharp's native binaries are traced and included in the
-  // /api/cover serverless function bundle (dynamic import isn't traced).
+  // Monorepo: allow tracing files from the repo root (where npm workspaces
+  // hoist node_modules), not just from apps/web/.
+  outputFileTracingRoot: path.join(__dirname, "../../"),
+  // Sharp v0.33+ puts native Linux binaries in @img/sharp-linux-x64.
+  // Dynamic import() isn't always traced, so explicitly include them.
   outputFileTracingIncludes: {
-    "/api/cover": ["./node_modules/sharp/**/*"]
+    "/api/cover": [
+      "../../node_modules/sharp/**/*",
+      "../../node_modules/@img/**/*"
+    ]
   },
   eslint: {
     ignoreDuringBuilds: true
