@@ -68,7 +68,7 @@ export default function DenseListRow({
             alt={fields.primaryTitle}
             src={originalSrc ?? coverUrl}
             cropData={cropData}
-            style={{ display: "block", width: "100%" }}
+            style={{ display: "block", width: "100%", aspectRatio: "3 / 4" }}
             objectFit="contain"
             sizes="40px"
           />

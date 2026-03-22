@@ -110,6 +110,14 @@ function renderCard({
     typeof group.primary.resolved_cover_url === "string" && group.primary.resolved_cover_url.trim()
       ? group.primary.resolved_cover_url
       : null;
+  const originalCoverSrc =
+    (typeof group.primary.cover_original_url === "string" && group.primary.cover_original_url.trim()
+      ? group.primary.cover_original_url.trim()
+      : null) ||
+    (typeof group.primary.edition?.cover_url === "string" && group.primary.edition.cover_url.trim()
+      ? group.primary.edition.cover_url.trim()
+      : null) ||
+    resolvedCoverUrl;
 
   return (
     <BookCard
@@ -124,7 +132,7 @@ function renderCard({
       copiesCount={group.copiesCount}
       href={isRearranging ? "" : `/app/books/${group.primary.id}`}
       coverUrl={resolvedCoverUrl}
-      originalSrc={resolvedCoverUrl}
+      originalSrc={originalCoverSrc}
       onOpen={() => onStoreBookNavContext()}
       cropData={group.primary.cover_crop}
       onDeleteCopy={onDeleteCopy}
