@@ -26,6 +26,7 @@ export default function PublicBookDetailGrid({
 }) {
   const [coverExpanded, setCoverExpanded] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [isNarrow, setIsNarrow] = useState(false);
   const galleryItems = useMemo(() => {
     const out: Array<{ url: string; alt: string }> = [];
     if (coverSrc) out.push({ url: coverSrc, alt: effectiveTitle });
@@ -47,11 +48,23 @@ export default function PublicBookDetailGrid({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [lightboxIndex, galleryItems.length]);
 
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 720px)");
+    const sync = () => setIsNarrow(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (isNarrow && coverExpanded) setCoverExpanded(false);
+  }, [isNarrow, coverExpanded]);
+
   return (
     <>
       <div
         className="om-book-detail-grid"
-        style={coverExpanded ? { gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" } : undefined}
+        style={!isNarrow && coverExpanded ? { gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" } : undefined}
       >
         <div>
           <div
@@ -67,7 +80,7 @@ export default function PublicBookDetailGrid({
             objectFit="contain"
           />
           </div>
-          {coverSrc ? (
+          {coverSrc && !isNarrow ? (
             <div style={{ marginTop: "var(--space-sm)" }}>
               <button
                 className="text-muted no-underline"
