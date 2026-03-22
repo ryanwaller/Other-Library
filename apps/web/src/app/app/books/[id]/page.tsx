@@ -4000,6 +4000,12 @@ export default function BookDetailPage() {
   const persistedWishlistState = String(book?.collection_state ?? "owned").trim().toLowerCase() === "wanted";
   const isWishlistItem = editMode ? formStatus === "wishlist" : persistedWishlistState;
   const showOwnershipMeta = !isWishlistItem;
+  const showOwnerCollectionMetaSection =
+    !isWishlistItem ||
+    editMode ||
+    (facetView.category.length > 0 && fieldVisibility.category !== false) ||
+    (facetView.tag.length > 0 && fieldVisibility.tag !== false) ||
+    showNotesSection;
   const showUrlSection = Boolean(publicBookUrl) && !isWishlistItem;
   const showDividerBorrowableLocation = showLocationBlock || showUrlSection;
   const showDividerShelfUrl = showShelfSection && showUrlSection;
@@ -5588,7 +5594,8 @@ export default function BookDetailPage() {
 
               {isOwner ? (
                 <>
-                  <hr className="divider" />
+                  {showOwnerCollectionMetaSection ? <hr className="divider" /> : null}
+                  {showOwnerCollectionMetaSection ? (
                   <div className="meta-list" style={{ gap: 0 }}>
                     {!isWishlistItem ? (
                       <div className="row om-row-baseline">
@@ -5759,6 +5766,7 @@ export default function BookDetailPage() {
                       </div>
                     )}
                   </div>
+                  ) : null}
 
                   <hr className="divider" />
                   <div className="meta-list" style={{ gap: 0 }}>
