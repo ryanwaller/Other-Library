@@ -41,7 +41,7 @@ type ExploreBookRow = {
 
 type EntityCluster = {
   entityId: string;
-  role: "author" | "designer" | "publisher" | "performer";
+  role: "author" | "designer" | "publisher" | "performer" | "tag" | "material";
   name: string;
   slug: string | null;
   count: number;
@@ -159,7 +159,29 @@ function railHeading(role: EntityCluster["role"], name: string): string {
   if (role === "designer") return `Designed by ${name}`;
   if (role === "author") return `Authored by ${name}`;
   if (role === "publisher") return `Published by ${name}`;
+  if (role === "tag") return `Tagged ${name}`;
+  if (role === "material") return `Material: ${name}`;
   return `Performed by ${name}`;
+}
+
+function rowMatchesPinnedCluster(row: ExploreBookRow, entityId: string, role: EntityCluster["role"]): boolean {
+  if (role === "tag") {
+    return (row.book_entities ?? []).some((entityRow) => {
+      const entityRole = String(entityRow?.role ?? "").trim().toLowerCase();
+      return (entityRole === "tag" || entityRole === "category") && String(entityRow?.entity?.id ?? "") === entityId;
+    });
+  }
+  if (role === "material") {
+    return (row.book_entities ?? []).some((entityRow) => {
+      const entityRole = String(entityRow?.role ?? "").trim().toLowerCase();
+      return entityRole === "material" && String(entityRow?.entity?.id ?? "") === entityId;
+    });
+  }
+  return (row.book_entities ?? []).some((entityRow) => {
+    const entityRole = String(entityRow?.role ?? "").trim().toLowerCase();
+    if (role === "designer") return (entityRole === "designer" || entityRole === "design") && String(entityRow?.entity?.id ?? "") === entityId;
+    return entityRole === role && String(entityRow?.entity?.id ?? "") === entityId;
+  });
 }
 
 async function loadExploreData() {
@@ -345,13 +367,7 @@ async function loadExploreData() {
 
   function clusterItemsFor(entityId: string, role: "author" | "designer" | "publisher" | "performer") {
     return recentRows
-      .filter((row) =>
-        (row.book_entities ?? []).some((entityRow) => {
-          const entityRole = String(entityRow?.role ?? "").trim().toLowerCase();
-          if (role === "designer") return (entityRole === "designer" || entityRole === "design") && String(entityRow?.entity?.id ?? "") === entityId;
-          return entityRole === role && String(entityRow?.entity?.id ?? "") === entityId;
-        })
-      )
+      .filter((row) => rowMatchesPinnedCluster(row, entityId, role))
       .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
       .filter((item): item is GridItem => Boolean(item))
       .slice(0, EXPLORE_RAIL_ITEMS);
@@ -460,7 +476,12 @@ async function loadExploreData() {
     if (mode !== "pinned") continue;
     const roleValue = String((row as any).role ?? "").trim().toLowerCase();
     const role =
-      roleValue === "designer" || roleValue === "author" || roleValue === "publisher" || roleValue === "performer"
+      roleValue === "designer" ||
+      roleValue === "author" ||
+      roleValue === "publisher" ||
+      roleValue === "performer" ||
+      roleValue === "tag" ||
+      roleValue === "material"
         ? (roleValue as EntityCluster["role"])
         : null;
     const entity = (row as any).entity;
@@ -469,13 +490,7 @@ async function loadExploreData() {
     const slug = String(entity?.slug ?? "").trim() || null;
     if (!role || !entityId || !name) continue;
     const items = allVisibleRows
-      .filter((bookRow) =>
-        (bookRow.book_entities ?? []).some((entityRow) => {
-          const entityRole = String(entityRow?.role ?? "").trim().toLowerCase();
-          if (role === "designer") return (entityRole === "designer" || entityRole === "design") && String(entityRow?.entity?.id ?? "") === entityId;
-          return entityRole === role && String(entityRow?.entity?.id ?? "") === entityId;
-        })
-      )
+      .filter((bookRow) => rowMatchesPinnedCluster(bookRow, entityId, role))
       .map((bookRow) => toGridItem(bookRow, usernameByOwnerId, signedMap))
       .filter((item): item is GridItem => Boolean(item))
       .slice(0, EXPLORE_RAIL_ITEMS);

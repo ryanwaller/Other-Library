@@ -70,7 +70,7 @@ type InvitesResponse = {
   metrics: { total: number; pending: number; used: number; expired: number };
 };
 
-type HomepageRailRole = "author" | "designer" | "publisher" | "performer";
+type HomepageRailRole = "author" | "designer" | "publisher" | "performer" | "tag" | "material";
 
 type HomepageRailEntity = {
   id: string;
@@ -997,6 +997,8 @@ function AdminPageInner() {
                         <option value="author">Author</option>
                         <option value="publisher">Publisher</option>
                         <option value="performer">Performer</option>
+                        <option value="tag">Tag</option>
+                        <option value="material">Material</option>
                       </select>
                       <input
                         value={searchDraft}
@@ -1132,7 +1134,7 @@ function AdminPageInner() {
                         await refreshHomepageRail();
                         setHomepageNotice("Saved");
                       } catch (e: any) {
-                        setError(e?.message === "migration_required" ? "Apply migration 0047_homepage_rail_dynamic_slots.sql before saving homepage slot changes." : (e?.message ?? "Failed to save homepage rail"));
+                        setError(e?.message === "migration_required" ? "Apply migration 0048_homepage_rail_tag_material_slots.sql before saving homepage slot changes." : (e?.message ?? "Failed to save homepage rail"));
                       } finally {
                         setHomepageSaving(false);
                       }

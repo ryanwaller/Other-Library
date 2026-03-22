@@ -7,7 +7,7 @@ const SURFACE = "explore_right_rail";
 const DEFAULT_SLOTS = 3;
 
 type SlotMode = "automatic" | "pinned";
-type SlotRole = "author" | "designer" | "publisher" | "performer";
+type SlotRole = "author" | "designer" | "publisher" | "performer" | "tag" | "material";
 
 function normalizeMode(value: unknown): SlotMode {
   return value === "pinned" ? "pinned" : "automatic";
@@ -15,7 +15,7 @@ function normalizeMode(value: unknown): SlotMode {
 
 function normalizeRole(value: unknown): SlotRole {
   const next = String(value ?? "").trim().toLowerCase();
-  if (next === "author" || next === "designer" || next === "publisher" || next === "performer") return next;
+  if (next === "author" || next === "designer" || next === "publisher" || next === "performer" || next === "tag" || next === "material") return next;
   return "designer";
 }
 
@@ -113,7 +113,10 @@ export async function POST(req: Request) {
     }
 
     const ins = await admin.from("homepage_feature_slots").insert(normalizedSlots);
-    if (ins.error) return NextResponse.json({ error: ins.error.message }, { status: 500 });
+    if (ins.error) {
+      if ((ins.error as any).code === "23514") return NextResponse.json({ error: "migration_required" }, { status: 409 });
+      return NextResponse.json({ error: ins.error.message }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
