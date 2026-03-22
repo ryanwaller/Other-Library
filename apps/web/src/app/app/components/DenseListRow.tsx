@@ -91,7 +91,7 @@ export default function DenseListRow({
           <CoverImage
             alt={fields.primaryTitle}
             src={thumbSrc}
-            cropData={cropData}
+            cropData={null}
             style={{ display: "block", width: "100%", aspectRatio: "3 / 4" }}
             objectFit="contain"
             sizes="40px"
