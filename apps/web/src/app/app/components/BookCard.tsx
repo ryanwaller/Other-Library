@@ -28,7 +28,8 @@ export default function BookCard({
   gridCols,
   secondaryMode = "authors",
   roundedCover = false,
-  wishlistMatchSummary = null
+  wishlistMatchSummary = null,
+  showWishlistMatchSummary = true
 }: {
   viewMode: BookCardViewMode;
   bulkMode: boolean;
@@ -57,6 +58,7 @@ export default function BookCard({
     publicCount: number;
     publicUsernames: string[];
   } | null;
+  showWishlistMatchSummary?: boolean;
 }) {
   const router = useRouter();
 
@@ -134,12 +136,13 @@ export default function BookCard({
   }
 
   const wishlistMatchLine = useMemo(() => {
+    if (!showWishlistMatchSummary) return null;
     if (!wishlistMatchSummary) return null;
     if (wishlistMatchSummary.followedCount > 1) return `Owned by ${wishlistMatchSummary.followedCount} people you follow`;
     if (wishlistMatchSummary.followedCount === 1) return `In ${wishlistMatchSummary.followedUsernames[0]}'s library`;
     if (wishlistMatchSummary.publicCount > 0) return `In ${wishlistMatchSummary.publicUsernames[0]}'s library`;
     return null;
-  }, [wishlistMatchSummary]);
+  }, [showWishlistMatchSummary, wishlistMatchSummary]);
 
   if (viewMode === "list") {
     return (

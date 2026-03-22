@@ -4508,6 +4508,7 @@ function AppShell({
                     onReorderPreview={previewItemReorder}
                     onReorderCommit={commitItemReorder}
                     onReorderCancel={cancelItemReorder}
+                    showWishlistMatchSummary={!wishlistMode}
                   />
                 )}
               />

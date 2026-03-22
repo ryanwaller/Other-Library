@@ -81,6 +81,11 @@ function isWishlistStatusConstraintError(error: { message?: string | null } | nu
   return message.includes("user_books_status_check") || (message.includes("status") && message.includes("check constraint"));
 }
 
+function isMissingSavedFromColumnError(error: { message?: string | null } | null | undefined): boolean {
+  const message = String(error?.message ?? "").toLowerCase();
+  return message.includes("saved_from_user_id") && (message.includes("does not exist") || message.includes("schema cache"));
+}
+
 export default function AddToLibraryButton({
   editionId,
   titleFallback,
@@ -465,7 +470,8 @@ export default function AddToLibraryButton({
         collection_state: "wanted",
         visibility: "followers_only",
         status: "wishlist",
-        borrowable_override: false
+        borrowable_override: false,
+        saved_from_user_id: sourceOwnerId ?? null
       };
       payload.object_type = source?.object_type ?? null;
       payload.source_type = source?.source_type ?? null;
@@ -501,6 +507,10 @@ export default function AddToLibraryButton({
       let ins = await supabase.from("user_books").insert(payload).select("id").single();
       if (ins.error && payload.status === "wishlist" && isWishlistStatusConstraintError(ins.error)) {
         delete payload.status;
+        ins = await supabase.from("user_books").insert(payload).select("id").single();
+      }
+      if (ins.error && payload.saved_from_user_id && isMissingSavedFromColumnError(ins.error)) {
+        delete payload.saved_from_user_id;
         ins = await supabase.from("user_books").insert(payload).select("id").single();
       }
       if (ins.error) throw new Error(ins.error.message);

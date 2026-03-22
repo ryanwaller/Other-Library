@@ -52,6 +52,7 @@ type SortableCatalogGridProps = {
   onReorderPreview: (activeKey: string, overKey: string, libraryId: number) => void;
   onReorderCommit: (libraryId: number) => Promise<void>;
   onReorderCancel: (libraryId: number) => void;
+  showWishlistMatchSummary?: boolean;
 };
 
 type SortableCatalogCardProps = {
@@ -80,8 +81,9 @@ function renderCard({
   orderedBookIds,
   onToggleSelected,
   onDeleteCopy,
-  onStoreBookNavContext
-}: Omit<SortableCatalogCardProps, "libraryId">) {
+  onStoreBookNavContext,
+  showWishlistMatchSummary = true
+}: Omit<SortableCatalogCardProps, "libraryId"> & { showWishlistMatchSummary?: boolean }) {
   const resolvedCoverUrl =
     typeof group.primary.resolved_cover_url === "string" && group.primary.resolved_cover_url.trim()
       ? group.primary.resolved_cover_url
@@ -109,6 +111,7 @@ function renderCard({
       secondaryMode={effectiveSecondaryLineFor(group.primary).mode}
       roundedCover={String(group.primary.collection_state ?? "").trim().toLowerCase() === "wanted"}
       wishlistMatchSummary={group.primary.wishlist_match_summary ?? null}
+      showWishlistMatchSummary={showWishlistMatchSummary}
     />
   );
 }
@@ -153,7 +156,8 @@ function SortableCatalogCard({
     orderedBookIds,
     onToggleSelected,
     onDeleteCopy,
-    onStoreBookNavContext
+    onStoreBookNavContext,
+    showWishlistMatchSummary
   });
 
   return (
@@ -216,7 +220,8 @@ const SortableCatalogGrid = memo(function SortableCatalogGrid({
   onReorderStart,
   onReorderPreview,
   onReorderCommit,
-  onReorderCancel
+  onReorderCancel,
+  showWishlistMatchSummary = true
 }: SortableCatalogGridProps) {
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const orderedBookIds = useMemo(

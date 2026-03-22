@@ -76,6 +76,7 @@ type UserBookDetail = {
   id: number;
   owner_id: string;
   library_id: number;
+  saved_from_user_id?: string | null;
   collection_state?: "owned" | "wanted" | null;
   visibility: "inherit" | "followers_only" | "public";
   status: DetailStatus;
@@ -622,6 +623,7 @@ export default function BookDetailPage() {
   const [book, setBook] = useState<UserBookDetail | null>(null);
   const [mediaUrlsByPath, setMediaUrlsByPath] = useState<Record<string, string>>({});
   const [ownerProfile, setOwnerProfile] = useState<{ username: string; visibility: "followers_only" | "public" } | null>(null);
+  const [savedFromProfile, setSavedFromProfile] = useState<{ username: string } | null>(null);
   const [ownerBorrowDefaults, setOwnerBorrowDefaults] = useState<{
     borrowable_default: boolean;
     borrow_request_scope: "anyone" | "followers" | "following";
@@ -1094,6 +1096,7 @@ export default function BookDetailPage() {
     setCoverOriginalSrc(null);
     setSuggestedCoverUrl(null);
     setOwnerProfile(null);
+    setSavedFromProfile(null);
     setOwnerBorrowDefaults(null);
     setMergeSource(null);
     setMergeState({ busy: false, error: null, message: null });
@@ -1101,9 +1104,9 @@ export default function BookDetailPage() {
     setCopiesCountState({ busy: false, error: null });
     try {
       const baseNew =
-        "id,owner_id,library_id,collection_state,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,subtitle_override,field_visibility,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,saved_from_user_id,collection_state,visibility,status,borrowable_override,borrow_request_scope_override,group_label,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,subtitle_override,field_visibility,decade,pages,trim_width,trim_height,trim_unit,cover_original_url,cover_crop,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
       const baseOld =
-        "id,owner_id,library_id,collection_state,visibility,status,borrowable_override,borrow_request_scope_override,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,field_visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
+        "id,owner_id,library_id,saved_from_user_id,collection_state,visibility,status,borrowable_override,borrow_request_scope_override,object_type,source_type,source_url,external_source_ids,music_metadata,issue_number,issue_volume,issue_season,issue_year,issn,field_visibility,title_override,authors_override,editors_override,designers_override,publisher_override,printer_override,materials_override,edition_override,publish_date_override,description_override,subjects_override,location,shelf,notes,edition:editions(id,isbn10,isbn13,title,authors,publisher,publish_date,description,subjects,cover_url,raw),media:user_book_media(id,kind,storage_path,caption,created_at),book_tags:user_book_tags(tag:tags(id,name,kind))";
 
       const entitiesSelect = ",book_entities:book_entities(role,position,visibility,entity:entities(id,name,slug))";
       const selectNew = baseNew + entitiesSelect;
@@ -1116,6 +1119,8 @@ export default function BookDetailPage() {
           // If any column is missing, try a conservative fallback that strips all newer columns.
           // This ensures the app functions during schema transitions.
           const fallbackSelect = selectNew
+            .replace("saved_from_user_id,", "")
+            .replace(",saved_from_user_id", "")
             .replace(",field_visibility", "")
             .replace(",trim_width,trim_height,trim_unit", "")
             .replace(",cover_original_url", "")
@@ -1127,7 +1132,11 @@ export default function BookDetailPage() {
           
           if (res.error && (res.error.message ?? "").toLowerCase().includes("does not exist")) {
             // Last resort: strip group_label too
-            res = await supabase.from("user_books").select(baseOld.replace(",field_visibility", "").replace(",group_label", "")).eq("id", bookId).maybeSingle();
+            res = await supabase
+              .from("user_books")
+              .select(baseOld.replace("saved_from_user_id,", "").replace(",saved_from_user_id", "").replace(",field_visibility", "").replace(",group_label", ""))
+              .eq("id", bookId)
+              .maybeSingle();
           }
         }
       }
@@ -1305,6 +1314,18 @@ export default function BookDetailPage() {
             borrowable_default: Boolean((profileRes.data as any).borrowable_default),
             borrow_request_scope: normalizedScope
           });
+        }
+      }
+
+      const savedFromUserId = String(row.saved_from_user_id ?? "").trim();
+      if (savedFromUserId) {
+        const savedFromRes = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", savedFromUserId)
+          .maybeSingle();
+        if (!savedFromRes.error && savedFromRes.data?.username) {
+          setSavedFromProfile({ username: savedFromRes.data.username });
         }
       }
 
@@ -5800,6 +5821,17 @@ export default function BookDetailPage() {
                         <div>{formStatus}</div>
                       )}
                     </div>
+
+                    {isWishlistItem && savedFromProfile ? (
+                      <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
+                        <div style={{ minWidth: 110 }} className="text-muted">
+                          Saved from
+                        </div>
+                        <div>
+                          <Link href={`/u/${savedFromProfile.username}`}>{savedFromProfile.username}</Link>
+                        </div>
+                      </div>
+                    ) : null}
 
                     {showOwnershipMeta ? (
                       <div className="row om-row-baseline" style={{ marginTop: "var(--space-8)" }}>
