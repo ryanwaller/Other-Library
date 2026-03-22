@@ -1108,7 +1108,9 @@ a.text-muted:hover {
   align-items: center;
   justify-content: center;
   padding: 6px 8px 6px 0;
-  pointer-events: none;
+  pointer-events: auto;
+  position: relative;
+  z-index: 3;
 }
 
 .om-dense-list-thumb-frame {

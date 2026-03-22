@@ -101,12 +101,12 @@ export default function DenseListRow({
             <div
               style={{
                 position: "fixed",
-                top: hoverPos.y + 18,
-                left: hoverPos.x + 18,
+                top: hoverPos.y + 16,
+                left: hoverPos.x + 16,
                 zIndex: 9999,
                 pointerEvents: "none",
-                width: 110,
-                boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
+                width: 160,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
                 borderRadius: 4,
                 overflow: "hidden",
                 background: "var(--bg-muted, #1a1a1a)"
