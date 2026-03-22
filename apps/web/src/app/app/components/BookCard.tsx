@@ -32,7 +32,8 @@ export default function BookCard({
   wishlistMatchSummary = null,
   showWishlistMatchSummary = true,
   item,
-  utilityLabel = null
+  utilityLabel = null,
+  isLastRow = false
 }: {
   viewMode: BookCardViewMode;
   bulkMode: boolean;
@@ -57,6 +58,7 @@ export default function BookCard({
   roundedCover?: boolean;
   item?: CatalogItem;
   utilityLabel?: string | null;
+  isLastRow?: boolean;
   wishlistMatchSummary?: {
     followedCount: number;
     followedUsernames: string[];
@@ -177,6 +179,7 @@ export default function BookCard({
         leadingControl={
           bulkMode ? <input type="checkbox" checked={selected} onChange={onToggleSelected} aria-label="Select book" /> : undefined
         }
+        isLastRow={isLastRow}
         onOpen={onOpen}
       />
     );

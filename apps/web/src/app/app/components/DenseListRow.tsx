@@ -39,7 +39,7 @@ export default function DenseListRow({
   const isClickable = Boolean(href);
   const hasLeading = Boolean(leadingControl);
   const hasTrailing = Boolean(trailingAction);
-  const coverRadius = roundedCover ? 12 : 4;
+  const coverRadius = roundedCover ? 12 : 0;
 
   return (
     <div
