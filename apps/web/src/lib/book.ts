@@ -113,13 +113,13 @@ export function denseListFieldsFor(b: PublicBook): DenseListFields {
 
   if (isMagazineObject(b.object_type)) {
     const issueLine = formatIssueDisplay(b) || null;
-    const dateLine = effectiveDateLabelFor(b);
+    const yearLine = effectiveYearFor(b);
     return {
       primaryTitle: title,
       primarySubtitle: subtitle,
       secondary: issueLine,
-      tertiary: dateLine && dateLine !== issueLine ? dateLine : null,
-      mobileSecondary: joinClean([issueLine, dateLine && dateLine !== issueLine ? dateLine : null])
+      tertiary: yearLine,
+      mobileSecondary: joinClean([issueLine, yearLine])
     };
   }
 

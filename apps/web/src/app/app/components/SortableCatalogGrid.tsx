@@ -34,11 +34,20 @@ function formatAddedDate(timestamp: number): string | null {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return null;
   const now = new Date();
-  const sameYear = date.getFullYear() === now.getFullYear();
-  return new Intl.DateTimeFormat("en-US", sameYear
-    ? { month: "short", day: "numeric" }
-    : { month: "short", day: "numeric", year: "numeric" }
-  ).format(date);
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7);
+    return `${weeks} ${weeks === 1 ? "week" : "weeks"} ago`;
+  }
+  if (diffDays < 365) {
+    const months = Math.floor(diffDays / 30);
+    return `${months} ${months === 1 ? "month" : "months"} ago`;
+  }
+  const years = Math.floor(diffDays / 365);
+  return `${years} ${years === 1 ? "year" : "years"} ago`;
 }
 
 type DeleteState = { busy: boolean; error: string | null; message: string | null } | undefined;

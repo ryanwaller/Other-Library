@@ -1106,9 +1106,10 @@ a.text-muted:hover {
 }
 
 .om-dense-list-thumb-frame {
-  width: 36px;
-  height: 40px;
+  width: 32px;
+  aspect-ratio: 3 / 4;
   overflow: hidden;
+  background: var(--bg-muted);
 }
 
 .om-dense-list-thumb-frame img {
@@ -1160,8 +1161,8 @@ a.text-muted:hover {
 }
 
 .om-dense-list-cell--utility {
-  justify-content: flex-end;
-  text-align: right;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .om-dense-list-cell--action {
@@ -1185,8 +1186,8 @@ a.text-muted:hover {
   }
 
   .om-dense-list-thumb-frame {
-    width: 32px;
-    height: 36px;
+    width: 28px;
+    aspect-ratio: 3 / 4;
   }
 
   .om-dense-list-cell {

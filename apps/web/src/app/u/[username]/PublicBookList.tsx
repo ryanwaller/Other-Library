@@ -90,13 +90,21 @@ function uniqCaseInsensitive(values: string[]): string[] {
 function formatAddedDate(value: unknown): string | null {
   const timestamp = Date.parse(String(value ?? ""));
   if (!Number.isFinite(timestamp)) return null;
-  const date = new Date(timestamp);
-  const now = new Date();
-  const sameYear = date.getFullYear() === now.getFullYear();
-  return new Intl.DateTimeFormat(
-    "en-US",
-    sameYear ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" }
-  ).format(date);
+  const now = Date.now();
+  const diffDays = Math.floor((now - timestamp) / 86400000);
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7);
+    return `${weeks} ${weeks === 1 ? "week" : "weeks"} ago`;
+  }
+  if (diffDays < 365) {
+    const months = Math.floor(diffDays / 30);
+    return `${months} ${months === 1 ? "month" : "months"} ago`;
+  }
+  const years = Math.floor(diffDays / 365);
+  return `${years} ${years === 1 ? "year" : "years"} ago`;
 }
 
 export default function PublicBookList({
