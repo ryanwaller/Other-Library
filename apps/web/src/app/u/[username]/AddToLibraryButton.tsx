@@ -757,14 +757,22 @@ function CatalogPickerDropdown({
         minWidth: isMobileViewport ? undefined : 200,
         width: isMobileViewport ? "auto" : undefined,
         maxWidth: isMobileViewport ? "calc(100vw - 24px)" : undefined,
-        background: "var(--bg)",
+        backgroundColor: "rgba(10, 10, 10, 0.98)",
         border: "1px solid var(--border)",
+        boxShadow: "0 12px 28px rgba(0, 0, 0, 0.32)",
         fontSize: "inherit",
         boxSizing: "border-box",
       }}
     >
+      <div
+        className="text-muted"
+        style={{ padding: "8px 12px 6px", fontSize: "0.82em", letterSpacing: "0.02em" }}
+      >
+        Add to catalog
+      </div>
+
       {catalogs.length === 0 ? (
-        <div className="text-muted" style={{ padding: "8px 12px" }}>
+        <div className="text-muted" style={{ padding: "0 12px 8px" }}>
           No catalogs
         </div>
       ) : (
@@ -794,29 +802,9 @@ function CatalogPickerDropdown({
         ))
       )}
 
-      <div style={{ borderTop: "1px solid var(--border)" }}>
-        <button
-          onClick={onSelectWishlist}
-          disabled={busy || wantedCount > 0}
-          style={{
-            display: "flex",
-            width: "100%",
-            textAlign: "left",
-            padding: "8px 12px",
-            border: "none",
-            borderBottom: "1px solid var(--border)",
-            background: "transparent",
-            cursor: busy ? "default" : "pointer",
-            gap: "var(--space-8)",
-            alignItems: "baseline",
-            opacity: wantedCount > 0 ? 0.5 : 1
-          }}
-        >
-          <span style={{ flex: 1 }}>Add to wishlist</span>
-          {wantedCount > 0 ? <span className="text-muted">✓</span> : null}
-        </button>
+      <div>
         {newCatalogMode ? (
-          <div style={{ padding: "8px 12px", display: "flex", gap: "var(--space-8)", alignItems: "baseline" }}>
+          <div style={{ padding: "8px 12px", display: "flex", gap: "var(--space-8)", alignItems: "baseline", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
             <input
               autoFocus
               value={newCatalogName}
@@ -846,6 +834,8 @@ function CatalogPickerDropdown({
               textAlign: "left",
               padding: "8px 12px",
               border: "none",
+              borderTop: "1px solid var(--border)",
+              borderBottom: "1px solid var(--border)",
               background: "transparent",
               cursor: "pointer",
             }}
@@ -853,6 +843,26 @@ function CatalogPickerDropdown({
             Add to new catalog
           </button>
         )}
+
+        <button
+          onClick={onSelectWishlist}
+          disabled={busy || wantedCount > 0}
+          style={{
+            display: "flex",
+            width: "100%",
+            textAlign: "left",
+            padding: "8px 12px",
+            border: "none",
+            background: "transparent",
+            cursor: busy ? "default" : "pointer",
+            gap: "var(--space-8)",
+            alignItems: "baseline",
+            opacity: wantedCount > 0 ? 0.5 : 1
+          }}
+        >
+          <span style={{ flex: 1 }}>Add to wishlist</span>
+          {wantedCount > 0 ? <span className="text-muted">✓</span> : null}
+        </button>
       </div>
     </div>
   );
