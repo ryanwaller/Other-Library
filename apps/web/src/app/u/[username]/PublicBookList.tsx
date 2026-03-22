@@ -731,7 +731,7 @@ export default function PublicBookList({
           cropData={cropData}
           roundedCover={wishlistMode}
           utilityLabel={formatAddedDate((b as any).created_at)}
-          trailingActionWidth={26}
+          trailingActionWidth={44}
           isLastRow={isLast}
           trailingAction={
             <AddToLibraryButton
@@ -957,9 +957,7 @@ export default function PublicBookList({
               return next;
             });
             return (
-              <Fragment key={lib.id}>
-              {idx > 0 && <hr className="om-hr" />}
-              <div className="card" style={{ marginTop: idx === 0 ? 0 : "var(--space-14)" }}>
+              <div key={lib.id} className="card om-section-divider-block" style={{ marginTop: 0 }}>
                 <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "nowrap" }}>
                   <div className="row" style={{ gap: "var(--space-10)", flex: 1, alignItems: "baseline", flexWrap: "nowrap", minWidth: 0 }}>
                     <button
@@ -1011,7 +1009,6 @@ export default function PublicBookList({
                   />
                 )}
               </div>
-              </Fragment>
             );
           })}
         </div>

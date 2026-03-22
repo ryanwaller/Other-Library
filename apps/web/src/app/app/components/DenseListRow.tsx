@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
 import CoverImage from "../../../components/CoverImage";
 import { denseListFieldsFor } from "../../../lib/book";
@@ -41,6 +43,17 @@ export default function DenseListRow({
   const hasTrailing = Boolean(trailingAction);
   const coverRadius = roundedCover ? 12 : 0;
 
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
+  const coverSrc = originalSrc ?? coverUrl;
+
+  function handleThumbMouseMove(e: React.MouseEvent) {
+    setHoverPos({ x: e.clientX, y: e.clientY });
+  }
+
+  function handleThumbMouseLeave() {
+    setHoverPos(null);
+  }
+
   return (
     <div
       className="om-dense-list-row"
@@ -65,11 +78,16 @@ export default function DenseListRow({
         {leadingControl}
       </div>
 
-      <div className="om-dense-list-thumb">
+      <div
+        className="om-dense-list-thumb"
+        onMouseMove={handleThumbMouseMove}
+        onMouseLeave={handleThumbMouseLeave}
+        style={{ cursor: coverSrc ? "default" : undefined }}
+      >
         <div className="om-dense-list-thumb-frame" style={{ borderRadius: coverRadius }}>
           <CoverImage
             alt={fields.primaryTitle}
-            src={originalSrc ?? coverUrl}
+            src={coverSrc}
             cropData={cropData}
             style={{ display: "block", width: "100%", aspectRatio: "3 / 4" }}
             objectFit="contain"
@@ -77,6 +95,34 @@ export default function DenseListRow({
           />
         </div>
       </div>
+
+      {hoverPos && coverSrc && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              style={{
+                position: "fixed",
+                top: hoverPos.y + 18,
+                left: hoverPos.x + 18,
+                zIndex: 9999,
+                pointerEvents: "none",
+                width: 110,
+                boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
+                borderRadius: 4,
+                overflow: "hidden",
+                background: "var(--bg-muted, #1a1a1a)"
+              }}
+            >
+              <CoverImage
+                alt=""
+                src={coverSrc}
+                cropData={cropData}
+                style={{ display: "block", width: "100%" }}
+                objectFit="contain"
+              />
+            </div>,
+            document.body
+          )
+        : null}
 
       <div className="om-dense-list-cell om-dense-list-cell--primary">
         <div className="om-dense-list-title">{fields.primaryTitle}</div>

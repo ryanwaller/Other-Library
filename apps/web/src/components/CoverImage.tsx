@@ -150,7 +150,7 @@ export default function CoverImage({
 
   // Reset to "loading" whenever src changes so a previously-errored component
   // gives the new URL a fresh attempt instead of staying stuck in "error".
-  const prevSrcRef = useRef<string | null>(null);
+  const prevSrcRef = useRef<string | null>(src);
   useEffect(() => {
     if (!src || src === prevSrcRef.current) return;
     prevSrcRef.current = src;
