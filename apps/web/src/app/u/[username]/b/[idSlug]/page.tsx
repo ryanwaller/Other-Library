@@ -635,9 +635,9 @@ export default async function PublicBookPage({ params }: { params: Promise<{ use
           bio={profile.bio}
         />
 
-        <hr className="divider" style={{ marginTop: "var(--space-14)" }} />
+        <hr className="divider" />
 
-        <div style={{ marginTop: "var(--space-lg)" }} className="card">
+        <div className="card">
           <PublicBookDetailGrid coverSrc={coverSrc} cropData={cropData} effectiveTitle={effectiveTitle} images={images} signedMap={signedMap}>
             <div>
               <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-md)" }}>

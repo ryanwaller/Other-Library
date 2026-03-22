@@ -4510,7 +4510,7 @@ export default function BookDetailPage() {
                 </div>
               ) : null}
 
-              <div style={{ marginTop: "var(--space-14)" }}>
+              <div style={{ marginTop: "var(--space-8)" }}>
                 {isMusicObject ? (
                   <>
                     {editMode || effectiveAuthors.length > 0 ? <hr className="divider" /> : null}
