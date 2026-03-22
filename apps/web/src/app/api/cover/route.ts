@@ -23,6 +23,9 @@ export async function GET(req: NextRequest) {
 
   // Primary: Supabase image transform API (no native binaries needed).
   // Requires the image transformation feature to be enabled on the project.
+  // When enabled, Supabase returns a /render/image/sign/ URL that resizes on fetch.
+  // When NOT enabled, it silently returns a regular /object/sign/ URL (full-size image)
+  // — so we check for the render path before trusting the response.
   if (targetWidth && Number.isFinite(targetWidth) && targetWidth > 0 && targetWidth <= 2000) {
     try {
       const { data: signedData, error: signedError } = await (admin.storage
@@ -31,7 +34,7 @@ export async function GET(req: NextRequest) {
           transform: { width: targetWidth, quality: 80 }
         });
 
-      if (!signedError && signedData?.signedUrl) {
+      if (!signedError && signedData?.signedUrl?.includes("/render/image/sign/")) {
         const imgRes = await fetch(signedData.signedUrl);
         if (imgRes.ok) {
           const buf = await imgRes.arrayBuffer();
@@ -39,7 +42,8 @@ export async function GET(req: NextRequest) {
             status: 200,
             headers: {
               "content-type": imgRes.headers.get("content-type") || "image/jpeg",
-              "cache-control": "public, max-age=31536000, immutable"
+              "cache-control": "public, max-age=31536000, immutable",
+              "x-resize-method": "supabase-transform"
             }
           });
         }
@@ -71,11 +75,13 @@ export async function GET(req: NextRequest) {
         status: 200,
         headers: {
           "content-type": "image/webp",
-          "cache-control": "public, max-age=31536000, immutable"
+          "cache-control": "public, max-age=31536000, immutable",
+          "x-resize-method": "sharp"
         }
       });
     } catch (sharpErr) {
-      console.error("[cover] sharp error:", sharpErr);
+      const msg = sharpErr instanceof Error ? sharpErr.message : String(sharpErr);
+      console.error("[cover] sharp error:", msg);
     }
   }
 
@@ -83,7 +89,8 @@ export async function GET(req: NextRequest) {
     status: 200,
     headers: {
       "content-type": data.type || "application/octet-stream",
-      "cache-control": "public, max-age=31536000, immutable"
+      "cache-control": "public, max-age=31536000, immutable",
+      "x-resize-method": "original"
     }
   });
 }
