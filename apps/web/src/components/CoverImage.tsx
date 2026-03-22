@@ -150,13 +150,15 @@ export default function CoverImage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Reset to "loading" whenever src changes so a previously-errored component
-  // gives the new URL a fresh attempt instead of staying stuck in "error".
+  // When src changes, only reset to "loading" if currently in "error" (so the
+  // img element re-mounts and gives the new URL a fresh attempt).
+  // If currently "ok", keep showing the current image while the new URL loads
+  // to avoid a flash-then-disappear when signed URLs are refreshed.
   const prevSrcRef = useRef<string | null>(src);
   useEffect(() => {
     if (!src || src === prevSrcRef.current) return;
     prevSrcRef.current = src;
-    setStatus("loading");
+    setStatus((prev) => (prev === "error" ? "loading" : prev));
   }, [src]);
 
   if (!src || status === "error") {
@@ -190,8 +192,8 @@ export default function CoverImage({
           ref={imgRef}
           alt={alt}
           src={src}
-          srcSet={sizes && src ? (buildSrcSet(src) || undefined) : undefined}
-          sizes={sizes}
+          srcSet={sizes && src && cropData?.mode !== "transform" ? (buildSrcSet(src) || undefined) : undefined}
+          sizes={cropData?.mode !== "transform" ? sizes : undefined}
           onLoad={handleLoad}
           onError={handleError}
           style={{
