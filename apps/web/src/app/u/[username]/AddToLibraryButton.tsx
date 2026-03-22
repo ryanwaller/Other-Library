@@ -76,6 +76,11 @@ function uniqueStrings(values: Array<string | null | undefined>): string[] {
   return out;
 }
 
+function isWishlistStatusConstraintError(error: { message?: string | null } | null | undefined): boolean {
+  const message = String(error?.message ?? "").toLowerCase();
+  return message.includes("user_books_status_check") || (message.includes("status") && message.includes("check constraint"));
+}
+
 export default function AddToLibraryButton({
   editionId,
   titleFallback,
@@ -493,7 +498,11 @@ export default function AddToLibraryButton({
       payload.publish_date_override = String(source?.publish_date_override ?? "").trim() || String(publishDateFallback ?? "").trim() || null;
       payload.description_override = String(source?.description_override ?? "").trim() || null;
       payload.subjects_override = Array.isArray(source?.subjects_override) ? uniqueStrings(source?.subjects_override) : [];
-      const ins = await supabase.from("user_books").insert(payload).select("id").single();
+      let ins = await supabase.from("user_books").insert(payload).select("id").single();
+      if (ins.error && payload.status === "wishlist" && isWishlistStatusConstraintError(ins.error)) {
+        delete payload.status;
+        ins = await supabase.from("user_books").insert(payload).select("id").single();
+      }
       if (ins.error) throw new Error(ins.error.message);
       const id = Number((ins.data as any)?.id ?? 0);
       if (!id) throw new Error("Wishlist add failed");

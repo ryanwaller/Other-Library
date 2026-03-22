@@ -67,6 +67,11 @@ type FacetRole =
 type EntityRef = { id: string; name: string; slug: string };
 type DetailStatus = "owned" | "loaned" | "selling" | "trading" | "wishlist";
 
+function isWishlistStatusConstraintError(error: { message?: string | null } | null | undefined): boolean {
+  const message = String(error?.message ?? "").toLowerCase();
+  return message.includes("user_books_status_check") || (message.includes("status") && message.includes("check constraint"));
+}
+
 type UserBookDetail = {
   id: number;
   owner_id: string;
@@ -2198,6 +2203,9 @@ export default function BookDetailPage() {
 
       let created = await supabase.from("user_books").insert(payload).select("id").single();
       if (created.error) {
+        if (payload.status === "wishlist" && isWishlistStatusConstraintError(created.error)) {
+          delete payload.status;
+        }
         delete payload.field_visibility;
         delete payload.group_label;
         delete payload.object_type;
@@ -2719,6 +2727,9 @@ export default function BookDetailPage() {
       
       let res = await supabase.from("user_books").update(payload).eq("id", book.id);
       if (res.error) {
+        if (payload.status === "wishlist" && isWishlistStatusConstraintError(res.error)) {
+          delete payload.status;
+        }
         // Strip columns added in migrations if they don't exist
         delete payload.field_visibility;
         delete payload.trim_width;

@@ -93,6 +93,11 @@ function uniqCaseInsensitive(values: string[]): string[] {
   return out;
 }
 
+function isWishlistStatusConstraintError(error: { message?: string | null } | null | undefined): boolean {
+  const message = String(error?.message ?? "").toLowerCase();
+  return message.includes("user_books_status_check") || (message.includes("status") && message.includes("check constraint"));
+}
+
 function entityHrefForName(name: string): string | undefined {
   const normalized = String(name ?? "").trim();
   if (!normalized) return undefined;
@@ -553,6 +558,18 @@ function AppShell({
   const wishlistInsertFields = useMemo(
     () => (wishlistMode ? { status: "wishlist", visibility: "followers_only", borrowable_override: false } : {}),
     [wishlistMode]
+  );
+  const insertUserBookWithWishlistFallback = useCallback(
+    async (payload: Record<string, unknown>) => {
+      let created = await supabase.from("user_books").insert(payload).select("id").single();
+      if (created.error && payload.status === "wishlist" && isWishlistStatusConstraintError(created.error)) {
+        const { status, ...fallbackPayload } = payload;
+        void status;
+        created = await supabase.from("user_books").insert(fallbackPayload).select("id").single();
+      }
+      return created;
+    },
+    []
   );
   const [profile, setProfile] = useState<{ username: string; visibility: string; avatar_path: string | null } | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -1926,7 +1943,7 @@ function AppShell({
       editionId = inserted.data.id;
     }
 
-    const created = await supabase.from("user_books").insert({ owner_id: userId, library_id: addLibraryId, edition_id: editionId, collection_state: activeCollectionState, ...wishlistInsertFields }).select("id").single();
+      const created = await insertUserBookWithWishlistFallback({ owner_id: userId, library_id: addLibraryId, edition_id: editionId, collection_state: activeCollectionState, ...wishlistInsertFields });
     if (created.error) throw new Error(created.error.message);
     const createdId = created.data.id as number;
 
@@ -2395,7 +2412,7 @@ function AppShell({
             ? `${String(musicMetadata?.original_release_year).trim().slice(0, 3)}0s`
             : null
       };
-      const created = await supabase.from("user_books").insert(insertPayload).select("id").single();
+      const created = await insertUserBookWithWishlistFallback(insertPayload);
       if (created.error) throw new Error(created.error.message);
       const createdId = created.data.id as number;
       const contributorEntities = data.contributor_entities ?? {};
@@ -2457,7 +2474,7 @@ function AppShell({
         external_source_ids: data.external_source_ids ?? null,
         decade: issueYear ? `${String(issueYear).slice(0, 3)}0s` : null
       };
-      const created = await supabase.from("user_books").insert(insertPayload).select("id").single();
+      const created = await insertUserBookWithWishlistFallback(insertPayload);
       if (created.error) throw new Error(created.error.message);
       const createdId = created.data.id as number;
       if (data.publisher) {
@@ -2517,7 +2534,7 @@ function AppShell({
       insertPayload.publisher_override = data.publisher ?? null;
       insertPayload.publish_date_override = data.publish_date ?? null;
     }
-    const created = await supabase.from("user_books").insert(insertPayload).select("id").single();
+    const created = await insertUserBookWithWishlistFallback(insertPayload);
     if (created.error) throw new Error(created.error.message);
     const createdId = created.data.id as number;
     const coverUrl = (data.cover_url ?? "").trim();
