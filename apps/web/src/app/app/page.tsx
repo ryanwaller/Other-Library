@@ -3595,7 +3595,7 @@ function AppShell({
 
   return (
     <>
-      <div style={{ marginTop: "var(--space-16)", display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
+      <div style={{ marginTop: 0, display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
         <input
           ref={csvInputRef}
           type="file"

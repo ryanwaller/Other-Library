@@ -58,6 +58,7 @@
   --catalog-top-gap: var(--space-xl);
   --stat-pair-gap: var(--space-10);
   --stat-group-gap: var(--space-16);
+  --page-top-gap: var(--space-md);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -908,7 +909,7 @@ select.om-filter-control::-ms-expand {
 .container {
   max-width: var(--container-max);
   margin: 0 auto;
-  padding: 16px var(--page-pad);
+  padding: var(--page-top-gap) var(--page-pad) 16px;
 }
 
 .row {
@@ -1278,7 +1279,7 @@ a.text-muted:hover {
 .om-explore-main,
 .om-explore-rail {
   min-width: 0;
-  padding-top: var(--space-xl);
+  padding-top: 0;
 }
 
 .om-explore-main {
@@ -1293,7 +1294,7 @@ a.text-muted:hover {
   grid-column: 2;
   grid-row: 1 / -1;
   background: var(--border);
-  margin-top: calc(var(--space-xl) + var(--space-sm));
+  margin-top: var(--space-8);
   align-self: stretch;
 }
 
@@ -1834,7 +1835,7 @@ summary::-webkit-details-marker {
   }
 
   .container {
-    padding: 8px var(--page-pad);
+    padding: var(--page-top-gap) var(--page-pad) 8px;
   }
 
   .row {
