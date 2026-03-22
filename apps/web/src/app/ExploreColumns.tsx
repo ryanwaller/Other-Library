@@ -20,10 +20,6 @@ export default function ExploreColumns({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mainRef = useRef<HTMLDivElement | null>(null);
   const railRef = useRef<HTMLDivElement | null>(null);
-  const currentMainOffsetRef = useRef(0);
-  const currentRailOffsetRef = useRef(0);
-  const targetMainOffsetRef = useRef(0);
-  const targetRailOffsetRef = useRef(0);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -32,46 +28,14 @@ export default function ExploreColumns({
     if (!container || !mainEl || !railEl) return;
 
     let raf = 0;
-    const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const desktopQuery = window.matchMedia("(min-width: 901px)");
 
-    const reset = () => {
-      currentMainOffsetRef.current = 0;
-      currentRailOffsetRef.current = 0;
-      targetMainOffsetRef.current = 0;
-      targetRailOffsetRef.current = 0;
-      mainEl.style.transform = "";
-      railEl.style.transform = "";
-    };
-
-    const animate = () => {
-      const mainDelta = targetMainOffsetRef.current - currentMainOffsetRef.current;
-      const railDelta = targetRailOffsetRef.current - currentRailOffsetRef.current;
-
-      currentMainOffsetRef.current += mainDelta * 0.16;
-      currentRailOffsetRef.current += railDelta * 0.16;
-
-      if (Math.abs(mainDelta) < 0.12) currentMainOffsetRef.current = targetMainOffsetRef.current;
-      if (Math.abs(railDelta) < 0.12) currentRailOffsetRef.current = targetRailOffsetRef.current;
-
-      mainEl.style.transform = `translate3d(0, ${currentMainOffsetRef.current.toFixed(2)}px, 0)`;
-      railEl.style.transform = `translate3d(0, ${currentRailOffsetRef.current.toFixed(2)}px, 0)`;
-
-      if (
-        currentMainOffsetRef.current !== targetMainOffsetRef.current ||
-        currentRailOffsetRef.current !== targetRailOffsetRef.current
-      ) {
-        raf = window.requestAnimationFrame(animate);
-      } else {
-        raf = 0;
-      }
-    };
-
-    const measure = () => {
+    const update = () => {
+      raf = 0;
       const isDesktop = window.matchMedia("(min-width: 901px)").matches;
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (!isDesktop || reduceMotion) {
-        reset();
+        mainEl.style.transform = "";
+        railEl.style.transform = "";
         return;
       }
 
@@ -85,36 +49,26 @@ export default function ExploreColumns({
       const railHeight = railEl.offsetHeight;
       const maxHeight = Math.max(mainHeight, railHeight);
 
-      targetMainOffsetRef.current = (maxHeight - mainHeight) * eased;
-      targetRailOffsetRef.current = (maxHeight - railHeight) * eased;
+      const mainOffset = (maxHeight - mainHeight) * eased;
+      const railOffset = (maxHeight - railHeight) * eased;
+
+      mainEl.style.transform = `translate3d(0, ${mainOffset.toFixed(2)}px, 0)`;
+      railEl.style.transform = `translate3d(0, ${railOffset.toFixed(2)}px, 0)`;
     };
 
     const requestUpdate = () => {
-      measure();
-      if (!raf) raf = window.requestAnimationFrame(animate);
+      if (raf) return;
+      raf = window.requestAnimationFrame(update);
     };
 
-    const resizeObserver = typeof ResizeObserver !== "undefined"
-      ? new ResizeObserver(() => requestUpdate())
-      : null;
-    resizeObserver?.observe(container);
-    resizeObserver?.observe(mainEl);
-    resizeObserver?.observe(railEl);
-
-    measure();
-    animate();
+    update();
     window.addEventListener("scroll", requestUpdate, { passive: true });
     window.addEventListener("resize", requestUpdate);
-    desktopQuery.addEventListener("change", requestUpdate);
-    reduceMotionQuery.addEventListener("change", requestUpdate);
 
     return () => {
       if (raf) window.cancelAnimationFrame(raf);
-      resizeObserver?.disconnect();
       window.removeEventListener("scroll", requestUpdate);
       window.removeEventListener("resize", requestUpdate);
-      desktopQuery.removeEventListener("change", requestUpdate);
-      reduceMotionQuery.removeEventListener("change", requestUpdate);
     };
   }, []);
 
