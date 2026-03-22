@@ -132,15 +132,13 @@ export default function ExploreSignInLock({ children }: { children: React.ReactN
           tabIndex={open ? 0 : -1}
           data-explore-lock-allow="true"
         />
-        <div className="om-explore-lock-modal" data-explore-lock-allow="true">
-          <Link
-            href={signInHref}
-            className="om-filter-control om-explore-lock-signin"
-            data-explore-lock-allow="true"
-          >
-            Sign in
-          </Link>
-        </div>
+        <Link
+          href={signInHref}
+          className="om-filter-control om-explore-lock-signin"
+          data-explore-lock-allow="true"
+        >
+          Sign in
+        </Link>
       </div>
     </div>
   );

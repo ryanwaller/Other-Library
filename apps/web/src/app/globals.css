@@ -1524,23 +1524,11 @@ body.om-explore-lock-open {
   cursor: default;
 }
 
-.om-explore-lock-modal {
+.om-explore-lock-signin {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: min(360px, calc(100vw - (var(--page-pad) * 2)));
-  min-height: 220px;
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(9, 9, 10, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.38);
-}
-
-.om-explore-lock-signin {
   min-width: 120px;
   justify-content: center;
   text-decoration: none !important;
