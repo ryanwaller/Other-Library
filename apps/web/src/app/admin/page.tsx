@@ -1523,7 +1523,7 @@ function AdminPageInner() {
                         const selected = Boolean(entityMergeSelected[entity.id]);
                         const keep = entityMergeKeepId === entity.id;
                         return (
-                          <label key={`${section.key}-${entity.id}`} className="om-list-row" style={{ cursor: "pointer" }}>
+                          <div key={`${section.key}-${entity.id}`} className="om-list-row">
                             <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-md)", flexWrap: "wrap" }}>
                               <div className="row" style={{ gap: "var(--space-10)", alignItems: "center", minWidth: 0, flex: 1 }}>
                                 <input
@@ -1546,7 +1546,13 @@ function AdminPageInner() {
                                   }}
                                 />
                                 <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
-                                  {entity.name}
+                                  {entity.slug ? (
+                                    <Link href={`/entity/${entity.slug}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+                                      {entity.name}
+                                    </Link>
+                                  ) : (
+                                    entity.name
+                                  )}
                                   <span className="text-muted"> · {entity.count}</span>
                                   {entity.slug ? <span className="text-muted"> · /entity/{entity.slug}</span> : null}
                                 </div>
@@ -1581,7 +1587,7 @@ function AdminPageInner() {
                                 ) : null}
                               </div>
                             </div>
-                          </label>
+                          </div>
                         );
                       })}
                     </div>
@@ -1603,7 +1609,7 @@ function AdminPageInner() {
                               const selected = Boolean(entityMergeSelected[entity.id]);
                               const keep = entityMergeKeepId === entity.id;
                               return (
-                                <label key={`${section.key}-${cluster.key}-${entity.id}`} className="om-list-row" style={{ cursor: "pointer" }}>
+                                <div key={`${section.key}-${cluster.key}-${entity.id}`} className="om-list-row">
                                   <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: "var(--space-md)", flexWrap: "wrap" }}>
                                     <div className="row" style={{ gap: "var(--space-10)", alignItems: "center", minWidth: 0, flex: 1 }}>
                                       <input
@@ -1626,7 +1632,13 @@ function AdminPageInner() {
                                         }}
                                       />
                                       <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
-                                        {entity.name}
+                                        {entity.slug ? (
+                                          <Link href={`/entity/${entity.slug}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+                                            {entity.name}
+                                          </Link>
+                                        ) : (
+                                          entity.name
+                                        )}
                                         <span className="text-muted"> · {entity.count}</span>
                                         {entity.slug ? <span className="text-muted"> · /entity/{entity.slug}</span> : null}
                                       </div>
@@ -1658,7 +1670,7 @@ function AdminPageInner() {
                                       ) : null}
                                     </div>
                                   </div>
-                                </label>
+                                </div>
                               );
                             })}
                           </div>
