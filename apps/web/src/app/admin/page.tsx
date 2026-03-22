@@ -118,6 +118,14 @@ type EntityMergePreviewResponse = {
   };
 };
 
+type EntityRenameResponse = {
+  entity: {
+    id: string;
+    name: string;
+    slug: string | null;
+  };
+};
+
 type TabKey = "users" | "waitlist" | "invites" | "feedback" | "homepage" | "entities";
 
 type MetaPair = { label: string; value: string | number };
@@ -478,6 +486,48 @@ function AdminPageInner() {
       setEntityMergeSections([]);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function refreshEntitiesAfterMutation() {
+    setEntityMergePreview(null);
+    await refreshEntitySections();
+    await refreshSummary();
+  }
+
+  async function renameEntity(entity: MergeEntity) {
+    const nextName = window.prompt("Rename entity", entity.name)?.trim();
+    if (!nextName || nextName === entity.name) return;
+    setEntityMergeBusy(true);
+    setError(null);
+    setEntityMergeNotice(null);
+    try {
+      const result = await api<EntityRenameResponse>("/api/admin/entities/merge", {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({
+          entity_id: entity.id,
+          name: nextName,
+        }),
+      });
+      setEntityMergeSelected((prev) =>
+        prev[entity.id]
+          ? {
+              ...prev,
+              [entity.id]: {
+                ...prev[entity.id],
+                name: result.entity.name,
+                slug: result.entity.slug,
+              },
+            }
+          : prev
+      );
+      setEntityMergeNotice(`Renamed entity to ${result.entity.name}.`);
+      await refreshEntitiesAfterMutation();
+    } catch (e: any) {
+      setError(e?.message === "migration_required" ? "Apply migration 0045_entity_aliases.sql before renaming entities." : (e?.message ?? "Entity rename failed"));
+    } finally {
+      setEntityMergeBusy(false);
     }
   }
 
@@ -1355,6 +1405,13 @@ function AdminPageInner() {
                                 </button>
                                 <button
                                   type="button"
+                                  onClick={() => void renameEntity(entity)}
+                                  disabled={entityMergeBusy}
+                                >
+                                  Rename
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => {
                                     setEntityMergeSelected((prev) => {
                                       const next = { ...prev };
@@ -1406,8 +1463,9 @@ function AdminPageInner() {
                       setEntityMergeNotice(`Merged ${result.merged_count ?? sourceIds.length} entities into ${result.target.name}.`);
                       setEntityMergeSelected({});
                       setEntityMergeKeepId(null);
+                      setEntityMergePreview(null);
                       await refreshHomepageRail();
-                      await refreshEntitySections();
+                      await refreshEntitiesAfterMutation();
                     } catch (e: any) {
                       setError(e?.message === "migration_required" ? "Apply migration 0045_entity_aliases.sql before merging entities." : (e?.message ?? "Entity merge failed"));
                     } finally {
@@ -1479,16 +1537,28 @@ function AdminPageInner() {
                                   <span className="text-muted">{entity.rawRoles.join(", ")}</span>
                                 ) : null}
                                 {selected ? (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      setEntityMergeKeepId(entity.id);
-                                    }}
-                                    disabled={entityMergeBusy}
-                                  >
-                                    {keep ? "Keeping" : "Keep"}
-                                  </button>
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        setEntityMergeKeepId(entity.id);
+                                      }}
+                                      disabled={entityMergeBusy}
+                                    >
+                                      {keep ? "Keeping" : "Keep"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        void renameEntity(entity);
+                                      }}
+                                      disabled={entityMergeBusy}
+                                    >
+                                      Rename
+                                    </button>
+                                  </>
                                 ) : null}
                               </div>
                             </div>
@@ -1544,16 +1614,28 @@ function AdminPageInner() {
                                     </div>
                                     <div className="row" style={{ gap: "var(--space-8)", alignItems: "center", flexWrap: "wrap" }}>
                                       {selected ? (
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            setEntityMergeKeepId(entity.id);
-                                          }}
-                                          disabled={entityMergeBusy}
-                                        >
-                                          {keep ? "Keeping" : "Keep"}
-                                        </button>
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              setEntityMergeKeepId(entity.id);
+                                            }}
+                                            disabled={entityMergeBusy}
+                                          >
+                                            {keep ? "Keeping" : "Keep"}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              void renameEntity(entity);
+                                            }}
+                                            disabled={entityMergeBusy}
+                                          >
+                                            Rename
+                                          </button>
+                                        </>
                                       ) : null}
                                     </div>
                                   </div>

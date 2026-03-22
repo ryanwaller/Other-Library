@@ -189,6 +189,16 @@ async function loadMergePreview(admin: any, sourceIds: string[]): Promise<MergeP
   };
 }
 
+async function loadEntityById(admin: any, entityId: string) {
+  const res = await admin
+    .from("entities")
+    .select("id,name,slug")
+    .eq("id", entityId)
+    .maybeSingle();
+  if (res.error) throw new Error(res.error.message);
+  return (res.data ?? null) as { id: string; name: string; slug: string | null } | null;
+}
+
 export async function GET(req: Request) {
   try {
     await requireAdmin(req);
@@ -306,6 +316,61 @@ export async function POST(req: Request) {
       merged_count: sources.length,
       target: { id: target.id, name: target.name, slug: target.slug },
     });
+  } catch (e: any) {
+    const msg = e?.message ?? "forbidden";
+    const status = msg === "not_authenticated" ? 401 : msg === "forbidden" ? 403 : 400;
+    return NextResponse.json({ error: msg }, { status });
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    await requireAdmin(req);
+    const admin = getSupabaseAdmin();
+    if (!admin) return NextResponse.json({ error: "admin_not_configured" }, { status: 500 });
+
+    const body = await req.json().catch(() => ({}));
+    const entityId = String(body?.entity_id ?? "").trim();
+    const nextName = String(body?.name ?? "").trim();
+    if (!entityId || !nextName) return NextResponse.json({ error: "entity_and_name_required" }, { status: 400 });
+
+    const current = await loadEntityById(admin, entityId);
+    if (!current) return NextResponse.json({ error: "entity_not_found" }, { status: 404 });
+
+    const slugRes = await admin.rpc("make_entity_slug", { name: nextName });
+    if (slugRes.error) return NextResponse.json({ error: slugRes.error.message }, { status: 500 });
+    const nextSlug = String(slugRes.data ?? "").trim();
+    if (!nextSlug) return NextResponse.json({ error: "slug_generation_failed" }, { status: 500 });
+
+    const updateRes = await admin
+      .from("entities")
+      .update({ name: nextName, slug: nextSlug })
+      .eq("id", entityId)
+      .select("id,name,slug")
+      .maybeSingle();
+    if (updateRes.error) return NextResponse.json({ error: updateRes.error.message }, { status: 500 });
+
+    const updated = (updateRes.data ?? null) as { id: string; name: string; slug: string | null } | null;
+    if (!updated) return NextResponse.json({ error: "entity_not_found" }, { status: 404 });
+
+    const previousSlug = String(current.slug ?? "").trim();
+    const changedSlug = previousSlug && previousSlug !== updated.slug;
+    if (changedSlug) {
+      const aliasRes = await admin
+        .from("entity_aliases")
+        .upsert(
+          [{ slug: previousSlug, name: current.name, entity_id: updated.id }],
+          { onConflict: "slug" }
+        );
+      if (aliasRes.error?.code === "42P01") {
+        return NextResponse.json({ error: "migration_required" }, { status: 409 });
+      }
+      if (aliasRes.error) {
+        return NextResponse.json({ error: aliasRes.error.message }, { status: 500 });
+      }
+    }
+
+    return NextResponse.json({ ok: true, entity: updated });
   } catch (e: any) {
     const msg = e?.message ?? "forbidden";
     const status = msg === "not_authenticated" ? 401 : msg === "forbidden" ? 403 : 400;
