@@ -88,6 +88,10 @@ function coverSrc(row: ExploreBookRow, signedMap: Record<string, string>): strin
   return String(row.edition?.cover_url ?? "").trim() || null;
 }
 
+function hasCoverPreview(row: ExploreBookRow, signedMap: Record<string, string>): boolean {
+  return Boolean(coverSrc(row, signedMap));
+}
+
 function effectiveTitle(row: ExploreBookRow): string {
   return String(row.title_override ?? "").trim() || String(row.edition?.title ?? "").trim() || "(untitled)";
 }
@@ -113,11 +117,13 @@ function toGridItem(row: ExploreBookRow, usernameByOwnerId: Map<string, string>,
   const username = usernameByOwnerId.get(row.owner_id);
   if (!username) return null;
   const title = effectiveTitle(row);
+  const resolvedCoverUrl = coverSrc(row, signedMap);
+  if (!resolvedCoverUrl) return null;
   return {
     id: row.id,
     title,
     secondaryLine: effectiveSecondaryLine(row),
-    coverUrl: coverSrc(row, signedMap),
+    coverUrl: resolvedCoverUrl,
     coverCrop: row.cover_crop,
     href: `/u/${encodeURIComponent(username)}/b/${bookIdSlug(row.id, title)}`,
   };
@@ -312,13 +318,15 @@ async function loadExploreData() {
     avatarUrlByOwnerId.set(profile.id, avatarPath ? avatarSignedMap[avatarPath] ?? null : null);
   }
 
-  const recentRecords = recentRows
+  const recentRowsWithCovers = recentRows.filter((row) => hasCoverPreview(row, signedMap));
+
+  const recentRecords = recentRowsWithCovers
     .filter((row) => String(row.object_type ?? "").trim().toLowerCase() === "music")
     .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
     .filter((item): item is GridItem => Boolean(item))
     .slice(0, EXPLORE_MAIN_MODULE_ITEMS);
 
-  const recentPeriodicals = recentRows
+  const recentPeriodicals = recentRowsWithCovers
     .filter((row) => isMagazineObject(row.object_type))
     .map((row) => toRecentGridItem(row, usernameByOwnerId, avatarUrlByOwnerId, signedMap))
     .filter((item): item is GridItem => Boolean(item))
@@ -342,7 +350,7 @@ async function loadExploreData() {
     map.set(entityId, current);
   }
 
-  for (const row of recentRows) {
+  for (const row of recentRowsWithCovers) {
     const seenInRow = new Set<string>();
     for (const entityRow of row.book_entities ?? []) {
       const role = String(entityRow?.role ?? "").trim().toLowerCase();
@@ -365,7 +373,7 @@ async function loadExploreData() {
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))[0] ?? null;
 
   const editorItems = topEditor
-    ? recentRows
+    ? recentRowsWithCovers
         .filter((row) =>
           (row.book_entities ?? []).some((entityRow) => {
             const role = String(entityRow?.role ?? "").trim().toLowerCase();
@@ -379,7 +387,7 @@ async function loadExploreData() {
 
   const ownerCounts = new Map<string, number>();
   const ownerLatestCreatedAt = new Map<string, string>();
-  for (const row of recentRows) {
+  for (const row of recentRowsWithCovers) {
     ownerCounts.set(row.owner_id, (ownerCounts.get(row.owner_id) ?? 0) + 1);
     const currentLatest = ownerLatestCreatedAt.get(row.owner_id);
     if (!currentLatest || String(row.created_at ?? "") > currentLatest) {
@@ -402,14 +410,14 @@ async function loadExploreData() {
       }
     : null;
   const recentOwnerItems = topOwnerId
-    ? recentRows
+    ? recentRowsWithCovers
         .filter((row) => row.owner_id === topOwnerId)
         .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
         .filter((item): item is GridItem => Boolean(item))
         .slice(0, EXPLORE_MAIN_MODULE_ITEMS)
     : [];
 
-  const recentItems = recentRows
+  const recentItems = recentRowsWithCovers
     .filter((row) => !topOwnerId || row.owner_id !== topOwnerId)
     .map((row) => toRecentGridItem(row, usernameByOwnerId, avatarUrlByOwnerId, signedMap))
     .filter((item): item is GridItem => Boolean(item))
@@ -478,7 +486,7 @@ async function loadExploreData() {
     (row) => String((row as any).mode ?? "").trim().toLowerCase() === "pinned"
   );
 
-  let allVisibleRows = recentRows;
+  let allVisibleRows = recentRowsWithCovers;
   if (pinnedSlotRows.length > 0) {
     const broadRes = await db
       .from("user_books")
@@ -503,7 +511,7 @@ async function loadExploreData() {
           if (row.path && row.signedUrl) signedMap[row.path] = row.signedUrl;
         }
       }
-      allVisibleRows = broadRows;
+      allVisibleRows = broadRows.filter((row) => hasCoverPreview(row, signedMap));
     }
   }
 
@@ -585,7 +593,7 @@ async function loadExploreData() {
   }
 
   const groupCounts = new Map<string, number>();
-  for (const row of recentRows) {
+  for (const row of recentRowsWithCovers) {
     const label = String(row.group_label ?? "").trim();
     if (!label) continue;
     groupCounts.set(label, (groupCounts.get(label) ?? 0) + 1);
@@ -596,7 +604,7 @@ async function loadExploreData() {
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
 
   const groupItems = topGroupLabel
-    ? recentRows
+    ? recentRowsWithCovers
         .filter((row) => String(row.group_label ?? "").trim() === topGroupLabel)
         .map((row) => toGridItem(row, usernameByOwnerId, signedMap))
         .filter((item): item is GridItem => Boolean(item))
