@@ -231,6 +231,9 @@ function toDisplayCoverUrl(mediaUrlsByPath: Record<string, string>, client: any,
 }
 
 function resolvedCoverUrlForItem(item: CatalogItem, mediaUrlsByPath: Record<string, string>, client: any): string | null {
+  const preResolved = typeof (item as any)?.resolved_cover_url === "string" ? (item as any).resolved_cover_url.trim() : "";
+  if (preResolved) return preResolved;
+
   const preferredMediaPath =
     (item.media ?? []).find((m) => String(m?.kind ?? "").trim().toLowerCase() === "cover")?.storage_path ??
     (item.media ?? [])[0]?.storage_path ??
