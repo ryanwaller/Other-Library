@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
     try {
       const sharp = (await import("sharp")).default;
       const resized = await sharp(Buffer.from(buf))
-        .resize({ width: targetWidth, withoutEnlargement: true })
+        .resize({ width: targetWidth, fit: "inside", withoutEnlargement: true })
         .webp({ quality: 80 })
         .toBuffer();
       return new NextResponse(new Uint8Array(resized), {
