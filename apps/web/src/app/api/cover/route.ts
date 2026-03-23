@@ -67,16 +67,21 @@ export async function GET(req: NextRequest) {
   if (targetWidth && Number.isFinite(targetWidth) && targetWidth > 0 && targetWidth <= 2000) {
     try {
       const sharp = (await import("sharp")).default;
+      const inputMeta = await sharp(Buffer.from(buf)).metadata();
+      console.log(`[cover] input: ${inputMeta.width}x${inputMeta.height} (${inputMeta.format}) → target w=${targetWidth}`);
       const resized = await sharp(Buffer.from(buf))
         .resize({ width: targetWidth, fit: "inside", withoutEnlargement: true })
         .webp({ quality: 80 })
         .toBuffer();
+      const outputMeta = await sharp(resized).metadata();
+      console.log(`[cover] output: ${outputMeta.width}x${outputMeta.height}`);
       return new NextResponse(new Uint8Array(resized), {
         status: 200,
         headers: {
           "content-type": "image/webp",
           "cache-control": "public, max-age=31536000, immutable",
-          "x-resize-method": "sharp"
+          "x-resize-method": "sharp",
+          "x-resize-dims": `${inputMeta.width}x${inputMeta.height}->${outputMeta.width}x${outputMeta.height}`
         }
       });
     } catch (sharpErr) {
