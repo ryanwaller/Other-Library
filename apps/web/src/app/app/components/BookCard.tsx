@@ -6,6 +6,7 @@ import { useMemo, useState, useEffect, type MouseEvent } from "react";
 import CoverImage from "../../../components/CoverImage";
 import type { CatalogItem } from "../../../lib/types";
 import { effectiveTitleFor } from "../../../lib/book";
+import { resizeCoverUrl } from "../../../lib/coverUrl";
 import DenseListRow from "./DenseListRow";
 
 export type BookCardViewMode = "grid" | "list";
@@ -102,11 +103,17 @@ export default function BookCard({
         ? "(max-width: 1100px) 20vw, 17vw"
         : "(max-width: 1100px) 30vw, 25vw";
 
+  // Target resize width (2x DPR headroom). Skip resize when cropData.mode="transform"
+  // because the CSS transform math relies on the image's natural pixel dimensions.
+  const gridResizeWidth = isMobile ? 400 : (gridCols ?? 6) >= 8 ? 300 : (gridCols ?? 6) >= 6 ? 400 : 600;
+  const rawGridSrc = originalSrc ?? coverUrl;
+  const gridSrc = cropData?.mode === "transform" ? rawGridSrc : resizeCoverUrl(rawGridSrc, gridResizeWidth);
+
   const coverEl = (
     <div className="om-cover-slot" style={{ height: "auto", width: "100%", borderRadius: roundedCover ? 24 : 0, overflow: roundedCover ? "hidden" : "visible" }}>
       <CoverImage
         alt={title}
-        src={originalSrc ?? coverUrl}
+        src={gridSrc}
         cropData={cropData}
         style={{ display: "block", width: "100%", height: "auto" }}
         objectFit="contain"

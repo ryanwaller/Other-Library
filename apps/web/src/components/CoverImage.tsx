@@ -7,7 +7,8 @@ const SRCSET_WIDTHS = [80, 200, 400, 800, 1200];
 function parseSupabasePath(src: string): { bucket: string; path: string } | null {
   try {
     const url = new URL(src);
-    const match = url.pathname.match(/^\/storage\/v1\/object\/sign\/([^/]+)\/(.+)$/);
+    // Match both signed (/sign/) and public (/public/) Supabase storage URLs
+    const match = url.pathname.match(/^\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/(.+)$/);
     if (!match) return null;
     return { bucket: match[1], path: match[2] };
   } catch {
@@ -15,14 +16,23 @@ function parseSupabasePath(src: string): { bucket: string; path: string } | null
   }
 }
 
-const COVER_VERSION = 8;
+const COVER_VERSION = 9;
 
 function buildSrcSet(src: string): string {
+  // Supabase storage URLs (signed or public) → /api/cover
   const parsed = parseSupabasePath(src);
-  if (!parsed) return "";
-  return SRCSET_WIDTHS
-    .map((w) => `/api/cover?bucket=${encodeURIComponent(parsed.bucket)}&path=${encodeURIComponent(parsed.path)}&w=${w}&v=${COVER_VERSION} ${w}w`)
-    .join(", ");
+  if (parsed) {
+    return SRCSET_WIDTHS
+      .map((w) => `/api/cover?bucket=${encodeURIComponent(parsed.bucket)}&path=${encodeURIComponent(parsed.path)}&w=${w}&v=${COVER_VERSION} ${w}w`)
+      .join(", ");
+  }
+  // Image-proxy URLs (external covers) → append &width= for server-side resize
+  if (src.startsWith("/api/image-proxy?")) {
+    return SRCSET_WIDTHS
+      .map((w) => `${src}&width=${w} ${w}w`)
+      .join(", ");
+  }
+  return "";
 }
 
 export type CoverCrop = {

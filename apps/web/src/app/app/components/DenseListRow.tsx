@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
 import CoverImage from "../../../components/CoverImage";
 import { denseListFieldsFor } from "../../../lib/book";
+import { resizeCoverUrl } from "../../../lib/coverUrl";
 import type { PublicBook } from "../../../lib/types";
 
 type DenseListRowProps = {
@@ -44,10 +45,9 @@ export default function DenseListRow({
   const coverRadius = roundedCover ? 12 : 0;
 
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
-  // Thumbnail always uses coverUrl (Supabase storage URL) so /api/cover can
-  // resize it. originalSrc may be an external URL that can't be proxied.
-  const thumbSrc = coverUrl;
-  const hoverSrc = originalSrc ?? coverUrl;
+  // Pre-resize both URLs so the browser always loads the right size.
+  const thumbSrc = resizeCoverUrl(coverUrl, 80);
+  const hoverSrc = resizeCoverUrl(originalSrc ?? coverUrl, 200);
 
   function handleThumbMouseMove(e: React.MouseEvent) {
     setHoverPos({ x: e.clientX, y: e.clientY });
