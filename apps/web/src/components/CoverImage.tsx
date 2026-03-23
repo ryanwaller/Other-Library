@@ -15,7 +15,7 @@ function parseSupabasePath(src: string): { bucket: string; path: string } | null
   }
 }
 
-const COVER_VERSION = 7;
+const COVER_VERSION = 8;
 
 function buildSrcSet(src: string): string {
   const parsed = parseSupabasePath(src);

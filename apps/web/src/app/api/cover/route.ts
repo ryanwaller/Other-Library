@@ -56,13 +56,18 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Fallback: download original, resize with sharp if available.
-  const { data, error } = await admin.storage.from(bucket).download(path);
-  if (error || !data) {
+  // Fallback: fetch original via signed URL (uses Supabase CDN, consistent with
+  // how the rest of the app accesses images), then resize with sharp.
+  const { data: signedFallback, error: signedFallbackError } = await (admin.storage.from(bucket) as any).createSignedUrl(path, 60);
+  if (signedFallbackError || !signedFallback?.signedUrl) {
+    return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
+  }
+  const rawRes = await fetch(signedFallback.signedUrl);
+  if (!rawRes.ok) {
     return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
   }
 
-  const buf = await data.arrayBuffer();
+  const buf = await rawRes.arrayBuffer();
 
   if (targetWidth && Number.isFinite(targetWidth) && targetWidth > 0 && targetWidth <= 2000) {
     try {
@@ -70,7 +75,7 @@ export async function GET(req: NextRequest) {
       const inputMeta = await sharp(Buffer.from(buf)).metadata();
       console.log(`[cover] input: ${inputMeta.width}x${inputMeta.height} (${inputMeta.format}) → target w=${targetWidth}`);
       const resized = await sharp(Buffer.from(buf))
-        .resize({ width: targetWidth, fit: "inside", withoutEnlargement: true })
+        .resize({ width: targetWidth, fit: "inside" })
         .webp({ quality: 80 })
         .toBuffer();
       const outputMeta = await sharp(resized).metadata();
@@ -93,7 +98,7 @@ export async function GET(req: NextRequest) {
   return new NextResponse(buf, {
     status: 200,
     headers: {
-      "content-type": data.type || "application/octet-stream",
+      "content-type": rawRes.headers.get("content-type") || "application/octet-stream",
       "cache-control": "public, max-age=31536000, immutable",
       "x-resize-method": "original"
     }
